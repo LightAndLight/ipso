@@ -264,9 +264,9 @@ instance Eq Int
 
 instance Eq a => Eq (Array a)
 
-instance Eq (Record row)
+instance Fields Eq row => Eq (Record row)
 
-instance Eq (Variant row)
+instance Fields Eq row => Eq (Variant row)
 ```
 
 ### Comparison
@@ -305,9 +305,25 @@ class ToJson a where
  toJson : ToJson a => a -> String
 ```
 
+```ipso
+instance ToJson Bool
+instance ToJson Int
+instance ToJson Char
+instance ToJson String
+instance ToJson a => ToJson (Array a)
+```
+
 ```
 class FromJson a where
   decoder : Decoder a
   
 fromJson : FromJson a => String -> < Err : JsonError, Ok : a >
+```
+
+```ipso
+instance FromJson Bool
+instance FromJson Int
+instance FromJson Char
+instance FromJson String
+instance FromJson a => ToJson (Array a)
 ```
