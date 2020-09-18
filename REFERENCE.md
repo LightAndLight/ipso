@@ -256,17 +256,11 @@ class Eq a where
 
 ```ipso
 instance Eq Bool
-
 instance Eq Char
-
 instance Eq String
-
 instance Eq Int
-
 instance Eq a => Eq (Array a)
-
 instance Fields Eq row => Eq (Record row)
-
 instance Fields Eq row => Eq (Variant row)
 ```
 
@@ -274,7 +268,7 @@ instance Fields Eq row => Eq (Variant row)
 
 ```ipso
 class Eq a => Ord a where
-  compare : a -> a -> { lt | eq | gt }
+  compare : a -> a -> < LT, EQ, GT >
   
 (<=) : a -> a -> Bool
 
@@ -312,13 +306,14 @@ instance ToJson Int
 instance ToJson Char
 instance ToJson String
 instance ToJson a => ToJson (Array a)
+instance Fields ToJson row => ToJson (Record row)
 ```
 
 ```
 class FromJson a where
   decoder : Decoder a
   
-fromJson : FromJson a => String -> < Err : JsonError, Ok : a >
+fromJson : FromJson a => String -> < Err : DecodeError, Ok : a >
 ```
 
 ```ipso
@@ -327,4 +322,5 @@ instance FromJson Int
 instance FromJson Char
 instance FromJson String
 instance FromJson a => ToJson (Array a)
+instance Fields FromJson row => FromJson (Record row)
 ```
