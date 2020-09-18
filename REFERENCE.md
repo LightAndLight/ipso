@@ -3,7 +3,7 @@
 ## Contents
 
 * Datatypes
-    * Booleans
+    * [Booleans](#booleans)
     * Integers
     * Characters
     * Strings
