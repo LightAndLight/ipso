@@ -11,9 +11,10 @@
     * [Arrays](#arrays)
     * [Records](#records)
     * [Variants](#variants)
-* Type classes
+* [Type classes](#type-classes)
     * [Equality](#equality)
     * [Comparison](#comparison)
+    * [JSON](#json)
 
 ## Datatypes
 
