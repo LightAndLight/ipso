@@ -295,3 +295,19 @@ instance Ord Int
 
 instance Ord a => Ord (Array a)
 ```
+
+### JSON
+
+```ipso
+class ToJson a where
+  encoder : a -> Json
+  
+ toJson : ToJson a => a -> String
+```
+
+```
+class FromJson a where
+  decoder : Decoder a
+  
+fromJson : FromJson a => String -> < Err : JsonError, Ok : a >
+```
