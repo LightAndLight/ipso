@@ -2,18 +2,18 @@
 
 ## Contents
 
-* Datatypes
+* [Datatypes](#datatypes)
     * [Booleans](#booleans)
-    * Integers
-    * Characters
-    * Strings
-    * Functions
-    * Arrays
-    * Records
-    * Variants
+    * [Integers](#integers)
+    * [Characters](#characters)
+    * [Strings](#strings)
+    * [Functions](#functions)
+    * [Arrays](#arrays)
+    * [Records](#records)
+    * [Variants](#variants)
 * Type classes
-    * Equality
-    * Comparison
+    * [Equality](#equality)
+    * [Comparison](#comparison)
 
 ## Datatypes
 
