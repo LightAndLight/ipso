@@ -2,6 +2,10 @@
 
 ## Contents
 
+* [Modules](#modules)
+    * [Declarations](#declarations)
+    * [Type Aliases](#type-aliases)
+    * [Imports](#imports)
 * [Datatypes](#datatypes)
     * [Booleans](#booleans)
     * [Integers](#integers)
@@ -11,10 +15,76 @@
     * [Arrays](#arrays)
     * [Records](#records)
     * [Variants](#variants)
-* [Type classes](#type-classes)
+* [Type Classes](#type-classes)
     * [Equality](#equality)
     * [Comparison](#comparison)
     * [JSON](#json)
+    
+## Modules
+
+```ipso
+module greetings
+
+morning : String
+morning = "good morning!"
+```
+
+### Declarations
+
+```ipso
+x = 1
+
+y : String
+y = "hello"
+```
+
+### Type Aliases
+
+```ipso
+type Person = { name : String, age : Int }
+```
+
+### Imports
+
+#### Basic Imports
+
+```ipso
+import char
+import string
+
+loudly : String -> String
+loudly = string.map char.to_upper
+```
+
+#### Renaming Imports
+
+```ipso
+import char as c
+import string as s
+
+loudly : String -> String
+loudly = s.map c.to_upper
+```
+
+#### Selective Imports
+
+```ipso
+from char import to_upper
+from string import map
+
+loudly : String -> String
+loudly = map to_upper
+```
+
+#### Wildcard Imports
+
+```ipso
+from char import *
+from string import *
+
+loudly : String -> String
+loudly = map to_upper
+```
 
 ## Datatypes
 
@@ -110,6 +180,8 @@ x : String
 #### Builtins
 
 ```ipso
+eq : String -> String -> Bool
+
 foldr : (Char -> a -> a) -> String -> a -> a
 
 foldl : (a -> Char -> a) -> String -> a -> a
@@ -140,6 +212,16 @@ f : Int -> Int
 3
 ```
 
+```ipso-repl
+> f { x, y } = x + y
+f : { x : Int, y : Int } -> Int
+```
+
+```ipso-repl
+> :t \{ x, y } -> x + y
+{ x : Int, y : Int } -> Int
+```
+
 ### Arrays
 
 ```ipso-repl
@@ -165,6 +247,8 @@ uncons : Array a -> < None, Some : { first : a, rest : Array a } >
 snoc : Array a -> a -> Array a
 
 unsnoc : Array a -> < None, Some : { rest : Array a, last : a } >
+
+len : Array a -> Int
 
 (++) : Array a -> Array a -> Array a
 
@@ -243,7 +327,7 @@ x : < None >
 1
 ```
 
-## Type classes
+## Type Classes
 
 ### Equality
 
@@ -281,13 +365,9 @@ class Eq a => Ord a where
 
 ```ipso
 instance Ord Bool
-
 instance Ord Char
-
 instance Ord String
-
 instance Ord Int
-
 instance Ord a => Ord (Array a)
 ```
 
