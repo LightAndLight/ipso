@@ -37,6 +37,12 @@ makeBound ''Type
 deriveEq1 ''Type
 deriveShow1 ''Type
 
+data TypeScheme
+  = Forall
+  { typeVariables :: Vector Text
+  , typeBody :: Scope Int Type Void
+  } deriving (Eq, Show)
+
 data Pattern
   = NamePattern Text
   | RecordPattern { recordPatternFields :: Vector Text, recordPatternOpen :: Bool }
@@ -123,6 +129,7 @@ data Module
 data Decl
   = Binding
     { bindingName :: Text
+    , bindingType :: Maybe TypeScheme
     , bindingArgs :: Vector Pattern
     , bindingBody :: Scope Int Expr Void
     }
