@@ -128,16 +128,16 @@ data Module
 
 data Decl
   = Binding
-    { bindingName :: Text
-    , bindingType :: Maybe TypeScheme
-    , bindingArgs :: Vector Pattern
-    , bindingBody :: Scope Int Expr Void
-    }
+  { bindingName :: Text
+  , bindingType :: Maybe TypeScheme
+  , bindingArgs :: Vector Pattern
+  , bindingBody :: Scope Int Expr Void
+  }
   | TypeAlias
-    { typeAliasName :: Text
-    , typeAliasArgs :: Vector Text
-    , typeAliasBody :: Scope Int Type Void
-    }
+  { typeAliasName :: Text
+  , typeAliasArgs :: Vector Text
+  , typeAliasBody :: Scope Int Type Void
+  }
   | Import Import
   deriving (Eq, Show)
 
