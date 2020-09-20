@@ -1,5 +1,4 @@
 {-# language TemplateHaskell #-}
-{-# language PackageImports #-}
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 module Ipso.Syntax where
 
@@ -12,6 +11,7 @@ import Data.Functor.Classes (Eq1(..))
 import "text" Data.Text (Text)
 import qualified "text-utf8" Data.Text as Utf8
 import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 import Data.Void (Void)
 
 data Type a
@@ -43,12 +43,29 @@ data TypeScheme
   , typeBody :: Scope Int Type Void
   } deriving (Eq, Show)
 
+data RecordPattern
+  = RecordPattern
+  { recordPatternFields :: Vector Text
+  , recordPatternOpen :: Bool
+  } deriving (Eq, Show)
+
 data Pattern
-  = NamePattern Text
-  | RecordPattern { recordPatternFields :: Vector Text, recordPatternOpen :: Bool }
-  | CtorPattern Text
-  | UnnamedPattern
+  = PName Text
+  | PRecord RecordPattern
+  | PCtor Text (Maybe RecordPattern)
+  | PUnnamed
   deriving (Eq, Show)
+
+recordPatternNames :: RecordPattern -> Vector Text
+recordPatternNames (RecordPattern fs _) = fs
+
+patternNames :: Pattern -> Vector Text
+patternNames p =
+  case p of
+    PName n -> Vector.singleton n
+    PRecord rp -> recordPatternNames rp
+    PCtor _ m_rp -> foldMap recordPatternNames m_rp
+    PUnnamed -> mempty
 
 data CaseBranch f a
   = CaseBranch Pattern (Scope Int f a)
@@ -60,6 +77,21 @@ deriveShow1 ''CaseBranch
 
 instance Bound CaseBranch where
   CaseBranch p e >>>= f = CaseBranch p (e >>>= f)
+
+data StringPart f a
+  = StringPart Utf8.Text
+  | ExprPart (f a)
+  deriving (Functor, Foldable, Traversable)
+$(return [])
+instance (Monad f, Eq1 f) => Eq1 (StringPart f) where
+  liftEq = $(makeLiftEq ''StringPart)
+deriveShow1 ''StringPart
+
+instance Bound StringPart where
+  sp >>>= f =
+    case sp of
+      StringPart s -> StringPart s
+      ExprPart e -> ExprPart (e >>= f)
 
 data Expr a
   = Name Text
@@ -78,9 +110,9 @@ data Expr a
   | Lam (Vector Pattern) (Scope Int Expr a)
   | App (Expr a) (Expr a)
 
-  | String Utf8.Text
+  | String (Vector (StringPart Expr a))
 
-  | Record (Vector (Text, Expr a))
+  | Record (Vector (Text, Maybe (Expr a)))
   | Project (Expr a) Text
 
   | Ctor Text
@@ -107,9 +139,9 @@ instance Monad Expr where
       Lam ps b -> Lam ps (b >>>= f)
       App a b -> App (a >>= f) (b >>= f)
 
-      String s -> String s
+      String s -> String ((>>>= f) <$> s)
 
-      Record es -> Record $ (fmap.fmap) (>>= f) es
+      Record es -> Record $ (fmap.fmap.fmap) (>>= f) es
       Project a b -> Project (a >>= f) b
 
       Ctor c -> Ctor c
