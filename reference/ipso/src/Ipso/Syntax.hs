@@ -17,6 +17,21 @@ import Data.Void (Void)
 data Type a
   = TName Text
   | TVar a
+
+  | TBool
+  | TInt
+  | TChar
+  | TString
+
+  | TArrow
+  | TArray
+  | TRecord
+  | TVariant
+
+  | TRowCons Text (Type a) (Type a)
+  | TRowNil
+
+  | TApp (Type a) (Type a)
   deriving (Functor, Foldable, Traversable)
 makeBound ''Type
 deriveEq1 ''Type
@@ -48,6 +63,10 @@ data Expr a
   | BFalse
   | IfThenElse (Expr a) (Expr a) (Expr a)
 
+  | Int Int
+
+  | Char Char
+
   | Array (Vector (Expr a))
 
   | Lam (Vector Pattern) (Scope Int Expr a)
@@ -72,6 +91,10 @@ instance Monad Expr where
       BTrue -> BTrue
       BFalse -> BFalse
       IfThenElse a b c -> IfThenElse (a >>= f) (b >>= f) (c >>= f)
+
+      Int n -> Int n
+
+      Char c -> Char c
 
       Array es -> Array ((>>= f) <$> es)
 
