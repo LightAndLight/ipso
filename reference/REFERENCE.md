@@ -2,6 +2,8 @@
 
 ## Contents
 
+* [Packages](#packages)
+    * [Using Packages](#using-packages)
 * [Modules](#modules)
     * [Declarations](#declarations)
     * [Type Aliases](#type-aliases)
@@ -19,15 +21,33 @@
     * [Equality](#equality)
     * [Comparison](#comparison)
     * [JSON](#json)
+* [Grammar](#grammar)
+    
+## Packages
+
+A package is a directory that contains `.ipso` files.
+
+```
+my_package
+├── a.ipso
+├── b.ipso
+├── b
+    ├── c.ipso
+    └── d.ipso
+└── e.ipso
+```
+
+### Using Packages
+
+Packages are made available to `ipso` via the `IPSO_PACKAGES` environment variable.
+
+Example:
+
+```bash
+$ IPSO_PACKAGES=/path/to/a:/path/to/b ipso my_file.ipso
+```
     
 ## Modules
-
-```ipso
-module greetings
-
-morning : String
-morning = "good morning!"
-```
 
 ### Declarations
 
@@ -222,6 +242,11 @@ f : { x : Int, y : Int } -> Int
 { x : Int, y : Int } -> Int
 ```
 
+```ipso-repl
+> :t \{ x, ...rest } -> x + rest.y + rest.z
+{ x : Int, y : Int, z : Int } -> Int
+```
+
 ### Arrays
 
 ```ipso-repl
@@ -278,7 +303,7 @@ false
 ```ipso-repl
 > rest = { more = false, words = ["a", "b"] }
 rest : { more : Bool, words : Array String }
-> :t { some = "some" | rest }
+> :t { some = "some", ...rest }
 { some : String, more : Bool, words : Array String }
 ```
 
@@ -300,7 +325,7 @@ forall r0. < None | r0 >
 
 ```ipso-repl
 > x = None
-x : forall r0 . < None | r0 >
+x : forall r0. < None | r0 >
 > case x of
 .   None -> 1
 .   _ -> 2
@@ -335,7 +360,7 @@ x : < None >
 class Eq a where
   (==) : a -> a -> Bool
   
-(!=) : a -> a -> Bool
+(!=) : Eq a => a -> a -> Bool
 ```
 
 ```ipso
@@ -377,7 +402,7 @@ instance Ord a => Ord (Array a)
 class ToJson a where
   encoder : a -> Json
   
- toJson : ToJson a => a -> String
+toJson : ToJson a => a -> String
 ```
 
 ```ipso
@@ -403,4 +428,218 @@ instance FromJson Char
 instance FromJson String
 instance FromJson a => ToJson (Array a)
 instance Fields FromJson row => FromJson (Record row)
+```
+
+## Grammar
+
+```
+ident ::=
+  ident_start ident_continue*
+  
+ident_start ::= (lowercase ASCII alphabetic characters)
+
+ident_continue ::= 
+  (ASCII alphanumeric characters) |
+  '_'
+
+
+ctor ::=
+  ctor_start ctor_continue*
+  
+ctor_start ::= (uppercase ASCII alphabetic characters)
+
+ctor_continue ::= 
+  (ASCII alphanumeric characters) |
+  '_'
+  
+  
+type ::=
+  type_app (type_arrow type)*
+  
+type_arrow ::=
+  '->' |
+  '=>'
+  
+type_app ::=
+  type_atom+
+  
+type_atom ::=
+  type_record |
+  type_variant |
+  ident |
+  ctor |
+  '(' type ')'
+  
+type_record ::=
+  '{' type_record_content '}'
+  
+type_record_content ::=
+  epsilon |
+  type_signature (',' type_signature)* [',' ident] |
+  ident
+  
+type_variant ::=
+  '<' type_variant_content '>'
+  
+type_variant_content ::=
+  epsilon |
+  [type_variant_item ('|' type_variant_item)* ['|' ident]] |
+  ident
+  
+type_variant_item ::=
+  ctor ':' type
+  
+  
+pattern ::=
+  ident |
+  '{' record_pattern '}' |
+  '_'
+  
+record_pattern ::=
+  epsilon |
+  ident (',' ident)* [',' '...' ident] |
+  '...' ident |
+ 
+ 
+expr ::=
+  lambda |
+  case |
+  ifthenelse |
+  binop
+  
+lambda ::=
+  '\' pattern '->' expr
+  
+case ::=
+  'case' expr 'of' case_branch*
+  
+case_branch ::=
+  ctor '->' expr
+  
+ifthenelse ::=
+  'if' expr 'then' expr 'else' expr
+  
+binop ::=
+  app (operator app)*
+  
+operator ::=
+  '=' (operator_symbol | '=')+
+  operator_symbol+
+  
+operator_symbol ::=
+  '+' |
+  '-' |
+  '*' |
+  '/' |
+  '<' |
+  '>' |
+  '^' |
+  '%' |
+  '|' |
+  '&' |
+  '!'
+  
+app ::=
+  project+
+  
+project ::=
+  atom ('.' ident)*
+  
+atom ::=
+  bool |
+  int |
+  char |
+  string |
+  array |
+  record |
+  ident |
+  ctor |
+  '(' expr ')'
+  
+bool ::=
+  'true' |
+  'false'
+  
+int ::=
+  (ASCII numeric character)+
+  
+char ::=
+  "'" (any unicode code point except single quote) "'" |
+  "'" '\' (single quote) "'"
+  
+string ::=
+  '"' string_part* '"'
+  
+string_part ::=
+  string_char+ |
+  string_interpolate
+  
+string_char ::=
+  (any unicode code point except double quote or dollar sign) |
+  '\' '"' |
+  '\' '$'
+  
+string_interpolate ::=
+  '$' '{' expr '}'
+  
+array ::=
+  '[' [expr (',' expr)*] ']'
+  
+record ::=
+  '{' record_content '}'
+  
+record_content ::=
+  epsilon |
+  record_item (',' record_item)* [',' '...' atom] |
+  '...' atom
+  
+record_item ::=
+  ident '=' expr
+
+
+decl ::=
+  import |
+  type_signature |
+  definition |
+  instance |
+  class |
+  type_alias
+
+
+import ::=
+  'import' module_name ['as' module_name] |
+  'from' module_name 'import' from_imports
+  
+module_name ::=
+  ident ('.' ident)*
+  
+from_imports ::=
+  '*' |
+  ident (',' ident)*
+
+
+type_signature ::=
+  ident ':' type
+
+
+definition ::=
+  ident '=' expr
+  
+
+instance ::=
+  'instance' type 'where' instance_member*
+  
+instance_member ::=
+  [type_signature] definition
+  
+
+class ::=
+  'class' type 'where' class_member*
+  
+class_member ::=
+  type_signature
+  
+  
+type_alias ::=
+  'type' type '=' type
 ```
