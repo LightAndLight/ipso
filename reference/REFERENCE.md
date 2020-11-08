@@ -8,6 +8,7 @@
     * [Declarations](#declarations)
     * [Type Aliases](#type-aliases)
     * [Imports](#imports)
+    * [Execution](#execution)
 * [Datatypes](#datatypes)
     * [Booleans](#booleans)
     * [Integers](#integers)
@@ -17,6 +18,7 @@
     * [Arrays](#arrays)
     * [Records](#records)
     * [Variants](#variants)
+    * [IO](#io)
 * [Type Classes](#type-classes)
     * [Equality](#equality)
     * [Comparison](#comparison)
@@ -31,7 +33,7 @@ A package is a directory that contains `.ipso` files.
 my_package
 ├── a.ipso
 ├── b.ipso
-├── b
+└── b
     ├── c.ipso
     └── d.ipso
 └── e.ipso
@@ -104,6 +106,32 @@ from string import *
 
 loudly : String -> String
 loudly = map to_upper
+```
+
+### Execution
+
+`ipso` will look for an IO action named `main` when called from the command line:
+
+```
+$ cat > example.ipso <<EOF
+main : IO ()
+main = print "hello"
+EOF
+
+$ ipso example.ipso
+hello
+```
+
+This behaviour can be overridden with `-r`/`--run`:
+
+```
+$ cat > example.ipso <<EOF
+sayHello : IO ()
+sayHello = print "hello"
+EOF
+
+$ ipso example.ipso --run sayHello
+hello
 ```
 
 ## Datatypes
@@ -352,6 +380,32 @@ x : < None >
 1
 ```
 
+### IO
+
+```ipso-repl
+> do
+.   line <- getLine
+.   print line
+hello
+hello
+```
+
+#### Builtins
+
+```ipso
+pure : a -> IO a
+
+(>>=) : IO a -> (a -> IO b) -> IO b
+
+open : String -> < ReadOnly | Replace | Append > -> IO File
+
+close : File -> IO ()
+
+readChars : Int -> File -> IO String
+
+readAll : File -> IO String
+```
+
 ## Type Classes
 
 ### Equality
@@ -487,7 +541,7 @@ type_variant_content ::=
   ident
   
 type_variant_item ::=
-  ctor ':' type
+  ctor [':' type]
   
   
 pattern ::=
@@ -623,7 +677,7 @@ type_signature ::=
 
 
 definition ::=
-  ident '=' expr
+  ident [pattern] '=' expr
   
 
 instance ::=
