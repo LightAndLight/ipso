@@ -1,7 +1,0 @@
-packages:
-  ./ipso
-
-source-repository-package
-  type: git
-  location: https://github.com/LightAndLight/sage.git
-  tag: 717c15a49219b8a20e76f0682e432abc0f723ce9
