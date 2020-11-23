@@ -1,5 +1,6 @@
 use std::env;
 mod parse;
+mod syntax;
 
 #[derive(Debug)]
 struct Config {
