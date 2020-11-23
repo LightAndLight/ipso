@@ -1,4 +1,8 @@
 use std::env;
+
+use syntax::Module;
+
+mod lex;
 mod parse;
 mod syntax;
 
@@ -72,8 +76,8 @@ fn report_interpreter_error(err: InterpreterError) {
 fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let filename: String = config.filename;
     let entrypoint: String = config.entrypoint.unwrap_or(String::from("main"));
-    let ast: () = parse::parse_file(&filename)?;
-    panic!("{:?} {:?} {:?}", filename, entrypoint, ast)
+    let module: Module = parse::parse_file(&filename)?;
+    panic!("{:?} {:?} {:?}", filename, entrypoint, module)
 }
 
 fn main() {

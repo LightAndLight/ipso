@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug)]
 enum Binop {
     Add,
     Multiply,
@@ -19,11 +20,13 @@ enum Binop {
     Lte,
 }
 
+#[derive(Debug)]
 enum StringPart {
     String(String),
     Expr(Expr),
 }
 
+#[derive(Debug)]
 enum Pattern {
     Name(String),
     Record {
@@ -37,11 +40,13 @@ enum Pattern {
     Wildcard,
 }
 
+#[derive(Debug)]
 struct Branch {
     pattern: Pattern,
     body: Expr,
 }
 
+#[derive(Debug)]
 enum Expr {
     Var(String),
 
@@ -75,6 +80,7 @@ enum Expr {
     Case(Box<Expr>, Vec<Branch>),
 }
 
+#[derive(Debug)]
 enum Type {
     Var(String),
     Name(String),
@@ -91,12 +97,14 @@ enum Type {
     App(Box<Type>, Box<Type>),
 }
 
+#[derive(Debug)]
 enum Names {
     All,
     Names(Vec<String>),
 }
 
-enum Declaration {
+#[derive(Debug)]
+pub enum Declaration {
     Definition {
         name: String,
         ty: Type,
@@ -118,6 +126,7 @@ enum Declaration {
     },
 }
 
-struct Module {
-    defs: Vec<Declaration>,
+#[derive(Debug)]
+pub struct Module {
+    pub decls: Vec<Declaration>,
 }
