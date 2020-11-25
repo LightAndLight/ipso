@@ -1,7 +1,10 @@
 use std::{fs::File, io::Read, slice::Iter, str::Chars, vec::IntoIter};
 
-use crate::lex::{Lexer, Token, TokenType};
 use crate::syntax::{Declaration, Module};
+use crate::{
+    lex::{Lexer, Token, TokenType},
+    syntax::Keyword,
+};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -114,11 +117,28 @@ impl Parser {
         Err(err)
     }
 
+    fn keyword(&mut self, expected: Keyword) -> Result<Token, ParseError> {
+        match self.input.next() {
+            None => Err(ParseError::Unexpected { pos: self.pos }),
+            Some(actual) => match actual.token_type {
+                TokenType::Ident(ref id) => {
+                    if expected.matches(id) {
+                        self.pos += actual.span.length;
+                        return Ok(actual);
+                    } else {
+                        Err(ParseError::Unexpected { pos: self.pos })
+                    }
+                }
+                _ => Err(ParseError::Unexpected { pos: self.pos }),
+            },
+        }
+    }
+
     fn token(&mut self, expected: TokenType) -> Result<Token, ParseError> {
         match self.input.next() {
             None => Err(ParseError::Unexpected { pos: self.pos }),
             Some(actual) => {
-                if expected == actual.tokenType {
+                if expected == actual.token_type {
                     self.pos += actual.span.length;
                     return Ok(actual);
                 } else {
@@ -143,8 +163,8 @@ impl Parser {
     fn import(&mut self) -> Result<Declaration, ParseError> {
         map2!(
             |module, name| Declaration::Import { module, name },
-            keep_right!(self.token(TokenType::Import), self.ident()),
-            optional!(self, keep_right!(self.token(TokenType::As), self.ident()))
+            keep_right!(self.keyword(Keyword::Import), self.ident()),
+            optional!(self, keep_right!(self.keyword(Keyword::As), self.ident()))
         )
     }
 

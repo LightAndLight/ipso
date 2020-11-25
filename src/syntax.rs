@@ -1,5 +1,32 @@
 use std::collections::HashMap;
 
+pub enum Keyword {
+    Case,
+    Of,
+    If,
+    Then,
+    Else,
+    True,
+    False,
+    Import,
+    As,
+    From,
+}
+
+impl Keyword {
+    pub fn matches(&self, actual: &String) -> bool {
+        match self {
+            Case => actual == "case",
+            Of => actual == "of",
+            If => actual == "if",
+            Then => actual == "then",
+            Else => actual == "else",
+            True => actual == "true",
+            False => actual == "false",
+        }
+    }
+}
+
 #[derive(Debug)]
 enum Binop {
     Add,
