@@ -27,6 +27,7 @@ pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
 pub struct Parser {
     pos: usize,
     consumed: bool,
+    indentation: Vec<usize>,
     input: IntoIter<Token>,
 }
 
@@ -109,6 +110,7 @@ impl Parser {
         Parser {
             pos: 0,
             consumed: false,
+            indentation: vec![0]
             input,
         }
     }
