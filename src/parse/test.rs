@@ -4,6 +4,7 @@ use crate::{
     keep_left,
     lex::{Lexer, TokenType},
     map2,
+    syntax::Expr,
     syntax::{Declaration, Module},
 };
 
@@ -27,7 +28,38 @@ macro_rules! parse_test {
 }
 
 #[test]
+fn parse_ident_1() {
+    parse_test!("hello", ident, Ok(String::from("hello")))
+}
+
+#[test]
+fn parse_ident_2() {
+    parse_test!(
+        "import",
+        ident,
+        Err(ParseError::Unexpected {
+            pos: 0,
+            expecting: vec![TokenType::Ident(String::from(""))]
+                .into_iter()
+                .collect()
+        })
+    )
+}
+
+#[test]
 fn parse_import_1() {
+    parse_test!(
+        "import yes",
+        import,
+        Ok(Declaration::Import {
+            module: String::from("yes"),
+            name: None
+        })
+    )
+}
+
+#[test]
+fn parse_import_as_1() {
     parse_test!(
         "import yes as no",
         import,
@@ -39,7 +71,7 @@ fn parse_import_1() {
 }
 
 #[test]
-fn parse_import_2() {
+fn parse_import_as_2() {
     parse_test!(
         "import yes\n as no",
         import,
@@ -51,7 +83,7 @@ fn parse_import_2() {
 }
 
 #[test]
-fn parse_import_3() {
+fn parse_import_as_3() {
     parse_test!(
         "import yes\nas no",
         import,

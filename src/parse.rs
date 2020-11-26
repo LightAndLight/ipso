@@ -2,7 +2,7 @@ mod test;
 
 use std::{collections::HashSet, fs::File, io::Read, vec::IntoIter};
 
-use crate::syntax::{self, Declaration, Module};
+use crate::syntax::{self, Declaration, Expr, Module, Pattern, Type};
 use crate::{
     lex::{Lexer, Token, TokenType},
     syntax::Keyword,
@@ -18,6 +18,19 @@ pub enum ParseError {
 }
 
 #[macro_export]
+macro_rules! apply {
+    ($a:expr, $b:expr) => {
+        match $a {
+            Err(err) => Err(err),
+            Ok(f) => match $b {
+                Err(err) => Err(err),
+                Ok(x) => Ok(f(x)),
+            },
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! map2 {
     ($f:expr, $a:expr, $b:expr) => {
         match $a {
@@ -27,6 +40,20 @@ macro_rules! map2 {
                 Ok(val2) => Ok($f(val1, val2)),
             },
         }
+    };
+}
+
+#[macro_export]
+macro_rules! map3 {
+    ($f:expr, $a:expr, $b:expr, $c:expr) => {
+        apply!(map2!($f, $a, $b), $c)
+    };
+}
+
+#[macro_export]
+macro_rules! map4 {
+    ($f:expr, $a:expr, $b:expr, $c:expr, $d:expr) => {
+        apply!(map3!($f, $a, $b, $c), $d)
     };
 }
 
@@ -240,11 +267,11 @@ impl Parser {
         )
     }
 
-    fn token(&mut self, expected: &Token) -> Result<(), ParseError> {
-        self.expecting.insert(expected.token_type.clone());
+    fn token(&mut self, expected: &TokenType) -> Result<(), ParseError> {
+        self.expecting.insert(expected.clone());
         keep_left!(
             match self.current {
-                Some(ref actual) if actual.token_type == expected.token_type => {
+                Some(ref actual) if actual.token_type == *expected => {
                     self.consume();
                     Ok(())
                 }
@@ -272,8 +299,57 @@ impl Parser {
         )
     }
 
+    fn type_(&mut self) -> Result<Type, ParseError> {
+        todo!("type_")
+    }
+
+    fn newline(&mut self) -> Result<(), ParseError> {
+        let current = self.current_indentation();
+        self.expecting.insert(TokenType::Indent(current));
+        match self.current {
+            None => self.unexpected(),
+            Some(ref token) => match token.token_type {
+                TokenType::Indent(n) if n == current => {
+                    self.consume();
+                    Ok(())
+                }
+                _ => self.unexpected(),
+            },
+        }
+    }
+
+    fn pattern(&mut self) -> Result<Pattern, ParseError> {
+        todo!("pattern")
+    }
+
+    fn expr(&mut self) -> Result<Expr, ParseError> {
+        todo!("expr")
+    }
+
     fn definition(&mut self) -> Result<Declaration, ParseError> {
-        todo!()
+        let name = self.ident()?;
+        let _ = self.spaces()?;
+
+        let _ = self.token(&TokenType::Colon)?;
+        let _ = self.spaces()?;
+
+        let ty = self.type_()?;
+        let _ = self.newline()?;
+
+        let _ = self.token(&TokenType::Ident(name.clone()))?;
+        let args = many!(self, self.pattern())?;
+
+        let _ = self.token(&TokenType::Equals)?;
+        let _ = self.spaces()?;
+
+        let body = self.expr()?;
+
+        Ok(Declaration::Definition {
+            name,
+            ty,
+            args,
+            body,
+        })
     }
 
     fn type_alias(&mut self) -> Result<Declaration, ParseError> {

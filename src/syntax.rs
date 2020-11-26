@@ -71,7 +71,7 @@ enum StringPart {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Pattern {
+pub enum Pattern {
     Name(String),
     Record {
         names: Vec<String>,
@@ -91,7 +91,7 @@ struct Branch {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Expr {
+pub enum Expr {
     Var(String),
 
     App(Box<Expr>, Box<Expr>),
@@ -125,7 +125,7 @@ enum Expr {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Type {
+pub enum Type {
     Var(String),
     Name(String),
     Bool,
