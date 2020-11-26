@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 pub enum Keyword {
@@ -15,19 +16,35 @@ pub enum Keyword {
 
 impl Keyword {
     pub fn matches(&self, actual: &String) -> bool {
+        self.to_string() == actual
+    }
+
+    pub fn to_string(&self) -> &str {
         match self {
-            Case => actual == "case",
-            Of => actual == "of",
-            If => actual == "if",
-            Then => actual == "then",
-            Else => actual == "else",
-            True => actual == "true",
-            False => actual == "false",
+            Keyword::Case => "case",
+            Keyword::Of => "of",
+            Keyword::If => "if",
+            Keyword::Then => "then",
+            Keyword::Else => "else",
+            Keyword::True => "true",
+            Keyword::False => "false",
+            Keyword::Import => "import",
+            Keyword::As => "as",
+            Keyword::From => "from",
         }
     }
 }
 
-#[derive(Debug)]
+lazy_static! {
+    static ref KEYWORDS: Vec<&'static str> =
+        vec!["case", "of", "if", "then", "else", "true", "false", "import", "as", "from"];
+}
+
+pub fn is_keyword(val: &String) -> bool {
+    KEYWORDS.contains(&val.as_str())
+}
+
+#[derive(Debug, PartialEq, Eq)]
 enum Binop {
     Add,
     Multiply,
@@ -47,13 +64,13 @@ enum Binop {
     Lte,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum StringPart {
     String(String),
     Expr(Expr),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Pattern {
     Name(String),
     Record {
@@ -67,13 +84,13 @@ enum Pattern {
     Wildcard,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Branch {
     pattern: Pattern,
     body: Expr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Expr {
     Var(String),
 
@@ -107,7 +124,7 @@ enum Expr {
     Case(Box<Expr>, Vec<Branch>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Type {
     Var(String),
     Name(String),
@@ -124,13 +141,13 @@ enum Type {
     App(Box<Type>, Box<Type>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Names {
     All,
     Names(Vec<String>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {
         name: String,
@@ -153,7 +170,7 @@ pub enum Declaration {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Declaration>,
 }

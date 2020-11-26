@@ -1,11 +1,8 @@
+mod test;
+
 use std::str::Chars;
 
-pub struct Span {
-    pub pos: usize,
-    pub length: usize,
-}
-
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TokenType {
     Unexpected(char),
 
@@ -39,11 +36,43 @@ pub enum TokenType {
     Slash,
 
     Indent(usize),
+    Space,
 }
 
+impl TokenType {
+    pub fn length(&self) -> usize {
+        match self {
+            TokenType::Unexpected(_) => 1,
+            TokenType::Ident(s) => s.len(),
+            TokenType::Ctor(s) => s.len(),
+            TokenType::LBrace => 1,
+            TokenType::RBrace => 1,
+            TokenType::LParen => 1,
+            TokenType::RParen => 1,
+            TokenType::LBracket => 1,
+            TokenType::RBracket => 1,
+            TokenType::Backslash => 1,
+            TokenType::Arrow => 2,
+            TokenType::FatArrow => 2,
+            TokenType::Dot => 1,
+            TokenType::Asterisk => 1,
+            TokenType::Equals => 1,
+            TokenType::Colon => 1,
+            TokenType::Comma => 1,
+            TokenType::Underscore => 1,
+            TokenType::Hyphen => 1,
+            TokenType::Plus => 1,
+            TokenType::Slash => 1,
+            TokenType::Indent(n) => n + 1,
+            TokenType::Space => 1,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token {
     pub token_type: TokenType,
-    pub span: Span,
+    pub pos: usize,
 }
 
 pub struct Lexer<'input> {
@@ -75,13 +104,8 @@ impl<'input> Lexer<'input> {
     }
 
     fn consume(&mut self) {
-        match self.input.next() {
-            None => {}
-            Some(c) => {
-                self.pos += 1;
-                self.current = Some(c);
-            }
-        }
+        self.current = self.input.next();
+        self.pos += 1;
     }
 
     fn next(&mut self) -> Option<Token> {
@@ -103,73 +127,77 @@ impl<'input> Lexer<'input> {
                     }
                     Some(Token {
                         token_type: TokenType::Indent(depth),
-                        span: Span {
-                            pos,
-                            length: depth + 1,
-                        },
+                        pos,
+                    })
+                }
+                ' ' => {
+                    self.consume();
+                    Some(Token {
+                        token_type: TokenType::Space,
+                        pos,
                     })
                 }
                 '{' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::LBrace,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '}' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::RBrace,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '(' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::LParen,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 ')' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::RParen,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '[' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::LBracket,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 ']' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::RBracket,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 ',' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Comma,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 ':' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Colon,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '.' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Dot,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '=' => {
@@ -180,12 +208,12 @@ impl<'input> Lexer<'input> {
 
                             Some(Token {
                                 token_type: TokenType::FatArrow,
-                                span: Span { pos, length: 2 },
+                                pos,
                             })
                         }
                         _ => Some(Token {
                             token_type: TokenType::Equals,
-                            span: Span { pos, length: 1 },
+                            pos,
                         }),
                     }
                 }
@@ -197,12 +225,12 @@ impl<'input> Lexer<'input> {
 
                             Some(Token {
                                 token_type: TokenType::Arrow,
-                                span: Span { pos, length: 2 },
+                                pos,
                             })
                         }
                         _ => Some(Token {
                             token_type: TokenType::Hyphen,
-                            span: Span { pos, length: 1 },
+                            pos,
                         }),
                     }
                 }
@@ -210,80 +238,76 @@ impl<'input> Lexer<'input> {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Plus,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '/' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Slash,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '\\' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Backslash,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '*' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Asterisk,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 '_' => {
                     self.consume();
                     Some(Token {
                         token_type: TokenType::Underscore,
-                        span: Span { pos, length: 1 },
+                        pos,
                     })
                 }
                 _ if is_ident_start(c) => {
                     self.consume();
                     let mut ident = String::new();
                     ident.push(c);
-                    let mut length: usize = 1;
                     loop {
                         match self.current {
                             Some(c) if is_ident_continue(c) => {
                                 self.consume();
                                 ident.push(c);
-                                length += 1;
                             }
                             _ => break,
                         }
                     }
                     Some(Token {
                         token_type: TokenType::Ident(ident),
-                        span: Span { pos, length },
+                        pos,
                     })
                 }
                 _ if is_ctor_start(c) => {
                     self.consume();
                     let mut ctor = String::new();
                     ctor.push(c);
-                    let mut length: usize = 1;
                     loop {
                         match self.current {
                             Some(c) if is_ident_continue(c) => {
                                 self.consume();
                                 ctor.push(c);
-                                length += 1;
                             }
                             _ => break,
                         }
                     }
                     Some(Token {
                         token_type: TokenType::Ctor(ctor),
-                        span: Span { pos, length },
+                        pos,
                     })
                 }
                 _ => Some(Token {
                     token_type: TokenType::Unexpected(c),
-                    span: Span { pos, length: 1 },
+                    pos,
                 }),
             },
         }
