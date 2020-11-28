@@ -4,6 +4,8 @@ use crate::{
     lex::{Lexer, TokenType},
     map2,
     syntax::Declaration,
+    syntax::Expr,
+    syntax::{Pattern, Type},
 };
 
 #[cfg(test)]
@@ -94,4 +96,109 @@ fn parse_import_as_3() {
                 .collect()
         })
     )
+}
+
+#[test]
+fn parse_definition_1() {
+    parse_test!(
+        "x : Int\nx = 1",
+        definition,
+        Ok(Declaration::Definition {
+            name: String::from("x"),
+            ty: Type::Int,
+            args: Vec::new(),
+            body: Expr::Int(1)
+        })
+    )
+}
+
+#[test]
+fn parse_definition_2() {
+    parse_test!(
+        "x : Int\nx =\n  1",
+        definition,
+        Ok(Declaration::Definition {
+            name: String::from("x"),
+            ty: Type::Int,
+            args: Vec::new(),
+            body: Expr::Int(1)
+        })
+    )
+}
+
+#[test]
+fn parse_definition_3() {
+    parse_test!(
+        "x : Int\nx =\n1",
+        definition,
+        Err(ParseError::Unexpected {
+            pos: 11,
+            expecting: vec![
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                },
+                TokenType::Space
+            ]
+            .into_iter()
+            .collect()
+        })
+    )
+}
+
+#[test]
+fn parse_type_1() {
+    parse_test!("Int", type_, Ok(Type::Int))
+}
+
+#[test]
+fn parse_type_2() {
+    parse_test!(
+        "Int -> Bool",
+        type_,
+        Ok(Type::mk_app(
+            Type::mk_app(Type::Arrow, Type::Int),
+            Type::Bool
+        ))
+    )
+}
+
+#[test]
+fn parse_type_3() {
+    parse_test!(
+        "Eq a => a -> a -> Bool",
+        type_,
+        Ok(Type::mk_fatarrow(
+            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
+            Type::mk_arrow(
+                Type::mk_name("a"),
+                Type::mk_arrow(Type::mk_name("a"), Type::Bool)
+            ),
+        ))
+    )
+}
+
+#[test]
+fn parse_type_4() {
+    parse_test!(
+        "Eq a => F => a -> Bool",
+        type_,
+        Ok(Type::mk_fatarrow(
+            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
+            Type::mk_fatarrow(
+                Type::mk_name("F"),
+                Type::mk_arrow(Type::mk_name("a"), Type::Bool)
+            )
+        ))
+    )
+}
+
+#[test]
+fn parse_pattern_1() {
+    parse_test!("a", pattern, Ok(Pattern::Name(String::from("a"))))
+}
+
+#[test]
+fn parse_pattern_2() {
+    parse_test!("_", pattern, Ok(Pattern::Wildcard))
 }

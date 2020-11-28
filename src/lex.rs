@@ -7,7 +7,7 @@ pub enum TokenType {
     Unexpected(char),
 
     Ident(String),
-    Ctor(String),
+    Int { value: usize, length: usize },
 
     LBrace,
     RBrace,
@@ -44,7 +44,7 @@ impl TokenType {
         match self {
             TokenType::Unexpected(_) => 1,
             TokenType::Ident(s) => s.len(),
-            TokenType::Ctor(s) => s.len(),
+            TokenType::Int { value: _, length } => *length,
             TokenType::LBrace => 1,
             TokenType::RBrace => 1,
             TokenType::LParen => 1,
@@ -81,12 +81,8 @@ pub struct Lexer<'input> {
     input: Chars<'input>,
 }
 
-fn is_ctor_start(c: char) -> bool {
-    'A' <= c && c <= 'Z'
-}
-
 fn is_ident_start(c: char) -> bool {
-    'a' <= c && c <= 'z'
+    'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_'
 }
 
 fn is_ident_continue(c: char) -> bool {
@@ -287,28 +283,28 @@ impl<'input> Lexer<'input> {
                         pos,
                     })
                 }
-                _ if is_ctor_start(c) => {
+                _ if c.is_digit(10) => {
                     self.consume();
-                    let mut ctor = String::new();
-                    ctor.push(c);
-                    loop {
-                        match self.current {
-                            Some(c) if is_ident_continue(c) => {
-                                self.consume();
-                                ctor.push(c);
-                            }
-                            _ => break,
-                        }
+                    let mut length = 1;
+                    let mut value: usize = c.to_digit(10).unwrap() as usize;
+                    while let Some(n) = self.current.and_then(|cur| cur.to_digit(10)) {
+                        self.consume();
+                        value *= 10;
+                        value += n as usize;
+                        length += 1;
                     }
                     Some(Token {
-                        token_type: TokenType::Ctor(ctor),
+                        token_type: TokenType::Int { value, length },
                         pos,
                     })
                 }
-                _ => Some(Token {
-                    token_type: TokenType::Unexpected(c),
-                    pos,
-                }),
+                _ => {
+                    self.consume();
+                    Some(Token {
+                        token_type: TokenType::Unexpected(c),
+                        pos,
+                    })
+                }
             },
         }
     }

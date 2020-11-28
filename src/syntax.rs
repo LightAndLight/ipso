@@ -104,7 +104,7 @@ pub enum Expr {
     False,
     IfThenElse(Box<Expr>, Box<Expr>, Box<Expr>),
 
-    Int(i32),
+    Int(u32),
 
     Binop(Binop, Box<Expr>, Box<Expr>),
 
@@ -126,7 +126,6 @@ pub enum Expr {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Type {
-    Var(String),
     Name(String),
     Bool,
     Int,
@@ -134,11 +133,30 @@ pub enum Type {
     String,
     Arrow,
     FatArrow,
+    Constraints(Vec<Type>),
     Array,
     Record(Vec<(String, Type)>, Option<String>),
     Variant(Vec<(String, Type)>, Option<String>),
     IO,
     App(Box<Type>, Box<Type>),
+}
+
+impl Type {
+    pub fn mk_app(a: Type, b: Type) -> Type {
+        Type::App(Box::new(a), Box::new(b))
+    }
+
+    pub fn mk_arrow(a: Type, b: Type) -> Type {
+        Type::mk_app(Type::mk_app(Type::Arrow, a), b)
+    }
+
+    pub fn mk_fatarrow(a: Type, b: Type) -> Type {
+        Type::mk_app(Type::mk_app(Type::FatArrow, a), b)
+    }
+
+    pub fn mk_name(s: &str) -> Type {
+        Type::Name(String::from(s))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

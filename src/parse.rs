@@ -10,7 +10,6 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
-    Empty,
     Unexpected {
         pos: usize,
         expecting: HashSet<TokenType>,
@@ -26,6 +25,25 @@ macro_rules! apply {
                 Err(err) => Err(err),
                 Ok(x) => Ok(f(x)),
             },
+        }
+    };
+}
+
+macro_rules! map0 {
+    ($a:expr, $b:expr) => {
+        match $b {
+            Err(err) => Err(err),
+            Ok(_) => Ok($a),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! map1 {
+    ($f:expr, $a:expr) => {
+        match $a {
+            Err(err) => Err(err),
+            Ok(val1) => Ok($f(val1)),
         }
     };
 }
@@ -46,7 +64,7 @@ macro_rules! map2 {
 #[macro_export]
 macro_rules! map3 {
     ($f:expr, $a:expr, $b:expr, $c:expr) => {
-        apply!(map2!($f, $a, $b), $c)
+        apply!(map2!(|a, b| move |c| $f(a, b, c), $a, $b), $c)
     };
 }
 
@@ -145,7 +163,7 @@ macro_rules! many_ {
 
 macro_rules! choices {
     ($self:expr) => {
-        $self.fail(ParseError::Empty)
+        $self.unexpected()
     };
     ($self:expr, $x:expr $(, $y:expr)*) => {
         match $x {
@@ -299,8 +317,107 @@ impl Parser {
         )
     }
 
+    fn int(&mut self) -> Result<u32, ParseError> {
+        self.expecting.insert(TokenType::Int {
+            value: 0,
+            length: 0,
+        });
+        keep_left!(
+            match self.current {
+                Some(ref token) => match token.token_type {
+                    TokenType::Int { value, length: _ } => {
+                        self.consume();
+                        Ok(value as u32)
+                    }
+                    _ => self.unexpected(),
+                },
+                None => self.unexpected(),
+            },
+            self.spaces()
+        )
+    }
+
+    fn type_atom(&mut self) -> Result<Type, ParseError> {
+        keep_left!(
+            choices!(
+                self,
+                map0!(
+                    Type::Bool,
+                    self.token(&TokenType::Ident(String::from("Bool")))
+                ),
+                map0!(
+                    Type::Int,
+                    self.token(&TokenType::Ident(String::from("Int")))
+                ),
+                map0!(
+                    Type::Char,
+                    self.token(&TokenType::Ident(String::from("Char")))
+                ),
+                map0!(
+                    Type::String,
+                    self.token(&TokenType::Ident(String::from("String")))
+                ),
+                map0!(
+                    Type::Array,
+                    self.token(&TokenType::Ident(String::from("Array")))
+                ),
+                map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
+                map1!(|s| Type::Name(s), self.ident()),
+                keep_right!(
+                    keep_left!(self.token(&TokenType::LParen), self.spaces()),
+                    keep_left!(self.type_(), self.token(&TokenType::RParen))
+                )
+            ),
+            self.spaces()
+        )
+    }
+
+    fn type_app(&mut self) -> Result<Type, ParseError> {
+        let mut acc = self.type_atom()?;
+        while let Ok(ty) = self.type_atom() {
+            acc = Type::mk_app(acc, ty)
+        }
+        Ok(acc)
+    }
+
+    fn type_arrow(&mut self) -> Result<Type, ParseError> {
+        let a = self.type_app()?;
+        let m_b = optional!(
+            self,
+            map3!(
+                |_, _, ty| ty,
+                self.token(&TokenType::Arrow),
+                self.spaces(),
+                self.type_arrow()
+            )
+        )?;
+
+        match m_b {
+            None => Ok(a),
+            Some(b) => Ok(Type::mk_arrow(a, b)),
+        }
+    }
+
+    fn type_fatarrow(&mut self) -> Result<Type, ParseError> {
+        let a = self.type_arrow()?;
+        let m_b = optional!(
+            self,
+            map3!(
+                |_, _, ty| ty,
+                self.token(&TokenType::FatArrow),
+                self.spaces(),
+                self.type_fatarrow()
+            )
+        )?;
+
+        match m_b {
+            None => Ok(a),
+            Some(b) => Ok(Type::mk_fatarrow(a, b)),
+        }
+    }
+
     fn type_(&mut self) -> Result<Type, ParseError> {
-        todo!("type_")
+        self.type_fatarrow()
     }
 
     fn newline(&mut self) -> Result<(), ParseError> {
@@ -319,11 +436,19 @@ impl Parser {
     }
 
     fn pattern(&mut self) -> Result<Pattern, ParseError> {
-        todo!("pattern")
+        choices!(
+            self,
+            map1!(|s| Pattern::Name(s), self.ident()),
+            map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
+        )
+    }
+
+    fn expr_atom(&mut self) -> Result<Expr, ParseError> {
+        choices!(self, map1!(|n| Expr::Int(n), self.int()))
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
-        todo!("expr")
+        self.expr_atom()
     }
 
     fn definition(&mut self) -> Result<Declaration, ParseError> {
@@ -334,6 +459,7 @@ impl Parser {
         let _ = self.spaces()?;
 
         let ty = self.type_()?;
+
         let _ = self.newline()?;
 
         let _ = self.token(&TokenType::Ident(name.clone()))?;
