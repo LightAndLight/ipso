@@ -1,22 +1,22 @@
-use std::collections::HashSet;
-
+#[cfg(test)]
 use crate::{
     keep_left,
     lex::{Lexer, TokenType},
     map2,
-    syntax::Expr,
-    syntax::{Declaration, Module},
+    syntax::Declaration,
 };
 
-use super::{parse_string, ParseError, Parser};
+#[cfg(test)]
+use super::{ParseError, Parser};
 
+#[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {
         assert_eq!(
             {
                 let tokens = {
                     let input = String::from($input);
-                    let mut lexer = Lexer::new(&input);
+                    let lexer = Lexer::new(&input);
                     lexer.tokenize()
                 };
                 let mut parser = Parser::new(tokens);

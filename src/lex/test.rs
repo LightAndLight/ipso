@@ -1,3 +1,4 @@
+#[cfg(test)]
 use super::{Lexer, Token, TokenType};
 
 #[test]
@@ -5,7 +6,7 @@ fn lex_import() {
     assert_eq!(
         {
             let input = String::from("import yes as no");
-            let mut lexer = Lexer::new(&input);
+            let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![

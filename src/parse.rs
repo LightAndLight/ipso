@@ -72,7 +72,7 @@ macro_rules! keep_left {
 
 pub fn parse_string(input: String) -> Result<Module, ParseError> {
     let tokens: Vec<Token> = {
-        let mut lexer = Lexer::new(&input);
+        let lexer = Lexer::new(&input);
         lexer.tokenize()
     };
     let mut parser: Parser = Parser::new(tokens);
