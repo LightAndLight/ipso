@@ -85,9 +85,9 @@ pub enum Pattern {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Branch {
-    pattern: Pattern,
-    body: Expr,
+pub struct Branch {
+    pub pattern: Pattern,
+    pub body: Expr,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -122,6 +122,16 @@ pub enum Expr {
 
     Variant(String, Vec<Expr>),
     Case(Box<Expr>, Vec<Branch>),
+}
+
+impl Expr {
+    pub fn mk_var(v: &str) -> Expr {
+        Expr::Var(String::from(v))
+    }
+
+    pub fn mk_case(cond: Expr, branches: Vec<Branch>) -> Expr {
+        Expr::Case(Box::new(cond), branches)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -2,7 +2,7 @@ mod test;
 
 use std::{collections::HashSet, fs::File, io::Read, vec::IntoIter};
 
-use crate::syntax::{self, Declaration, Expr, Module, Pattern, Type};
+use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, Type};
 use crate::{
     lex::{Lexer, Token, TokenType},
     syntax::Keyword,
@@ -161,6 +161,41 @@ macro_rules! many_ {
     }};
 }
 
+#[macro_export]
+macro_rules! sep_by {
+    ($self:expr, $a:expr, $sep:expr) => {
+        choices!(
+            $self,
+            {
+                match $a {
+                    Ok(first) => {
+                        let mut error: Option<ParseError> = None;
+                        let mut acc: Vec<_> = vec![first];
+                        loop {
+                            $self.consumed = false;
+                            match keep_right!($sep, $a) {
+                                Err(err) => {
+                                    if $self.consumed {
+                                        error = Some(err);
+                                    };
+                                    break;
+                                }
+                                Ok(val) => acc.push(val),
+                            }
+                        }
+                        match error {
+                            None => Ok(acc),
+                            Some(err) => Err(err),
+                        }
+                    }
+                    Err(err) => Err(err),
+                }
+            },
+            Ok(Vec::new())
+        )
+    };
+}
+
 macro_rules! choices {
     ($self:expr) => {
         $self.unexpected()
@@ -238,7 +273,7 @@ impl Parser {
     }
 
     fn current_indentation(&self) -> usize {
-        self.indentation[0]
+        self.indentation[self.indentation.len() - 1]
     }
 
     fn space(&mut self) -> Result<(), ParseError> {
@@ -250,6 +285,22 @@ impl Parser {
                     Ok(())
                 }
                 TokenType::Space => {
+                    self.consume();
+                    Ok(())
+                }
+                _ => self.unexpected(),
+            },
+            None => self.unexpected(),
+        }
+    }
+
+    fn indent(&mut self) -> Result<(), ParseError> {
+        self.expecting.insert(TokenType::Indent(0));
+        let current_indentation = self.current_indentation();
+        match self.current {
+            Some(ref token) => match token.token_type {
+                TokenType::Indent(n) if n > current_indentation => {
+                    self.indentation.push(n);
                     self.consume();
                     Ok(())
                 }
@@ -287,16 +338,13 @@ impl Parser {
 
     fn token(&mut self, expected: &TokenType) -> Result<(), ParseError> {
         self.expecting.insert(expected.clone());
-        keep_left!(
-            match self.current {
-                Some(ref actual) if actual.token_type == *expected => {
-                    self.consume();
-                    Ok(())
-                }
-                _ => self.unexpected(),
-            },
-            self.spaces()
-        )
+        match self.current {
+            Some(ref actual) if actual.token_type == *expected => {
+                self.consume();
+                Ok(())
+            }
+            _ => self.unexpected(),
+        }
     }
 
     fn ident(&mut self) -> Result<String, ParseError> {
@@ -444,16 +492,44 @@ impl Parser {
     }
 
     fn expr_atom(&mut self) -> Result<Expr, ParseError> {
-        choices!(self, map1!(|n| Expr::Int(n), self.int()))
+        choices!(
+            self,
+            map1!(|n| Expr::Int(n), self.int()),
+            map1!(|n| Expr::Var(n), self.ident())
+        )
+    }
+
+    fn branch(&mut self) -> Result<Branch, ParseError> {
+        map3!(
+            |pattern, _, body| Branch { pattern, body },
+            self.pattern(),
+            keep_left!(self.token(&TokenType::Arrow), self.spaces()),
+            self.expr()
+        )
+    }
+
+    fn expr_case(&mut self) -> Result<Expr, ParseError> {
+        let _ = self.token(&TokenType::Ident(String::from("case")))?;
+        let _ = self.spaces()?;
+
+        let cond = self.expr()?;
+
+        let _ = self.token(&TokenType::Ident(String::from("of")))?;
+        let _ = many_!(self, self.token(&TokenType::Space))?;
+
+        let _ = self.indent()?;
+        let branches = sep_by!(self, self.branch(), self.newline())?;
+        self.indentation.pop();
+
+        Ok(Expr::Case(Box::new(cond), branches))
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
-        self.expr_atom()
+        choices!(self, self.expr_atom(), self.expr_case())
     }
 
     fn definition(&mut self) -> Result<Declaration, ParseError> {
         let name = self.ident()?;
-        let _ = self.spaces()?;
 
         let _ = self.token(&TokenType::Colon)?;
         let _ = self.spaces()?;

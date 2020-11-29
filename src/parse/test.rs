@@ -5,7 +5,7 @@ use crate::{
     map2,
     syntax::Declaration,
     syntax::Expr,
-    syntax::{Pattern, Type},
+    syntax::{Branch, Pattern, Type},
 };
 
 #[cfg(test)]
@@ -147,6 +147,20 @@ fn parse_definition_3() {
 }
 
 #[test]
+fn parse_definition_4() {
+    parse_test!(
+        "x : Int\nx y _ = 1",
+        definition,
+        Ok(Declaration::Definition {
+            name: String::from("x"),
+            ty: Type::Int,
+            args: vec![Pattern::Name(String::from("y")), Pattern::Wildcard],
+            body: Expr::Int(1)
+        })
+    )
+}
+
+#[test]
 fn parse_type_1() {
     parse_test!("Int", type_, Ok(Type::Int))
 }
@@ -201,4 +215,61 @@ fn parse_pattern_1() {
 #[test]
 fn parse_pattern_2() {
     parse_test!("_", pattern, Ok(Pattern::Wildcard))
+}
+
+#[test]
+fn parse_case_1() {
+    parse_test!(
+        "case x of\n  a -> b",
+        expr_case,
+        Ok(Expr::mk_case(
+            Expr::mk_var("x"),
+            vec![Branch {
+                pattern: Pattern::Name(String::from("a")),
+                body: Expr::mk_var("b")
+            }]
+        ))
+    )
+}
+
+#[test]
+fn parse_case_2() {
+    parse_test!(
+        "case x of\n  a -> b\n  c -> d",
+        expr_case,
+        Ok(Expr::mk_case(
+            Expr::mk_var("x"),
+            vec![
+                Branch {
+                    pattern: Pattern::Name(String::from("a")),
+                    body: Expr::mk_var("b")
+                },
+                Branch {
+                    pattern: Pattern::Name(String::from("c")),
+                    body: Expr::mk_var("d")
+                }
+            ]
+        ))
+    )
+}
+
+#[test]
+fn parse_case_3() {
+    parse_test!(
+        "case x of\n  a ->\n    b\n  c -> d",
+        expr_case,
+        Ok(Expr::mk_case(
+            Expr::mk_var("x"),
+            vec![
+                Branch {
+                    pattern: Pattern::Name(String::from("a")),
+                    body: Expr::mk_var("b")
+                },
+                Branch {
+                    pattern: Pattern::Name(String::from("c")),
+                    body: Expr::mk_var("d")
+                }
+            ]
+        ))
+    )
 }

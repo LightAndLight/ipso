@@ -194,3 +194,60 @@ fn lex_definition_2() {
         ]
     )
 }
+
+#[test]
+fn lex_case_1() {
+    assert_eq!(
+        {
+            let input = String::from("case x of\n  a -> b");
+            let lexer = Lexer::new(&input);
+            lexer.tokenize()
+        },
+        vec![
+            Token {
+                token_type: TokenType::Ident(String::from("case")),
+                pos: 0
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 4
+            },
+            Token {
+                token_type: TokenType::Ident(String::from("x")),
+                pos: 5
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 6
+            },
+            Token {
+                token_type: TokenType::Ident(String::from("of")),
+                pos: 7
+            },
+            Token {
+                token_type: TokenType::Indent(2),
+                pos: 9
+            },
+            Token {
+                token_type: TokenType::Ident(String::from("a")),
+                pos: 12
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 13
+            },
+            Token {
+                token_type: TokenType::Arrow,
+                pos: 14
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 16
+            },
+            Token {
+                token_type: TokenType::Ident(String::from("b")),
+                pos: 17
+            },
+        ]
+    )
+}
