@@ -16,6 +16,51 @@ pub enum ParseError {
     },
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseResult<A> {
+    consumed: bool,
+    result: Result<A, ParseError>,
+}
+
+impl<A> ParseResult<A> {
+    fn and_then<B, F>(self, f: F) -> ParseResult<B>
+    where
+        F: FnOnce(A) -> ParseResult<B>,
+    {
+        match self.result {
+            Err(err) => ParseResult {
+                consumed: self.consumed,
+                result: Err(err),
+            },
+            Ok(a) => {
+                let mut next = f(a);
+                next.consumed = next.consumed || self.consumed;
+                next
+            }
+        }
+    }
+
+    fn map<B, F>(self, f: F) -> ParseResult<B>
+    where
+        F: FnOnce(A) -> B,
+    {
+        ParseResult {
+            consumed: self.consumed,
+            result: match self.result {
+                Err(err) => Err(err),
+                Ok(a) => Ok(f(a)),
+            },
+        }
+    }
+
+    fn pure(x: A) -> Self {
+        ParseResult {
+            consumed: false,
+            result: Ok(x),
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! apply {
     ($a:expr, $b:expr) => {
@@ -30,49 +75,39 @@ macro_rules! apply {
 }
 
 macro_rules! map0 {
-    ($a:expr, $b:expr) => {
-        match $b {
-            Err(err) => Err(err),
-            Ok(_) => Ok($a),
+    ($a:expr, $b:expr) => {{
+        let b = $b;
+        ParseResult {
+            consumed: b.consumed,
+            result: match b.result {
+                Err(err) => Err(err),
+                Ok(_) => Ok($a),
+            },
         }
-    };
-}
-
-#[macro_export]
-macro_rules! map1 {
-    ($f:expr, $a:expr) => {
-        match $a {
-            Err(err) => Err(err),
-            Ok(val1) => Ok($f(val1)),
-        }
-    };
+    };};
 }
 
 #[macro_export]
 macro_rules! map2 {
-    ($f:expr, $a:expr, $b:expr) => {
-        match $a {
-            Err(err) => Err(err),
-            Ok(val1) => match $b {
-                Err(err) => Err(err),
-                Ok(val2) => Ok($f(val1, val2)),
+    ($f:expr, $a:expr, $b:expr) => {{
+        let a = $a;
+        match a.result {
+            Err(err) => ParseResult {
+                consumed: a.consumed,
+                result: Err(err),
             },
+            Ok(val1) => {
+                let b = $b;
+                ParseResult {
+                    consumed: a.consumed || b.consumed,
+                    result: match b.result {
+                        Err(err) => Err(err),
+                        Ok(val2) => Ok($f(val1, val2)),
+                    },
+                }
+            }
         }
-    };
-}
-
-#[macro_export]
-macro_rules! map3 {
-    ($f:expr, $a:expr, $b:expr, $c:expr) => {
-        apply!(map2!(|a, b| move |c| $f(a, b, c), $a, $b), $c)
-    };
-}
-
-#[macro_export]
-macro_rules! map4 {
-    ($f:expr, $a:expr, $b:expr, $c:expr, $d:expr) => {
-        apply!(map3!($f, $a, $b, $c), $d)
-    };
+    };};
 }
 
 macro_rules! keep_right {
@@ -94,7 +129,7 @@ pub fn parse_string(input: String) -> Result<Module, ParseError> {
         lexer.tokenize()
     };
     let mut parser: Parser = Parser::new(tokens);
-    keep_left!(parser.module(), parser.eof())
+    keep_left!(parser.module(), parser.eof()).result
 }
 
 pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
@@ -109,124 +144,127 @@ pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
 
 pub struct Parser {
     pos: usize,
-    consumed: bool,
     indentation: Vec<usize>,
     expecting: HashSet<TokenType>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
 
-macro_rules! many {
-    ($self:expr, $x:expr) => {{
+macro_rules! many_with {
+    ($vec:expr, $self:expr, $x:expr) => {{
         let mut error: Option<ParseError> = None;
-        let mut acc: Vec<_> = Vec::new();
+        let mut acc: Vec<_> = $vec;
+        let mut consumed = false;
         loop {
-            $self.consumed = false;
-            match $x {
+            let next = $x;
+            match next.result {
                 Err(err) => {
-                    if $self.consumed {
+                    if next.consumed {
                         error = Some(err);
                     };
                     break;
                 }
-                Ok(val) => acc.push(val),
+                Ok(val) => {
+                    consumed = consumed || next.consumed;
+                    acc.push(val)
+                }
             }
         }
-        match error {
-            None => Ok(acc),
-            Some(err) => Err(err),
+        ParseResult {
+            consumed,
+            result: match error {
+                None => Ok(acc),
+                Some(err) => Err(err),
+            },
         }
     }};
+}
+
+macro_rules! many {
+    ($self:expr, $x:expr) => {
+        many_with!(Vec::new(), $self, $x)
+    };
 }
 
 macro_rules! many_ {
     ($self:expr, $x:expr) => {{
         let mut error: Option<ParseError> = None;
+        let mut consumed = false;
         loop {
-            $self.consumed = false;
-            match $x {
+            let next = $x;
+            match next.result {
                 Err(err) => {
-                    if $self.consumed {
+                    if next.consumed {
                         error = Some(err);
                     };
                     break;
                 }
-                Ok(_) => {}
+                Ok(_) => {
+                    consumed = consumed || next.consumed;
+                }
             }
         }
-        match error {
-            None => Ok(()),
-            Some(err) => Err(err),
+        ParseResult {
+            consumed,
+            result: match error {
+                None => Ok(()),
+                Some(err) => Err(err),
+            },
         }
     }};
 }
 
-#[macro_export]
 macro_rules! sep_by {
-    ($self:expr, $a:expr, $sep:expr) => {
+    ($self:expr, $x:expr, $sep:expr) => {
         choices!(
             $self,
-            {
-                match $a {
-                    Ok(first) => {
-                        let mut error: Option<ParseError> = None;
-                        let mut acc: Vec<_> = vec![first];
-                        loop {
-                            $self.consumed = false;
-                            match keep_right!($sep, $a) {
-                                Err(err) => {
-                                    if $self.consumed {
-                                        error = Some(err);
-                                    };
-                                    break;
-                                }
-                                Ok(val) => acc.push(val),
-                            }
-                        }
-                        match error {
-                            None => Ok(acc),
-                            Some(err) => Err(err),
-                        }
-                    }
-                    Err(err) => Err(err),
-                }
-            },
-            Ok(Vec::new())
+            $x.and_then(|first| { many_with!(vec![first], $self, keep_right!($sep, $x)) }),
+            ParseResult::pure(Vec::new())
         )
     };
 }
 
 macro_rules! choices {
     ($self:expr) => {
-        $self.unexpected()
+        $self.unexpected(false)
     };
-    ($self:expr, $x:expr $(, $y:expr)*) => {
-        match $x {
+    ($self:expr, $x:expr $(, $y:expr)*) => {{
+        let first = $x;
+        match first.result {
             Err(err) => {
-                if $self.consumed {
-                    Err(err)
+                if first.consumed {
+                    ParseResult{ consumed: true, result: Err(err) }
                 } else {
-                    choices!($self $(, $y)*)
+                    let mut rest = choices!($self $(, $y)*);
+                    rest.consumed = first.consumed || rest.consumed ;
+                    rest
                 }
             }
-            Ok(val) => Ok(val),
+            Ok(val) => ParseResult{consumed:first.consumed, result:Ok(val)},
         }
     };
-}
+}}
 
 macro_rules! optional {
-    ($self:expr, $a:expr) => {
-        match $a {
+    ($self:expr, $a:expr) => {{
+        let first = $a;
+        match first.result {
             Err(err) => {
-                if $self.consumed {
-                    Err(err)
+                if first.consumed {
+                    ParseResult {
+                        consumed: true,
+                        result: Err(err),
+                    }
                 } else {
-                    Ok(None)
+                    ParseResult::pure(None)
                 }
             }
-            Ok(val) => Ok(Some(val)),
+            Ok(val) => ParseResult {
+                consumed: first.consumed,
+                result: Ok(Some(val)),
+            },
         }
-    };
+    }};
 }
 
 impl Parser {
@@ -235,7 +273,6 @@ impl Parser {
         let current = input.next();
         Parser {
             pos: 0,
-            consumed: false,
             indentation: vec![0],
             expecting: HashSet::new(),
             current,
@@ -243,149 +280,146 @@ impl Parser {
         }
     }
 
-    fn fail<A>(&self, err: ParseError) -> Result<A, ParseError> {
-        Err(err)
-    }
-
-    fn unexpected<A>(&self) -> Result<A, ParseError> {
-        self.fail(ParseError::Unexpected {
-            pos: self.pos,
-            expecting: self.expecting.clone(),
-        })
-    }
-
-    fn eof(&self) -> Result<(), ParseError> {
-        match self.current {
-            None => Ok(()),
-            Some(_) => self.unexpected(),
+    fn fail<A>(&self, consumed: bool, err: ParseError) -> ParseResult<A> {
+        ParseResult {
+            consumed,
+            result: Err(err),
         }
     }
 
-    fn consume(&mut self) {
-        let len = match self.current {
-            None => 0,
-            Some(ref token) => token.token_type.length(),
-        };
-        self.pos += len;
-        self.current = self.input.next();
-        self.expecting = HashSet::new();
-        self.consumed = true;
+    fn unexpected<A>(&self, consumed: bool) -> ParseResult<A> {
+        self.fail(
+            consumed,
+            ParseError::Unexpected {
+                pos: self.pos,
+                expecting: self.expecting.clone(),
+            },
+        )
+    }
+
+    fn eof(&self) -> ParseResult<()> {
+        match self.current {
+            None => ParseResult::pure(()),
+            Some(_) => self.unexpected(false),
+        }
+    }
+
+    fn consume(&mut self) -> ParseResult<()> {
+        match self.current {
+            None => self.unexpected(false),
+            Some(ref token) => {
+                self.pos += token.token_type.length();
+                self.current = self.input.next();
+                self.expecting = HashSet::new();
+                ParseResult {
+                    consumed: true,
+                    result: Ok(()),
+                }
+            }
+        }
     }
 
     fn current_indentation(&self) -> usize {
         self.indentation[self.indentation.len() - 1]
     }
 
-    fn space(&mut self) -> Result<(), ParseError> {
+    fn space(&mut self) -> ParseResult<()> {
         self.expecting.insert(TokenType::Space);
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n > self.current_indentation() => {
-                    self.consume();
-                    Ok(())
+                    map0!((), self.consume())
                 }
                 TokenType::Space => {
-                    self.consume();
-                    Ok(())
+                    map0!((), self.consume())
                 }
-                _ => self.unexpected(),
+                _ => self.unexpected(false),
             },
-            None => self.unexpected(),
+            None => self.unexpected(false),
         }
     }
 
-    fn indent(&mut self) -> Result<(), ParseError> {
+    fn indent(&mut self) -> ParseResult<()> {
         self.expecting.insert(TokenType::Indent(0));
         let current_indentation = self.current_indentation();
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n > current_indentation => {
                     self.indentation.push(n);
-                    self.consume();
-                    Ok(())
+                    map0!((), self.consume())
                 }
-                _ => self.unexpected(),
+                _ => self.unexpected(false),
             },
-            None => self.unexpected(),
+            None => self.unexpected(false),
         }
     }
 
-    fn spaces(&mut self) -> Result<(), ParseError> {
+    fn spaces(&mut self) -> ParseResult<()> {
         many_!(self, self.space())
     }
 
-    fn keyword(&mut self, expected: Keyword) -> Result<(), ParseError> {
+    fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
         self.expecting
             .insert(TokenType::Ident(String::from(expected.to_string())));
         keep_left!(
             match self.current {
-                None => self.unexpected(),
+                None => self.unexpected(false),
                 Some(ref actual) => match actual.token_type {
                     TokenType::Ident(ref id) => {
                         if expected.matches(id) {
-                            self.consume();
-                            Ok(())
+                            map0!((), self.consume())
                         } else {
-                            self.unexpected()
+                            self.unexpected(false)
                         }
                     }
-                    _ => self.unexpected(),
+                    _ => self.unexpected(false),
                 },
-            },
-            { self.spaces() }
-        )
-    }
-
-    fn token(&mut self, expected: &TokenType) -> Result<(), ParseError> {
-        self.expecting.insert(expected.clone());
-        match self.current {
-            Some(ref actual) if actual.token_type == *expected => {
-                self.consume();
-                Ok(())
-            }
-            _ => self.unexpected(),
-        }
-    }
-
-    fn ident(&mut self) -> Result<String, ParseError> {
-        self.expecting.insert(TokenType::Ident(String::new()));
-        keep_left!(
-            match self.current {
-                Some(ref token) => match token.token_type {
-                    TokenType::Ident(ref s) if !syntax::is_keyword(s) => {
-                        let s = s.clone();
-                        self.consume();
-                        Ok(s)
-                    }
-                    _ => self.unexpected(),
-                },
-                None => self.unexpected(),
             },
             self.spaces()
         )
     }
 
-    fn int(&mut self) -> Result<u32, ParseError> {
+    fn token(&mut self, expected: &TokenType) -> ParseResult<()> {
+        self.expecting.insert(expected.clone());
+        match self.current {
+            Some(ref actual) if actual.token_type == *expected => {
+                map0!((), self.consume())
+            }
+            _ => self.unexpected(false),
+        }
+    }
+
+    fn ident(&mut self) -> ParseResult<String> {
+        self.expecting.insert(TokenType::Ident(String::new()));
+        match self.current {
+            Some(ref token) => match token.token_type {
+                TokenType::Ident(ref s) if !syntax::is_keyword(s) => {
+                    let s = s.clone();
+                    map0!(s, self.consume())
+                }
+                _ => self.unexpected(false),
+            },
+            None => self.unexpected(false),
+        }
+    }
+
+    fn int(&mut self) -> ParseResult<u32> {
         self.expecting.insert(TokenType::Int {
             value: 0,
             length: 0,
         });
-        keep_left!(
-            match self.current {
-                Some(ref token) => match token.token_type {
-                    TokenType::Int { value, length: _ } => {
-                        self.consume();
-                        Ok(value as u32)
-                    }
-                    _ => self.unexpected(),
-                },
-                None => self.unexpected(),
+        match self.current {
+            Some(ref token) => match token.token_type {
+                TokenType::Int { value, length: _ } => {
+                    map0!(value as u32, self.consume())
+                }
+                _ => self.unexpected(false),
             },
-            self.spaces()
-        )
+            None => self.unexpected(false),
+        }
     }
 
-    fn type_atom(&mut self) -> Result<Type, ParseError> {
+    fn type_atom(&mut self) -> ParseResult<Type> {
         keep_left!(
             choices!(
                 self,
@@ -410,7 +444,7 @@ impl Parser {
                     self.token(&TokenType::Ident(String::from("Array")))
                 ),
                 map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
-                map1!(|s| Type::Name(s), self.ident()),
+                self.ident().map(|s| Type::Name(s)),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
                     keep_left!(self.type_(), self.token(&TokenType::RParen))
@@ -420,157 +454,172 @@ impl Parser {
         )
     }
 
-    fn type_app(&mut self) -> Result<Type, ParseError> {
-        let mut acc = self.type_atom()?;
-        while let Ok(ty) = self.type_atom() {
-            acc = Type::mk_app(acc, ty)
-        }
-        Ok(acc)
+    fn type_app(&mut self) -> ParseResult<Type> {
+        self.type_atom().and_then(|first| {
+            many!(self, self.type_atom()).map(|rest| {
+                rest.into_iter()
+                    .fold(first, |acc, el| Type::mk_app(acc, el))
+            })
+        })
     }
 
-    fn type_arrow(&mut self) -> Result<Type, ParseError> {
-        let a = self.type_app()?;
-        let m_b = optional!(
-            self,
-            map3!(
-                |_, _, ty| ty,
-                self.token(&TokenType::Arrow),
-                self.spaces(),
-                self.type_arrow()
+    fn type_arrow(&mut self) -> ParseResult<Type> {
+        self.type_app().and_then(|a| {
+            optional!(
+                self,
+                map2!(
+                    |_, ty| ty,
+                    keep_left!(self.token(&TokenType::Arrow), self.spaces()),
+                    self.type_arrow()
+                )
             )
-        )?;
-
-        match m_b {
-            None => Ok(a),
-            Some(b) => Ok(Type::mk_arrow(a, b)),
-        }
+            .map(|m_b| match m_b {
+                None => a,
+                Some(b) => Type::mk_arrow(a, b),
+            })
+        })
     }
 
-    fn type_fatarrow(&mut self) -> Result<Type, ParseError> {
-        let a = self.type_arrow()?;
-        let m_b = optional!(
-            self,
-            map3!(
-                |_, _, ty| ty,
-                self.token(&TokenType::FatArrow),
-                self.spaces(),
-                self.type_fatarrow()
+    fn type_fatarrow(&mut self) -> ParseResult<Type> {
+        self.type_arrow().and_then(|a| {
+            optional!(
+                self,
+                map2!(
+                    |_, ty| ty,
+                    keep_left!(self.token(&TokenType::FatArrow), self.spaces()),
+                    self.type_fatarrow()
+                )
             )
-        )?;
-
-        match m_b {
-            None => Ok(a),
-            Some(b) => Ok(Type::mk_fatarrow(a, b)),
-        }
+            .map(|m_b| match m_b {
+                None => a,
+                Some(b) => Type::mk_fatarrow(a, b),
+            })
+        })
     }
 
-    fn type_(&mut self) -> Result<Type, ParseError> {
+    fn type_(&mut self) -> ParseResult<Type> {
         self.type_fatarrow()
     }
 
-    fn newline(&mut self) -> Result<(), ParseError> {
+    fn newline(&mut self) -> ParseResult<()> {
         let current = self.current_indentation();
         self.expecting.insert(TokenType::Indent(current));
         match self.current {
-            None => self.unexpected(),
+            None => self.unexpected(false),
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n == current => {
-                    self.consume();
-                    Ok(())
+                    map0!((), self.consume())
                 }
-                _ => self.unexpected(),
+                _ => self.unexpected(false),
             },
         }
     }
 
-    fn pattern(&mut self) -> Result<Pattern, ParseError> {
-        choices!(
-            self,
-            map1!(|s| Pattern::Name(s), self.ident()),
-            map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
+    fn pattern(&mut self) -> ParseResult<Pattern> {
+        keep_left!(
+            choices!(
+                self,
+                self.ident().map(|s| Pattern::Name(s)),
+                map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
+            ),
+            self.spaces()
         )
     }
 
-    fn expr_atom(&mut self) -> Result<Expr, ParseError> {
-        choices!(
-            self,
-            map1!(|n| Expr::Int(n), self.int()),
-            map1!(|n| Expr::Var(n), self.ident())
+    fn expr_atom(&mut self) -> ParseResult<Expr> {
+        keep_left!(
+            choices!(
+                self,
+                self.int().map(|n| Expr::Int(n)),
+                self.ident().map(|n| Expr::Var(n))
+            ),
+            self.spaces()
         )
     }
 
-    fn branch(&mut self) -> Result<Branch, ParseError> {
-        map3!(
-            |pattern, _, body| Branch { pattern, body },
-            self.pattern(),
-            keep_left!(self.token(&TokenType::Arrow), self.spaces()),
-            self.expr()
-        )
-    }
-
-    fn expr_case(&mut self) -> Result<Expr, ParseError> {
-        let _ = self.token(&TokenType::Ident(String::from("case")))?;
-        let _ = self.spaces()?;
-
-        let cond = self.expr()?;
-
-        let _ = self.token(&TokenType::Ident(String::from("of")))?;
-        let _ = many_!(self, self.token(&TokenType::Space))?;
-
-        let _ = self.indent()?;
-        let branches = sep_by!(self, self.branch(), self.newline())?;
-        self.indentation.pop();
-
-        Ok(Expr::Case(Box::new(cond), branches))
-    }
-
-    fn expr(&mut self) -> Result<Expr, ParseError> {
-        choices!(self, self.expr_atom(), self.expr_case())
-    }
-
-    fn definition(&mut self) -> Result<Declaration, ParseError> {
-        let name = self.ident()?;
-
-        let _ = self.token(&TokenType::Colon)?;
-        let _ = self.spaces()?;
-
-        let ty = self.type_()?;
-
-        let _ = self.newline()?;
-
-        let _ = self.token(&TokenType::Ident(name.clone()))?;
-        let args = many!(self, self.pattern())?;
-
-        let _ = self.token(&TokenType::Equals)?;
-        let _ = self.spaces()?;
-
-        let body = self.expr()?;
-
-        Ok(Declaration::Definition {
-            name,
-            ty,
-            args,
-            body,
+    fn branch(&mut self) -> ParseResult<Branch> {
+        keep_left!(self.pattern(), self.spaces()).and_then(|pattern| {
+            map2!(
+                |_, body| Branch { pattern, body },
+                keep_left!(self.token(&TokenType::Arrow), self.spaces()),
+                self.expr()
+            )
         })
     }
 
-    fn type_alias(&mut self) -> Result<Declaration, ParseError> {
-        todo!()
-    }
-
-    fn import(&mut self) -> Result<Declaration, ParseError> {
-        map2!(
-            |module, name| Declaration::Import { module, name },
-            keep_right!(self.keyword(Keyword::Import), self.ident()),
-            optional!(self, keep_right!(self.keyword(Keyword::As), self.ident()))
+    fn expr_case(&mut self) -> ParseResult<Expr> {
+        keep_left!(
+            self.token(&TokenType::Ident(String::from("case"))),
+            self.spaces()
         )
+        .and_then(|_| {
+            self.expr().and_then(|cond| {
+                keep_left!(
+                    self.token(&TokenType::Ident(String::from("of"))),
+                    many_!(self, self.token(&TokenType::Space))
+                )
+                .and_then(|_| {
+                    keep_right!(self.indent(), sep_by!(self, self.branch(), self.newline())).map(
+                        |branches| {
+                            self.indentation.pop();
+
+                            Expr::Case(Box::new(cond), branches)
+                        },
+                    )
+                })
+            })
+        })
     }
 
-    fn from_import(&mut self) -> Result<Declaration, ParseError> {
+    fn expr(&mut self) -> ParseResult<Expr> {
+        choices!(self, self.expr_atom(), self.expr_case())
+    }
+
+    fn definition(&mut self) -> ParseResult<Declaration> {
+        keep_left!(self.ident(), self.spaces()).and_then(|name| {
+            keep_left!(self.token(&TokenType::Colon), self.spaces()).and_then(|_| {
+                keep_left!(self.type_(), self.newline()).and_then(|ty| {
+                    keep_right!(
+                        keep_left!(self.token(&TokenType::Ident(name.clone())), self.spaces()),
+                        many!(self, self.pattern())
+                    )
+                    .and_then(|args| {
+                        keep_left!(self.token(&TokenType::Equals), self.spaces()).and_then(|_| {
+                            self.expr().map(|body| Declaration::Definition {
+                                name,
+                                ty,
+                                args,
+                                body,
+                            })
+                        })
+                    })
+                })
+            })
+        })
+    }
+
+    fn type_alias(&mut self) -> ParseResult<Declaration> {
         todo!()
     }
 
-    fn declaration(&mut self) -> Result<Declaration, ParseError> {
+    fn import(&mut self) -> ParseResult<Declaration> {
+        keep_left!(self.keyword(Keyword::Import), self.spaces()).and_then(|_| {
+            keep_left!(self.ident(), self.spaces()).and_then(|module| {
+                optional!(
+                    self,
+                    keep_left!(self.keyword(Keyword::As), self.spaces())
+                        .and_then(|_| keep_left!(self.ident(), self.spaces()))
+                )
+                .map(|name| Declaration::Import { module, name })
+            })
+        })
+    }
+
+    fn from_import(&mut self) -> ParseResult<Declaration> {
+        todo!()
+    }
+
+    fn declaration(&mut self) -> ParseResult<Declaration> {
         choices!(
             self,
             self.definition(),
@@ -580,7 +629,7 @@ impl Parser {
         )
     }
 
-    fn module(&mut self) -> Result<Module, ParseError> {
+    fn module(&mut self) -> ParseResult<Module> {
         many!(self, self.declaration()).map(|decls| Module { decls })
     }
 }

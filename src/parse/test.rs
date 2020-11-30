@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[cfg(test)]
-use super::{ParseError, Parser};
+use super::{ParseError, ParseResult, Parser};
 
 #[cfg(test)]
 macro_rules! parse_test {
@@ -22,7 +22,7 @@ macro_rules! parse_test {
                     lexer.tokenize()
                 };
                 let mut parser = Parser::new(tokens);
-                keep_left!(parser.$function(), parser.eof())
+                keep_left!(parser.$function(), parser.eof()).result
             },
             $output
         )
@@ -138,6 +138,8 @@ fn parse_definition_3() {
                     value: 0,
                     length: 0
                 },
+                TokenType::Ident(String::from("")),
+                TokenType::Ident(String::from("case")),
                 TokenType::Space
             ]
             .into_iter()
@@ -178,6 +180,18 @@ fn parse_type_2() {
 }
 
 #[test]
+fn parse_type_2_1() {
+    parse_test!(
+        "Int -> Bool -> Int",
+        type_,
+        Ok(Type::mk_arrow(
+            Type::Int,
+            Type::mk_arrow(Type::Bool, Type::Int)
+        ))
+    )
+}
+
+#[test]
 fn parse_type_3() {
     parse_test!(
         "Eq a => a -> a -> Bool",
@@ -188,6 +202,18 @@ fn parse_type_3() {
                 Type::mk_name("a"),
                 Type::mk_arrow(Type::mk_name("a"), Type::Bool)
             ),
+        ))
+    )
+}
+
+#[test]
+fn parse_type_3_1() {
+    parse_test!(
+        "Eq a => a",
+        type_,
+        Ok(Type::mk_fatarrow(
+            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
+            Type::mk_name("a"),
         ))
     )
 }
