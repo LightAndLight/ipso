@@ -10,7 +10,8 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
-    Unexpected {pos: usize,
+    Unexpected {
+        pos: usize,
         expecting: HashSet<TokenType>,
     },
 }
@@ -38,7 +39,6 @@ impl<A> ParseResult<A> {
             }
         }
     }
-
     fn map<B, F>(self, f: F) -> ParseResult<B>
     where
         F: FnOnce(A) -> B,

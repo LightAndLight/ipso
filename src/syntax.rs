@@ -45,7 +45,7 @@ pub fn is_keyword(val: &String) -> bool {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Binop {
+pub enum Binop {
     Add,
     Multiply,
     Subtract,
@@ -65,7 +65,7 @@ enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum StringPart {
+pub enum StringPart {
     String(String),
     Expr(Expr),
 }
@@ -79,7 +79,7 @@ pub enum Pattern {
     },
     Variant {
         name: String,
-        args: Vec<Option<String>>,
+        args: Vec<String>,
     },
     Wildcard,
 }
@@ -129,6 +129,13 @@ impl Expr {
         Expr::Var(String::from(v))
     }
 
+    pub fn mk_lam(args: Vec<Pattern>, body: Expr) -> Expr {
+        Expr::Lam {
+            args,
+            body: Box::new(body),
+        }
+    }
+
     pub fn mk_case(cond: Expr, branches: Vec<Branch>) -> Expr {
         Expr::Case(Box::new(cond), branches)
     }
@@ -170,7 +177,7 @@ impl Type {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Names {
+pub enum Names {
     All,
     Names(Vec<String>),
 }

@@ -2,9 +2,11 @@ use std::env;
 
 use syntax::Module;
 
+mod core;
 mod lex;
 mod parse;
 mod syntax;
+mod typecheck;
 
 #[derive(Debug)]
 struct Config {
