@@ -299,3 +299,31 @@ fn parse_case_3() {
         ))
     )
 }
+
+#[test]
+fn parse_case_4() {
+    parse_test!(
+        "case x of\n  a -> b\n   c -> d",
+        expr_case,
+        Err(ParseError::Unexpected {
+            pos: 22,
+            expecting: vec![TokenType::Space, TokenType::Indent(2)]
+                .into_iter()
+                .collect()
+        })
+    )
+}
+
+#[test]
+fn parse_case_5() {
+    parse_test!(
+        "case x of\n  a -> b\n c -> d",
+        expr_case,
+        Err(ParseError::Unexpected {
+            pos: 18,
+            expecting: vec![TokenType::Space, TokenType::Indent(2)]
+                .into_iter()
+                .collect()
+        })
+    )
+}

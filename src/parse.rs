@@ -10,8 +10,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
-    Unexpected {
-        pos: usize,
+    Unexpected {pos: usize,
         expecting: HashSet<TokenType>,
     },
 }
