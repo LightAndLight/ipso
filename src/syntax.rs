@@ -141,7 +141,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     Name(String),
     Bool,
@@ -152,10 +152,12 @@ pub enum Type {
     FatArrow,
     Constraints(Vec<Type>),
     Array,
-    Record(Vec<(String, Type)>, Option<String>),
-    Variant(Vec<(String, Type)>, Option<String>),
+    Record,
+    Variant,
     IO,
     App(Box<Type>, Box<Type>),
+    RowNil,
+    RowCons(String, Box<Type>, Box<Type>),
 }
 
 impl Type {
@@ -173,6 +175,10 @@ impl Type {
 
     pub fn mk_name(s: &str) -> Type {
         Type::Name(String::from(s))
+    }
+
+    pub fn mk_rowcons(field: &str, a: Type, b: Type) -> Type {
+        Type::RowCons(String::from(field), Box::new(a), Box::new(b))
     }
 }
 
