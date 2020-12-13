@@ -122,6 +122,8 @@ pub enum Expr {
 
     Variant(String, Vec<Expr>),
     Case(Box<Expr>, Vec<Branch>),
+
+    Unit,
 }
 
 impl Expr {
@@ -158,6 +160,7 @@ pub enum Type {
     App(Box<Type>, Box<Type>),
     RowNil,
     RowCons(String, Box<Type>, Box<Type>),
+    Unit,
 }
 
 impl Type {

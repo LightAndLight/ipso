@@ -65,7 +65,7 @@ impl Typechecker {
                 args,
                 body,
             } => {
-                let body = self.check_expr(syntax::Expr::mk_lam(args, body), &ty)?;
+                let body = self.check_expr(syntax::Expr::mk_lam(args, body), ty.clone())?;
                 Ok(core::Declaration::Definition { name, ty, body })
             }
             syntax::Declaration::TypeAlias { name, args, body } => {
@@ -210,16 +210,17 @@ impl Typechecker {
                 self.check_kind(rest, Kind::Row)?;
                 Ok(Kind::Row)
             }
+            syntax::Type::Unit => Ok(Kind::Type),
         }
     }
 
     fn unify_type(
         &mut self,
-        expected: &syntax::Type,
-        actual: &syntax::Type,
+        expected: syntax::Type,
+        actual: syntax::Type,
     ) -> Result<(), TypeError> {
-        let expected_kind = self.infer_kind(expected)?;
-        let actual_kind = self.infer_kind(actual)?;
+        let expected_kind = self.infer_kind(&expected)?;
+        let actual_kind = self.infer_kind(&actual)?;
         self.unify_kind(expected_kind, actual_kind)?;
         match expected {
             syntax::Type::App(a, b) => {
@@ -267,70 +268,24 @@ impl Typechecker {
             syntax::Type::RowCons(field, ty, rest) => {
                 todo!()
             }
+            syntax::Type::Unit => {
+                todo!()
+            }
         }
     }
+
+    fn infer_expr(&mut self, expr: syntax::Expr) -> Result<(core::Expr, syntax::Type), TypeError> {
+        todo!()
+    }
+
     fn check_expr(
         &mut self,
         expr: syntax::Expr,
-        ty: &syntax::Type,
+        ty: syntax::Type,
     ) -> Result<core::Expr, TypeError> {
-        match expr {
-            syntax::Expr::Var(n) => {
-                let entry = self.lookup(n)?;
-                self.unify_type(ty, &entry.ty)?;
-                Ok(core::Expr::Var(entry.index))
-            }
-
-            syntax::Expr::App(f, x) => {
-                todo!()
-            }
-            syntax::Expr::Lam { args, body } => {
-                todo!()
-            }
-
-            syntax::Expr::True => {
-                todo!()
-            }
-            syntax::Expr::False => {
-                todo!()
-            }
-            syntax::Expr::IfThenElse(cond, then_, else_) => {
-                todo!()
-            }
-
-            syntax::Expr::Int(n) => {
-                todo!()
-            }
-
-            syntax::Expr::Binop(op, a, b) => {
-                todo!()
-            }
-
-            syntax::Expr::Char(c) => {
-                todo!()
-            }
-
-            syntax::Expr::String(parts) => {
-                todo!()
-            }
-
-            syntax::Expr::Array(items) => {
-                todo!()
-            }
-
-            syntax::Expr::Record { fields, rest } => {
-                todo!()
-            }
-            syntax::Expr::Project(value, field) => {
-                todo!()
-            }
-
-            syntax::Expr::Variant(name, args) => {
-                todo!()
-            }
-            syntax::Expr::Case(value, branches) => {
-                todo!()
-            }
-        }
+        let expected = ty;
+        let (expr, actual) = self.infer_expr(expr)?;
+        self.unify_type(expected, actual)?;
+        Ok(expr)
     }
 }
