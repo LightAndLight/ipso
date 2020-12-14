@@ -3,6 +3,7 @@ use std::env;
 use syntax::Module;
 
 mod core;
+mod diagnostic;
 mod lex;
 mod parse;
 mod syntax;
