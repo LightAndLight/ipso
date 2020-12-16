@@ -1,5 +1,8 @@
 mod test;
 
+use crate::Diagnostic;
+use crate::Item;
+use std::collections::BTreeSet;
 use std::{collections::HashSet, fs::File, io::Read, vec::IntoIter};
 
 use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, Type};
@@ -12,8 +15,43 @@ use crate::{
 pub enum ParseError {
     Unexpected {
         pos: usize,
-        expecting: HashSet<TokenType>,
+        expecting: BTreeSet<TokenType>,
     },
+}
+
+impl ParseError {
+    fn position(&self) -> usize {
+        match self {
+            ParseError::Unexpected { pos, expecting: _ } => *pos,
+        }
+    }
+
+    fn message(&self) -> String {
+        match self {
+            ParseError::Unexpected { pos: _, expecting } => {
+                let mut str = String::from("expected one of: ");
+                let mut iter = expecting.iter();
+                match iter.next() {
+                    None => return str,
+                    Some(token) => {
+                        str.push_str(token.render().as_str());
+                        for token in iter {
+                            str.push_str(", ");
+                            str.push_str(token.render().as_str());
+                        }
+                        str
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn report(self, diagnostic: &mut Diagnostic) {
+        diagnostic.item(Item {
+            pos: self.position(),
+            message: self.message(),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -144,7 +182,7 @@ pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
 pub struct Parser {
     pos: usize,
     indentation: Vec<usize>,
-    expecting: HashSet<TokenType>,
+    expecting: BTreeSet<TokenType>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
@@ -273,7 +311,7 @@ impl Parser {
         Parser {
             pos: 0,
             indentation: vec![0],
-            expecting: HashSet::new(),
+            expecting: BTreeSet::new(),
             current,
             input,
         }
@@ -309,7 +347,7 @@ impl Parser {
             Some(ref token) => {
                 self.pos += token.token_type.length();
                 self.current = self.input.next();
-                self.expecting = HashSet::new();
+                self.expecting = BTreeSet::new();
                 ParseResult {
                     consumed: true,
                     result: Ok(()),

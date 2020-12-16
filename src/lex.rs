@@ -2,7 +2,7 @@ mod test;
 
 use std::str::Chars;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum TokenType {
     Unexpected(char),
 
@@ -40,6 +40,51 @@ pub enum TokenType {
 }
 
 impl TokenType {
+    pub fn render(&self) -> String {
+        match self {
+            TokenType::Unexpected(c) => String::from("unexpected"),
+            TokenType::Ident(s) => {
+                if s.len() == 0 {
+                    String::from("identifier")
+                } else {
+                    format!("\"{}\"", s)
+                }
+            }
+            TokenType::Int { value, length } => {
+                if *length == 0 {
+                    String::from("integer")
+                } else {
+                    format!("\"{}\"", value)
+                }
+            }
+            TokenType::LBrace => String::from("'{'"),
+            TokenType::RBrace => String::from("'}'"),
+            TokenType::LParen => String::from("'('"),
+            TokenType::RParen => String::from("')'"),
+            TokenType::LBracket => String::from("'['"),
+            TokenType::RBracket => String::from("']'"),
+            TokenType::Backslash => String::from("'\\'"),
+            TokenType::Arrow => String::from("'->'"),
+            TokenType::FatArrow => String::from("'=>'"),
+            TokenType::Dot => String::from("'.'"),
+            TokenType::Asterisk => String::from("'*'"),
+            TokenType::Equals => String::from("'='"),
+            TokenType::Colon => String::from("':'"),
+            TokenType::Comma => String::from("','"),
+            TokenType::Underscore => String::from("'_'"),
+            TokenType::Hyphen => String::from("'-'"),
+            TokenType::Plus => String::from("'+'"),
+            TokenType::Slash => String::from("'/'"),
+            TokenType::Indent(n) => {
+                if *n == 0 {
+                    String::from("newline")
+                } else {
+                    format!("indent ({})", n)
+                }
+            }
+            TokenType::Space => String::from("space"),
+        }
+    }
     pub fn length(&self) -> usize {
         match self {
             TokenType::Unexpected(_) => 1,

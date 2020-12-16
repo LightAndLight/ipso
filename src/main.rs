@@ -1,5 +1,8 @@
-use std::env;
+use crate::diagnostic::{Diagnostic, Item};
+use std::path::Path;
+use std::{env, io};
 
+use parse::ParseError;
 use syntax::Module;
 
 mod core;
@@ -72,28 +75,36 @@ impl From<parse::ParseError> for InterpreterError {
     }
 }
 
-fn report_interpreter_error(err: InterpreterError) {
-    println!("{:?}", err)
+fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Result<()> {
+    let mut diagnostic = Diagnostic::new();
+    match err {
+        InterpreterError::ParseError(err) => err.report(&mut diagnostic),
+    }
+    diagnostic.report_all(&Path::new(&config.filename))
 }
 
-fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
-    let filename: String = config.filename;
-    let entrypoint: String = config.entrypoint.unwrap_or(String::from("main"));
-    let module: Module = parse::parse_file(&filename)?;
+fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
+    let filename: &String = &config.filename;
+    let main = String::from("main");
+    let entrypoint: &String = match config.entrypoint {
+        None => &main,
+        Some(ref value) => value,
+    };
+    let module: Module = parse::parse_file(filename)?;
     panic!("{:?} {:?} {:?}", filename, entrypoint, module)
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     match parse_args() {
         Err(err) => {
             report_config_error(err);
-            std::process::exit(1);
+            std::process::exit(1)
         }
-        Ok(config) => match run_interpreter(config) {
-            Ok(()) => {}
+        Ok(config) => match run_interpreter(&config) {
+            Ok(()) => Ok(()),
             Err(err) => {
-                report_interpreter_error(err);
-                std::process::exit(1);
+                let () = report_interpreter_error(&config, err)?;
+                std::process::exit(1)
             }
         },
     }

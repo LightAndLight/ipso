@@ -3,18 +3,19 @@
 module Main where
 
 import Control.Monad (unless)
-import Control.Selective (whenS)
-import Data.Foldable (for_)
+import qualified Data.Either as Either
+import Data.Foldable (traverse_)
 import Data.IORef (modifyIORef, newIORef, readIORef)
+import Data.Semigroup (Option (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+import Data.Traversable (for)
 import Data.Vector (Vector)
 import qualified Dhall
 import Options.Applicative (Parser, execParser, fullDesc, help, info, long, metavar, strOption)
 import System.Directory (getCurrentDirectory, listDirectory, setCurrentDirectory)
-import System.Exit (ExitCode (..), exitFailure)
-import System.FilePath ((</>))
+import System.Exit (ExitCode (..), exitFailure, exitSuccess)
+import System.FilePath (takeExtension, (</>))
 import System.Process (readProcessWithExitCode)
 
 data Example = Example
@@ -47,7 +48,7 @@ eqExitCode e1 e2 =
         ExitFailure n2 -> n1 == fromIntegral n2
         _ -> False
 
-runExample :: Config -> Example -> IO ()
+runExample :: Config -> Example -> IO (Either String ())
 runExample config example = do
   let args = foldr ((:) . Text.unpack) [] $ exArgs example
   (exitCode, stdout, stderr) <-
@@ -56,28 +57,31 @@ runExample config example = do
       args
       ""
 
-  hasErrorRef <- newIORef False
+  errorRef <- newIORef $ Option Nothing
 
   unless (stdout == Text.unpack (exStdout example)) $ do
-    modifyIORef hasErrorRef (True ||)
-    displayError "stdout" (exPath example) (exStdout example, id) (stdout, id)
+    modifyIORef errorRef (<> pure (displayError "stdout" (exPath example) (exStdout example, id) (stdout, id)))
 
   unless (stderr == Text.unpack (exStderr example)) $ do
-    modifyIORef hasErrorRef (True ||)
-    displayError "stderr" (exPath example) (exStderr example, id) (stderr, id)
+    modifyIORef errorRef (<> pure (displayError "stderr" (exPath example) (exStderr example, id) (stderr, id)))
 
   unless (eqExitCode (exExitCode example) exitCode) $ do
-    modifyIORef hasErrorRef (True ||)
-    displayError "exitcode" (exPath example) (exExitCode example, Text.pack . show) (exitCode, show)
+    modifyIORef errorRef (<> pure (displayError "exitcode" (exPath example) (exExitCode example, Text.pack . show) (exitCode, show)))
 
-  whenS (readIORef hasErrorRef) exitFailure
+  Option mError <- readIORef errorRef
+  pure $
+    case mError of
+      Just err -> Left err
+      Nothing -> Right ()
  where
-  displayError label path (expected, showExpected) (actual, showActual) = do
-    putStrLn $ path <> ": " <> label <> " mismatch"
-    putStrLn "expected:"
-    Text.putStrLn $ showExpected expected
-    putStrLn "actual:"
-    putStrLn $ showActual actual
+  displayError label path (expected, showExpected) (actual, showActual) =
+    unlines
+      [ path <> ": " <> label <> " mismatch"
+      , "expected:"
+      , Text.unpack $ showExpected expected
+      , "actual:"
+      , showActual actual
+      ]
 
 data Config = Config
   { cfgBin :: FilePath
@@ -104,7 +108,13 @@ main = do
   config <- execParser (info (configParser curDir) fullDesc)
   setCurrentDirectory $ cfgDir config
   files <- listDirectory "."
-  for_ files $ \file -> do
+  results <- for (filter ((".dhall" ==) . takeExtension) files) $ \file -> do
     example <- Dhall.inputFile (exampleDecoder file) file
     runExample config example
-  putStrLn "golden tests passed\n"
+  let (failures, successes) = Either.partitionEithers results
+  putStrLn $ show (length successes) <> " examples passed"
+  putStrLn $ show (length failures) <> " examples failed"
+  traverse_ putStrLn failures
+  case failures of
+    [] -> exitSuccess
+    _ : _ -> exitFailure

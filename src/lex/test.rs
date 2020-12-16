@@ -251,3 +251,44 @@ fn lex_case_1() {
         ]
     )
 }
+
+#[test]
+fn lex_ann_1() {
+    assert_eq!(
+        {
+            let input = String::from("main : IO ~");
+            let lexer = Lexer::new(&input);
+            lexer.tokenize()
+        },
+        vec![
+            Token {
+                token_type: TokenType::Ident(String::from("main")),
+                pos: 0
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 4
+            },
+            Token {
+                token_type: TokenType::Colon,
+                pos: 5
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 6
+            },
+            Token {
+                token_type: TokenType::Ident(String::from("IO")),
+                pos: 7
+            },
+            Token {
+                token_type: TokenType::Space,
+                pos: 9
+            },
+            Token {
+                token_type: TokenType::Unexpected('~'),
+                pos: 10
+            },
+        ]
+    )
+}

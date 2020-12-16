@@ -6,12 +6,13 @@ use std::{fs::File, io};
 
 mod test;
 
-struct Item {
-    pos: usize,
-    message: String,
+#[derive(Debug)]
+pub struct Item {
+    pub pos: usize,
+    pub message: String,
 }
 
-struct Diagnostic {
+pub struct Diagnostic {
     items: Vec<Item>,
 }
 
@@ -31,7 +32,7 @@ impl Diagnostic {
         line: usize,
         col: usize,
         path: &str,
-        line_str: &String,
+        line_str: &str,
         message: &String,
     ) -> String {
         let mut result = String::new();
@@ -62,7 +63,7 @@ impl Diagnostic {
         let file = File::open(path)?;
         let mut reader = BufReader::new(file);
         let mut line_str = String::new();
-        let mut line: usize = 1;
+        let mut line: usize = 0;
         let mut offset: usize = 0;
         for item in self.items.into_iter() {
             if item.pos >= offset {
@@ -78,27 +79,26 @@ impl Diagnostic {
                         }
                     }
                 }
-            } else {
-                let col: usize = {
-                    let item_bytes = &(line_str.as_bytes())[0..offset - item.pos];
-                    from_utf8(item_bytes).unwrap().chars().count()
-                };
-                let result = Diagnostic::report_string(
-                    line,
-                    col,
-                    path.to_str().unwrap(),
-                    &line_str,
-                    &item.message,
-                );
-                match io::stdout().write(result.as_bytes()) {
-                    Ok(_) => {}
-                    Err(err) => return Err(err),
-                };
-                match io::stdout().write(b"\n") {
-                    Ok(_) => {}
-                    Err(err) => return Err(err),
-                };
             }
+            let col: usize = {
+                let item_bytes = &(line_str.as_bytes())[0..item.pos];
+                from_utf8(item_bytes).unwrap().chars().count() + 1
+            };
+            let result = Diagnostic::report_string(
+                line,
+                col,
+                path.to_str().unwrap(),
+                line_str.trim_end_matches('\n'),
+                &item.message,
+            );
+            match io::stderr().write(result.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
+            match io::stderr().write(b"\n") {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
         }
         Ok(())
     }
