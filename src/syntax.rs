@@ -216,7 +216,7 @@ pub enum Declaration {
     },
     FromImport {
         module: String,
-        name: Names,
+        names: Names,
     },
 }
 

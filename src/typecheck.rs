@@ -74,7 +74,7 @@ impl Typechecker {
             syntax::Declaration::Import { module, name } => {
                 todo!()
             }
-            syntax::Declaration::FromImport { module, name } => {
+            syntax::Declaration::FromImport { module, names } => {
                 todo!()
             }
         }

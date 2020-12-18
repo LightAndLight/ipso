@@ -3,12 +3,12 @@ mod test;
 use crate::Diagnostic;
 use crate::Item;
 use std::collections::BTreeSet;
-use std::{collections::HashSet, fs::File, io::Read, vec::IntoIter};
+use std::{fs::File, io::Read, vec::IntoIter};
 
 use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, Type};
 use crate::{
     lex::{Lexer, Token, TokenType},
-    syntax::Keyword,
+    syntax::{Keyword, Names},
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -683,7 +683,26 @@ impl Parser {
     }
 
     fn from_import(&mut self) -> ParseResult<Declaration> {
-        todo!()
+        keep_right!(
+            keep_left!(self.keyword(Keyword::From), self.spaces()),
+            keep_left!(self.ident(), self.spaces()).and_then(|module| keep_right!(
+                keep_left!(self.keyword(Keyword::Import), self.spaces()),
+                choices!(
+                    self,
+                    keep_left!(
+                        map0!(Names::All, self.token(&TokenType::Asterisk)),
+                        self.spaces()
+                    ),
+                    sep_by!(
+                        self,
+                        keep_left!(self.ident(), self.spaces()),
+                        keep_left!(self.token(&TokenType::Comma), self.spaces())
+                    )
+                    .map(|names| Names::Names(names))
+                )
+                .map(|names| Declaration::FromImport { module, names })
+            ))
+        )
     }
 
     fn declaration(&mut self) -> ParseResult<Declaration> {

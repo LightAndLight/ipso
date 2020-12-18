@@ -3,9 +3,7 @@ use crate::{
     keep_left,
     lex::{Lexer, TokenType},
     map2,
-    syntax::Declaration,
-    syntax::Expr,
-    syntax::{Branch, Pattern, Type},
+    syntax::{Branch, Declaration, Expr, Names, Pattern, Type},
 };
 
 #[cfg(test)]
@@ -199,6 +197,34 @@ fn parse_type_alias_2() {
             name: String::from("Ap"),
             args: vec![String::from("a"), String::from("b")],
             body: Type::mk_app(Type::mk_name("a"), Type::mk_name("b"))
+        })
+    )
+}
+
+#[test]
+fn parse_from_import_1() {
+    parse_test!(
+        "from asdf import *",
+        from_import,
+        Ok(Declaration::FromImport {
+            module: String::from("asdf"),
+            names: Names::All
+        })
+    )
+}
+
+#[test]
+fn parse_from_import_2() {
+    parse_test!(
+        "from asdf import b, c, d",
+        from_import,
+        Ok(Declaration::FromImport {
+            module: String::from("asdf"),
+            names: Names::Names(vec![
+                String::from("b"),
+                String::from("c"),
+                String::from("d")
+            ])
         })
     )
 }
