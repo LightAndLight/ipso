@@ -1,4 +1,6 @@
 use crate::syntax::Type;
+use crate::typecheck::Context;
+use crate::typecheck::ContextEntry;
 
 use super::{Kind, TypeError, Typechecker};
 
@@ -41,4 +43,57 @@ fn infer_kind_test_4() {
         ))
         .map(|kind| tc.zonk_kind(kind));
     assert_eq!(expected, actual)
+}
+
+#[test]
+fn context_test_1() {
+    assert_eq!(
+        {
+            let mut ctx = Context::new();
+            ctx.insert(vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool),
+                (String::from("c"), Type::String),
+            ]);
+            ctx
+        },
+        Context(
+            vec![
+                (
+                    String::from("a"),
+                    vec![ContextEntry {
+                        index: 2,
+                        ty: Type::Unit
+                    }]
+                ),
+                (
+                    String::from("b"),
+                    vec![ContextEntry {
+                        index: 1,
+                        ty: Type::Bool
+                    }]
+                ),
+                (
+                    String::from("c"),
+                    vec![ContextEntry {
+                        index: 0,
+                        ty: Type::String
+                    }]
+                )
+            ]
+            .into_iter()
+            .collect()
+        )
+    )
+}
+
+#[test]
+#[should_panic]
+fn context_test_2() {
+    let mut ctx = Context::new();
+    ctx.insert(vec![
+        (String::from("a"), Type::Unit),
+        (String::from("a"), Type::Bool),
+        (String::from("c"), Type::String),
+    ]);
 }

@@ -173,6 +173,7 @@ pub enum Type {
     RowNil,
     RowCons(String, Box<Type>, Box<Type>),
     Unit,
+    Meta(usize),
 }
 
 impl Type {

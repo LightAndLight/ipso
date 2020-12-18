@@ -49,6 +49,12 @@ pub enum Expr {
     Case(Box<Expr>, Vec<Branch>),
 }
 
+impl Expr {
+    pub fn mk_app(a: Expr, b: Expr) -> Expr {
+        Expr::App(Box::new(a), Box::new(b))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {

@@ -1,25 +1,107 @@
 use crate::core;
 use crate::diagnostic;
 use crate::syntax;
+use crate::syntax::Spanned;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[cfg(test)]
 mod test;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct ContextEntry {
     index: usize,
     ty: syntax::Type,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct Context(HashMap<String, Vec<ContextEntry>>);
+
+impl Context {
+    fn new() -> Self {
+        Context(HashMap::new())
+    }
+
+    fn lookup(&self, name: &String) -> Option<ContextEntry> {
+        self.0
+            .get(name)
+            .and_then(|entries| entries.last().map(|entry| entry.clone()))
+    }
+
+    fn insert(&mut self, vars: Vec<(String, syntax::Type)>) {
+        debug_assert!(
+            {
+                let mut seen: HashSet<&String> = HashSet::new();
+                vars.iter().fold(true, |acc, el: &(String, syntax::Type)| {
+                    let acc = acc && !seen.contains(&&el.0);
+                    seen.insert(&el.0);
+                    acc
+                })
+            },
+            "duplicate name in {:?}",
+            vars
+        );
+        let num_vars = vars.len();
+        for (_, entries) in &mut self.0 {
+            for mut entry in entries {
+                entry.index += num_vars;
+            }
+        }
+        for (index, (var, ty)) in vars.into_iter().rev().enumerate() {
+            match self.0.get_mut(&var) {
+                None => {
+                    self.0.insert(var, vec![ContextEntry { index, ty }]);
+                }
+                Some(entries) => {
+                    entries.push(ContextEntry { index, ty });
+                }
+            };
+        }
+    }
+    fn delete(&mut self, vars: Vec<String>) {
+        debug_assert!(
+            {
+                let mut seen: HashSet<&String> = HashSet::new();
+                vars.iter().fold(true, |acc, el: &String| {
+                    let acc = acc && !seen.contains(&el);
+                    seen.insert(&el);
+                    acc
+                })
+            },
+            "duplicate name in {:?}",
+            vars
+        );
+        let num_vars = vars.len();
+        for var in vars {
+            match self.0.get_mut(&var) {
+                Some(entries) if entries.len() > 0 => {
+                    entries.pop();
+                }
+                _ => {}
+            }
+        }
+        for item in &mut self.0 {
+            for entry in item.1 {
+                entry.index -= num_vars;
+            }
+        }
+    }
+}
+
 pub struct Typechecker {
     kind_solutions: Vec<Option<Kind>>,
-    context: HashMap<String, ContextEntry>,
+    type_solutions: Vec<Option<syntax::Type>>,
+    typevar_kinds: Vec<Kind>,
+    context: Context,
     position: Option<usize>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
+    DuplicateArgument {
+        pos: usize,
+        name: String,
+    },
     NotInScope {
         pos: usize,
         name: String,
@@ -31,6 +113,35 @@ pub enum TypeError {
     },
 }
 
+impl syntax::Pattern {
+    fn get_arg_names(&self) -> Vec<&Spanned<String>> {
+        let mut arg_names = Vec::new();
+        match self {
+            syntax::Pattern::Name(n) => {
+                arg_names.push(n);
+            }
+            syntax::Pattern::Record { names, rest } => {
+                for name in names {
+                    arg_names.push(name);
+                }
+                match rest {
+                    None => {}
+                    Some(n) => {
+                        arg_names.push(n);
+                    }
+                }
+            }
+            syntax::Pattern::Variant { name: _, args } => {
+                for name in args {
+                    arg_names.push(name);
+                }
+            }
+            syntax::Pattern::Wildcard => {}
+        }
+        arg_names
+    }
+}
+
 impl TypeError {
     pub fn position(&self) -> usize {
         match self {
@@ -40,6 +151,7 @@ impl TypeError {
                 actual: _,
             } => *pos,
             TypeError::NotInScope { pos, name: _ } => *pos,
+            TypeError::DuplicateArgument { pos, name: _ } => *pos,
         }
     }
     pub fn message(&self) -> String {
@@ -59,12 +171,8 @@ impl TypeError {
                 message.push('"');
                 message
             }
-            TypeError::NotInScope { pos: _, name } => {
-                let mut message = String::new();
-                message.push_str(name.as_str());
-                message.push_str("not in scope");
-                message
-            }
+            TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
+            TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
         }
     }
 
@@ -129,7 +237,9 @@ impl Typechecker {
     pub fn new() -> Self {
         Typechecker {
             kind_solutions: vec![],
-            context: HashMap::new(),
+            type_solutions: vec![],
+            typevar_kinds: vec![],
+            context: Context::new(),
             position: None,
         }
     }
@@ -179,13 +289,13 @@ impl Typechecker {
         }
     }
 
-    fn lookup(&self, name: String) -> Result<ContextEntry, TypeError> {
-        match self.context.get(&name) {
+    fn lookup_expr(&self, name: String) -> Result<ContextEntry, TypeError> {
+        match self.context.lookup(&name) {
+            Some(entry) => Ok(entry),
             None => Err(TypeError::NotInScope {
                 pos: self.current_position(),
                 name,
             }),
-            Some(entry) => Ok(entry.clone()),
         }
     }
 
@@ -275,6 +385,13 @@ impl Typechecker {
         self.unify_kind(expected, actual)
     }
 
+    fn lookup_typevar(&self, n: usize) -> Result<Kind, TypeError> {
+        match self.typevar_kinds.get(n) {
+            None => panic!("missing type var: ?{}", n),
+            Some(k) => Ok(k.clone()),
+        }
+    }
+
     fn infer_kind(&mut self, ty: &syntax::Type) -> Result<Kind, TypeError> {
         match ty {
             syntax::Type::Name(n) => {
@@ -317,6 +434,7 @@ impl Typechecker {
                 Ok(Kind::Row)
             }
             syntax::Type::Unit => Ok(Kind::Type),
+            syntax::Type::Meta(n) => self.lookup_typevar(*n),
         }
     }
 
@@ -377,11 +495,91 @@ impl Typechecker {
             syntax::Type::Unit => {
                 todo!()
             }
+            syntax::Type::Meta(n) => {
+                todo!()
+            }
         }
     }
 
+    fn fresh_typevar(&mut self) -> syntax::Type {
+        let n = self.type_solutions.len();
+        self.type_solutions.push(None);
+        syntax::Type::Meta(n)
+    }
+
+    fn check_duplicate_args(&self, args: &Vec<&Spanned<String>>) -> Result<(), TypeError> {
+        let mut seen: HashSet<&String> = HashSet::new();
+        for arg in args {
+            if seen.contains(&arg.item) {
+                return Err(TypeError::DuplicateArgument {
+                    pos: arg.pos,
+                    name: arg.item.clone(),
+                });
+            } else {
+                seen.insert(&arg.item);
+            }
+        }
+        Ok(())
+    }
+
     fn infer_expr(&mut self, expr: syntax::Expr) -> Result<(core::Expr, syntax::Type), TypeError> {
-        todo!()
+        match expr {
+            syntax::Expr::Var(name) => {
+                let entry = self.lookup_expr(name)?;
+                Ok((core::Expr::Var(entry.index), entry.ty))
+            }
+            syntax::Expr::App(f, x) => {
+                let (f_core, f_ty) = self.infer_expr(*f)?;
+                let in_ty = self.fresh_typevar();
+                let out_ty = self.fresh_typevar();
+                self.unify_type(syntax::Type::mk_app(in_ty.clone(), out_ty.clone()), f_ty)?;
+                let x_core = self.check_expr(*x, in_ty)?;
+                Ok((core::Expr::mk_app(f_core, x_core), out_ty))
+            }
+            syntax::Expr::Lam { args, body } => {
+                let mut arg_names: Vec<&Spanned<String>> = Vec::new();
+                for arg in &args {
+                    arg_names.extend(arg.get_arg_names());
+                }
+                self.check_duplicate_args(&arg_names)?;
+                todo!()
+            }
+            syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
+            syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),
+            syntax::Expr::IfThenElse(_, _, _) => {
+                todo!();
+            }
+            syntax::Expr::Binop(_, _, _) => {
+                todo!();
+            }
+            syntax::Expr::Int(_) => {
+                todo!();
+            }
+            syntax::Expr::Char(_) => {
+                todo!();
+            }
+            syntax::Expr::String(_) => {
+                todo!();
+            }
+            syntax::Expr::Array(_) => {
+                todo!();
+            }
+            syntax::Expr::Record { fields, rest } => {
+                todo!();
+            }
+            syntax::Expr::Project(_, _) => {
+                todo!();
+            }
+            syntax::Expr::Variant(_, _) => {
+                todo!();
+            }
+            syntax::Expr::Case(_, _) => {
+                todo!();
+            }
+            syntax::Expr::Unit => {
+                todo!();
+            }
+        }
     }
 
     fn check_expr(
