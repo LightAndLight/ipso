@@ -1,5 +1,6 @@
 use crate::core;
 use crate::syntax;
+use crate::Diagnostic;
 use std::collections::HashMap;
 
 #[cfg(test)]
@@ -11,15 +12,21 @@ struct ContextEntry {
     ty: syntax::Type,
 }
 
-struct Typechecker {
+pub struct Typechecker {
     kind_solutions: Vec<Option<Kind>>,
     context: HashMap<String, ContextEntry>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
-enum TypeError {
+pub enum TypeError {
     NotInScope(String),
     KindMismatch { expected: Kind, actual: Kind },
+}
+
+impl TypeError {
+    pub fn report(diagnostic: &mut Diagnostic) {
+        todo!()
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -38,17 +45,17 @@ impl Kind {
 }
 
 impl Typechecker {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Typechecker {
             kind_solutions: vec![],
             context: HashMap::new(),
         }
     }
 
-    fn module(&mut self, module: syntax::Module) -> Result<core::Module, TypeError> {
+    pub fn check_module(&mut self, module: syntax::Module) -> Result<core::Module, TypeError> {
         let decls = module.decls.into_iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.declaration(decl).and_then(|decl| {
+                self.check_declaration(decl).and_then(|decl| {
                     decls.push(decl);
                     Ok(decls)
                 })
@@ -57,7 +64,10 @@ impl Typechecker {
         Ok(core::Module { decls })
     }
 
-    fn declaration(&mut self, decl: syntax::Declaration) -> Result<core::Declaration, TypeError> {
+    fn check_declaration(
+        &mut self,
+        decl: syntax::Declaration,
+    ) -> Result<core::Declaration, TypeError> {
         match decl {
             syntax::Declaration::Definition {
                 name,

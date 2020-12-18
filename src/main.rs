@@ -1,4 +1,5 @@
 use crate::diagnostic::{Diagnostic, Item};
+use crate::typecheck::Typechecker;
 use std::path::Path;
 use std::{env, io};
 
@@ -67,6 +68,7 @@ fn report_config_error(err: ConfigError) {
 #[derive(Debug)]
 enum InterpreterError {
     ParseError(parse::ParseError),
+    TypeError(typecheck::TypeError),
 }
 
 impl From<parse::ParseError> for InterpreterError {
@@ -75,10 +77,17 @@ impl From<parse::ParseError> for InterpreterError {
     }
 }
 
+impl From<typecheck::TypeError> for InterpreterError {
+    fn from(err: typecheck::TypeError) -> Self {
+        InterpreterError::TypeError(err)
+    }
+}
+
 fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Result<()> {
     let mut diagnostic = Diagnostic::new();
     match err {
         InterpreterError::ParseError(err) => err.report(&mut diagnostic),
+        InterpreterError::TypeError(err) => err.report(&mut diagnostic),
     }
     diagnostic.report_all(&Path::new(&config.filename))
 }
@@ -90,7 +99,9 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
         None => &main,
         Some(ref value) => value,
     };
-    let module: Module = parse::parse_file(filename)?;
+    let module: syntax::Module = parse::parse_file(filename)?;
+    let mut tc: Typechecker = Typechecker::new();
+    let module: core::Module = tc.check_module(module)?;
     panic!("{:?} {:?} {:?}", filename, entrypoint, module)
 }
 
