@@ -43,7 +43,29 @@ impl TypeError {
         }
     }
     pub fn message(&self) -> String {
-        todo!()
+        match self {
+            TypeError::KindMismatch {
+                pos: _,
+                expected,
+                actual,
+            } => {
+                let mut message = String::from("expected kind ");
+                message.push('"');
+                message.push_str(expected.render().as_str());
+                message.push('"');
+                message.push_str(", got kind ");
+                message.push('"');
+                message.push_str(actual.render().as_str());
+                message.push('"');
+                message
+            }
+            TypeError::NotInScope { pos: _, name } => {
+                let mut message = String::new();
+                message.push_str(name.as_str());
+                message.push_str("not in scope");
+                message
+            }
+        }
     }
 
     pub fn report(&self, diagnostic: &mut diagnostic::Diagnostic) {
@@ -55,7 +77,7 @@ impl TypeError {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-enum Kind {
+pub enum Kind {
     Type,
     Row,
     Constraint,
@@ -66,6 +88,30 @@ enum Kind {
 impl Kind {
     fn mk_arrow(a: Kind, b: Kind) -> Kind {
         Kind::Arrow(Box::new(a), Box::new(b))
+    }
+
+    fn render(&self) -> String {
+        match self {
+            Kind::Arrow(a, b) => {
+                let mut val = String::new();
+                match **a {
+                    Kind::Arrow(_, _) => val.push('('),
+                    _ => {}
+                }
+                val.push_str(a.render().as_str());
+                match **a {
+                    Kind::Arrow(_, _) => val.push(')'),
+                    _ => {}
+                }
+                val.push_str(" -> ");
+                val.push_str(b.render().as_str());
+                val
+            }
+            Kind::Type => String::from("Type"),
+            Kind::Row => String::from("Row"),
+            Kind::Constraint => String::from("Constraint"),
+            Kind::Meta(n) => format!("?{}", n),
+        }
     }
 }
 
