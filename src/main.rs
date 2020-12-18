@@ -3,9 +3,6 @@ use crate::typecheck::Typechecker;
 use std::path::Path;
 use std::{env, io};
 
-use parse::ParseError;
-use syntax::Module;
-
 mod core;
 mod diagnostic;
 mod lex;

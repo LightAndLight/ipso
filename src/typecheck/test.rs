@@ -22,6 +22,7 @@ fn infer_kind_test_2() {
 fn infer_kind_test_3() {
     let mut tc = Typechecker::new();
     let expected = Err(TypeError::KindMismatch {
+        pos: 0,
         expected: Kind::Type,
         actual: Kind::Row,
     });

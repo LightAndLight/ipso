@@ -1,6 +1,6 @@
 use crate::core;
+use crate::diagnostic;
 use crate::syntax;
-use crate::Diagnostic;
 use std::collections::HashMap;
 
 #[cfg(test)]
@@ -15,17 +15,42 @@ struct ContextEntry {
 pub struct Typechecker {
     kind_solutions: Vec<Option<Kind>>,
     context: HashMap<String, ContextEntry>,
+    position: Option<usize>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
-    NotInScope(String),
-    KindMismatch { expected: Kind, actual: Kind },
+    NotInScope {
+        pos: usize,
+        name: String,
+    },
+    KindMismatch {
+        pos: usize,
+        expected: Kind,
+        actual: Kind,
+    },
 }
 
 impl TypeError {
-    pub fn report(diagnostic: &mut Diagnostic) {
+    pub fn position(&self) -> usize {
+        match self {
+            TypeError::KindMismatch {
+                pos,
+                expected: _,
+                actual: _,
+            } => *pos,
+            TypeError::NotInScope { pos, name: _ } => *pos,
+        }
+    }
+    pub fn message(&self) -> String {
         todo!()
+    }
+
+    pub fn report(&self, diagnostic: &mut diagnostic::Diagnostic) {
+        diagnostic.item(diagnostic::Item {
+            pos: self.position(),
+            message: self.message(),
+        })
     }
 }
 
@@ -44,11 +69,22 @@ impl Kind {
     }
 }
 
+macro_rules! with_position {
+    ($self:ident, $new:expr, $x:expr) => {{
+        let current = self.position;
+        self.position = $new;
+        let res = $x;
+        self.position = old;
+        res
+    }};
+}
+
 impl Typechecker {
     pub fn new() -> Self {
         Typechecker {
             kind_solutions: vec![],
             context: HashMap::new(),
+            position: None,
         }
     }
 
@@ -90,9 +126,19 @@ impl Typechecker {
         }
     }
 
+    fn current_position(&self) -> usize {
+        match self.position {
+            None => 0,
+            Some(n) => n,
+        }
+    }
+
     fn lookup(&self, name: String) -> Result<ContextEntry, TypeError> {
         match self.context.get(&name) {
-            None => Err(TypeError::NotInScope(name)),
+            None => Err(TypeError::NotInScope {
+                pos: self.current_position(),
+                name,
+            }),
             Some(entry) => Ok(entry.clone()),
         }
     }
@@ -118,7 +164,11 @@ impl Typechecker {
     }
 
     fn kind_mismatch<A>(&self, expected: Kind, actual: Kind) -> Result<A, TypeError> {
-        Err(TypeError::KindMismatch { expected, actual })
+        Err(TypeError::KindMismatch {
+            pos: self.current_position(),
+            expected,
+            actual,
+        })
     }
 
     fn solve_kindvar_right(&mut self, expected: Kind, meta: usize) -> Result<(), TypeError> {

@@ -1,5 +1,5 @@
 #[cfg(test)]
-use super::{Diagnostic, Item};
+use super::Diagnostic;
 
 #[test]
 fn test_1() {
