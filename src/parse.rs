@@ -484,7 +484,9 @@ impl Parser {
                 self.ident().map(|s| Type::Name(s)),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
-                    keep_left!(self.type_(), self.token(&TokenType::RParen))
+                    keep_left!(
+                        optional!(self, self.type_()).map(|m_ty| m_ty.unwrap_or(Type::Unit)), self.token(&TokenType::RParen)
+                    )
                 )
             ),
             self.spaces()

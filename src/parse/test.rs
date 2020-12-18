@@ -234,6 +234,15 @@ fn parse_type_4() {
 }
 
 #[test]
+fn parse_type_5() {
+    parse_test!(
+        "IO ()",
+        type_,
+        Ok(Type::mk_app(Type::IO, Type::Unit))
+    )
+}
+
+#[test]
 fn parse_pattern_1() {
     parse_test!("a", pattern, Ok(Pattern::Name(String::from("a"))))
 }
