@@ -23,7 +23,7 @@ data Example = Example
   , exArgs :: Vector Text
   , exStdout :: Text
   , exStderr :: Text
-  , exExitCode :: Integer
+  , exExitCode :: Dhall.Natural
   }
 
 exampleDecoder :: FilePath -> Dhall.Decoder Example
@@ -33,9 +33,9 @@ exampleDecoder path =
       <$> Dhall.field "args" (Dhall.vector Dhall.strictText)
         <*> Dhall.field "stdout" Dhall.strictText
         <*> Dhall.field "stderr" Dhall.strictText
-        <*> Dhall.field "exitcode" Dhall.integer
+        <*> Dhall.field "exitcode" Dhall.natural
 
-eqExitCode :: Integer -> ExitCode -> Bool
+eqExitCode :: (Eq a, Num a) => a -> ExitCode -> Bool
 eqExitCode e1 e2 =
   case e1 of
     0 ->

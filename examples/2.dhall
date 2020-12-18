@@ -8,5 +8,5 @@
     1 | main : IO ~
       |           ^
     '',
-  exitcode = +1
+  exitcode = 1
 }
