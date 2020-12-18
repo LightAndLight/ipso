@@ -141,6 +141,10 @@ impl Expr {
     pub fn mk_case(cond: Expr, branches: Vec<Branch>) -> Expr {
         Expr::Case(Box::new(cond), branches)
     }
+
+    pub fn mk_app(a: Expr, b: Expr) -> Expr {
+        Expr::App(Box::new(a), Box::new(b))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -140,7 +140,8 @@ fn parse_definition_3() {
                 },
                 TokenType::Ident(String::from("")),
                 TokenType::Ident(String::from("case")),
-                TokenType::Space
+                TokenType::Space,
+                TokenType::LParen
             ]
             .into_iter()
             .collect()
@@ -159,6 +160,41 @@ fn parse_definition_4() {
             args: vec![Pattern::Name(String::from("y")), Pattern::Wildcard],
             body: Expr::Int(1)
         })
+    )
+}
+
+#[test]
+fn parse_definition_5() {
+    parse_test!(
+        "main : IO ()\nmain = pure ()",
+        definition,
+        Ok(Declaration::Definition {
+            name: String::from("main"),
+            ty: Type::mk_app(Type::IO, Type::Unit),
+            args: vec![],
+            body: Expr::mk_app(Expr::mk_var("pure"), Expr::Unit)
+        })
+    )
+}
+
+#[test]
+fn parse_app_1() {
+    parse_test!(
+        "a b c",
+        expr_app,
+        Ok(Expr::mk_app(
+            Expr::mk_app(Expr::mk_var("a"), Expr::mk_var("b")),
+            Expr::mk_var("c")
+        ))
+    )
+}
+
+#[test]
+fn parse_app_2() {
+    parse_test!(
+        "pure ()",
+        expr_app,
+        Ok(Expr::mk_app(Expr::mk_var("pure"), Expr::Unit))
     )
 }
 
@@ -235,11 +271,7 @@ fn parse_type_4() {
 
 #[test]
 fn parse_type_5() {
-    parse_test!(
-        "IO ()",
-        type_,
-        Ok(Type::mk_app(Type::IO, Type::Unit))
-    )
+    parse_test!("IO ()", type_, Ok(Type::mk_app(Type::IO, Type::Unit)))
 }
 
 #[test]
@@ -315,10 +347,19 @@ fn parse_case_4() {
         "case x of\n  a -> b\n   c -> d",
         expr_case,
         Err(ParseError::Unexpected {
-            pos: 22,
-            expecting: vec![TokenType::Space, TokenType::Indent(2)]
-                .into_iter()
-                .collect()
+            pos: 24,
+            expecting: vec![
+                TokenType::Space,
+                TokenType::Indent(2),
+                TokenType::LParen,
+                TokenType::Ident(String::from("")),
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
@@ -330,9 +371,18 @@ fn parse_case_5() {
         expr_case,
         Err(ParseError::Unexpected {
             pos: 18,
-            expecting: vec![TokenType::Space, TokenType::Indent(2)]
-                .into_iter()
-                .collect()
+            expecting: vec![
+                TokenType::Space,
+                TokenType::Indent(2),
+                TokenType::LParen,
+                TokenType::Ident(String::from("")),
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }

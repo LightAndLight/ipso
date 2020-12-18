@@ -485,7 +485,8 @@ impl Parser {
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
                     keep_left!(
-                        optional!(self, self.type_()).map(|m_ty| m_ty.unwrap_or(Type::Unit)), self.token(&TokenType::RParen)
+                        optional!(self, self.type_()).map(|m_ty| m_ty.unwrap_or(Type::Unit)),
+                        self.token(&TokenType::RParen)
                     )
                 )
             ),
@@ -570,7 +571,14 @@ impl Parser {
             choices!(
                 self,
                 self.int().map(|n| Expr::Int(n)),
-                self.ident().map(|n| Expr::Var(n))
+                self.ident().map(|n| Expr::Var(n)),
+                keep_right!(
+                    keep_left!(self.token(&TokenType::LParen), self.spaces()),
+                    keep_left!(
+                        optional!(self, self.expr()).map(|m_ty| m_ty.unwrap_or(Expr::Unit)),
+                        self.token(&TokenType::RParen)
+                    )
+                )
             ),
             self.spaces()
         )
@@ -610,8 +618,17 @@ impl Parser {
         })
     }
 
+    fn expr_app(&mut self) -> ParseResult<Expr> {
+        self.expr_atom().and_then(|first| {
+            many!(self, self.expr_atom()).map(|rest| {
+                rest.into_iter()
+                    .fold(first, |acc, el| Expr::mk_app(acc, el))
+            })
+        })
+    }
+
     fn expr(&mut self) -> ParseResult<Expr> {
-        choices!(self, self.expr_atom(), self.expr_case())
+        choices!(self, self.expr_app(), self.expr_case())
     }
 
     fn definition(&mut self) -> ParseResult<Declaration> {
