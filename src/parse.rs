@@ -304,6 +304,13 @@ macro_rules! optional {
     }};
 }
 
+macro_rules! spanned {
+    ($self:expr, $x:expr) => {{
+        let pos = $self.pos;
+        $x.map(|item| syntax::Spanned { pos, item })
+    }};
+}
+
 impl Parser {
     fn new(input: Vec<Token>) -> Self {
         let mut input = input.into_iter();
@@ -559,7 +566,7 @@ impl Parser {
         keep_left!(
             choices!(
                 self,
-                self.ident().map(|s| Pattern::Name(s)),
+                spanned!(self, self.ident()).map(|s| Pattern::Name(s)),
                 map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
             ),
             self.spaces()

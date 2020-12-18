@@ -1,6 +1,12 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct Spanned<A> {
+    pub pos: usize,
+    pub item: A,
+}
+
 pub enum Keyword {
     Case,
     Of,
@@ -74,14 +80,14 @@ pub enum StringPart {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Pattern {
-    Name(String),
+    Name(Spanned<String>),
     Record {
-        names: Vec<String>,
-        rest: Option<String>,
+        names: Vec<Spanned<String>>,
+        rest: Option<Spanned<String>>,
     },
     Variant {
         name: String,
-        args: Vec<String>,
+        args: Vec<Spanned<String>>,
     },
     Wildcard,
 }

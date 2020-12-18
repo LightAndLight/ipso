@@ -1,4 +1,5 @@
 #[cfg(test)]
+use crate::syntax::Spanned;
 use crate::{
     keep_left,
     lex::{Lexer, TokenType},
@@ -155,7 +156,13 @@ fn parse_definition_4() {
         Ok(Declaration::Definition {
             name: String::from("x"),
             ty: Type::Int,
-            args: vec![Pattern::Name(String::from("y")), Pattern::Wildcard],
+            args: vec![
+                Pattern::Name(Spanned {
+                    pos: 10,
+                    item: String::from("y")
+                }),
+                Pattern::Wildcard
+            ],
             body: Expr::Int(1)
         })
     )
@@ -328,7 +335,14 @@ fn parse_type_5() {
 
 #[test]
 fn parse_pattern_1() {
-    parse_test!("a", pattern, Ok(Pattern::Name(String::from("a"))))
+    parse_test!(
+        "a",
+        pattern,
+        Ok(Pattern::Name(Spanned {
+            pos: 0,
+            item: String::from("a")
+        }))
+    )
 }
 
 #[test]
@@ -344,7 +358,10 @@ fn parse_case_1() {
         Ok(Expr::mk_case(
             Expr::mk_var("x"),
             vec![Branch {
-                pattern: Pattern::Name(String::from("a")),
+                pattern: Pattern::Name(Spanned {
+                    pos: 12,
+                    item: String::from("a")
+                }),
                 body: Expr::mk_var("b")
             }]
         ))
@@ -360,11 +377,17 @@ fn parse_case_2() {
             Expr::mk_var("x"),
             vec![
                 Branch {
-                    pattern: Pattern::Name(String::from("a")),
+                    pattern: Pattern::Name(Spanned {
+                        pos: 12,
+                        item: String::from("a")
+                    }),
                     body: Expr::mk_var("b")
                 },
                 Branch {
-                    pattern: Pattern::Name(String::from("c")),
+                    pattern: Pattern::Name(Spanned {
+                        pos: 21,
+                        item: String::from("c")
+                    }),
                     body: Expr::mk_var("d")
                 }
             ]
@@ -381,11 +404,17 @@ fn parse_case_3() {
             Expr::mk_var("x"),
             vec![
                 Branch {
-                    pattern: Pattern::Name(String::from("a")),
+                    pattern: Pattern::Name(Spanned {
+                        pos: 12,
+                        item: String::from("a")
+                    }),
                     body: Expr::mk_var("b")
                 },
                 Branch {
-                    pattern: Pattern::Name(String::from("c")),
+                    pattern: Pattern::Name(Spanned {
+                        pos: 25,
+                        item: String::from("c")
+                    }),
                     body: Expr::mk_var("d")
                 }
             ]
