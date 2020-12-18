@@ -655,7 +655,18 @@ impl Parser {
     }
 
     fn type_alias(&mut self) -> ParseResult<Declaration> {
-        todo!()
+        keep_right!(
+            keep_left!(self.keyword(Keyword::Type), self.spaces()),
+            keep_left!(self.ident(), self.spaces()).and_then(|name| many!(
+                self,
+                keep_left!(self.ident(), self.spaces())
+            )
+            .and_then(|args| keep_right!(
+                keep_left!(self.token(&TokenType::Equals), self.spaces()),
+                self.type_()
+                    .map(|body| Declaration::TypeAlias { name, args, body })
+            )))
+        )
     }
 
     fn import(&mut self) -> ParseResult<Declaration> {

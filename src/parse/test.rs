@@ -178,6 +178,32 @@ fn parse_definition_5() {
 }
 
 #[test]
+fn parse_type_alias_1() {
+    parse_test!(
+        "type Hello = ()",
+        type_alias,
+        Ok(Declaration::TypeAlias {
+            name: String::from("Hello"),
+            args: vec![],
+            body: Type::Unit
+        })
+    )
+}
+
+#[test]
+fn parse_type_alias_2() {
+    parse_test!(
+        "type Ap a b = a b",
+        type_alias,
+        Ok(Declaration::TypeAlias {
+            name: String::from("Ap"),
+            args: vec![String::from("a"), String::from("b")],
+            body: Type::mk_app(Type::mk_name("a"), Type::mk_name("b"))
+        })
+    )
+}
+
+#[test]
 fn parse_app_1() {
     parse_test!(
         "a b c",

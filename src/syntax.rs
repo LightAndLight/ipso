@@ -12,6 +12,7 @@ pub enum Keyword {
     Import,
     As,
     From,
+    Type,
 }
 
 impl Keyword {
@@ -31,6 +32,7 @@ impl Keyword {
             Keyword::Import => "import",
             Keyword::As => "as",
             Keyword::From => "from",
+            Keyword::Type => "type",
         }
     }
 }
