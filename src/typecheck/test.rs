@@ -239,3 +239,158 @@ fn infer_pattern_test_4() {
         )
     )
 }
+
+#[test]
+fn infer_lam_test_1() {
+    let mut tc = Typechecker::new();
+    // \x -> x
+    let term = syntax::Expr::mk_lam(
+        vec![syntax::Pattern::Name(syntax::Spanned {
+            pos: 1,
+            item: String::from("x"),
+        })],
+        syntax::Expr::Var(String::from("x")),
+    );
+    assert_eq!(
+        tc.infer_expr(term),
+        Ok((
+            core::Expr::mk_lam(core::Pattern::Name, core::Expr::Var(0)),
+            syntax::Type::mk_arrow(syntax::Type::Meta(0), syntax::Type::Meta(0))
+        ))
+    )
+}
+
+#[test]
+fn infer_lam_test_2() {
+    let mut tc = Typechecker::new();
+    // \{x, y} -> x
+    let term = syntax::Expr::mk_lam(
+        vec![syntax::Pattern::Record {
+            names: vec![
+                syntax::Spanned {
+                    pos: 2,
+                    item: String::from("x"),
+                },
+                syntax::Spanned {
+                    pos: 5,
+                    item: String::from("y"),
+                },
+            ],
+            rest: None,
+        }],
+        syntax::Expr::Var(String::from("x")),
+    );
+    assert_eq!(
+        tc.infer_expr(term),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Record {
+                    names: 2,
+                    rest: false
+                },
+                core::Expr::Var(1)
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_record(
+                    vec![
+                        (String::from("x"), syntax::Type::Meta(0)),
+                        (String::from("y"), syntax::Type::Meta(1))
+                    ],
+                    None
+                ),
+                syntax::Type::Meta(0)
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_lam_test_3() {
+    let mut tc = Typechecker::new();
+    // \{x, y} -> y
+    let term = syntax::Expr::mk_lam(
+        vec![syntax::Pattern::Record {
+            names: vec![
+                syntax::Spanned {
+                    pos: 2,
+                    item: String::from("x"),
+                },
+                syntax::Spanned {
+                    pos: 5,
+                    item: String::from("y"),
+                },
+            ],
+            rest: None,
+        }],
+        syntax::Expr::Var(String::from("y")),
+    );
+    assert_eq!(
+        tc.infer_expr(term),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Record {
+                    names: 2,
+                    rest: false
+                },
+                core::Expr::Var(0)
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_record(
+                    vec![
+                        (String::from("x"), syntax::Type::Meta(0)),
+                        (String::from("y"), syntax::Type::Meta(1))
+                    ],
+                    None
+                ),
+                syntax::Type::Meta(1)
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_lam_test_4() {
+    let mut tc = Typechecker::new();
+    // \{x, y, ...z} -> z
+    let term = syntax::Expr::mk_lam(
+        vec![syntax::Pattern::Record {
+            names: vec![
+                syntax::Spanned {
+                    pos: 2,
+                    item: String::from("x"),
+                },
+                syntax::Spanned {
+                    pos: 5,
+                    item: String::from("y"),
+                },
+            ],
+            rest: Some(syntax::Spanned {
+                pos: 11,
+                item: String::from("z"),
+            }),
+        }],
+        syntax::Expr::Var(String::from("z")),
+    );
+    assert_eq!(
+        tc.infer_expr(term),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Record {
+                    names: 2,
+                    rest: true
+                },
+                core::Expr::Var(0)
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_record(
+                    vec![
+                        (String::from("x"), syntax::Type::Meta(0)),
+                        (String::from("y"), syntax::Type::Meta(1))
+                    ],
+                    Some(syntax::Type::Meta(2))
+                ),
+                syntax::Type::mk_record(vec![], Some(syntax::Type::Meta(2)))
+            )
+        ))
+    )
+}
