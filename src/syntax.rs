@@ -87,7 +87,7 @@ pub enum Pattern {
     },
     Variant {
         name: String,
-        args: Vec<Spanned<String>>,
+        arg: Spanned<String>,
     },
     Wildcard,
 }
@@ -202,7 +202,15 @@ impl Type {
         for (field, a) in fields.into_iter().rev() {
             ty = Type::mk_rowcons(field, a, ty)
         }
-        ty
+        Type::mk_app(Type::Record, ty)
+    }
+
+    pub fn mk_variant(ctors: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+        let mut ty = rest.unwrap_or(Type::RowNil);
+        for (field, arg) in ctors.into_iter().rev() {
+            ty = Type::mk_rowcons(field, arg, ty)
+        }
+        Type::mk_app(Type::Variant, ty)
     }
 }
 
