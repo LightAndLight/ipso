@@ -28,12 +28,12 @@ impl Context {
             .and_then(|entries| entries.last().map(|entry| entry.clone()))
     }
 
-    fn insert(&mut self, vars: Vec<(String, syntax::Type)>) {
+    fn insert(&mut self, vars: &Vec<(&String, syntax::Type)>) {
         debug_assert!(
             {
                 let mut seen: HashSet<&String> = HashSet::new();
-                vars.iter().fold(true, |acc, el: &(String, syntax::Type)| {
-                    let acc = acc && !seen.contains(&&el.0);
+                vars.iter().fold(true, |acc, el: &(&String, syntax::Type)| {
+                    let acc = acc && !seen.contains(&el.0);
                     seen.insert(&el.0);
                     acc
                 })
@@ -47,23 +47,24 @@ impl Context {
                 entry.index += num_vars;
             }
         }
-        for (index, (var, ty)) in vars.into_iter().rev().enumerate() {
-            match self.0.get_mut(&var) {
+        for (index, (var, ty)) in vars.iter().rev().enumerate() {
+            match self.0.get_mut(*var) {
                 None => {
-                    self.0.insert(var, vec![ContextEntry { index, ty }]);
+                    self.0.insert((*var).clone(), vec![ContextEntry { index, ty: ty.clone() }]);
                 }
                 Some(entries) => {
-                    entries.push(ContextEntry { index, ty });
+                    entries.push(ContextEntry { index, ty: ty.clone() });
                 }
             };
         }
     }
-    fn delete(&mut self, vars: Vec<String>) {
+    
+    fn delete(&mut self, vars: &Vec<&String>) {
         debug_assert!(
             {
                 let mut seen: HashSet<&String> = HashSet::new();
-                vars.iter().fold(true, |acc, el: &String| {
-                    let acc = acc && !seen.contains(&el);
+                vars.iter().fold(true, |acc, el: &&String| {
+                    let acc = acc && !seen.contains(el);
                     seen.insert(&el);
                     acc
                 })
@@ -73,7 +74,7 @@ impl Context {
         );
         let num_vars = vars.len();
         for var in vars {
-            match self.0.get_mut(&var) {
+            match self.0.get_mut(*var) {
                 Some(entries) if entries.len() > 0 => {
                     entries.pop();
                 }
@@ -522,6 +523,30 @@ impl Typechecker {
         Ok(())
     }
 
+    fn infer_pattern<'a, 'b>(&'a mut self, arg: &'b syntax::Pattern) -> (core::Pattern, syntax::Type, Vec<(&'b String, syntax::Type)>) {
+        match arg {
+            syntax::Pattern::Wildcard => (core::Pattern::Wildcard, self.fresh_typevar(), Vec::new()),
+            syntax::Pattern::Name(n) => {
+                let ty = self.fresh_typevar();
+                (core::Pattern::Name, ty.clone(), vec![(&n.item, ty)])
+            }
+            syntax::Pattern::Record{names, rest} => {
+                let mut names_tys: Vec<(&String, syntax::Type)> = names.iter().map(|name| (&name.item, self.fresh_typevar())).collect();
+                let rest_ty: Option<(&String, syntax::Type)> = 
+                    match rest {
+                        None => None,
+                        Some(name) => Some ((&name.item, self.fresh_typevar()))
+                    };
+                let ty = syntax::Type::mk_record(names_tys.iter().map(|(name, ty)| ((*name).clone(), ty.clone())).collect(), rest_ty.clone().map(|x| x.1));
+                rest_ty.map(|x| names_tys.push(x));
+                (core::Pattern::Record{names: names.len(), rest: match rest { None => false, Some(_) => true }}, ty, names_tys)
+            }
+            syntax::Pattern::Variant{name, args} => {
+                todo!();
+            }
+        }
+    }
+
     fn infer_expr(&mut self, expr: syntax::Expr) -> Result<(core::Expr, syntax::Type), TypeError> {
         match expr {
             syntax::Expr::Var(name) => {
@@ -537,12 +562,38 @@ impl Typechecker {
                 Ok((core::Expr::mk_app(f_core, x_core), out_ty))
             }
             syntax::Expr::Lam { args, body } => {
-                let mut arg_names: Vec<&Spanned<String>> = Vec::new();
+                {
+
+                let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
                 for arg in &args {
-                    arg_names.extend(arg.get_arg_names());
+                    arg_names_spanned.extend(arg.get_arg_names());
                 }
-                self.check_duplicate_args(&arg_names)?;
-                todo!()
+                self.check_duplicate_args(&arg_names_spanned)?;
+                }
+
+                let mut args_core = Vec::new();
+                let mut args_tys = Vec::new();
+                let mut args_names_tys = Vec::new();
+                for arg in &args {
+                    let (arg_core, arg_tys, arg_names_tys) = self.infer_pattern(&arg);
+                    args_core.push(arg_core);
+                    args_tys.push(arg_tys);
+                    args_names_tys.extend(arg_names_tys);
+                }
+                
+                self.context.insert(&args_names_tys);
+                let (body_core, body_ty) = self.infer_expr(*body)?;
+                self.context.delete(&args_names_tys.iter().map(|el| el.0).collect());
+                
+                let mut expr_core = body_core;
+                for arg_core in args_core.into_iter().rev() {
+                    expr_core = core::Expr::mk_lam(arg_core, expr_core);
+                }
+                let mut expr_ty = body_ty;
+                for arg_ty in args_tys.into_iter().rev() {
+                    expr_ty = syntax::Type::mk_arrow(arg_ty, expr_ty);
+                }
+                Ok((expr_core, expr_ty))
             }
             syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
             syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),

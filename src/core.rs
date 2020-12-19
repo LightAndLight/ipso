@@ -3,7 +3,7 @@ use crate::syntax;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Pattern {
     Name,
-    Record { fields: usize, rest: bool },
+    Record { names: usize, rest: bool },
     Variant { tag: usize, args: usize },
     Wildcard,
 }
@@ -52,6 +52,10 @@ pub enum Expr {
 impl Expr {
     pub fn mk_app(a: Expr, b: Expr) -> Expr {
         Expr::App(Box::new(a), Box::new(b))
+    }
+    
+    pub fn mk_lam(arg: Pattern, body: Expr) -> Expr {
+        Expr::Lam{arg, body: Box::new(body)}
     }
 }
 

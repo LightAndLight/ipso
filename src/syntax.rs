@@ -193,8 +193,16 @@ impl Type {
         Type::Name(String::from(s))
     }
 
-    pub fn mk_rowcons(field: &str, a: Type, b: Type) -> Type {
-        Type::RowCons(String::from(field), Box::new(a), Box::new(b))
+    pub fn mk_rowcons(field: String, a: Type, b: Type) -> Type {
+        Type::RowCons(field, Box::new(a), Box::new(b))
+    }
+
+    pub fn mk_record(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+        let mut ty = rest.unwrap_or(Type::RowNil);
+        for (field, a) in fields.into_iter().rev() {
+            ty = Type::mk_rowcons(field, a, ty)
+        }
+        ty
     }
 }
 
