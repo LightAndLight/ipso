@@ -121,6 +121,11 @@ pub enum TypeError {
         expected: Kind,
         actual: Kind,
     },
+    TypeMismatch {
+        pos: usize,
+        expected: syntax::Type,
+        actual: syntax::Type,
+    },
 }
 
 impl syntax::Pattern {
@@ -158,10 +163,16 @@ impl TypeError {
                 expected: _,
                 actual: _,
             } => *pos,
+            TypeError::TypeMismatch {
+                pos,
+                expected: _,
+                actual: _,
+            } => *pos,
             TypeError::NotInScope { pos, name: _ } => *pos,
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
         }
     }
+
     pub fn message(&self) -> String {
         match self {
             TypeError::KindMismatch {
@@ -174,6 +185,21 @@ impl TypeError {
                 message.push_str(expected.render().as_str());
                 message.push('"');
                 message.push_str(", got kind ");
+                message.push('"');
+                message.push_str(actual.render().as_str());
+                message.push('"');
+                message
+            }
+            TypeError::TypeMismatch {
+                pos: _,
+                expected,
+                actual,
+            } => {
+                let mut message = String::from("expected type ");
+                message.push('"');
+                message.push_str(expected.render().as_str());
+                message.push('"');
+                message.push_str(", got type ");
                 message.push('"');
                 message.push_str(actual.render().as_str());
                 message.push('"');
@@ -355,6 +381,42 @@ impl Typechecker {
         }
     }
 
+    fn type_mismatch<A>(
+        &self,
+        expected: syntax::Type,
+        actual: syntax::Type,
+    ) -> Result<A, TypeError> {
+        Err(TypeError::TypeMismatch {
+            pos: self.current_position(),
+            expected,
+            actual,
+        })
+    }
+
+    fn solve_typevar_right(
+        &mut self,
+        expected: syntax::Type,
+        meta: usize,
+    ) -> Result<(), TypeError> {
+        match self.type_solutions[meta].clone() {
+            None => {
+                self.type_solutions[meta] = Some(expected);
+                Ok(())
+            }
+            Some(actual) => self.unify_type(expected, actual),
+        }
+    }
+
+    fn solve_typevar_left(&mut self, meta: usize, actual: syntax::Type) -> Result<(), TypeError> {
+        match self.type_solutions[meta].clone() {
+            None => {
+                self.type_solutions[meta] = Some(actual);
+                Ok(())
+            }
+            Some(expected) => self.unify_type(expected, actual),
+        }
+    }
+
     fn unify_kind(&mut self, expected: Kind, actual: Kind) -> Result<(), TypeError> {
         match expected.clone() {
             Kind::Type => match actual {
@@ -464,9 +526,11 @@ impl Typechecker {
             syntax::Type::Bool => {
                 todo!()
             }
-            syntax::Type::Int => {
-                todo!()
-            }
+            syntax::Type::Int => match actual {
+                syntax::Type::Int => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
             syntax::Type::Char => {
                 todo!()
             }
@@ -589,6 +653,19 @@ impl Typechecker {
         }
     }
 
+    fn check_string_part(
+        &mut self,
+        part: syntax::StringPart,
+    ) -> Result<core::StringPart, TypeError> {
+        match part {
+            syntax::StringPart::String(s) => Ok(core::StringPart::String(s)),
+            syntax::StringPart::Expr(e) => {
+                let e_core = self.check_expr(e, syntax::Type::String)?;
+                Ok(core::StringPart::Expr(e_core))
+            }
+        }
+    }
+
     fn infer_expr(&mut self, expr: syntax::Expr) -> Result<(core::Expr, syntax::Type), TypeError> {
         match expr {
             syntax::Expr::Var(name) => {
@@ -639,23 +716,48 @@ impl Typechecker {
             }
             syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
             syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),
-            syntax::Expr::IfThenElse(_, _, _) => {
-                todo!();
+            syntax::Expr::IfThenElse(cond, then_, else_) => {
+                let cond_core = self.check_expr(*cond, syntax::Type::Bool)?;
+                let (then_core, then_ty) = self.infer_expr(*then_)?;
+                let else_core = self.check_expr(*else_, then_ty.clone())?;
+                Ok((
+                    core::Expr::mk_ifthenelse(cond_core, then_core, else_core),
+                    then_ty,
+                ))
             }
-            syntax::Expr::Binop(_, _, _) => {
-                todo!();
+            syntax::Expr::Unit => Ok((core::Expr::Unit, syntax::Type::Unit)),
+            syntax::Expr::Int(n) => Ok((core::Expr::Int(n), syntax::Type::Int)),
+            syntax::Expr::Char(c) => Ok((core::Expr::Char(c), syntax::Type::Char)),
+            syntax::Expr::String(parts) => {
+                let mut parts_core = Vec::new();
+                for part in parts {
+                    match self.check_string_part(part) {
+                        Err(err) => return Err(err),
+                        Ok(part_core) => parts_core.push(part_core),
+                    }
+                }
+                Ok((core::Expr::String(parts_core), syntax::Type::String))
             }
-            syntax::Expr::Int(_) => {
-                todo!();
-            }
-            syntax::Expr::Char(_) => {
-                todo!();
-            }
-            syntax::Expr::String(_) => {
-                todo!();
-            }
-            syntax::Expr::Array(_) => {
-                todo!();
+            syntax::Expr::Array(items) => {
+                let mut items_iter = items.into_iter();
+                match items_iter.next() {
+                    Some(first) => {
+                        let (first_core, first_ty) = self.infer_expr(first)?;
+                        let mut items_core = vec![first_core];
+                        for item in items_iter {
+                            let item_core = self.check_expr(item, first_ty.clone())?;
+                            items_core.push(item_core);
+                        }
+                        Ok((
+                            core::Expr::Array(items_core),
+                            syntax::Type::mk_app(syntax::Type::Array, first_ty),
+                        ))
+                    }
+                    None => Ok((
+                        core::Expr::Array(Vec::new()),
+                        syntax::Type::mk_app(syntax::Type::Array, self.fresh_typevar()),
+                    )),
+                }
             }
             syntax::Expr::Record { fields, rest } => {
                 todo!();
@@ -666,10 +768,10 @@ impl Typechecker {
             syntax::Expr::Variant(_, _) => {
                 todo!();
             }
-            syntax::Expr::Case(_, _) => {
+            syntax::Expr::Binop(_, _, _) => {
                 todo!();
             }
-            syntax::Expr::Unit => {
+            syntax::Expr::Case(_, _) => {
                 todo!();
             }
         }

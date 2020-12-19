@@ -177,6 +177,67 @@ pub enum Type {
 }
 
 impl Type {
+    fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
+        match self {
+            Type::App(a, b) => match **a {
+                Type::App(ref c, ref d) => match **c {
+                    Type::Arrow => Some((b, d)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn unwrap_fatarrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
+        match self {
+            Type::App(a, b) => match **a {
+                Type::App(ref c, ref d) => match **c {
+                    Type::FatArrow => Some((b, d)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type)>, Option<&'a Type>) {
+        let mut current = self;
+        let mut fields = Vec::new();
+        loop {
+            match current {
+                Type::RowNil => return (fields, None),
+                Type::RowCons(field, ty, rest) => {
+                    fields.push((field, ty));
+                    current = rest;
+                }
+                _ => return (fields, Some(current)),
+            }
+        }
+    }
+
+    fn unwrap_record<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+        match self {
+            Type::App(a, b) => match **a {
+                Type::Record => Some(b.unwrap_rows()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn unwrap_variant<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+        match self {
+            Type::App(a, b) => match **a {
+                Type::Variant => Some(b.unwrap_rows()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     pub fn mk_app(a: Type, b: Type) -> Type {
         Type::App(Box::new(a), Box::new(b))
     }
@@ -211,6 +272,175 @@ impl Type {
             ty = Type::mk_rowcons(field, arg, ty)
         }
         Type::mk_app(Type::Variant, ty)
+    }
+
+    pub fn render(&self) -> String {
+        let mut s = String::new();
+
+        match self.unwrap_record() {
+            Some((fields, rest)) => {
+                s.push('{');
+                let mut fields_iter = fields.iter();
+                match fields_iter.next() {
+                    None => {}
+                    Some((first_field, first_ty)) => {
+                        s.push_str(first_field.as_str());
+                        s.push_str(" : ");
+                        s.push_str(first_ty.render().as_str());
+                        for (field, ty) in fields_iter {
+                            s.push_str(", ");
+                            s.push_str(field.as_str());
+                            s.push_str(" : ");
+                            s.push_str(ty.render().as_str());
+                        }
+                    }
+                }
+                match rest {
+                    None => {}
+                    Some(ty) => {
+                        if fields.len() > 0 {
+                            s.push_str(", ")
+                        }
+                        s.push_str(ty.render().as_str());
+                    }
+                }
+                s.push('}');
+                return s;
+            }
+            None => {}
+        }
+
+        match self.unwrap_variant() {
+            Some((fields, rest)) => {
+                s.push('<');
+                let mut fields_iter = fields.iter();
+                match fields_iter.next() {
+                    None => {}
+                    Some((first_field, first_ty)) => {
+                        s.push_str(first_field.as_str());
+                        s.push_str(" : ");
+                        s.push_str(first_ty.render().as_str());
+                        for (field, ty) in fields_iter {
+                            s.push_str(" | ");
+                            s.push_str(field.as_str());
+                            s.push_str(" : ");
+                            s.push_str(ty.render().as_str());
+                        }
+                    }
+                }
+                match rest {
+                    None => {}
+                    Some(ty) => {
+                        if fields.len() > 0 {
+                            s.push_str(" | ")
+                        }
+                        s.push_str(ty.render().as_str());
+                    }
+                }
+                s.push('>');
+                return s;
+            }
+            None => {}
+        }
+
+        match self.unwrap_arrow() {
+            Some((a, b)) => {
+                match a.unwrap_arrow() {
+                    Some(_) => s.push('('),
+                    None => {}
+                }
+                s.push_str(a.render().as_str());
+                match a.unwrap_arrow() {
+                    Some(_) => s.push(')'),
+                    None => {}
+                }
+                s.push_str(" -> ");
+                s.push_str(b.render().as_str());
+                return s;
+            }
+            None => {}
+        }
+
+        match self.unwrap_fatarrow() {
+            Some((a, b)) => {
+                match a.unwrap_arrow() {
+                    Some(_) => s.push('('),
+                    None => {}
+                }
+                s.push_str(a.render().as_str());
+                match a.unwrap_arrow() {
+                    Some(_) => s.push(')'),
+                    None => {}
+                }
+                s.push_str(" => ");
+                s.push_str(b.render().as_str());
+                return s;
+            }
+            None => {}
+        }
+
+        match self {
+            Type::Name(n) => s.push_str(n.clone().as_str()),
+            Type::Bool => s.push_str("Bool"),
+            Type::Int => s.push_str("Int"),
+            Type::Char => s.push_str("Char"),
+            Type::String => s.push_str("String"),
+            Type::Arrow => s.push_str("(->)"),
+            Type::FatArrow => s.push_str("(=>)"),
+            Type::Constraints(cs) => {
+                s.push('(');
+                let mut cs_iter = cs.iter();
+                match cs_iter.next() {
+                    None => {}
+                    Some(first) => {
+                        s.push_str(first.render().as_str());
+                        for c in cs_iter {
+                            s.push_str(", ");
+                            s.push_str(c.render().as_str());
+                        }
+                    }
+                }
+                s.push(')');
+            }
+            Type::Array => s.push_str("Array"),
+            Type::Record => s.push_str("Record"),
+            Type::Variant => s.push_str("Variant"),
+            Type::IO => s.push_str("IO"),
+            Type::Unit => s.push_str("()"),
+            Type::Meta(n) => {
+                s.push('?');
+                s.push_str(format!("{}", n).as_str());
+            }
+            Type::RowNil => s.push_str("()"),
+            Type::RowCons(field, ty, rest) => {
+                s.push('(');
+                s.push_str(field.as_str());
+                s.push_str(" : ");
+                s.push_str(ty.render().as_str());
+                s.push_str(" | ");
+                s.push_str(rest.render().as_str());
+                s.push(')');
+            }
+            Type::App(a, b) => {
+                s.push_str(a.render().as_str());
+                s.push(' ');
+
+                match **b {
+                    Type::App(_, _) => {
+                        s.push('(');
+                    }
+                    _ => {}
+                }
+                s.push_str(b.render().as_str());
+                match **b {
+                    Type::App(_, _) => {
+                        s.push(')');
+                    }
+                    _ => {}
+                }
+            }
+        }
+        s
     }
 }
 

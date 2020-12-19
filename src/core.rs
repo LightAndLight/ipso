@@ -15,7 +15,7 @@ pub struct Branch {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum StringPart {
+pub enum StringPart {
     String(String),
     Expr(Expr),
 }
@@ -47,6 +47,7 @@ pub enum Expr {
 
     Variant(usize, Vec<Expr>),
     Case(Box<Expr>, Vec<Branch>),
+    Unit,
 }
 
 impl Expr {
@@ -59,6 +60,10 @@ impl Expr {
             arg,
             body: Box::new(body),
         }
+    }
+
+    pub fn mk_ifthenelse(x: Expr, y: Expr, z: Expr) -> Expr {
+        Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
     }
 }
 

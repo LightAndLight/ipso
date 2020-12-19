@@ -394,3 +394,42 @@ fn infer_lam_test_4() {
         ))
     )
 }
+
+#[test]
+fn infer_array_test_1() {
+    let mut tc = Typechecker::new();
+    let term = syntax::Expr::Array(vec![
+        syntax::Expr::Int(1),
+        syntax::Expr::Int(2),
+        syntax::Expr::Int(3),
+    ]);
+    assert_eq!(
+        tc.infer_expr(term),
+        Ok((
+            core::Expr::Array(vec![
+                core::Expr::Int(1),
+                core::Expr::Int(2),
+                core::Expr::Int(3)
+            ]),
+            syntax::Type::mk_app(syntax::Type::Array, syntax::Type::Int)
+        ))
+    )
+}
+
+#[test]
+fn infer_array_test_2() {
+    let mut tc = Typechecker::new();
+    let term = syntax::Expr::Array(vec![
+        syntax::Expr::Int(1),
+        syntax::Expr::True,
+        syntax::Expr::Int(3),
+    ]);
+    assert_eq!(
+        tc.infer_expr(term),
+        Err(TypeError::TypeMismatch {
+            pos: (),
+            expected: syntax::Type::Int,
+            actual: syntax::Type::Bool
+        })
+    )
+}
