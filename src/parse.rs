@@ -1,5 +1,6 @@
 mod test;
 
+use crate::syntax::Spanned;
 use crate::Diagnostic;
 use crate::Item;
 use std::collections::BTreeSet;
@@ -573,17 +574,23 @@ impl Parser {
         )
     }
 
-    fn expr_atom(&mut self) -> ParseResult<Expr> {
+    fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
-            choices!(
+            spanned!(
                 self,
-                self.int().map(|n| Expr::Int(n)),
-                self.ident().map(|n| Expr::Var(n)),
-                keep_right!(
-                    keep_left!(self.token(&TokenType::LParen), self.spaces()),
-                    keep_left!(
-                        optional!(self, self.expr()).map(|m_ty| m_ty.unwrap_or(Expr::Unit)),
-                        self.token(&TokenType::RParen)
+                choices!(
+                    self,
+                    self.int().map(|n| Expr::Int(n)),
+                    self.ident().map(|n| Expr::Var(n)),
+                    keep_right!(
+                        keep_left!(self.token(&TokenType::LParen), self.spaces()),
+                        keep_left!(
+                            optional!(self, self.expr()).map(|m_ty| match m_ty {
+                                None => Expr::Unit,
+                                Some(ty) => ty.item,
+                            }),
+                            self.token(&TokenType::RParen)
+                        )
                     )
                 )
             ),
@@ -601,31 +608,33 @@ impl Parser {
         })
     }
 
-    fn expr_case(&mut self) -> ParseResult<Expr> {
-        keep_left!(
-            self.token(&TokenType::Ident(String::from("case"))),
-            self.spaces()
-        )
-        .and_then(|_| {
-            self.expr().and_then(|cond| {
-                keep_left!(
-                    self.token(&TokenType::Ident(String::from("of"))),
-                    many_!(self, self.token(&TokenType::Space))
-                )
-                .and_then(|_| {
-                    keep_right!(self.indent(), sep_by!(self, self.branch(), self.newline())).map(
-                        |branches| {
-                            self.indentation.pop();
-
-                            Expr::Case(Box::new(cond), branches)
-                        },
+    fn expr_case(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            keep_left!(
+                self.token(&TokenType::Ident(String::from("case"))),
+                self.spaces()
+            )
+            .and_then(|_| {
+                self.expr().and_then(|cond| {
+                    keep_left!(
+                        self.token(&TokenType::Ident(String::from("of"))),
+                        many_!(self, self.token(&TokenType::Space))
                     )
+                    .and_then(|_| {
+                        keep_right!(self.indent(), sep_by!(self, self.branch(), self.newline()))
+                            .map(|branches| {
+                                self.indentation.pop();
+
+                                Expr::mk_case(cond, branches)
+                            })
+                    })
                 })
             })
-        })
+        )
     }
 
-    fn expr_app(&mut self) -> ParseResult<Expr> {
+    fn expr_app(&mut self) -> ParseResult<Spanned<Expr>> {
         self.expr_atom().and_then(|first| {
             many!(self, self.expr_atom()).map(|rest| {
                 rest.into_iter()
@@ -634,7 +643,7 @@ impl Parser {
         })
     }
 
-    fn expr(&mut self) -> ParseResult<Expr> {
+    fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
         choices!(self, self.expr_app(), self.expr_case())
     }
 
@@ -723,6 +732,6 @@ impl Parser {
     }
 
     fn module(&mut self) -> ParseResult<Module> {
-        many!(self, self.declaration()).map(|decls| Module { decls })
+        many!(self, spanned!(self, self.declaration())).map(|decls| Module { decls })
     }
 }

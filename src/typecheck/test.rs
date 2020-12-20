@@ -244,13 +244,19 @@ fn infer_pattern_test_4() {
 fn infer_lam_test_1() {
     let mut tc = Typechecker::new();
     // \x -> x
-    let term = syntax::Expr::mk_lam(
-        vec![syntax::Pattern::Name(syntax::Spanned {
-            pos: 1,
-            item: String::from("x"),
-        })],
-        syntax::Expr::Var(String::from("x")),
-    );
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 1,
+                item: String::from("x"),
+            })],
+            syntax::Spanned {
+                pos: 6,
+                item: syntax::Expr::Var(String::from("x")),
+            },
+        ),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Ok((
@@ -264,22 +270,28 @@ fn infer_lam_test_1() {
 fn infer_lam_test_2() {
     let mut tc = Typechecker::new();
     // \{x, y} -> x
-    let term = syntax::Expr::mk_lam(
-        vec![syntax::Pattern::Record {
-            names: vec![
-                syntax::Spanned {
-                    pos: 2,
-                    item: String::from("x"),
-                },
-                syntax::Spanned {
-                    pos: 5,
-                    item: String::from("y"),
-                },
-            ],
-            rest: None,
-        }],
-        syntax::Expr::Var(String::from("x")),
-    );
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Record {
+                names: vec![
+                    syntax::Spanned {
+                        pos: 2,
+                        item: String::from("x"),
+                    },
+                    syntax::Spanned {
+                        pos: 5,
+                        item: String::from("y"),
+                    },
+                ],
+                rest: None,
+            }],
+            syntax::Spanned {
+                pos: 11,
+                item: syntax::Expr::Var(String::from("x")),
+            },
+        ),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Ok((
@@ -308,22 +320,28 @@ fn infer_lam_test_2() {
 fn infer_lam_test_3() {
     let mut tc = Typechecker::new();
     // \{x, y} -> y
-    let term = syntax::Expr::mk_lam(
-        vec![syntax::Pattern::Record {
-            names: vec![
-                syntax::Spanned {
-                    pos: 2,
-                    item: String::from("x"),
-                },
-                syntax::Spanned {
-                    pos: 5,
-                    item: String::from("y"),
-                },
-            ],
-            rest: None,
-        }],
-        syntax::Expr::Var(String::from("y")),
-    );
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Record {
+                names: vec![
+                    syntax::Spanned {
+                        pos: 2,
+                        item: String::from("x"),
+                    },
+                    syntax::Spanned {
+                        pos: 5,
+                        item: String::from("y"),
+                    },
+                ],
+                rest: None,
+            }],
+            syntax::Spanned {
+                pos: 11,
+                item: syntax::Expr::Var(String::from("y")),
+            },
+        ),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Ok((
@@ -352,25 +370,31 @@ fn infer_lam_test_3() {
 fn infer_lam_test_4() {
     let mut tc = Typechecker::new();
     // \{x, y, ...z} -> z
-    let term = syntax::Expr::mk_lam(
-        vec![syntax::Pattern::Record {
-            names: vec![
-                syntax::Spanned {
-                    pos: 2,
-                    item: String::from("x"),
-                },
-                syntax::Spanned {
-                    pos: 5,
-                    item: String::from("y"),
-                },
-            ],
-            rest: Some(syntax::Spanned {
-                pos: 11,
-                item: String::from("z"),
-            }),
-        }],
-        syntax::Expr::Var(String::from("z")),
-    );
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Record {
+                names: vec![
+                    syntax::Spanned {
+                        pos: 2,
+                        item: String::from("x"),
+                    },
+                    syntax::Spanned {
+                        pos: 5,
+                        item: String::from("y"),
+                    },
+                ],
+                rest: Some(syntax::Spanned {
+                    pos: 11,
+                    item: String::from("z"),
+                }),
+            }],
+            syntax::Spanned {
+                pos: 17,
+                item: syntax::Expr::Var(String::from("z")),
+            },
+        ),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Ok((
@@ -398,11 +422,24 @@ fn infer_lam_test_4() {
 #[test]
 fn infer_array_test_1() {
     let mut tc = Typechecker::new();
-    let term = syntax::Expr::Array(vec![
-        syntax::Expr::Int(1),
-        syntax::Expr::Int(2),
-        syntax::Expr::Int(3),
-    ]);
+    // [1, 2, 3]
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::Array(vec![
+            syntax::Spanned {
+                pos: 1,
+                item: syntax::Expr::Int(1),
+            },
+            syntax::Spanned {
+                pos: 4,
+                item: syntax::Expr::Int(2),
+            },
+            syntax::Spanned {
+                pos: 7,
+                item: syntax::Expr::Int(3),
+            },
+        ]),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Ok((
@@ -419,15 +456,28 @@ fn infer_array_test_1() {
 #[test]
 fn infer_array_test_2() {
     let mut tc = Typechecker::new();
-    let term = syntax::Expr::Array(vec![
-        syntax::Expr::Int(1),
-        syntax::Expr::True,
-        syntax::Expr::Int(3),
-    ]);
+    // [1, true, 3]
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::Array(vec![
+            syntax::Spanned {
+                pos: 1,
+                item: syntax::Expr::Int(1),
+            },
+            syntax::Spanned {
+                pos: 4,
+                item: syntax::Expr::True,
+            },
+            syntax::Spanned {
+                pos: 10,
+                item: syntax::Expr::Int(3),
+            },
+        ]),
+    };
     assert_eq!(
         tc.infer_expr(term),
         Err(TypeError::TypeMismatch {
-            pos: (),
+            pos: 4,
             expected: syntax::Type::Int,
             actual: syntax::Type::Bool
         })

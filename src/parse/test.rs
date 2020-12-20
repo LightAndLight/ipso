@@ -106,7 +106,10 @@ fn parse_definition_1() {
             name: String::from("x"),
             ty: Type::Int,
             args: Vec::new(),
-            body: Expr::Int(1)
+            body: Spanned {
+                pos: 12,
+                item: Expr::Int(1)
+            }
         })
     )
 }
@@ -120,7 +123,10 @@ fn parse_definition_2() {
             name: String::from("x"),
             ty: Type::Int,
             args: Vec::new(),
-            body: Expr::Int(1)
+            body: Spanned {
+                pos: 14,
+                item: Expr::Int(1)
+            }
         })
     )
 }
@@ -163,7 +169,10 @@ fn parse_definition_4() {
                 }),
                 Pattern::Wildcard
             ],
-            body: Expr::Int(1)
+            body: Spanned {
+                pos: 16,
+                item: Expr::Int(1)
+            }
         })
     )
 }
@@ -177,7 +186,16 @@ fn parse_definition_5() {
             name: String::from("main"),
             ty: Type::mk_app(Type::IO, Type::Unit),
             args: vec![],
-            body: Expr::mk_app(Expr::mk_var("pure"), Expr::Unit)
+            body: Expr::mk_app(
+                Spanned {
+                    pos: 20,
+                    item: Expr::mk_var("pure")
+                },
+                Spanned {
+                    pos: 25,
+                    item: Expr::Unit
+                }
+            )
         })
     )
 }
@@ -242,8 +260,20 @@ fn parse_app_1() {
         "a b c",
         expr_app,
         Ok(Expr::mk_app(
-            Expr::mk_app(Expr::mk_var("a"), Expr::mk_var("b")),
-            Expr::mk_var("c")
+            Expr::mk_app(
+                Spanned {
+                    pos: 0,
+                    item: Expr::mk_var("a")
+                },
+                Spanned {
+                    pos: 2,
+                    item: Expr::mk_var("b")
+                }
+            ),
+            Spanned {
+                pos: 4,
+                item: Expr::mk_var("c")
+            }
         ))
     )
 }
@@ -253,7 +283,16 @@ fn parse_app_2() {
     parse_test!(
         "pure ()",
         expr_app,
-        Ok(Expr::mk_app(Expr::mk_var("pure"), Expr::Unit))
+        Ok(Expr::mk_app(
+            Spanned {
+                pos: 0,
+                item: Expr::mk_var("pure")
+            },
+            Spanned {
+                pos: 5,
+                item: Expr::Unit
+            }
+        ))
     )
 }
 
@@ -355,16 +394,25 @@ fn parse_case_1() {
     parse_test!(
         "case x of\n  a -> b",
         expr_case,
-        Ok(Expr::mk_case(
-            Expr::mk_var("x"),
-            vec![Branch {
-                pattern: Pattern::Name(Spanned {
-                    pos: 12,
-                    item: String::from("a")
-                }),
-                body: Expr::mk_var("b")
-            }]
-        ))
+        Ok(Spanned {
+            pos: 0,
+            item: Expr::mk_case(
+                Spanned {
+                    pos: 5,
+                    item: Expr::mk_var("x")
+                },
+                vec![Branch {
+                    pattern: Pattern::Name(Spanned {
+                        pos: 12,
+                        item: String::from("a")
+                    }),
+                    body: Spanned {
+                        pos: 17,
+                        item: Expr::mk_var("b")
+                    }
+                }]
+            )
+        })
     )
 }
 
@@ -373,25 +421,37 @@ fn parse_case_2() {
     parse_test!(
         "case x of\n  a -> b\n  c -> d",
         expr_case,
-        Ok(Expr::mk_case(
-            Expr::mk_var("x"),
-            vec![
-                Branch {
-                    pattern: Pattern::Name(Spanned {
-                        pos: 12,
-                        item: String::from("a")
-                    }),
-                    body: Expr::mk_var("b")
+        Ok(Spanned {
+            pos: 0,
+            item: Expr::mk_case(
+                Spanned {
+                    pos: 5,
+                    item: Expr::mk_var("x")
                 },
-                Branch {
-                    pattern: Pattern::Name(Spanned {
-                        pos: 21,
-                        item: String::from("c")
-                    }),
-                    body: Expr::mk_var("d")
-                }
-            ]
-        ))
+                vec![
+                    Branch {
+                        pattern: Pattern::Name(Spanned {
+                            pos: 12,
+                            item: String::from("a")
+                        }),
+                        body: Spanned {
+                            pos: 17,
+                            item: Expr::mk_var("b")
+                        }
+                    },
+                    Branch {
+                        pattern: Pattern::Name(Spanned {
+                            pos: 21,
+                            item: String::from("c")
+                        }),
+                        body: Spanned {
+                            pos: 26,
+                            item: Expr::mk_var("d")
+                        }
+                    }
+                ]
+            )
+        })
     )
 }
 
@@ -400,25 +460,37 @@ fn parse_case_3() {
     parse_test!(
         "case x of\n  a ->\n    b\n  c -> d",
         expr_case,
-        Ok(Expr::mk_case(
-            Expr::mk_var("x"),
-            vec![
-                Branch {
-                    pattern: Pattern::Name(Spanned {
-                        pos: 12,
-                        item: String::from("a")
-                    }),
-                    body: Expr::mk_var("b")
+        Ok(Spanned {
+            pos: 0,
+            item: Expr::mk_case(
+                Spanned {
+                    pos: 5,
+                    item: Expr::mk_var("x")
                 },
-                Branch {
-                    pattern: Pattern::Name(Spanned {
-                        pos: 25,
-                        item: String::from("c")
-                    }),
-                    body: Expr::mk_var("d")
-                }
-            ]
-        ))
+                vec![
+                    Branch {
+                        pattern: Pattern::Name(Spanned {
+                            pos: 12,
+                            item: String::from("a")
+                        }),
+                        body: Spanned {
+                            pos: 21,
+                            item: Expr::mk_var("b")
+                        }
+                    },
+                    Branch {
+                        pattern: Pattern::Name(Spanned {
+                            pos: 25,
+                            item: String::from("c")
+                        }),
+                        body: Spanned {
+                            pos: 30,
+                            item: Expr::mk_var("d")
+                        }
+                    }
+                ]
+            )
+        })
     )
 }
 

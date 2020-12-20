@@ -106,6 +106,16 @@ pub struct Typechecker {
     position: Option<usize>,
 }
 
+macro_rules! with_position {
+    ($self:expr, $pos:expr, $val:expr) => {{
+        let old = $self.position;
+        $self.position = Some($pos);
+        let res = $val;
+        $self.position = old;
+        res
+    }};
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
@@ -257,16 +267,6 @@ impl Kind {
     }
 }
 
-macro_rules! with_position {
-    ($self:ident, $new:expr, $x:expr) => {{
-        let current = self.position;
-        self.position = $new;
-        let res = $x;
-        self.position = old;
-        res
-    }};
-}
-
 impl Typechecker {
     pub fn new() -> Self {
         Typechecker {
@@ -292,16 +292,22 @@ impl Typechecker {
 
     fn check_declaration(
         &mut self,
-        decl: syntax::Declaration,
+        decl: syntax::Spanned<syntax::Declaration>,
     ) -> Result<core::Declaration, TypeError> {
-        match decl {
+        match decl.item {
             syntax::Declaration::Definition {
                 name,
                 ty,
                 args,
                 body,
             } => {
-                let body = self.check_expr(syntax::Expr::mk_lam(args, body), ty.clone())?;
+                let body = self.check_expr(
+                    syntax::Spanned {
+                        pos: decl.pos,
+                        item: syntax::Expr::mk_lam(args, body),
+                    },
+                    ty.clone(),
+                )?;
                 Ok(core::Declaration::Definition { name, ty, body })
             }
             syntax::Declaration::TypeAlias { name, args, body } => {
@@ -666,125 +672,134 @@ impl Typechecker {
         }
     }
 
-    fn infer_expr(&mut self, expr: syntax::Expr) -> Result<(core::Expr, syntax::Type), TypeError> {
-        match expr {
-            syntax::Expr::Var(name) => {
-                let entry = self.lookup_expr(name)?;
-                Ok((core::Expr::Var(entry.index), entry.ty))
-            }
-            syntax::Expr::App(f, x) => {
-                let (f_core, f_ty) = self.infer_expr(*f)?;
-                let in_ty = self.fresh_typevar();
-                let out_ty = self.fresh_typevar();
-                self.unify_type(syntax::Type::mk_app(in_ty.clone(), out_ty.clone()), f_ty)?;
-                let x_core = self.check_expr(*x, in_ty)?;
-                Ok((core::Expr::mk_app(f_core, x_core), out_ty))
-            }
-            syntax::Expr::Lam { args, body } => {
-                {
-                    let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
-                    for arg in &args {
-                        arg_names_spanned.extend(arg.get_arg_names());
-                    }
-                    self.check_duplicate_args(&arg_names_spanned)?;
+    fn infer_expr(
+        &mut self,
+        expr: syntax::Spanned<syntax::Expr>,
+    ) -> Result<(core::Expr, syntax::Type), TypeError> {
+        with_position!(
+            self,
+            expr.pos,
+            match expr.item {
+                syntax::Expr::Var(name) => {
+                    let entry = self.lookup_expr(name)?;
+                    Ok((core::Expr::Var(entry.index), entry.ty))
                 }
-
-                let mut args_core = Vec::new();
-                let mut args_tys = Vec::new();
-                let mut args_names_tys = Vec::new();
-                for arg in &args {
-                    let (arg_core, arg_tys, arg_names_tys) = self.infer_pattern(&arg);
-                    args_core.push(arg_core);
-                    args_tys.push(arg_tys);
-                    args_names_tys.extend(arg_names_tys);
+                syntax::Expr::App(f, x) => {
+                    let (f_core, f_ty) = self.infer_expr(*f)?;
+                    let in_ty = self.fresh_typevar();
+                    let out_ty = self.fresh_typevar();
+                    self.unify_type(syntax::Type::mk_app(in_ty.clone(), out_ty.clone()), f_ty)?;
+                    let x_core = self.check_expr(*x, in_ty)?;
+                    Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
-
-                self.context.insert(&args_names_tys);
-                let (body_core, body_ty) = self.infer_expr(*body)?;
-                self.context
-                    .delete(&args_names_tys.iter().map(|el| el.0).collect());
-
-                let mut expr_core = body_core;
-                for arg_core in args_core.into_iter().rev() {
-                    expr_core = core::Expr::mk_lam(arg_core, expr_core);
-                }
-                let mut expr_ty = body_ty;
-                for arg_ty in args_tys.into_iter().rev() {
-                    expr_ty = syntax::Type::mk_arrow(arg_ty, expr_ty);
-                }
-                Ok((expr_core, expr_ty))
-            }
-            syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
-            syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),
-            syntax::Expr::IfThenElse(cond, then_, else_) => {
-                let cond_core = self.check_expr(*cond, syntax::Type::Bool)?;
-                let (then_core, then_ty) = self.infer_expr(*then_)?;
-                let else_core = self.check_expr(*else_, then_ty.clone())?;
-                Ok((
-                    core::Expr::mk_ifthenelse(cond_core, then_core, else_core),
-                    then_ty,
-                ))
-            }
-            syntax::Expr::Unit => Ok((core::Expr::Unit, syntax::Type::Unit)),
-            syntax::Expr::Int(n) => Ok((core::Expr::Int(n), syntax::Type::Int)),
-            syntax::Expr::Char(c) => Ok((core::Expr::Char(c), syntax::Type::Char)),
-            syntax::Expr::String(parts) => {
-                let mut parts_core = Vec::new();
-                for part in parts {
-                    match self.check_string_part(part) {
-                        Err(err) => return Err(err),
-                        Ok(part_core) => parts_core.push(part_core),
-                    }
-                }
-                Ok((core::Expr::String(parts_core), syntax::Type::String))
-            }
-            syntax::Expr::Array(items) => {
-                let mut items_iter = items.into_iter();
-                match items_iter.next() {
-                    Some(first) => {
-                        let (first_core, first_ty) = self.infer_expr(first)?;
-                        let mut items_core = vec![first_core];
-                        for item in items_iter {
-                            let item_core = self.check_expr(item, first_ty.clone())?;
-                            items_core.push(item_core);
+                syntax::Expr::Lam { args, body } => {
+                    {
+                        let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
+                        for arg in &args {
+                            arg_names_spanned.extend(arg.get_arg_names());
                         }
-                        Ok((
-                            core::Expr::Array(items_core),
-                            syntax::Type::mk_app(syntax::Type::Array, first_ty),
-                        ))
+                        self.check_duplicate_args(&arg_names_spanned)?;
                     }
-                    None => Ok((
-                        core::Expr::Array(Vec::new()),
-                        syntax::Type::mk_app(syntax::Type::Array, self.fresh_typevar()),
-                    )),
+
+                    let mut args_core = Vec::new();
+                    let mut args_tys = Vec::new();
+                    let mut args_names_tys = Vec::new();
+                    for arg in &args {
+                        let (arg_core, arg_tys, arg_names_tys) = self.infer_pattern(&arg);
+                        args_core.push(arg_core);
+                        args_tys.push(arg_tys);
+                        args_names_tys.extend(arg_names_tys);
+                    }
+
+                    self.context.insert(&args_names_tys);
+                    let (body_core, body_ty) = self.infer_expr(*body)?;
+                    self.context
+                        .delete(&args_names_tys.iter().map(|el| el.0).collect());
+
+                    let mut expr_core = body_core;
+                    for arg_core in args_core.into_iter().rev() {
+                        expr_core = core::Expr::mk_lam(arg_core, expr_core);
+                    }
+                    let mut expr_ty = body_ty;
+                    for arg_ty in args_tys.into_iter().rev() {
+                        expr_ty = syntax::Type::mk_arrow(arg_ty, expr_ty);
+                    }
+                    Ok((expr_core, expr_ty))
+                }
+                syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
+                syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),
+                syntax::Expr::IfThenElse(cond, then_, else_) => {
+                    let cond_core = self.check_expr(*cond, syntax::Type::Bool)?;
+                    let (then_core, then_ty) = self.infer_expr(*then_)?;
+                    let else_core = self.check_expr(*else_, then_ty.clone())?;
+                    Ok((
+                        core::Expr::mk_ifthenelse(cond_core, then_core, else_core),
+                        then_ty,
+                    ))
+                }
+                syntax::Expr::Unit => Ok((core::Expr::Unit, syntax::Type::Unit)),
+                syntax::Expr::Int(n) => Ok((core::Expr::Int(n), syntax::Type::Int)),
+                syntax::Expr::Char(c) => Ok((core::Expr::Char(c), syntax::Type::Char)),
+                syntax::Expr::String(parts) => {
+                    let mut parts_core = Vec::new();
+                    for part in parts {
+                        match self.check_string_part(part) {
+                            Err(err) => return Err(err),
+                            Ok(part_core) => parts_core.push(part_core),
+                        }
+                    }
+                    Ok((core::Expr::String(parts_core), syntax::Type::String))
+                }
+                syntax::Expr::Array(items) => {
+                    let mut items_iter = items.into_iter();
+                    match items_iter.next() {
+                        Some(first) => {
+                            let (first_core, first_ty) = self.infer_expr(first)?;
+                            let mut items_core = vec![first_core];
+                            for item in items_iter {
+                                let item_core = self.check_expr(item, first_ty.clone())?;
+                                items_core.push(item_core);
+                            }
+                            Ok((
+                                core::Expr::Array(items_core),
+                                syntax::Type::mk_app(syntax::Type::Array, first_ty),
+                            ))
+                        }
+                        None => Ok((
+                            core::Expr::Array(Vec::new()),
+                            syntax::Type::mk_app(syntax::Type::Array, self.fresh_typevar()),
+                        )),
+                    }
+                }
+                syntax::Expr::Record { fields, rest } => {
+                    todo!();
+                }
+                syntax::Expr::Project(_, _) => {
+                    todo!();
+                }
+                syntax::Expr::Variant(_, _) => {
+                    todo!();
+                }
+                syntax::Expr::Binop(_, _, _) => {
+                    todo!();
+                }
+                syntax::Expr::Case(_, _) => {
+                    todo!();
                 }
             }
-            syntax::Expr::Record { fields, rest } => {
-                todo!();
-            }
-            syntax::Expr::Project(_, _) => {
-                todo!();
-            }
-            syntax::Expr::Variant(_, _) => {
-                todo!();
-            }
-            syntax::Expr::Binop(_, _, _) => {
-                todo!();
-            }
-            syntax::Expr::Case(_, _) => {
-                todo!();
-            }
-        }
+        )
     }
 
     fn check_expr(
         &mut self,
-        expr: syntax::Expr,
+        expr: syntax::Spanned<syntax::Expr>,
         ty: syntax::Type,
     ) -> Result<core::Expr, TypeError> {
-        let expected = ty;
-        let (expr, actual) = self.infer_expr(expr)?;
-        self.unify_type(expected, actual)?;
-        Ok(expr)
+        with_position!(self, expr.pos, {
+            let expected = ty;
+            let (expr, actual) = self.infer_expr(expr)?;
+            self.unify_type(expected, actual)?;
+            Ok(expr)
+        })
     }
 }

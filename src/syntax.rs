@@ -75,7 +75,7 @@ pub enum Binop {
 #[derive(Debug, PartialEq, Eq)]
 pub enum StringPart {
     String(String),
-    Expr(Expr),
+    Expr(Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -95,41 +95,41 @@ pub enum Pattern {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Branch {
     pub pattern: Pattern,
-    pub body: Expr,
+    pub body: Spanned<Expr>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
     Var(String),
 
-    App(Box<Expr>, Box<Expr>),
+    App(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
     Lam {
         args: Vec<Pattern>,
-        body: Box<Expr>,
+        body: Box<Spanned<Expr>>,
     },
 
     True,
     False,
-    IfThenElse(Box<Expr>, Box<Expr>, Box<Expr>),
+    IfThenElse(Box<Spanned<Expr>>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 
     Int(u32),
 
-    Binop(Binop, Box<Expr>, Box<Expr>),
+    Binop(Binop, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
 
     Char(char),
 
     String(Vec<StringPart>),
 
-    Array(Vec<Expr>),
+    Array(Vec<Spanned<Expr>>),
 
     Record {
-        fields: HashMap<String, Expr>,
-        rest: Option<Box<Expr>>,
+        fields: HashMap<String, Spanned<Expr>>,
+        rest: Option<Box<Spanned<Expr>>>,
     },
-    Project(Box<Expr>, String),
+    Project(Box<Spanned<Expr>>, String),
 
-    Variant(String, Vec<Expr>),
-    Case(Box<Expr>, Vec<Branch>),
+    Variant(String, Box<Spanned<Expr>>),
+    Case(Box<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
 }
@@ -139,19 +139,22 @@ impl Expr {
         Expr::Var(String::from(v))
     }
 
-    pub fn mk_lam(args: Vec<Pattern>, body: Expr) -> Expr {
+    pub fn mk_lam(args: Vec<Pattern>, body: Spanned<Expr>) -> Expr {
         Expr::Lam {
             args,
             body: Box::new(body),
         }
     }
 
-    pub fn mk_case(cond: Expr, branches: Vec<Branch>) -> Expr {
+    pub fn mk_case(cond: Spanned<Expr>, branches: Vec<Branch>) -> Expr {
         Expr::Case(Box::new(cond), branches)
     }
 
-    pub fn mk_app(a: Expr, b: Expr) -> Expr {
-        Expr::App(Box::new(a), Box::new(b))
+    pub fn mk_app(a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
+        Spanned {
+            pos: a.pos,
+            item: Expr::App(Box::new(a), Box::new(b)),
+        }
     }
 }
 
@@ -456,7 +459,7 @@ pub enum Declaration {
         name: String,
         ty: Type,
         args: Vec<Pattern>,
-        body: Expr,
+        body: Spanned<Expr>,
     },
     TypeAlias {
         name: String,
@@ -475,5 +478,5 @@ pub enum Declaration {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
-    pub decls: Vec<Declaration>,
+    pub decls: Vec<Spanned<Declaration>>,
 }
