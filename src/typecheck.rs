@@ -228,6 +228,127 @@ impl TypeError {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+enum PartitionTree<'a, A> {
+    Leaf(&'a [A]),
+    Branch(usize, Box<PartitionTree<'a, A>>, Box<PartitionTree<'a, A>>),
+}
+
+impl<'a, A> PartitionTree<'a, A> {
+    pub fn from_vec(v: &'a Vec<A>) -> PartitionTree<'a, A> {
+        PartitionTree::Leaf(v)
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            PartitionTree::Leaf(slice) => slice.len(),
+            PartitionTree::Branch(size, _, _) => *size,
+        }
+    }
+
+    pub fn delete(self, ix: usize) -> Result<PartitionTree<'a, A>, PartitionTree<'a, A>> {
+        match self {
+            PartitionTree::Leaf(slice) => {
+                if ix < slice.len() {
+                    let (prefix, suffix) = slice.split_at(ix);
+                    let suffix = &suffix[1..];
+                    let prefix_len = prefix.len();
+                    let suffix_len = suffix.len();
+                    if prefix_len == 0 {
+                        Ok(PartitionTree::Leaf(suffix))
+                    } else if suffix_len == 0 {
+                        Ok(PartitionTree::Leaf(prefix))
+                    } else {
+                        Ok(PartitionTree::Branch(
+                            prefix_len + suffix_len,
+                            Box::new(PartitionTree::Leaf(prefix)),
+                            Box::new(PartitionTree::Leaf(suffix)),
+                        ))
+                    }
+                } else {
+                    Err(PartitionTree::Leaf(slice))
+                }
+            }
+            PartitionTree::Branch(size, mut left, mut right) => {
+                let left_size = left.size();
+                if ix >= left_size {
+                    match (*right).delete(ix - left_size) {
+                        Err(new) => {
+                            *right = new;
+                            Err(PartitionTree::Branch(size, left, right))
+                        }
+                        Ok(new) => {
+                            if new.size() == 0 {
+                                Ok(*left)
+                            } else {
+                                *right = new;
+                                Ok(PartitionTree::Branch(size - 1, left, right))
+                            }
+                        }
+                    }
+                } else {
+                    match (*left).delete(ix) {
+                        Err(new) => {
+                            *left = new;
+                            Err(PartitionTree::Branch(size, left, right))
+                        }
+                        Ok(new) => {
+                            if new.size() == 0 {
+                                Ok(*right)
+                            } else {
+                                *left = new;
+                                Ok(PartitionTree::Branch(size - 1, left, right))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn iter<'b>(&'b self) -> PartitionTreeIter<'b, 'a, A> {
+        PartitionTreeIter {
+            next: vec![self],
+            current: [].iter(),
+        }
+    }
+}
+
+struct PartitionTreeIter<'b, 'a, A> {
+    next: Vec<&'b PartitionTree<'a, A>>,
+    current: std::slice::Iter<'a, A>,
+}
+
+impl<'b, 'a, A> Iterator for PartitionTreeIter<'b, 'a, A> {
+    type Item = &'a A;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.current.next() {
+            Some(val) => Some(val),
+            None => match self.next.pop() {
+                None => None,
+                Some(next) => {
+                    let mut next = next;
+                    loop {
+                        match next {
+                            PartitionTree::Branch(_, a, b) => {
+                                next = &*a;
+                                self.next.push(&*b);
+                            }
+                            PartitionTree::Leaf(slice) => {
+                                let mut slice_iter = slice.iter();
+                                let next = slice_iter.next();
+                                self.current = slice_iter;
+                                return next;
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Kind {
     Type,
@@ -523,59 +644,114 @@ impl Typechecker {
         let actual_kind = self.infer_kind(&actual)?;
         self.unify_kind(expected_kind, actual_kind)?;
         match expected {
-            syntax::Type::App(a, b) => {
-                todo!()
-            }
-            syntax::Type::Name(n) => {
-                todo!()
-            }
-            syntax::Type::Bool => {
-                todo!()
-            }
+            syntax::Type::App(a1, b1) => match actual {
+                syntax::Type::App(a2, b2) => {
+                    self.unify_type(*a1, *a2)?;
+                    self.unify_type(*b1, *b2)?;
+                    Ok(())
+                }
+                syntax::Type::Meta(n) => self.solve_typevar_right(syntax::Type::App(a1, b1), n),
+                actual => self.type_mismatch(syntax::Type::App(a1, b1), actual),
+            },
+            syntax::Type::Name(n) => match actual {
+                syntax::Type::Name(nn) if n == nn => Ok(()),
+                syntax::Type::Meta(nn) => self.solve_typevar_right(syntax::Type::Name(n), nn),
+                actual => self.type_mismatch(syntax::Type::Name(n), actual),
+            },
+            syntax::Type::Bool => match actual {
+                syntax::Type::String => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
             syntax::Type::Int => match actual {
                 syntax::Type::Int => Ok(()),
                 syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
                 _ => self.type_mismatch(expected, actual),
             },
-            syntax::Type::Char => {
-                todo!()
-            }
-            syntax::Type::String => {
-                todo!()
-            }
-            syntax::Type::Array => {
-                todo!()
-            }
-            syntax::Type::Arrow => {
-                todo!()
-            }
-            syntax::Type::FatArrow => {
-                todo!()
-            }
-            syntax::Type::Constraints(constraints) => {
-                todo!()
-            }
-            syntax::Type::Record => {
-                todo!()
-            }
-            syntax::Type::Variant => {
-                todo!()
-            }
-            syntax::Type::IO => {
-                todo!()
-            }
-            syntax::Type::RowNil => {
-                todo!()
-            }
-            syntax::Type::RowCons(field, ty, rest) => {
-                todo!()
-            }
-            syntax::Type::Unit => {
-                todo!()
-            }
-            syntax::Type::Meta(n) => {
-                todo!()
-            }
+            syntax::Type::Char => match actual {
+                syntax::Type::Char => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::String => match actual {
+                syntax::Type::String => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Array => match actual {
+                syntax::Type::Array => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Arrow => match actual {
+                syntax::Type::Arrow => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::FatArrow => match actual {
+                syntax::Type::FatArrow => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Constraints(constraints1) => match actual {
+                syntax::Type::Constraints(constraints2) => {
+                    for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
+                        match self.unify_type(c1, c2) {
+                            Err(err) => return Err(err),
+                            Ok(_) => {}
+                        }
+                    }
+                    Ok(())
+                }
+                syntax::Type::Meta(n) => {
+                    self.solve_typevar_right(syntax::Type::Constraints(constraints1), n)
+                }
+                actual => self.type_mismatch(syntax::Type::Constraints(constraints1), actual),
+            },
+            syntax::Type::Record => match actual {
+                syntax::Type::Record => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Variant => match actual {
+                syntax::Type::Variant => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::IO => match actual {
+                syntax::Type::IO => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::RowNil => match actual {
+                syntax::Type::RowNil => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::RowCons(field1, ty1, rest1) => match actual {
+                syntax::Type::RowCons(field2, ty2, rest2) => {
+                    let (rows1, rest1) = syntax::Type::RowCons(field1, ty1, rest1).unwrap_rows();
+                    let (rows2, rest2) = syntax::Type::RowCons(field2, ty2, rest2).unwrap_rows();
+
+                    let mut sames = Vec::new();
+                    let mut not_in_rows1 = Vec::new();
+                    let mut not_in_rows2 = Vec::new();
+                    todo!()
+                }
+                syntax::Type::Meta(n) => {
+                    self.solve_typevar_right(syntax::Type::RowCons(field1, ty1, rest1), n)
+                }
+                actual => self.type_mismatch(syntax::Type::RowCons(field1, ty1, rest1), actual),
+            },
+            syntax::Type::Unit => match actual {
+                syntax::Type::Unit => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Meta(n) => match actual {
+                syntax::Type::Meta(nn) if n == nn => Ok(()),
+                _ => self.solve_typevar_left(n, actual),
+            },
         }
     }
 

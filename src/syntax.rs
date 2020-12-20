@@ -206,7 +206,7 @@ impl Type {
         }
     }
 
-    fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type)>, Option<&'a Type>) {
+    pub fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type)>, Option<&'a Type>) {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
