@@ -229,60 +229,60 @@ impl TypeError {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-enum PartitionTree<'a, A> {
+enum Rope<'a, A> {
     Leaf(&'a [A]),
-    Branch(usize, Box<PartitionTree<'a, A>>, Box<PartitionTree<'a, A>>),
+    Branch(usize, Box<Rope<'a, A>>, Box<Rope<'a, A>>),
 }
 
-impl<'a, A> PartitionTree<'a, A> {
-    pub fn from_vec(v: &'a Vec<A>) -> PartitionTree<'a, A> {
-        PartitionTree::Leaf(v)
+impl<'a, A> Rope<'a, A> {
+    pub fn from_vec(v: &'a Vec<A>) -> Rope<'a, A> {
+        Rope::Leaf(v)
     }
 
     pub fn size(&self) -> usize {
         match self {
-            PartitionTree::Leaf(slice) => slice.len(),
-            PartitionTree::Branch(size, _, _) => *size,
+            Rope::Leaf(slice) => slice.len(),
+            Rope::Branch(size, _, _) => *size,
         }
     }
 
-    pub fn delete(self, ix: usize) -> Result<PartitionTree<'a, A>, PartitionTree<'a, A>> {
+    pub fn delete(self, ix: usize) -> Result<Rope<'a, A>, Rope<'a, A>> {
         match self {
-            PartitionTree::Leaf(slice) => {
+            Rope::Leaf(slice) => {
                 if ix < slice.len() {
                     let (prefix, suffix) = slice.split_at(ix);
                     let suffix = &suffix[1..];
                     let prefix_len = prefix.len();
                     let suffix_len = suffix.len();
                     if prefix_len == 0 {
-                        Ok(PartitionTree::Leaf(suffix))
+                        Ok(Rope::Leaf(suffix))
                     } else if suffix_len == 0 {
-                        Ok(PartitionTree::Leaf(prefix))
+                        Ok(Rope::Leaf(prefix))
                     } else {
-                        Ok(PartitionTree::Branch(
+                        Ok(Rope::Branch(
                             prefix_len + suffix_len,
-                            Box::new(PartitionTree::Leaf(prefix)),
-                            Box::new(PartitionTree::Leaf(suffix)),
+                            Box::new(Rope::Leaf(prefix)),
+                            Box::new(Rope::Leaf(suffix)),
                         ))
                     }
                 } else {
-                    Err(PartitionTree::Leaf(slice))
+                    Err(Rope::Leaf(slice))
                 }
             }
-            PartitionTree::Branch(size, mut left, mut right) => {
+            Rope::Branch(size, mut left, mut right) => {
                 let left_size = left.size();
                 if ix >= left_size {
                     match (*right).delete(ix - left_size) {
                         Err(new) => {
                             *right = new;
-                            Err(PartitionTree::Branch(size, left, right))
+                            Err(Rope::Branch(size, left, right))
                         }
                         Ok(new) => {
                             if new.size() == 0 {
                                 Ok(*left)
                             } else {
                                 *right = new;
-                                Ok(PartitionTree::Branch(size - 1, left, right))
+                                Ok(Rope::Branch(size - 1, left, right))
                             }
                         }
                     }
@@ -290,14 +290,14 @@ impl<'a, A> PartitionTree<'a, A> {
                     match (*left).delete(ix) {
                         Err(new) => {
                             *left = new;
-                            Err(PartitionTree::Branch(size, left, right))
+                            Err(Rope::Branch(size, left, right))
                         }
                         Ok(new) => {
                             if new.size() == 0 {
                                 Ok(*right)
                             } else {
                                 *left = new;
-                                Ok(PartitionTree::Branch(size - 1, left, right))
+                                Ok(Rope::Branch(size - 1, left, right))
                             }
                         }
                     }
@@ -306,20 +306,20 @@ impl<'a, A> PartitionTree<'a, A> {
         }
     }
 
-    pub fn iter<'b>(&'b self) -> PartitionTreeIter<'b, 'a, A> {
-        PartitionTreeIter {
+    pub fn iter<'b>(&'b self) -> RopeIter<'b, 'a, A> {
+        RopeIter {
             next: vec![self],
             current: [].iter(),
         }
     }
 }
 
-struct PartitionTreeIter<'b, 'a, A> {
-    next: Vec<&'b PartitionTree<'a, A>>,
+struct RopeIter<'b, 'a, A> {
+    next: Vec<&'b Rope<'a, A>>,
     current: std::slice::Iter<'a, A>,
 }
 
-impl<'b, 'a, A> Iterator for PartitionTreeIter<'b, 'a, A> {
+impl<'b, 'a, A> Iterator for RopeIter<'b, 'a, A> {
     type Item = &'a A;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -331,11 +331,11 @@ impl<'b, 'a, A> Iterator for PartitionTreeIter<'b, 'a, A> {
                     let mut next = next;
                     loop {
                         match next {
-                            PartitionTree::Branch(_, a, b) => {
+                            Rope::Branch(_, a, b) => {
                                 next = &*a;
                                 self.next.push(&*b);
                             }
-                            PartitionTree::Leaf(slice) => {
+                            Rope::Leaf(slice) => {
                                 let mut slice_iter = slice.iter();
                                 let next = slice_iter.next();
                                 self.current = slice_iter;
@@ -733,9 +733,9 @@ impl Typechecker {
                     let (rows1, rest1) = syntax::Type::RowCons(field1, ty1, rest1).unwrap_rows();
                     let (rows2, rest2) = syntax::Type::RowCons(field2, ty2, rest2).unwrap_rows();
 
-                    let mut sames = Vec::new();
-                    let mut not_in_rows1 = Vec::new();
-                    let mut not_in_rows2 = Vec::new();
+                    // let mut sames = Vec::new();
+                    // let mut not_in_rows1 = Vec::new();
+                    // let mut not_in_rows2 = Vec::new();
                     todo!()
                 }
                 syntax::Type::Meta(n) => {

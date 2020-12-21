@@ -2,7 +2,7 @@ use crate::core;
 use crate::syntax::{self, Type};
 use crate::typecheck::Context;
 use crate::typecheck::ContextEntry;
-use crate::typecheck::PartitionTree;
+use crate::typecheck::Rope;
 
 use super::{Kind, TypeError, Typechecker};
 
@@ -486,9 +486,9 @@ fn infer_array_test_2() {
 }
 
 #[test]
-fn partition_tree_test_1() {
+fn rope_test_1() {
     assert_eq!(
-        PartitionTree::from_vec(&vec![0, 1, 2, 3, 4])
+        Rope::from_vec(&vec![0, 1, 2, 3, 4])
             .delete(1)
             .map(|xs| xs.iter().collect()),
         Ok(vec![&0, &2, &3, &4])
@@ -496,9 +496,9 @@ fn partition_tree_test_1() {
 }
 
 #[test]
-fn partition_tree_test_2() {
+fn rope_test_2() {
     assert_eq!(
-        PartitionTree::from_vec(&vec![0, 1, 2, 3, 4])
+        Rope::from_vec(&vec![0, 1, 2, 3, 4])
             .delete(0)
             .map(|xs| xs.iter().collect()),
         Ok(vec![&1, &2, &3, &4])
@@ -506,9 +506,9 @@ fn partition_tree_test_2() {
 }
 
 #[test]
-fn partition_tree_test_3() {
+fn rope_test_3() {
     assert_eq!(
-        PartitionTree::from_vec(&vec![0, 1, 2, 3, 4])
+        Rope::from_vec(&vec![0, 1, 2, 3, 4])
             .delete(4)
             .map(|xs| xs.iter().collect()),
         Ok(vec![&0, &1, &2, &3])
@@ -516,9 +516,9 @@ fn partition_tree_test_3() {
 }
 
 #[test]
-fn partition_tree_test_4() {
+fn rope_test_4() {
     assert_eq!(
-        PartitionTree::from_vec(&vec![0, 1, 2, 3, 4])
+        Rope::from_vec(&vec![0, 1, 2, 3, 4])
             .delete(1)
             .unwrap()
             .delete(2)
@@ -528,9 +528,9 @@ fn partition_tree_test_4() {
 }
 
 #[test]
-fn partition_tree_test_5() {
+fn rope_test_5() {
     assert_eq!(
-        PartitionTree::from_vec(&vec![0, 1, 2, 3, 4])
+        Rope::from_vec(&vec![0, 1, 2, 3, 4])
             .delete(3)
             .unwrap()
             .delete(1)
