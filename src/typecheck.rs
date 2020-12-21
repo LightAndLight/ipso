@@ -657,7 +657,7 @@ impl Typechecker {
 
     fn lookup_typevar(&self, n: usize) -> Result<Kind, TypeError> {
         match self.typevar_kinds.get(n) {
-            None => panic!("missing type var: ?{}", n),
+            None => panic!("missing kind for type var: ?{}", n),
             Some(k) => Ok(k.clone()),
         }
     }
@@ -708,6 +708,13 @@ impl Typechecker {
         }
     }
 
+    fn fresh_typevar(&mut self, kind: Kind) -> syntax::Type {
+        let n = self.type_solutions.len();
+        self.type_solutions.push(None);
+        self.typevar_kinds.push(kind);
+        syntax::Type::Meta(n)
+    }
+
     fn unify_type(
         &mut self,
         expected: syntax::Type,
@@ -732,7 +739,7 @@ impl Typechecker {
                 actual => self.type_mismatch(syntax::Type::Name(n), actual),
             },
             syntax::Type::Bool => match actual {
-                syntax::Type::String => Ok(()),
+                syntax::Type::Bool => Ok(()),
                 syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
                 _ => self.type_mismatch(expected, actual),
             },
@@ -825,7 +832,6 @@ impl Typechecker {
                                         Ok(new) => new,
                                     };
                                 sames.push((field1, ty1, ty2));
-                                todo!();
                             }
                         }
                     }
@@ -847,7 +853,7 @@ impl Typechecker {
                         }
                     }
 
-                    let rest3 = Some(self.fresh_typevar());
+                    let rest3 = Some(self.fresh_typevar(Kind::Row));
                     self.unify_type(
                         match rest1 {
                             None => syntax::Type::RowNil,
@@ -882,12 +888,6 @@ impl Typechecker {
         }
     }
 
-    fn fresh_typevar(&mut self) -> syntax::Type {
-        let n = self.type_solutions.len();
-        self.type_solutions.push(None);
-        syntax::Type::Meta(n)
-    }
-
     fn check_duplicate_args(&self, args: &Vec<&Spanned<String>>) -> Result<(), TypeError> {
         let mut seen: HashSet<&String> = HashSet::new();
         for arg in args {
@@ -908,21 +908,23 @@ impl Typechecker {
         arg: &'b syntax::Pattern,
     ) -> (core::Pattern, syntax::Type, Vec<(&'b String, syntax::Type)>) {
         match arg {
-            syntax::Pattern::Wildcard => {
-                (core::Pattern::Wildcard, self.fresh_typevar(), Vec::new())
-            }
+            syntax::Pattern::Wildcard => (
+                core::Pattern::Wildcard,
+                self.fresh_typevar(Kind::Type),
+                Vec::new(),
+            ),
             syntax::Pattern::Name(n) => {
-                let ty = self.fresh_typevar();
+                let ty = self.fresh_typevar(Kind::Type);
                 (core::Pattern::Name, ty.clone(), vec![(&n.item, ty)])
             }
             syntax::Pattern::Record { names, rest } => {
                 let mut names_tys: Vec<(&String, syntax::Type)> = names
                     .iter()
-                    .map(|name| (&name.item, self.fresh_typevar()))
+                    .map(|name| (&name.item, self.fresh_typevar(Kind::Type)))
                     .collect();
                 let rest_ty: Option<(&String, syntax::Type)> = match rest {
                     None => None,
-                    Some(name) => Some((&name.item, self.fresh_typevar())),
+                    Some(name) => Some((&name.item, self.fresh_typevar(Kind::Type))),
                 };
                 let ty = syntax::Type::mk_record(
                     names_tys
@@ -950,8 +952,8 @@ impl Typechecker {
                 )
             }
             syntax::Pattern::Variant { name, arg } => {
-                let arg_ty: syntax::Type = self.fresh_typevar();
-                let rest_ty = Some(self.fresh_typevar());
+                let arg_ty: syntax::Type = self.fresh_typevar(Kind::Type);
+                let rest_ty = Some(self.fresh_typevar(Kind::Type));
                 let ty = syntax::Type::mk_variant(vec![(name.clone(), arg_ty.clone())], rest_ty);
                 (
                     core::Pattern::Variant { name: name.clone() },
@@ -989,8 +991,8 @@ impl Typechecker {
                 }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(*f)?;
-                    let in_ty = self.fresh_typevar();
-                    let out_ty = self.fresh_typevar();
+                    let in_ty = self.fresh_typevar(Kind::Type);
+                    let out_ty = self.fresh_typevar(Kind::Type);
                     self.unify_type(syntax::Type::mk_app(in_ty.clone(), out_ty.clone()), f_ty)?;
                     let x_core = self.check_expr(*x, in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
@@ -1070,7 +1072,10 @@ impl Typechecker {
                         }
                         None => Ok((
                             core::Expr::Array(Vec::new()),
-                            syntax::Type::mk_app(syntax::Type::Array, self.fresh_typevar()),
+                            syntax::Type::mk_app(
+                                syntax::Type::Array,
+                                self.fresh_typevar(Kind::Type),
+                            ),
                         )),
                     }
                 }

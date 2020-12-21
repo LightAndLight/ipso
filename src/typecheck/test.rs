@@ -572,3 +572,109 @@ fn rope_test_8() {
         Ok(vec![&("a", 0), &("c", 3)])
     )
 }
+
+#[test]
+fn unify_rows_test_1() {
+    let mut tc = Typechecker::new();
+    assert_eq!(
+        tc.unify_type(
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("y"), Type::Bool)
+                ],
+                None
+            ),
+            Type::mk_record(
+                vec![
+                    (String::from("y"), Type::Bool),
+                    (String::from("x"), Type::Int)
+                ],
+                None
+            )
+        ),
+        Ok(())
+    )
+}
+
+#[test]
+fn unify_rows_test_2() {
+    let mut tc = Typechecker::new();
+    assert_eq!(
+        tc.unify_type(
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("x"), Type::Bool),
+                    (String::from("y"), Type::Bool)
+                ],
+                None
+            ),
+            Type::mk_record(
+                vec![
+                    (String::from("y"), Type::Bool),
+                    (String::from("x"), Type::Int),
+                    (String::from("x"), Type::Bool)
+                ],
+                None
+            )
+        ),
+        Ok(())
+    )
+}
+
+#[test]
+fn unify_rows_test_3() {
+    let mut tc = Typechecker::new();
+    assert_eq!(
+        tc.unify_type(
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("x"), Type::Bool),
+                    (String::from("y"), Type::Bool)
+                ],
+                None
+            ),
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("y"), Type::Bool),
+                    (String::from("x"), Type::Bool)
+                ],
+                None
+            )
+        ),
+        Ok(())
+    )
+}
+
+#[test]
+fn unify_rows_test_4() {
+    let mut tc = Typechecker::new();
+    assert_eq!(
+        tc.unify_type(
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("x"), Type::Bool),
+                    (String::from("y"), Type::Bool)
+                ],
+                None
+            ),
+            Type::mk_record(
+                vec![
+                    (String::from("x"), Type::Int),
+                    (String::from("y"), Type::Bool),
+                    (String::from("x"), Type::Int)
+                ],
+                None
+            )
+        ),
+        Err(TypeError::TypeMismatch {
+            pos: 0,
+            expected: Type::Bool,
+            actual: Type::Int
+        })
+    )
+}
