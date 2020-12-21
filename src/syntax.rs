@@ -261,20 +261,20 @@ impl Type {
         Type::RowCons(field, Box::new(a), Box::new(b))
     }
 
-    pub fn mk_record(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+    pub fn mk_rows(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
         let mut ty = rest.unwrap_or(Type::RowNil);
         for (field, a) in fields.into_iter().rev() {
             ty = Type::mk_rowcons(field, a, ty)
         }
-        Type::mk_app(Type::Record, ty)
+        ty
+    }
+
+    pub fn mk_record(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+        Type::mk_app(Type::Record, Type::mk_rows(fields, rest))
     }
 
     pub fn mk_variant(ctors: Vec<(String, Type)>, rest: Option<Type>) -> Type {
-        let mut ty = rest.unwrap_or(Type::RowNil);
-        for (field, arg) in ctors.into_iter().rev() {
-            ty = Type::mk_rowcons(field, arg, ty)
-        }
-        Type::mk_app(Type::Variant, ty)
+        Type::mk_app(Type::Variant, Type::mk_rows(ctors, rest))
     }
 
     pub fn render(&self) -> String {

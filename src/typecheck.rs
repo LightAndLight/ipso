@@ -230,6 +230,7 @@ impl TypeError {
 
 #[derive(PartialEq, Eq, Debug)]
 enum Rope<'a, A> {
+    Empty,
     Leaf(&'a [A]),
     Branch(usize, Box<Rope<'a, A>>, Box<Rope<'a, A>>),
 }
@@ -241,13 +242,75 @@ impl<'a, A> Rope<'a, A> {
 
     pub fn size(&self) -> usize {
         match self {
+            Rope::Empty => 0,
             Rope::Leaf(slice) => slice.len(),
             Rope::Branch(size, _, _) => *size,
         }
     }
 
+    pub fn delete_first<P: Fn(&A) -> bool>(
+        self,
+        predicate: &P,
+    ) -> Result<Rope<'a, A>, Rope<'a, A>> {
+        match self {
+            Rope::Empty => Err(Rope::Empty),
+            Rope::Leaf(slice) => match slice.iter().position(predicate) {
+                Some(ix) => {
+                    let (prefix, suffix) = slice.split_at(ix);
+                    let suffix = &suffix[1..];
+                    let prefix_len = prefix.len();
+                    let suffix_len = suffix.len();
+                    if prefix_len == 0 {
+                        Ok(Rope::Leaf(suffix))
+                    } else if suffix_len == 0 {
+                        Ok(Rope::Leaf(prefix))
+                    } else {
+                        Ok(Rope::Branch(
+                            prefix_len + suffix_len,
+                            Box::new(Rope::Leaf(prefix)),
+                            Box::new(Rope::Leaf(suffix)),
+                        ))
+                    }
+                }
+                None => Err(self),
+            },
+            Rope::Branch(size, mut left, mut right) => match left.delete_first(predicate) {
+                Err(new_left) => {
+                    *left = new_left;
+                    match right.delete_first(predicate) {
+                        Err(new_right) => {
+                            *right = new_right;
+                            Err(Rope::Branch(size, left, right))
+                        }
+                        Ok(new_right) => {
+                            *right = new_right;
+                            let left_size = left.size();
+                            let right_size = right.size();
+                            if right.size() == 0 {
+                                Ok(*left)
+                            } else {
+                                Ok(Rope::Branch(left_size + right_size, left, right))
+                            }
+                        }
+                    }
+                }
+                Ok(new_left) => {
+                    *left = new_left;
+                    let left_size = left.size();
+                    let right_size = right.size();
+                    if left.size() == 0 {
+                        Ok(*right)
+                    } else {
+                        Ok(Rope::Branch(left_size + right_size, left, right))
+                    }
+                }
+            },
+        }
+    }
+
     pub fn delete(self, ix: usize) -> Result<Rope<'a, A>, Rope<'a, A>> {
         match self {
+            Rope::Empty => Err(Rope::Empty),
             Rope::Leaf(slice) => {
                 if ix < slice.len() {
                     let (prefix, suffix) = slice.split_at(ix);
@@ -255,7 +318,11 @@ impl<'a, A> Rope<'a, A> {
                     let prefix_len = prefix.len();
                     let suffix_len = suffix.len();
                     if prefix_len == 0 {
-                        Ok(Rope::Leaf(suffix))
+                        if suffix_len == 0 {
+                            Ok(Rope::Empty)
+                        } else {
+                            Ok(Rope::Leaf(suffix))
+                        }
                     } else if suffix_len == 0 {
                         Ok(Rope::Leaf(prefix))
                     } else {
@@ -331,6 +398,12 @@ impl<'b, 'a, A> Iterator for RopeIter<'b, 'a, A> {
                     let mut next = next;
                     loop {
                         match next {
+                            Rope::Empty => match self.next.pop() {
+                                None => return None,
+                                Some(val) => {
+                                    next = val;
+                                }
+                            },
                             Rope::Branch(_, a, b) => {
                                 next = &*a;
                                 self.next.push(&*b);
@@ -730,13 +803,67 @@ impl Typechecker {
             },
             syntax::Type::RowCons(field1, ty1, rest1) => match actual {
                 syntax::Type::RowCons(field2, ty2, rest2) => {
-                    let (rows1, rest1) = syntax::Type::RowCons(field1, ty1, rest1).unwrap_rows();
-                    let (rows2, rest2) = syntax::Type::RowCons(field2, ty2, rest2).unwrap_rows();
+                    let expected = syntax::Type::RowCons(field1, ty1, rest1);
+                    let actual = syntax::Type::RowCons(field2, ty2, rest2);
+                    let (rows1, rest1) = expected.unwrap_rows();
+                    let (rows2, rest2) = actual.unwrap_rows();
 
-                    // let mut sames = Vec::new();
-                    // let mut not_in_rows1 = Vec::new();
-                    // let mut not_in_rows2 = Vec::new();
-                    todo!()
+                    let mut rows2_remaining = Rope::from_vec(&rows2);
+
+                    let mut sames: Vec<(&String, &syntax::Type, &syntax::Type)> = Vec::new();
+                    let mut not_in_rows2: Vec<(String, syntax::Type)> = Vec::new();
+
+                    for (field1, ty1) in &rows1 {
+                        match rows2_remaining.iter().find(|(field2, _)| field1 == field2) {
+                            None => {
+                                not_in_rows2.push(((**field1).clone(), (**ty1).clone()));
+                            }
+                            Some((_, ty2)) => {
+                                rows2_remaining =
+                                    match rows2_remaining.delete_first(&|(f, _)| f == field1) {
+                                        Err(new) => new,
+                                        Ok(new) => new,
+                                    };
+                                sames.push((field1, ty1, ty2));
+                                todo!();
+                            }
+                        }
+                    }
+
+                    // every field in rows1 that has a partner in rows2 has been deleted from rows2
+                    // therefore whatever's left in rows2_remaining is necessarily not in rows_1
+                    let mut not_in_rows1: Vec<(String, syntax::Type)> = rows2_remaining
+                        .iter()
+                        .map(|(a, b)| ((**a).clone(), (**b).clone()))
+                        .collect();
+
+                    // now we're working with: sames, not_in_rows1, not_in_rows2
+                    //
+                    // unify sames
+                    for (field, ty1, ty2) in sames {
+                        match self.unify_type((*ty1).clone(), (*ty2).clone()) {
+                            Err(err) => return Err(err),
+                            Ok(()) => {}
+                        }
+                    }
+
+                    let rest3 = Some(self.fresh_typevar());
+                    self.unify_type(
+                        match rest1 {
+                            None => syntax::Type::RowNil,
+                            Some(ty) => (*ty).clone(),
+                        },
+                        syntax::Type::mk_rows(not_in_rows1, rest3.clone()),
+                    )?;
+                    self.unify_type(
+                        syntax::Type::mk_rows(not_in_rows2, rest3),
+                        match rest2 {
+                            None => syntax::Type::RowNil,
+                            Some(ty) => (*ty).clone(),
+                        },
+                    )?;
+
+                    Ok(())
                 }
                 syntax::Type::Meta(n) => {
                     self.solve_typevar_right(syntax::Type::RowCons(field1, ty1, rest1), n)
