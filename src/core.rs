@@ -110,6 +110,10 @@ impl Expr {
     pub fn mk_variant(tag: EVar, expr: Expr) -> Expr {
         Expr::Variant(tag, Box::new(expr))
     }
+
+    pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
+        Expr::Binop(op, Box::new(a), Box::new(b))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

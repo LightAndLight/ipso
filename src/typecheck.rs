@@ -1187,8 +1187,86 @@ impl Typechecker {
                         syntax::Type::mk_app(syntax::Type::Variant, rows),
                     ))
                 }
-                syntax::Expr::Binop(_, _, _) => {
-                    todo!();
+                syntax::Expr::Binop(op, left, right) => {
+                    match op {
+                        syntax::Binop::Add => {
+                            let left_core = self.check_expr(*left, syntax::Type::Int)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Int,
+                            ))
+                        }
+                        syntax::Binop::Multiply => {
+                            let left_core = self.check_expr(*left, syntax::Type::Int)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Int,
+                            ))
+                        }
+                        syntax::Binop::Subtract => {
+                            let left_core = self.check_expr(*left, syntax::Type::Int)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Int,
+                            ))
+                        }
+                        syntax::Binop::Divide => {
+                            let left_core = self.check_expr(*left, syntax::Type::Int)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Int,
+                            ))
+                        }
+
+                        syntax::Binop::Append => {
+                            let item_ty = self.fresh_typevar(Kind::Type);
+                            let expected = syntax::Type::mk_app(syntax::Type::Array, item_ty);
+                            let left_core = self.check_expr(*left, expected.clone())?;
+                            let right_core = self.check_expr(*right, expected.clone())?;
+                            Ok((core::Expr::mk_binop(op, left_core, right_core), expected))
+                        }
+
+                        syntax::Binop::Or => {
+                            let left_core = self.check_expr(*left, syntax::Type::Bool)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Bool)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Bool,
+                            ))
+                        }
+                        syntax::Binop::And => {
+                            let left_core = self.check_expr(*left, syntax::Type::Bool)?;
+                            let right_core = self.check_expr(*right, syntax::Type::Bool)?;
+                            Ok((
+                                core::Expr::mk_binop(op, left_core, right_core),
+                                syntax::Type::Bool,
+                            ))
+                        }
+
+                        syntax::Binop::Eq => {
+                            todo!("==")
+                        }
+                        syntax::Binop::Neq => {
+                            todo!("!=")
+                        }
+
+                        syntax::Binop::Gt => {
+                            todo!(">")
+                        }
+                        syntax::Binop::Gte => {
+                            todo!(">=")
+                        }
+                        syntax::Binop::Lt => {
+                            todo!("<")
+                        }
+                        syntax::Binop::Lte => {
+                            todo!("<=")
+                        }
+                    }
                 }
                 syntax::Expr::Case(_, _) => {
                     todo!();
