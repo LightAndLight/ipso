@@ -2,8 +2,8 @@ use crate::core;
 use crate::diagnostic;
 use crate::syntax;
 use crate::syntax::Spanned;
-use std::collections::HashMap;
 use std::collections::HashSet;
+use std::{collections::HashMap, ops::Index};
 
 #[cfg(test)]
 mod test;
@@ -102,6 +102,7 @@ pub struct Typechecker {
     kind_solutions: Vec<Option<Kind>>,
     type_solutions: Vec<Option<syntax::Type>>,
     typevar_kinds: Vec<Kind>,
+    evidence: core::Evidence,
     context: Context,
     position: Option<usize>,
 }
@@ -467,6 +468,7 @@ impl Typechecker {
             kind_solutions: vec![],
             type_solutions: vec![],
             typevar_kinds: vec![],
+            evidence: core::Evidence::new(),
             context: Context::new(),
             position: None,
         }
@@ -1154,8 +1156,18 @@ impl Typechecker {
                         syntax::Type::mk_record(fields_rows, rest_row),
                     ))
                 }
-                syntax::Expr::Project(_, _) => {
-                    todo!();
+                syntax::Expr::Project(expr, field) => {
+                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let rest = self.fresh_typevar(Kind::Row);
+                    let record_ty =
+                        syntax::Type::mk_record(vec![(field.clone(), out_ty.clone())], Some(rest));
+                    let expr_core = self.check_expr(*expr, record_ty.clone())?;
+                    let offset = self.evidence.fresh_evar(core::Constraint::HasField {
+                        field,
+                        ty: out_ty.clone(),
+                        actual: record_ty,
+                    });
+                    Ok((core::Expr::mk_project(expr_core, offset), out_ty))
                 }
                 syntax::Expr::Variant(_, _) => {
                     todo!();

@@ -21,6 +21,30 @@ pub enum StringPart {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct EVar(usize);
+
+pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
+
+pub enum Constraint {
+    HasField {
+        field: String,
+        ty: syntax::Type,
+        actual: syntax::Type,
+    },
+}
+
+impl Evidence {
+    pub fn new() -> Self {
+        Evidence(Vec::new())
+    }
+    pub fn fresh_evar(&mut self, constraint: Constraint) -> EVar {
+        let ix = self.0.len();
+        self.0.push((constraint, None));
+        EVar(ix)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
     Var(usize),
 
@@ -49,7 +73,7 @@ pub enum Expr {
         fields: Vec<Expr>,
         rest: Option<Box<Expr>>,
     },
-    Project(Box<Expr>, usize),
+    Project(Box<Expr>, EVar),
 
     Variant(usize, Vec<Expr>),
     Case(Box<Expr>, Vec<Branch>),
@@ -77,6 +101,10 @@ impl Expr {
             fields,
             rest: rest.map(|x| Box::new(x)),
         }
+    }
+
+    pub fn mk_project(expr: Expr, offset: EVar) -> Expr {
+        Expr::Project(Box::new(expr), offset)
     }
 }
 
