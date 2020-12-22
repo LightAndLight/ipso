@@ -678,3 +678,147 @@ fn unify_rows_test_4() {
         })
     )
 }
+
+#[test]
+fn infer_record_test_1() {
+    let mut tc = Typechecker::new();
+    // {}
+    let term = syntax::Expr::mk_record(Vec::new(), None);
+    assert_eq!(
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term }),
+        Ok((
+            core::Expr::mk_record(Vec::new(), None),
+            syntax::Type::mk_record(Vec::new(), None)
+        ))
+    )
+}
+
+#[test]
+fn infer_record_test_2() {
+    let mut tc = Typechecker::new();
+    // { x = 1, y = true }
+    let term = syntax::Expr::mk_record(
+        vec![
+            (
+                String::from("x"),
+                syntax::Spanned {
+                    pos: 2,
+                    item: syntax::Expr::Int(1),
+                },
+            ),
+            (
+                String::from("y"),
+                syntax::Spanned {
+                    pos: 13,
+                    item: syntax::Expr::True,
+                },
+            ),
+        ],
+        None,
+    );
+    assert_eq!(
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term }),
+        Ok((
+            core::Expr::mk_record(vec![core::Expr::Int(1), core::Expr::True], None),
+            syntax::Type::mk_record(
+                vec![
+                    (String::from("x"), syntax::Type::Int),
+                    (String::from("y"), syntax::Type::Bool)
+                ],
+                None
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_record_test_3() {
+    let mut tc = Typechecker::new();
+    // { x = 1, y = true, ...{ z = 'c' } }
+    let term = syntax::Expr::mk_record(
+        vec![
+            (
+                String::from("x"),
+                syntax::Spanned {
+                    pos: 2,
+                    item: syntax::Expr::Int(1),
+                },
+            ),
+            (
+                String::from("y"),
+                syntax::Spanned {
+                    pos: 13,
+                    item: syntax::Expr::True,
+                },
+            ),
+        ],
+        Some(syntax::Spanned {
+            pos: 22,
+            item: syntax::Expr::mk_record(
+                vec![(
+                    String::from("z"),
+                    syntax::Spanned {
+                        pos: 24,
+                        item: syntax::Expr::Char('c'),
+                    },
+                )],
+                None,
+            ),
+        }),
+    );
+    assert_eq!(
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty).unwrap())),
+        Ok((
+            core::Expr::mk_record(
+                vec![core::Expr::Int(1), core::Expr::True],
+                Some(core::Expr::mk_record(vec![core::Expr::Char('c')], None))
+            ),
+            syntax::Type::mk_record(
+                vec![
+                    (String::from("x"), syntax::Type::Int),
+                    (String::from("y"), syntax::Type::Bool),
+                    (String::from("z"), syntax::Type::Char)
+                ],
+                None
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_record_test_4() {
+    let mut tc = Typechecker::new();
+    // { x = 1, y = true, ...1 }
+    let term = syntax::Expr::mk_record(
+        vec![
+            (
+                String::from("x"),
+                syntax::Spanned {
+                    pos: 2,
+                    item: syntax::Expr::Int(1),
+                },
+            ),
+            (
+                String::from("y"),
+                syntax::Spanned {
+                    pos: 13,
+                    item: syntax::Expr::True,
+                },
+            ),
+        ],
+        Some(syntax::Spanned {
+            pos: 22,
+            item: syntax::Expr::Int(1),
+        }),
+    );
+    assert_eq!(
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty).unwrap())),
+        Err(TypeError::TypeMismatch {
+            pos: 22,
+            expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+            actual: syntax::Type::Int
+        })
+    )
+}

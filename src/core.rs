@@ -25,7 +25,10 @@ pub enum Expr {
     Var(usize),
 
     App(Box<Expr>, Box<Expr>),
-    Lam { arg: Pattern, body: Box<Expr> },
+    Lam {
+        arg: Pattern,
+        body: Box<Expr>,
+    },
 
     True,
     False,
@@ -42,7 +45,10 @@ pub enum Expr {
     Array(Vec<Expr>),
 
     Append(Vec<Expr>, Box<Expr>),
-    Record(Vec<Expr>),
+    Record {
+        fields: Vec<Expr>,
+        rest: Option<Box<Expr>>,
+    },
     Project(Box<Expr>, usize),
 
     Variant(usize, Vec<Expr>),
@@ -64,6 +70,13 @@ impl Expr {
 
     pub fn mk_ifthenelse(x: Expr, y: Expr, z: Expr) -> Expr {
         Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
+    }
+
+    pub fn mk_record(fields: Vec<Expr>, rest: Option<Expr>) -> Expr {
+        Expr::Record {
+            fields,
+            rest: rest.map(|x| Box::new(x)),
+        }
     }
 }
 

@@ -533,6 +533,47 @@ impl Typechecker {
         }
     }
 
+    fn zonk_type(&self, ty: syntax::Type) -> Option<syntax::Type> {
+        match ty {
+            syntax::Type::Name(n) => Some(syntax::Type::Name(n)),
+            syntax::Type::Bool => Some(syntax::Type::Bool),
+            syntax::Type::Int => Some(syntax::Type::Int),
+            syntax::Type::Char => Some(syntax::Type::Char),
+            syntax::Type::String => Some(syntax::Type::String),
+            syntax::Type::Arrow => Some(syntax::Type::Arrow),
+            syntax::Type::FatArrow => Some(syntax::Type::FatArrow),
+            syntax::Type::Constraints(cs) => {
+                let mut new_cs = Vec::new();
+                for c in cs {
+                    match self.zonk_type(c) {
+                        None => return None,
+                        Some(new_c) => {
+                            new_cs.push(new_c);
+                        }
+                    }
+                }
+                Some(syntax::Type::Constraints(new_cs))
+            }
+            syntax::Type::Array => Some(syntax::Type::Array),
+            syntax::Type::Record => Some(syntax::Type::Record),
+            syntax::Type::Variant => Some(syntax::Type::Variant),
+            syntax::Type::IO => Some(syntax::Type::IO),
+            syntax::Type::App(a, b) => {
+                let a = self.zonk_type(*a)?;
+                let b = self.zonk_type(*b)?;
+                Some(syntax::Type::mk_app(a, b))
+            }
+            syntax::Type::RowNil => Some(syntax::Type::RowNil),
+            syntax::Type::Unit => Some(syntax::Type::Unit),
+            syntax::Type::RowCons(field, ty, rest) => {
+                let ty = self.zonk_type(*ty)?;
+                let rest = self.zonk_type(*rest)?;
+                Some(syntax::Type::mk_rowcons(field, ty, rest))
+            }
+            syntax::Type::Meta(n) => self.type_solutions[n].clone(),
+        }
+    }
+
     fn zonk_kind(&self, kind: Kind) -> Option<Kind> {
         match kind {
             Kind::Type => Some(Kind::Type),
@@ -1080,7 +1121,38 @@ impl Typechecker {
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
-                    todo!();
+                    let mut fields_core = Vec::new();
+                    let mut fields_rows = Vec::new();
+                    for (field, expr) in fields {
+                        match self.infer_expr(expr) {
+                            Err(err) => return Err(err),
+                            Ok((expr_core, expr_ty)) => {
+                                fields_core.push(expr_core);
+                                fields_rows.push((field, expr_ty));
+                            }
+                        }
+                    }
+
+                    let mut rest_core = None;
+                    let mut rest_row = None;
+                    for expr in rest {
+                        let rest_tyvar = self.fresh_typevar(Kind::Row);
+                        match self.check_expr(
+                            *expr,
+                            syntax::Type::mk_app(syntax::Type::Record, rest_tyvar.clone()),
+                        ) {
+                            Err(err) => return Err(err),
+                            Ok(expr_core) => {
+                                rest_core = Some(expr_core);
+                                rest_row = Some(rest_tyvar);
+                            }
+                        }
+                    }
+
+                    Ok((
+                        core::Expr::mk_record(fields_core, rest_core),
+                        syntax::Type::mk_record(fields_rows, rest_row),
+                    ))
                 }
                 syntax::Expr::Project(_, _) => {
                     todo!();

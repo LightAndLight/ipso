@@ -123,7 +123,7 @@ pub enum Expr {
     Array(Vec<Spanned<Expr>>),
 
     Record {
-        fields: HashMap<String, Spanned<Expr>>,
+        fields: Vec<(String, Spanned<Expr>)>,
         rest: Option<Box<Spanned<Expr>>>,
     },
     Project(Box<Spanned<Expr>>, String),
@@ -154,6 +154,13 @@ impl Expr {
         Spanned {
             pos: a.pos,
             item: Expr::App(Box::new(a), Box::new(b)),
+        }
+    }
+
+    pub fn mk_record(fields: Vec<(String, Spanned<Expr>)>, rest: Option<Spanned<Expr>>) -> Expr {
+        Expr::Record {
+            fields,
+            rest: rest.map(|x| Box::new(x)),
         }
     }
 }
