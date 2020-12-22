@@ -1159,18 +1159,33 @@ impl Typechecker {
                 syntax::Expr::Project(expr, field) => {
                     let out_ty = self.fresh_typevar(Kind::Type);
                     let rest = self.fresh_typevar(Kind::Row);
-                    let record_ty =
-                        syntax::Type::mk_record(vec![(field.clone(), out_ty.clone())], Some(rest));
-                    let expr_core = self.check_expr(*expr, record_ty.clone())?;
+                    let rows =
+                        syntax::Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
+                    let expr_core = self.check_expr(
+                        *expr,
+                        syntax::Type::mk_app(syntax::Type::Record, rows.clone()),
+                    )?;
                     let offset = self.evidence.fresh_evar(core::Constraint::HasField {
                         field,
                         ty: out_ty.clone(),
-                        actual: record_ty,
+                        actual: rows,
                     });
                     Ok((core::Expr::mk_project(expr_core, offset), out_ty))
                 }
-                syntax::Expr::Variant(_, _) => {
-                    todo!();
+                syntax::Expr::Variant(ctor, arg) => {
+                    let (arg_core, arg_ty) = self.infer_expr(*arg)?;
+                    let rest = self.fresh_typevar(Kind::Row);
+                    let rows =
+                        syntax::Type::mk_rows(vec![(ctor.clone(), arg_ty.clone())], Some(rest));
+                    let tag = self.evidence.fresh_evar(core::Constraint::HasField {
+                        field: ctor,
+                        ty: arg_ty,
+                        actual: rows.clone(),
+                    });
+                    Ok((
+                        core::Expr::mk_variant(tag, arg_core),
+                        syntax::Type::mk_app(syntax::Type::Variant, rows),
+                    ))
                 }
                 syntax::Expr::Binop(_, _, _) => {
                     todo!();

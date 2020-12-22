@@ -75,7 +75,7 @@ pub enum Expr {
     },
     Project(Box<Expr>, EVar),
 
-    Variant(usize, Vec<Expr>),
+    Variant(EVar, Box<Expr>),
     Case(Box<Expr>, Vec<Branch>),
     Unit,
 }
@@ -105,6 +105,10 @@ impl Expr {
 
     pub fn mk_project(expr: Expr, offset: EVar) -> Expr {
         Expr::Project(Box::new(expr), offset)
+    }
+
+    pub fn mk_variant(tag: EVar, expr: Expr) -> Expr {
+        Expr::Variant(tag, Box::new(expr))
     }
 }
 
