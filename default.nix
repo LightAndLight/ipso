@@ -12,6 +12,9 @@ pkgs.rustPlatform.buildRustPackage {
     ];
     src = ./.;
   };
+  checkPhase = ''
+    cargo test
+  '';
 
   cargoSha256 = "1f330yjqvnf2srlp3br2dbz8hmkfdm2a922pfs4ykj57ikhxfxpi";
 }
