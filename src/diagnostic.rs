@@ -66,7 +66,9 @@ impl Diagnostic {
         let mut line: usize = 0;
         let mut offset: usize = 0;
         for item in self.items.into_iter() {
-            if item.pos >= offset {
+            let mut pos = item.pos;
+            while item.pos >= offset {
+                pos -= line_str.len();
                 line_str.clear();
                 match reader.read_line(&mut line_str) {
                     Err(err) => return Err(err),
@@ -81,7 +83,7 @@ impl Diagnostic {
                 }
             }
             let col: usize = {
-                let item_bytes = &(line_str.as_bytes())[0..item.pos];
+                let item_bytes = &(line_str.as_bytes())[0..pos];
                 from_utf8(item_bytes).unwrap().chars().count() + 1
             };
             let result = Diagnostic::report_string(
