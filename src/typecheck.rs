@@ -9,20 +9,20 @@ use std::collections::HashSet;
 mod test;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct ContextEntry {
+struct BoundVarsEntry {
     index: usize,
     ty: syntax::Type,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Context(HashMap<String, Vec<ContextEntry>>);
+struct BoundVars(HashMap<String, Vec<BoundVarsEntry>>);
 
-impl Context {
+impl BoundVars {
     fn new() -> Self {
-        Context(HashMap::new())
+        BoundVars(HashMap::new())
     }
 
-    fn lookup(&self, name: &String) -> Option<ContextEntry> {
+    fn lookup(&self, name: &String) -> Option<BoundVarsEntry> {
         self.0
             .get(name)
             .and_then(|entries| entries.last().map(|entry| entry.clone()))
@@ -52,14 +52,14 @@ impl Context {
                 None => {
                     self.0.insert(
                         (*var).clone(),
-                        vec![ContextEntry {
+                        vec![BoundVarsEntry {
                             index,
                             ty: ty.clone(),
                         }],
                     );
                 }
                 Some(entries) => {
-                    entries.push(ContextEntry {
+                    entries.push(BoundVarsEntry {
                         index,
                         ty: ty.clone(),
                     });
@@ -103,7 +103,7 @@ pub struct Typechecker {
     type_solutions: Vec<Option<syntax::Type>>,
     typevar_kinds: Vec<Kind>,
     evidence: core::Evidence,
-    context: Context,
+    bound_vars: BoundVars,
     position: Option<usize>,
 }
 
@@ -474,7 +474,7 @@ impl Typechecker {
             type_solutions: vec![],
             typevar_kinds: vec![],
             evidence: core::Evidence::new(),
-            context: Context::new(),
+            bound_vars: BoundVars::new(),
             position: None,
         }
     }
@@ -530,8 +530,8 @@ impl Typechecker {
         }
     }
 
-    fn lookup_expr(&self, name: String) -> Result<ContextEntry, TypeError> {
-        match self.context.lookup(&name) {
+    fn lookup_var(&self, name: String) -> Result<BoundVarsEntry, TypeError> {
+        match self.bound_vars.lookup(&name) {
             Some(entry) => Ok(entry),
             None => Err(TypeError::NotInScope {
                 pos: self.current_position(),
@@ -1032,7 +1032,7 @@ impl Typechecker {
             expr.pos,
             match expr.item {
                 syntax::Expr::Var(name) => {
-                    let entry = self.lookup_expr(name)?;
+                    let entry = self.lookup_var(name)?;
                     Ok((core::Expr::Var(entry.index), entry.ty))
                 }
                 syntax::Expr::App(f, x) => {
@@ -1062,9 +1062,9 @@ impl Typechecker {
                         args_names_tys.extend(arg_names_tys);
                     }
 
-                    self.context.insert(&args_names_tys);
+                    self.bound_vars.insert(&args_names_tys);
                     let (body_core, body_ty) = self.infer_expr(*body)?;
-                    self.context
+                    self.bound_vars
                         .delete(&args_names_tys.iter().map(|el| el.0).collect());
 
                     let mut expr_core = body_core;
@@ -1304,7 +1304,7 @@ impl Typechecker {
                         match self.check_pattern(&branch.pattern.item, in_ty.clone()) {
                             Err(err) => return Err(err),
                             Ok((pattern_core, pattern_bind)) => {
-                                self.context.insert(&pattern_bind);
+                                self.bound_vars.insert(&pattern_bind);
                                 match self.check_expr(branch.body, out_ty.clone()) {
                                     Err(err) => return Err(err),
                                     Ok(body_core) => {
@@ -1316,7 +1316,7 @@ impl Typechecker {
                                         };
                                     }
                                 }
-                                self.context
+                                self.bound_vars
                                     .delete(&pattern_bind.iter().map(|x| x.0).collect());
                                 seen.insert(current_seen);
                             }

@@ -1,8 +1,7 @@
 use crate::core;
 use crate::syntax::{self, Type};
-use crate::typecheck::Context;
-use crate::typecheck::ContextEntry;
 use crate::typecheck::Rope;
+use crate::typecheck::{BoundVars, BoundVarsEntry};
 
 use super::{Kind, TypeError, Typechecker};
 
@@ -55,7 +54,7 @@ fn infer_kind_test_4() {
 fn context_test_1() {
     assert_eq!(
         {
-            let mut ctx = Context::new();
+            let mut ctx = BoundVars::new();
             ctx.insert(&vec![
                 (&String::from("a"), Type::Unit),
                 (&String::from("b"), Type::Bool),
@@ -63,25 +62,25 @@ fn context_test_1() {
             ]);
             ctx
         },
-        Context(
+        BoundVars(
             vec![
                 (
                     String::from("a"),
-                    vec![ContextEntry {
+                    vec![BoundVarsEntry {
                         index: 2,
                         ty: Type::Unit
                     }]
                 ),
                 (
                     String::from("b"),
-                    vec![ContextEntry {
+                    vec![BoundVarsEntry {
                         index: 1,
                         ty: Type::Bool
                     }]
                 ),
                 (
                     String::from("c"),
-                    vec![ContextEntry {
+                    vec![BoundVarsEntry {
                         index: 0,
                         ty: Type::String
                     }]
@@ -96,7 +95,7 @@ fn context_test_1() {
 #[test]
 #[should_panic]
 fn context_test_2() {
-    let mut ctx = Context::new();
+    let mut ctx = BoundVars::new();
     ctx.insert(&vec![
         (&String::from("a"), Type::Unit),
         (&String::from("a"), Type::Bool),
