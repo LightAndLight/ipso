@@ -1168,9 +1168,8 @@ impl Typechecker {
                         *expr,
                         syntax::Type::mk_app(syntax::Type::Record, rows.clone()),
                     )?;
-                    let offset = self.evidence.fresh_evar(core::Constraint::HasNthField {
+                    let offset = self.evidence.fresh_evar(core::Constraint::HasField {
                         field,
-                        number: 0,
                         actual: rows,
                     });
                     Ok((core::Expr::mk_project(expr_core, offset), out_ty))
@@ -1180,9 +1179,8 @@ impl Typechecker {
                     let rest = self.fresh_typevar(Kind::Row);
                     let rows =
                         syntax::Type::mk_rows(vec![(ctor.clone(), arg_ty.clone())], Some(rest));
-                    let tag = self.evidence.fresh_evar(core::Constraint::HasNthField {
+                    let tag = self.evidence.fresh_evar(core::Constraint::HasField {
                         field: ctor,
-                        number: 0,
                         actual: rows.clone(),
                     });
                     Ok((

@@ -26,11 +26,7 @@ pub struct EVar(usize);
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
 
 pub enum Constraint {
-    HasNthField {
-        field: String,
-        number: usize,
-        actual: syntax::Type,
-    },
+    HasField { field: String, actual: syntax::Type },
 }
 
 impl Evidence {
