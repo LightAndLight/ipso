@@ -599,7 +599,7 @@ impl Parser {
     }
 
     fn branch(&mut self) -> ParseResult<Branch> {
-        keep_left!(self.pattern(), self.spaces()).and_then(|pattern| {
+        keep_left!(spanned!(self, self.pattern()), self.spaces()).and_then(|pattern| {
             map2!(
                 |_, body| Branch { pattern, body },
                 keep_left!(self.token(&TokenType::Arrow), self.spaces()),

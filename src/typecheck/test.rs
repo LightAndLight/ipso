@@ -768,7 +768,7 @@ fn infer_record_test_3() {
     );
     assert_eq!(
         tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty).unwrap())),
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
                 vec![core::Expr::Int(1), core::Expr::True],
@@ -814,11 +814,365 @@ fn infer_record_test_4() {
     );
     assert_eq!(
         tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty).unwrap())),
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Err(TypeError::TypeMismatch {
             pos: 22,
             expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
             actual: syntax::Type::Int
         })
+    )
+}
+
+#[test]
+fn infer_case_1() {
+    let mut tc = Typechecker::new();
+    /*
+    \x -> case x of
+      X a -> a
+    */
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 1,
+                item: String::from("x"),
+            })],
+            syntax::Spanned {
+                pos: 6,
+                item: syntax::Expr::mk_case(
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("x")),
+                    },
+                    vec![syntax::Branch {
+                        pattern: syntax::Spanned {
+                            pos: 18,
+                            item: syntax::Pattern::Variant {
+                                name: String::from("X"),
+                                arg: syntax::Spanned {
+                                    pos: 20,
+                                    item: String::from("a"),
+                                },
+                            },
+                        },
+                        body: syntax::Spanned {
+                            pos: 25,
+                            item: syntax::Expr::Var(String::from("a")),
+                        },
+                    }],
+                ),
+            },
+        ),
+    };
+    assert_eq!(
+        tc.infer_expr(term)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Name,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![core::Branch {
+                        pattern: core::Pattern::Variant {
+                            name: String::from("X")
+                        },
+                        body: core::Expr::Var(0)
+                    }]
+                )
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(3))], None),
+                syntax::Type::Meta(3)
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_case_2() {
+    let mut tc = Typechecker::new();
+    /*
+    \x -> case x of
+      Left a -> a
+      Right b -> b
+    */
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 1,
+                item: String::from("x"),
+            })],
+            syntax::Spanned {
+                pos: 6,
+                item: syntax::Expr::mk_case(
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("x")),
+                    },
+                    vec![
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 18,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Left"),
+                                    arg: syntax::Spanned {
+                                        pos: 23,
+                                        item: String::from("a"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 28,
+                                item: syntax::Expr::Var(String::from("a")),
+                            },
+                        },
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 32,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Right"),
+                                    arg: syntax::Spanned {
+                                        pos: 34,
+                                        item: String::from("b"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 39,
+                                item: syntax::Expr::Var(String::from("b")),
+                            },
+                        },
+                    ],
+                ),
+            },
+        ),
+    };
+    assert_eq!(
+        tc.infer_expr(term)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Name,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![
+                        core::Branch {
+                            pattern: core::Pattern::Variant {
+                                name: String::from("Left")
+                            },
+                            body: core::Expr::Var(0)
+                        },
+                        core::Branch {
+                            pattern: core::Pattern::Variant {
+                                name: String::from("Right")
+                            },
+                            body: core::Expr::Var(0)
+                        },
+                    ]
+                )
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_variant(
+                    vec![
+                        (String::from("Left"), syntax::Type::Meta(5)),
+                        (String::from("Right"), syntax::Type::Meta(5))
+                    ],
+                    None
+                ),
+                syntax::Type::Meta(5)
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_case_3() {
+    let mut tc = Typechecker::new();
+    /*
+    \x -> case x of
+      Left a -> a
+      Right b -> b
+      _ -> 1
+    */
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 1,
+                item: String::from("x"),
+            })],
+            syntax::Spanned {
+                pos: 6,
+                item: syntax::Expr::mk_case(
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("x")),
+                    },
+                    vec![
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 18,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Left"),
+                                    arg: syntax::Spanned {
+                                        pos: 23,
+                                        item: String::from("a"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 28,
+                                item: syntax::Expr::Var(String::from("a")),
+                            },
+                        },
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 32,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Right"),
+                                    arg: syntax::Spanned {
+                                        pos: 34,
+                                        item: String::from("b"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 39,
+                                item: syntax::Expr::Var(String::from("b")),
+                            },
+                        },
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 43,
+                                item: syntax::Pattern::Wildcard,
+                            },
+                            body: syntax::Spanned {
+                                pos: 48,
+                                item: syntax::Expr::Int(1),
+                            },
+                        },
+                    ],
+                ),
+            },
+        ),
+    };
+    assert_eq!(
+        tc.infer_expr(term)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Name,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![
+                        core::Branch {
+                            pattern: core::Pattern::Variant {
+                                name: String::from("Left")
+                            },
+                            body: core::Expr::Var(0)
+                        },
+                        core::Branch {
+                            pattern: core::Pattern::Variant {
+                                name: String::from("Right")
+                            },
+                            body: core::Expr::Var(0)
+                        },
+                        core::Branch {
+                            pattern: core::Pattern::Wildcard,
+                            body: core::Expr::Int(1)
+                        },
+                    ]
+                )
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_variant(
+                    vec![
+                        (String::from("Left"), syntax::Type::Int),
+                        (String::from("Right"), syntax::Type::Int)
+                    ],
+                    Some(syntax::Type::Meta(7))
+                ),
+                syntax::Type::Int
+            )
+        ))
+    )
+}
+
+#[test]
+fn infer_case_4() {
+    let mut tc = Typechecker::new();
+    /*
+    \x -> case x of
+      Left a -> a
+      Left b -> b
+      _ -> 1
+    */
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 1,
+                item: String::from("x"),
+            })],
+            syntax::Spanned {
+                pos: 6,
+                item: syntax::Expr::mk_case(
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("x")),
+                    },
+                    vec![
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 18,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Left"),
+                                    arg: syntax::Spanned {
+                                        pos: 23,
+                                        item: String::from("a"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 28,
+                                item: syntax::Expr::Var(String::from("a")),
+                            },
+                        },
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 32,
+                                item: syntax::Pattern::Variant {
+                                    name: String::from("Left"),
+                                    arg: syntax::Spanned {
+                                        pos: 34,
+                                        item: String::from("b"),
+                                    },
+                                },
+                            },
+                            body: syntax::Spanned {
+                                pos: 38,
+                                item: syntax::Expr::Var(String::from("b")),
+                            },
+                        },
+                        syntax::Branch {
+                            pattern: syntax::Spanned {
+                                pos: 42,
+                                item: syntax::Pattern::Wildcard,
+                            },
+                            body: syntax::Spanned {
+                                pos: 47,
+                                item: syntax::Expr::Int(1),
+                            },
+                        },
+                    ],
+                ),
+            },
+        ),
+    };
+    assert_eq!(
+        tc.infer_expr(term)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+        Err(TypeError::RedundantPattern { pos: 32 })
     )
 }

@@ -26,9 +26,9 @@ pub struct EVar(usize);
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
 
 pub enum Constraint {
-    HasField {
+    HasNthField {
         field: String,
-        ty: syntax::Type,
+        number: usize,
         actual: syntax::Type,
     },
 }
@@ -113,6 +113,10 @@ impl Expr {
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
         Expr::Binop(op, Box::new(a), Box::new(b))
+    }
+
+    pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
+        Expr::Case(Box::new(expr), branches)
     }
 }
 

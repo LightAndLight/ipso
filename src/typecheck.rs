@@ -2,8 +2,8 @@ use crate::core;
 use crate::diagnostic;
 use crate::syntax;
 use crate::syntax::Spanned;
+use std::collections::HashMap;
 use std::collections::HashSet;
-use std::{collections::HashMap, ops::Index};
 
 #[cfg(test)]
 mod test;
@@ -137,6 +137,9 @@ pub enum TypeError {
         expected: syntax::Type,
         actual: syntax::Type,
     },
+    RedundantPattern {
+        pos: usize,
+    },
 }
 
 impl syntax::Pattern {
@@ -181,6 +184,7 @@ impl TypeError {
             } => *pos,
             TypeError::NotInScope { pos, name: _ } => *pos,
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
+            TypeError::RedundantPattern { pos } => *pos,
         }
     }
 
@@ -218,6 +222,7 @@ impl TypeError {
             }
             TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
             TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
+            TypeError::RedundantPattern { pos: _ } => String::from("redundant pattern"),
         }
     }
 
@@ -535,44 +540,32 @@ impl Typechecker {
         }
     }
 
-    fn zonk_type(&self, ty: syntax::Type) -> Option<syntax::Type> {
+    fn zonk_type(&self, ty: syntax::Type) -> syntax::Type {
         match ty {
-            syntax::Type::Name(n) => Some(syntax::Type::Name(n)),
-            syntax::Type::Bool => Some(syntax::Type::Bool),
-            syntax::Type::Int => Some(syntax::Type::Int),
-            syntax::Type::Char => Some(syntax::Type::Char),
-            syntax::Type::String => Some(syntax::Type::String),
-            syntax::Type::Arrow => Some(syntax::Type::Arrow),
-            syntax::Type::FatArrow => Some(syntax::Type::FatArrow),
+            syntax::Type::Name(n) => syntax::Type::Name(n),
+            syntax::Type::Bool => syntax::Type::Bool,
+            syntax::Type::Int => syntax::Type::Int,
+            syntax::Type::Char => syntax::Type::Char,
+            syntax::Type::String => syntax::Type::String,
+            syntax::Type::Arrow => syntax::Type::Arrow,
+            syntax::Type::FatArrow => syntax::Type::FatArrow,
             syntax::Type::Constraints(cs) => {
-                let mut new_cs = Vec::new();
-                for c in cs {
-                    match self.zonk_type(c) {
-                        None => return None,
-                        Some(new_c) => {
-                            new_cs.push(new_c);
-                        }
-                    }
-                }
-                Some(syntax::Type::Constraints(new_cs))
+                syntax::Type::Constraints(cs.iter().map(|c| self.zonk_type(c.clone())).collect())
             }
-            syntax::Type::Array => Some(syntax::Type::Array),
-            syntax::Type::Record => Some(syntax::Type::Record),
-            syntax::Type::Variant => Some(syntax::Type::Variant),
-            syntax::Type::IO => Some(syntax::Type::IO),
-            syntax::Type::App(a, b) => {
-                let a = self.zonk_type(*a)?;
-                let b = self.zonk_type(*b)?;
-                Some(syntax::Type::mk_app(a, b))
-            }
-            syntax::Type::RowNil => Some(syntax::Type::RowNil),
-            syntax::Type::Unit => Some(syntax::Type::Unit),
+            syntax::Type::Array => syntax::Type::Array,
+            syntax::Type::Record => syntax::Type::Record,
+            syntax::Type::Variant => syntax::Type::Variant,
+            syntax::Type::IO => syntax::Type::IO,
+            syntax::Type::App(a, b) => syntax::Type::mk_app(self.zonk_type(*a), self.zonk_type(*b)),
+            syntax::Type::RowNil => syntax::Type::RowNil,
+            syntax::Type::Unit => syntax::Type::Unit,
             syntax::Type::RowCons(field, ty, rest) => {
-                let ty = self.zonk_type(*ty)?;
-                let rest = self.zonk_type(*rest)?;
-                Some(syntax::Type::mk_rowcons(field, ty, rest))
+                syntax::Type::mk_rowcons(field, self.zonk_type(*ty), self.zonk_type(*rest))
             }
-            syntax::Type::Meta(n) => self.type_solutions[n].clone(),
+            syntax::Type::Meta(n) => match self.type_solutions[n] {
+                None => syntax::Type::Meta(n),
+                Some(ref ty) => self.zonk_type(ty.clone()),
+            },
         }
     }
 
@@ -996,7 +989,7 @@ impl Typechecker {
             }
             syntax::Pattern::Variant { name, arg } => {
                 let arg_ty: syntax::Type = self.fresh_typevar(Kind::Type);
-                let rest_ty = Some(self.fresh_typevar(Kind::Type));
+                let rest_ty = Some(self.fresh_typevar(Kind::Row));
                 let ty = syntax::Type::mk_variant(vec![(name.clone(), arg_ty.clone())], rest_ty);
                 (
                     core::Pattern::Variant { name: name.clone() },
@@ -1005,6 +998,16 @@ impl Typechecker {
                 )
             }
         }
+    }
+
+    fn check_pattern<'a, 'b>(
+        &'a mut self,
+        arg: &'b syntax::Pattern,
+        expected: syntax::Type,
+    ) -> Result<(core::Pattern, Vec<(&'b String, syntax::Type)>), TypeError> {
+        let (pat, actual, binds) = self.infer_pattern(arg);
+        self.unify_type(expected, actual)?;
+        Ok((pat, binds))
     }
 
     fn check_string_part(
@@ -1165,9 +1168,9 @@ impl Typechecker {
                         *expr,
                         syntax::Type::mk_app(syntax::Type::Record, rows.clone()),
                     )?;
-                    let offset = self.evidence.fresh_evar(core::Constraint::HasField {
+                    let offset = self.evidence.fresh_evar(core::Constraint::HasNthField {
                         field,
-                        ty: out_ty.clone(),
+                        number: 0,
                         actual: rows,
                     });
                     Ok((core::Expr::mk_project(expr_core, offset), out_ty))
@@ -1177,9 +1180,9 @@ impl Typechecker {
                     let rest = self.fresh_typevar(Kind::Row);
                     let rows =
                         syntax::Type::mk_rows(vec![(ctor.clone(), arg_ty.clone())], Some(rest));
-                    let tag = self.evidence.fresh_evar(core::Constraint::HasField {
+                    let tag = self.evidence.fresh_evar(core::Constraint::HasNthField {
                         field: ctor,
-                        ty: arg_ty,
+                        number: 0,
                         actual: rows.clone(),
                     });
                     Ok((
@@ -1268,8 +1271,77 @@ impl Typechecker {
                         }
                     }
                 }
-                syntax::Expr::Case(_, _) => {
-                    todo!();
+                syntax::Expr::Case(expr, branches) => {
+                    #[derive(PartialEq, Eq, Hash)]
+                    enum Seen {
+                        Fallthrough,
+                        Record,
+                        Variant(String),
+                    }
+
+                    fn to_seen(pat: &syntax::Pattern) -> Seen {
+                        match pat {
+                            syntax::Pattern::Wildcard => Seen::Fallthrough,
+                            syntax::Pattern::Name(_) => Seen::Fallthrough,
+                            syntax::Pattern::Record { names: _, rest: _ } => Seen::Record,
+                            syntax::Pattern::Variant { name, arg: _ } => {
+                                Seen::Variant(name.clone())
+                            }
+                        }
+                    }
+
+                    let in_ty = self.fresh_typevar(Kind::Type);
+                    let out_ty = self.fresh_typevar(Kind::Type);
+
+                    let mut branches_core = Vec::new();
+                    let mut seen: HashSet<Seen> = HashSet::new();
+                    for branch in branches {
+                        let current_seen = to_seen(&branch.pattern.item);
+                        let saw_fallthrough = seen.contains(&Seen::Fallthrough);
+                        if saw_fallthrough || seen.contains(&current_seen) {
+                            return Err(TypeError::RedundantPattern {
+                                pos: branch.pattern.pos,
+                            });
+                        }
+                        match self.check_pattern(&branch.pattern.item, in_ty.clone()) {
+                            Err(err) => return Err(err),
+                            Ok((pattern_core, pattern_bind)) => {
+                                self.context.insert(&pattern_bind);
+                                match self.check_expr(branch.body, out_ty.clone()) {
+                                    Err(err) => return Err(err),
+                                    Ok(body_core) => {
+                                        if !saw_fallthrough {
+                                            branches_core.push(core::Branch {
+                                                pattern: pattern_core,
+                                                body: body_core,
+                                            })
+                                        };
+                                    }
+                                }
+                                self.context
+                                    .delete(&pattern_bind.iter().map(|x| x.0).collect());
+                                seen.insert(current_seen);
+                            }
+                        }
+                    }
+
+                    println!("in_ty before: {:?}", self.zonk_type(in_ty.clone()));
+                    match self.zonk_type(in_ty.clone()).unwrap_variant() {
+                        Some((ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
+                            None => {}
+                            Some(rest) => {
+                                println!("rest before: {:?}", self.zonk_type(rest.clone()));
+                                self.unify_type(syntax::Type::RowNil, rest.clone())?;
+                                println!("rest after: {:?}", self.zonk_type(rest.clone()));
+                            }
+                        },
+                        _ => {}
+                    }
+                    println!("solutions after: {:?}", self.type_solutions);
+                    println!("in_ty after: {:?}", self.zonk_type(in_ty.clone()));
+                    let expr_core = self.check_expr(*expr, in_ty)?;
+
+                    Ok((core::Expr::mk_case(expr_core, branches_core), out_ty))
                 }
             }
         )

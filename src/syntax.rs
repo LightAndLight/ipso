@@ -94,7 +94,7 @@ pub enum Pattern {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Branch {
-    pub pattern: Pattern,
+    pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
 
@@ -228,7 +228,7 @@ impl Type {
         }
     }
 
-    fn unwrap_record<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+    pub fn unwrap_record<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Record => Some(b.unwrap_rows()),
@@ -238,7 +238,7 @@ impl Type {
         }
     }
 
-    fn unwrap_variant<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+    pub fn unwrap_variant<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Variant => Some(b.unwrap_rows()),
