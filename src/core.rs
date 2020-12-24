@@ -117,10 +117,16 @@ impl Expr {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct TypeSig {
+    ty_vars: Vec<syntax::Kind>,
+    body: syntax::Type,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {
         name: String,
-        ty: syntax::Type,
+        sig: TypeSig,
         body: Expr,
     },
     TypeAlias {

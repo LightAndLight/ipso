@@ -1,9 +1,9 @@
 use crate::core;
-use crate::syntax::{self, Type};
+use crate::syntax::{self, Kind, Type};
 use crate::typecheck::Rope;
 use crate::typecheck::{BoundVars, BoundVarsEntry};
 
-use super::{Kind, TypeError, Typechecker};
+use super::{TypeError, Typechecker};
 
 #[test]
 fn infer_kind_test_1() {

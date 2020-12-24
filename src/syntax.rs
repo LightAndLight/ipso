@@ -1,5 +1,7 @@
 use lazy_static::lazy_static;
-use std::collections::HashMap;
+
+#[cfg(test)]
+mod test;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Spanned<A> {
@@ -168,6 +170,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     Name(String),
+    Var(usize),
     Bool,
     Int,
     Char,
@@ -186,7 +189,83 @@ pub enum Type {
     Meta(usize),
 }
 
+struct IterVars<'a> {
+    next: Vec<&'a Type>,
+    current: &'a Type,
+}
+
+impl<'a> Iterator for IterVars<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        enum Step<'a> {
+            Yield(usize),
+            Skip,
+            Continue(Vec<&'a Type>),
+        }
+
+        fn step_type<'a>(ty: &'a Type) -> Step<'a> {
+            match ty {
+                Type::Name(_) => Step::Skip,
+                Type::Var(n) => Step::Yield(*n),
+                Type::Bool => Step::Skip,
+                Type::Int => Step::Skip,
+                Type::Char => Step::Skip,
+                Type::String => Step::Skip,
+                Type::Arrow => Step::Skip,
+                Type::FatArrow => Step::Skip,
+                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
+                Type::Array => Step::Skip,
+                Type::Record => Step::Skip,
+                Type::Variant => Step::Skip,
+                Type::IO => Step::Skip,
+                Type::App(a, b) => Step::Continue(vec![&*a, &*b]),
+                Type::RowNil => Step::Skip,
+                Type::RowCons(_, a, b) => Step::Continue(vec![&*a, &*b]),
+                Type::Unit => Step::Skip,
+                Type::Meta(_) => Step::Skip,
+            }
+        }
+
+        loop {
+            match step_type(self.current) {
+                Step::Skip => match self.next.pop() {
+                    None => {
+                        return None;
+                    }
+                    Some(current) => {
+                        self.current = current;
+                    }
+                },
+                Step::Continue(tys) => match tys.first() {
+                    None => {}
+                    Some(current) => {
+                        self.current = current;
+                        self.next.extend(tys[1..].iter().rev());
+                    }
+                },
+                Step::Yield(n) => {
+                    match self.next.pop() {
+                        None => {}
+                        Some(current) => {
+                            self.current = current;
+                        }
+                    }
+                    return Some(n);
+                }
+            }
+        }
+    }
+}
+
 impl Type {
+    pub fn iter_vars<'a>(&'a self) -> IterVars<'a> {
+        IterVars {
+            next: Vec::new(),
+            current: self,
+        }
+    }
+
     fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
         match self {
             Type::App(a, b) => match **a {
@@ -391,6 +470,7 @@ impl Type {
 
         match self {
             Type::Name(n) => s.push_str(n.clone().as_str()),
+            Type::Var(n) => s.push_str(format!("#{}", n).as_str()),
             Type::Bool => s.push_str("Bool"),
             Type::Int => s.push_str("Int"),
             Type::Char => s.push_str("Char"),
@@ -486,4 +566,43 @@ pub enum Declaration {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Spanned<Declaration>>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Kind {
+    Type,
+    Row,
+    Constraint,
+    Arrow(Box<Kind>, Box<Kind>),
+    Meta(usize),
+}
+
+impl Kind {
+    pub fn mk_arrow(a: Kind, b: Kind) -> Kind {
+        Kind::Arrow(Box::new(a), Box::new(b))
+    }
+
+    pub fn render(&self) -> String {
+        match self {
+            Kind::Arrow(a, b) => {
+                let mut val = String::new();
+                match **a {
+                    Kind::Arrow(_, _) => val.push('('),
+                    _ => {}
+                }
+                val.push_str(a.render().as_str());
+                match **a {
+                    Kind::Arrow(_, _) => val.push(')'),
+                    _ => {}
+                }
+                val.push_str(" -> ");
+                val.push_str(b.render().as_str());
+                val
+            }
+            Kind::Type => String::from("Type"),
+            Kind::Row => String::from("Row"),
+            Kind::Constraint => String::from("Constraint"),
+            Kind::Meta(n) => format!("?{}", n),
+        }
+    }
 }

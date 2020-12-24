@@ -1,5 +1,6 @@
 #[cfg(test)]
 use crate::syntax::Spanned;
+#[cfg(test)]
 use crate::{
     keep_left,
     lex::{Lexer, TokenType},
