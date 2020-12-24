@@ -189,15 +189,16 @@ pub enum Type {
     Meta(usize),
 }
 
-struct IterVars<'a> {
-    next: Vec<&'a Type>,
-    current: &'a Type,
+#[derive(Debug)]
+pub struct IterVars<'a> {
+    items: Vec<&'a Type>,
 }
 
 impl<'a> Iterator for IterVars<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
+        #[derive(Debug)]
         enum Step<'a> {
             Yield(usize),
             Skip,
@@ -227,43 +228,35 @@ impl<'a> Iterator for IterVars<'a> {
             }
         }
 
+        let result;
         loop {
-            match step_type(self.current) {
-                Step::Skip => match self.next.pop() {
-                    None => {
-                        return None;
-                    }
-                    Some(current) => {
-                        self.current = current;
-                    }
-                },
-                Step::Continue(tys) => match tys.first() {
-                    None => {}
-                    Some(current) => {
-                        self.current = current;
-                        self.next.extend(tys[1..].iter().rev());
-                    }
-                },
-                Step::Yield(n) => {
-                    match self.next.pop() {
-                        None => {}
-                        Some(current) => {
-                            self.current = current;
-                        }
-                    }
-                    return Some(n);
+            match self.items.pop() {
+                None => {
+                    result = None;
+                    break;
                 }
+                Some(current) => match step_type(current) {
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue(tys) => {
+                        self.items.extend(tys.iter().rev());
+                        continue;
+                    }
+                    Step::Yield(n) => {
+                        result = Some(n);
+                        break;
+                    }
+                },
             }
         }
+        return result;
     }
 }
 
 impl Type {
     pub fn iter_vars<'a>(&'a self) -> IterVars<'a> {
-        IterVars {
-            next: Vec::new(),
-            current: self,
-        }
+        IterVars { items: vec![&self] }
     }
 
     fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
@@ -541,10 +534,16 @@ pub enum Names {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct TypeSig {
+    pub ty_vars: Vec<String>,
+    pub body: Type,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {
         name: String,
-        ty: Type,
+        sig: TypeSig,
         args: Vec<Pattern>,
         body: Spanned<Expr>,
     },

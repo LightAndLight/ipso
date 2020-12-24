@@ -1,6 +1,6 @@
 mod test;
 
-use crate::syntax::Spanned;
+use crate::syntax::{Spanned, TypeSig};
 use crate::Diagnostic;
 use crate::Item;
 use std::collections::BTreeSet;
@@ -647,10 +647,16 @@ impl Parser {
         choices!(self, self.expr_app(), self.expr_case())
     }
 
+    fn type_signature(&mut self) -> ParseResult<TypeSig> {
+        let ty_vars = todo!();
+        let body = todo!();
+        ParseResult::pure(TypeSig { ty_vars, body })
+    }
+
     fn definition(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.ident(), self.spaces()).and_then(|name| {
             keep_left!(self.token(&TokenType::Colon), self.spaces()).and_then(|_| {
-                keep_left!(self.type_(), self.newline()).and_then(|ty| {
+                keep_left!(self.type_signature(), self.newline()).and_then(|sig| {
                     keep_right!(
                         keep_left!(self.token(&TokenType::Ident(name.clone())), self.spaces()),
                         many!(self, self.pattern())
@@ -659,7 +665,7 @@ impl Parser {
                         keep_left!(self.token(&TokenType::Equals), self.spaces()).and_then(|_| {
                             self.expr().map(|body| Declaration::Definition {
                                 name,
-                                ty,
+                                sig,
                                 args,
                                 body,
                             })

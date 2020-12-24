@@ -40,7 +40,7 @@ fn infer_kind_test_3() {
 #[test]
 fn infer_kind_test_4() {
     let mut tc = Typechecker::new();
-    let expected = Ok(Some(Kind::Type));
+    let expected = Ok(Kind::Type);
     let actual = tc
         .infer_kind(&Type::mk_app(
             Type::Record,

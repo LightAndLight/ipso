@@ -2,8 +2,7 @@ use crate::core;
 use crate::diagnostic;
 use crate::syntax;
 use crate::syntax::Spanned;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[cfg(test)]
 mod test;
@@ -100,8 +99,7 @@ impl BoundVars {
 
 pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
-    type_solutions: Vec<Option<syntax::Type>>,
-    typevar_kinds: Vec<syntax::Kind>,
+    type_solutions: Vec<(syntax::Kind, Option<syntax::Type>)>,
     evidence: core::Evidence,
     context: HashMap<String, core::TypeSig>,
     bound_vars: BoundVars,
@@ -434,7 +432,6 @@ impl Typechecker {
         Typechecker {
             kind_solutions: vec![],
             type_solutions: vec![],
-            typevar_kinds: vec![],
             evidence: core::Evidence::new(),
             context: HashMap::new(),
             bound_vars: BoundVars::new(),
@@ -461,35 +458,36 @@ impl Typechecker {
         match decl.item {
             syntax::Declaration::Definition {
                 name,
-                ty,
+                sig,
                 args,
                 body,
             } => {
-                let mut ty_var_kinds = Vec::new();
-                for ty_var in ty.iter_vars() {
-                    let ty_var_kinds_len = ty_var_kinds.len();
-                    if ty_var < ty_var_kinds_len {
-                        continue;
-                    } else if ty_var == ty_var_kinds_len {
-                        ty_var_kinds.push(self.fresh_kindvar());
-                    } else {
-                        panic!(
-                            "kind-checking signature: expected ty var {:?}, got {:?}",
-                            ty_var_kinds_len, ty_var
-                        )
-                    }
-                }
+                let ty_var_kinds: Vec<syntax::Kind> =
+                    sig.ty_vars.iter().map(|_| self.fresh_kindvar()).collect();
+
+                self.check_kind(&sig.body, syntax::Kind::Type)?;
+
+                let ty_var_kinds = ty_var_kinds
+                    .into_iter()
+                    .map(|kind| match self.zonk_kind(kind) {
+                        syntax::Kind::Meta(_) => syntax::Kind::Type,
+                        kind => kind,
+                    })
+                    .collect();
+
+                let sig: core::TypeSig = core::TypeSig {
+                    ty_vars: ty_var_kinds,
+                    body: sig.body,
+                };
+
                 let body = self.check_expr(
                     syntax::Spanned {
                         pos: decl.pos,
                         item: syntax::Expr::mk_lam(args, body),
                     },
-                    ty.clone(),
+                    sig.body.clone(),
                 )?;
-                let sig: core::TypeSig = core::TypeSig {
-                    ty_vars: ty.iter_vars().collect(),
-                    body: ty,
-                };
+
                 Ok(core::Declaration::Definition { name, sig, body })
             }
             syntax::Declaration::TypeAlias { name, args, body } => {
@@ -524,6 +522,7 @@ impl Typechecker {
     fn zonk_type(&self, ty: syntax::Type) -> syntax::Type {
         match ty {
             syntax::Type::Name(n) => syntax::Type::Name(n),
+            syntax::Type::Var(n) => syntax::Type::Var(n),
             syntax::Type::Bool => syntax::Type::Bool,
             syntax::Type::Int => syntax::Type::Int,
             syntax::Type::Char => syntax::Type::Char,
@@ -543,24 +542,25 @@ impl Typechecker {
             syntax::Type::RowCons(field, ty, rest) => {
                 syntax::Type::mk_rowcons(field, self.zonk_type(*ty), self.zonk_type(*rest))
             }
-            syntax::Type::Meta(n) => match self.type_solutions[n] {
+            syntax::Type::Meta(n) => match self.type_solutions[n].1 {
                 None => syntax::Type::Meta(n),
                 Some(ref ty) => self.zonk_type(ty.clone()),
             },
         }
     }
 
-    fn zonk_kind(&self, kind: syntax::Kind) -> Option<syntax::Kind> {
+    fn zonk_kind(&self, kind: syntax::Kind) -> syntax::Kind {
         match kind {
-            syntax::Kind::Type => Some(syntax::Kind::Type),
-            syntax::Kind::Row => Some(syntax::Kind::Row),
-            syntax::Kind::Constraint => Some(syntax::Kind::Constraint),
+            syntax::Kind::Type => syntax::Kind::Type,
+            syntax::Kind::Row => syntax::Kind::Row,
+            syntax::Kind::Constraint => syntax::Kind::Constraint,
             syntax::Kind::Arrow(a, b) => {
-                let a_zonked = self.zonk_kind(*a)?;
-                let b_zonked = self.zonk_kind(*b)?;
-                Some(syntax::Kind::mk_arrow(a_zonked, b_zonked))
+                syntax::Kind::mk_arrow(self.zonk_kind(*a), self.zonk_kind(*b))
             }
-            syntax::Kind::Meta(m) => self.kind_solutions[m].clone(),
+            syntax::Kind::Meta(m) => match self.kind_solutions[m].clone() {
+                None => syntax::Kind::Meta(m),
+                Some(kind) => self.zonk_kind(kind),
+            },
         }
     }
 
@@ -623,9 +623,9 @@ impl Typechecker {
         expected: syntax::Type,
         meta: usize,
     ) -> Result<(), TypeError> {
-        match self.type_solutions[meta].clone() {
+        match self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta] = Some(expected);
+                self.type_solutions[meta].1 = Some(expected);
                 Ok(())
             }
             Some(actual) => self.unify_type(expected, actual),
@@ -633,9 +633,9 @@ impl Typechecker {
     }
 
     fn solve_typevar_left(&mut self, meta: usize, actual: syntax::Type) -> Result<(), TypeError> {
-        match self.type_solutions[meta].clone() {
+        match self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta] = Some(actual);
+                self.type_solutions[meta].1 = Some(actual);
                 Ok(())
             }
             Some(expected) => self.unify_type(expected, actual),
@@ -685,15 +685,18 @@ impl Typechecker {
     }
 
     fn lookup_typevar(&self, n: usize) -> Result<syntax::Kind, TypeError> {
-        match self.typevar_kinds.get(n) {
+        match self.type_solutions.get(n) {
             None => panic!("missing kind for type var: ?{}", n),
-            Some(k) => Ok(k.clone()),
+            Some((k, _)) => Ok(k.clone()),
         }
     }
 
     fn infer_kind(&mut self, ty: &syntax::Type) -> Result<syntax::Kind, TypeError> {
         match ty {
             syntax::Type::Name(n) => {
+                todo!()
+            }
+            syntax::Type::Var(n) => {
                 todo!()
             }
             syntax::Type::Bool => Ok(syntax::Kind::Type),
@@ -754,8 +757,7 @@ impl Typechecker {
 
     fn fresh_typevar(&mut self, kind: syntax::Kind) -> syntax::Type {
         let n = self.type_solutions.len();
-        self.type_solutions.push(None);
-        self.typevar_kinds.push(kind);
+        self.type_solutions.push((kind, None));
         syntax::Type::Meta(n)
     }
 
@@ -781,6 +783,11 @@ impl Typechecker {
                 syntax::Type::Name(nn) if n == nn => Ok(()),
                 syntax::Type::Meta(nn) => self.solve_typevar_right(syntax::Type::Name(n), nn),
                 actual => self.type_mismatch(syntax::Type::Name(n), actual),
+            },
+            syntax::Type::Var(n) => match actual {
+                syntax::Type::Var(nn) if n == nn => Ok(()),
+                syntax::Type::Meta(nn) => self.solve_typevar_right(syntax::Type::Var(n), nn),
+                actual => self.type_mismatch(syntax::Type::Var(n), actual),
             },
             syntax::Type::Bool => match actual {
                 syntax::Type::Bool => Ok(()),

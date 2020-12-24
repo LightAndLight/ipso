@@ -118,8 +118,8 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeSig {
-    ty_vars: Vec<syntax::Kind>,
-    body: syntax::Type,
+    pub ty_vars: Vec<syntax::Kind>,
+    pub body: syntax::Type,
 }
 
 #[derive(Debug, PartialEq, Eq)]
