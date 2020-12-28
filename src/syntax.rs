@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use lazy_static::lazy_static;
 
 #[cfg(test)]
@@ -168,44 +170,44 @@ impl Expr {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Type {
+pub enum Type<A> {
     Name(String),
-    Var(usize),
+    Var(A),
     Bool,
     Int,
     Char,
     String,
     Arrow,
     FatArrow,
-    Constraints(Vec<Type>),
+    Constraints(Vec<Type<A>>),
     Array,
     Record,
     Variant,
     IO,
-    App(Box<Type>, Box<Type>),
+    App(Box<Type<A>>, Box<Type<A>>),
     RowNil,
-    RowCons(String, Box<Type>, Box<Type>),
+    RowCons(String, Box<Type<A>>, Box<Type<A>>),
     Unit,
     Meta(usize),
 }
 
 #[derive(Debug)]
-pub struct IterVars<'a> {
-    items: Vec<&'a Type>,
+pub struct IterVars<'a, A> {
+    items: Vec<&'a Type<A>>,
 }
 
-impl<'a> Iterator for IterVars<'a> {
-    type Item = usize;
+impl<'a, A> Iterator for IterVars<'a, A> {
+    type Item = A;
 
     fn next(&mut self) -> Option<Self::Item> {
         #[derive(Debug)]
-        enum Step<'a> {
-            Yield(usize),
+        enum Step<'a, A> {
+            Yield(A),
             Skip,
-            Continue(Vec<&'a Type>),
+            Continue(Vec<&'a Type<A>>),
         }
 
-        fn step_type<'a>(ty: &'a Type) -> Step<'a> {
+        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, A> {
             match ty {
                 Type::Name(_) => Step::Skip,
                 Type::Var(n) => Step::Yield(*n),
@@ -254,12 +256,37 @@ impl<'a> Iterator for IterVars<'a> {
     }
 }
 
-impl Type {
-    pub fn iter_vars<'a>(&'a self) -> IterVars<'a> {
+impl<A> Type<A> {
+    pub fn map<B, F: Fn(&A) -> B>(&self, f: F) -> Type<B> {
+        match self {
+            Type::Name(n) => Type::Name(n.clone()),
+            Type::Var(x) => Type::Var(f(x)),
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.map(f)).collect()),
+            Type::Array => Type::Arrow,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(a, b) => Type::mk_app(a.map(f), b.map(f)),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(field, ty, rest) => {
+                Type::mk_rowcons(field.clone(), ty.map(f), rest.map(f))
+            }
+            Type::Unit => Type::Unit,
+            Type::Meta(n) => Type::Meta(*n),
+        }
+    }
+
+    pub fn iter_vars<'a>(&'a self) -> IterVars<'a, A> {
         IterVars { items: vec![&self] }
     }
 
-    fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
+    fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::App(ref c, ref d) => match **c {
@@ -272,7 +299,7 @@ impl Type {
         }
     }
 
-    fn unwrap_fatarrow<'a>(&'a self) -> Option<(&'a Type, &'a Type)> {
+    fn unwrap_fatarrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::App(ref c, ref d) => match **c {
@@ -285,7 +312,7 @@ impl Type {
         }
     }
 
-    pub fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type)>, Option<&'a Type>) {
+    pub fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>) {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
@@ -300,7 +327,9 @@ impl Type {
         }
     }
 
-    pub fn unwrap_record<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+    pub fn unwrap_record<'a>(
+        &'a self,
+    ) -> Option<(Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Record => Some(b.unwrap_rows()),
@@ -310,7 +339,9 @@ impl Type {
         }
     }
 
-    pub fn unwrap_variant<'a>(&'a self) -> Option<(Vec<(&'a String, &'a Type)>, Option<&'a Type>)> {
+    pub fn unwrap_variant<'a>(
+        &'a self,
+    ) -> Option<(Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Variant => Some(b.unwrap_rows()),
@@ -320,27 +351,27 @@ impl Type {
         }
     }
 
-    pub fn mk_app(a: Type, b: Type) -> Type {
+    pub fn mk_app(a: Type<A>, b: Type<A>) -> Type<A> {
         Type::App(Box::new(a), Box::new(b))
     }
 
-    pub fn mk_arrow(a: Type, b: Type) -> Type {
+    pub fn mk_arrow(a: Type<A>, b: Type<A>) -> Type<A> {
         Type::mk_app(Type::mk_app(Type::Arrow, a), b)
     }
 
-    pub fn mk_fatarrow(a: Type, b: Type) -> Type {
+    pub fn mk_fatarrow(a: Type<A>, b: Type<A>) -> Type<A> {
         Type::mk_app(Type::mk_app(Type::FatArrow, a), b)
     }
 
-    pub fn mk_name(s: &str) -> Type {
+    pub fn mk_name(s: &str) -> Type<A> {
         Type::Name(String::from(s))
     }
 
-    pub fn mk_rowcons(field: String, a: Type, b: Type) -> Type {
+    pub fn mk_rowcons(field: String, a: Type<A>, b: Type<A>) -> Type<A> {
         Type::RowCons(field, Box::new(a), Box::new(b))
     }
 
-    pub fn mk_rows(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+    pub fn mk_rows(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         let mut ty = rest.unwrap_or(Type::RowNil);
         for (field, a) in fields.into_iter().rev() {
             ty = Type::mk_rowcons(field, a, ty)
@@ -348,15 +379,18 @@ impl Type {
         ty
     }
 
-    pub fn mk_record(fields: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+    pub fn mk_record(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         Type::mk_app(Type::Record, Type::mk_rows(fields, rest))
     }
 
-    pub fn mk_variant(ctors: Vec<(String, Type)>, rest: Option<Type>) -> Type {
+    pub fn mk_variant(ctors: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         Type::mk_app(Type::Variant, Type::mk_rows(ctors, rest))
     }
 
-    pub fn render(&self) -> String {
+    pub fn render(&self) -> String
+    where
+        A: Display,
+    {
         let mut s = String::new();
 
         match self.unwrap_record() {
@@ -536,7 +570,7 @@ pub enum Names {
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeSig {
     pub ty_vars: Vec<String>,
-    pub body: Type,
+    pub body: Type<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -550,7 +584,7 @@ pub enum Declaration {
     TypeAlias {
         name: String,
         args: Vec<String>,
-        body: Type,
+        body: Type<String>,
     },
     Import {
         module: String,

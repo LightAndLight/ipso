@@ -26,7 +26,10 @@ pub struct EVar(usize);
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
 
 pub enum Constraint {
-    HasField { field: String, actual: syntax::Type },
+    HasField {
+        field: String,
+        actual: syntax::Type<usize>,
+    },
 }
 
 impl Evidence {
@@ -119,7 +122,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq)]
 pub struct TypeSig {
     pub ty_vars: Vec<syntax::Kind>,
-    pub body: syntax::Type,
+    pub body: syntax::Type<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
