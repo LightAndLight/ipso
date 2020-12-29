@@ -3,6 +3,7 @@ use crate::typecheck::Typechecker;
 use std::path::Path;
 use std::{env, io};
 
+mod builtins;
 mod core;
 mod diagnostic;
 mod lex;
@@ -97,7 +98,7 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
         Some(ref value) => value,
     };
     let module: syntax::Module = parse::parse_file(filename)?;
-    let mut tc: Typechecker = Typechecker::new();
+    let mut tc: Typechecker = Typechecker::new_with_builtins();
     let module: core::Module = tc.check_module(module)?;
     panic!("{:?} {:?} {:?}", filename, entrypoint, module)
 }

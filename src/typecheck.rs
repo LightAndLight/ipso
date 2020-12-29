@@ -1,3 +1,4 @@
+use crate::builtins;
 use crate::core;
 use crate::diagnostic;
 use crate::syntax;
@@ -443,6 +444,12 @@ impl Typechecker {
         }
     }
 
+    pub fn new_with_builtins() -> Self {
+        let mut tc = Self::new();
+        tc.from_import(&builtins::BUILTINS, &syntax::Names::All);
+        tc
+    }
+
     pub fn check_module(&mut self, module: syntax::Module) -> Result<core::Module, TypeError> {
         let decls = module.decls.into_iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
@@ -453,6 +460,44 @@ impl Typechecker {
             })
         })?;
         Ok(core::Module { decls })
+    }
+
+    fn from_import(&mut self, module: &core::Module, names: &syntax::Names) {
+        let should_import = |name: &String| -> bool {
+            match names {
+                syntax::Names::All => true,
+                syntax::Names::Names(names) => names.contains(name),
+            }
+        };
+        for decl in &module.decls {
+            match decl {
+                core::Declaration::Definition { name, sig, body: _ } => {
+                    if should_import(name) {
+                        self.context.insert(name.clone(), sig.clone());
+                    }
+                }
+                core::Declaration::TypeAlias { name, args, body } => {
+                    if should_import(name) {
+                        todo!("import type alias")
+                    }
+                }
+                core::Declaration::Import { module: _, name: _ } => {}
+                core::Declaration::FromImport { module: _, name: _ } => {}
+                core::Declaration::Class {
+                    ty_vars,
+                    supers,
+                    name,
+                    args,
+                    members,
+                } => todo!("import type class"),
+                core::Declaration::Instance {
+                    ty_vars,
+                    assumes,
+                    head,
+                    dict,
+                } => todo!("import type class instance"),
+            }
+        }
     }
 
     fn check_declaration(
