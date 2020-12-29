@@ -127,6 +127,12 @@ pub struct TypeSig {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct ClassMember {
+    name: String,
+    sig: TypeSig,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {
         name: String,
@@ -145,6 +151,19 @@ pub enum Declaration {
     FromImport {
         module: String,
         name: syntax::Names,
+    },
+    Class {
+        ty_vars: Vec<syntax::Kind>,
+        supers: Vec<syntax::Type<usize>>,
+        name: String,
+        args: Vec<usize>,
+        members: Vec<ClassMember>,
+    },
+    Instance {
+        ty_vars: Vec<syntax::Kind>,
+        assumes: Vec<syntax::Type<usize>>,
+        head: syntax::Type<usize>,
+        dict: Expr,
     },
 }
 
