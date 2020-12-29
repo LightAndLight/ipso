@@ -1,14 +1,14 @@
 use crate::core;
 use crate::syntax::{self, Kind, Type};
+use crate::typecheck::BoundVars;
 use crate::typecheck::Rope;
-use crate::typecheck::{BoundVars, BoundVarsEntry};
 
 use super::{TypeError, Typechecker};
 
 #[test]
 fn infer_kind_test_1() {
     let mut tc = Typechecker::new();
-    let expected = Ok(Kind::Type);
+    let expected = Ok((Type::Bool, Kind::Type));
     let actual = tc.infer_kind(&Type::Bool);
     assert_eq!(expected, actual)
 }
@@ -16,7 +16,7 @@ fn infer_kind_test_1() {
 #[test]
 fn infer_kind_test_2() {
     let mut tc = Typechecker::new();
-    let expected = Ok(Kind::Row);
+    let expected = Ok((Type::RowNil, Kind::Row));
     let actual = tc.infer_kind(&Type::RowNil);
     assert_eq!(expected, actual)
 }
@@ -46,50 +46,41 @@ fn infer_kind_test_4() {
             Type::Record,
             Type::mk_rowcons(String::from("x"), Type::Bool, Type::RowNil),
         ))
-        .map(|kind| tc.zonk_kind(kind));
+        .map(|(_, kind)| tc.zonk_kind(kind));
     assert_eq!(expected, actual)
 }
 
 #[test]
 fn context_test_1() {
+    let mut ctx = BoundVars::new();
+    ctx.insert(&vec![
+        (&String::from("a"), Type::Unit::<usize>),
+        (&String::from("b"), Type::Bool),
+        (&String::from("c"), Type::String),
+    ]);
     assert_eq!(
-        {
-            let mut ctx = BoundVars::new();
-            ctx.insert(&vec![
-                (&String::from("a"), Type::Unit),
-                (&String::from("b"), Type::Bool),
-                (&String::from("c"), Type::String),
-            ]);
-            ctx
-        },
-        BoundVars(
-            vec![
-                (
-                    String::from("a"),
-                    vec![BoundVarsEntry {
-                        index: 2,
-                        ty: Type::Unit
-                    }]
-                ),
-                (
-                    String::from("b"),
-                    vec![BoundVarsEntry {
-                        index: 1,
-                        ty: Type::Bool
-                    }]
-                ),
-                (
-                    String::from("c"),
-                    vec![BoundVarsEntry {
-                        index: 0,
-                        ty: Type::String
-                    }]
-                )
+        ctx,
+        BoundVars {
+            indices: vec![
+                (String::from("a"), vec![2]),
+                (String::from("b"), vec![1]),
+                (String::from("c"), vec![0])
             ]
             .into_iter()
-            .collect()
-        )
-    )
+            .collect(),
+            info: vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool),
+                (String::from("c"), Type::String),
+            ]
+        }
+    );
+    assert_eq!(ctx.lookup_name(&String::from("a")), Some((2, &Type::Unit)));
+    assert_eq!(ctx.lookup_name(&String::from("b")), Some((1, &Type::Bool)));
+    assert_eq!(
+        ctx.lookup_name(&String::from("c")),
+        Some((0, &Type::String))
+    );
 }
 
 #[test]
@@ -97,10 +88,117 @@ fn context_test_1() {
 fn context_test_2() {
     let mut ctx = BoundVars::new();
     ctx.insert(&vec![
-        (&String::from("a"), Type::Unit),
+        (&String::from("a"), Type::Unit::<usize>),
         (&String::from("a"), Type::Bool),
         (&String::from("c"), Type::String),
     ]);
+}
+
+#[test]
+fn context_test_3() {
+    let mut ctx = BoundVars::new();
+    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(String::from("a"), Type::Unit),]
+        }
+    );
+    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0]),]
+                .into_iter()
+                .collect(),
+            info: vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool),
+            ]
+        }
+    );
+    ctx.insert(&vec![(&String::from("c"), Type::String)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![
+                (String::from("a"), vec![2]),
+                (String::from("b"), vec![1]),
+                (String::from("c"), vec![0])
+            ]
+            .into_iter()
+            .collect(),
+            info: vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool),
+                (String::from("c"), Type::String),
+            ]
+        }
+    );
+}
+
+#[test]
+fn context_test_4() {
+    let mut ctx = BoundVars::new();
+    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(String::from("a"), Type::Unit),]
+        }
+    );
+    ctx.delete(1);
+    assert_eq!(ctx, BoundVars::new())
+}
+
+#[test]
+fn context_test_5() {
+    let mut ctx = BoundVars::new();
+    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0])]
+                .into_iter()
+                .collect(),
+            info: vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool)
+            ]
+        }
+    );
+    ctx.delete(1);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(String::from("a"), Type::Unit),]
+        }
+    )
+}
+
+#[test]
+fn context_test_6() {
+    let mut ctx = BoundVars::new();
+    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    assert_eq!(
+        ctx,
+        BoundVars {
+            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0])]
+                .into_iter()
+                .collect(),
+            info: vec![
+                (String::from("a"), Type::Unit),
+                (String::from("b"), Type::Bool)
+            ]
+        }
+    );
+    ctx.delete(2);
+    assert_eq!(ctx, BoundVars::new())
 }
 
 #[test]

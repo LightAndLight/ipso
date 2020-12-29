@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::syntax::{Spanned, TypeSig};
+use crate::syntax::Spanned;
 #[cfg(test)]
 use crate::{
     keep_left,
@@ -105,10 +105,7 @@ fn parse_definition_1() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            sig: TypeSig {
-                ty_vars: Vec::new(),
-                body: Type::Int
-            },
+            ty: Type::Int,
             args: Vec::new(),
             body: Spanned {
                 pos: 12,
@@ -125,10 +122,7 @@ fn parse_definition_2() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            sig: TypeSig {
-                ty_vars: Vec::new(),
-                body: Type::Int
-            },
+            ty: Type::Int,
             args: Vec::new(),
             body: Spanned {
                 pos: 14,
@@ -168,10 +162,7 @@ fn parse_definition_4() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            sig: TypeSig {
-                ty_vars: Vec::new(),
-                body: Type::Int
-            },
+            ty: Type::Int,
             args: vec![
                 Pattern::Name(Spanned {
                     pos: 10,
@@ -194,10 +185,7 @@ fn parse_definition_5() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("main"),
-            sig: TypeSig {
-                ty_vars: Vec::new(),
-                body: Type::mk_app(Type::IO, Type::Unit)
-            },
+            ty: Type::mk_app(Type::IO, Type::Unit),
             args: vec![],
             body: Expr::mk_app(
                 Spanned {

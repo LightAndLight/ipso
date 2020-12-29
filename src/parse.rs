@@ -1,6 +1,6 @@
 mod test;
 
-use crate::syntax::{Spanned, TypeSig};
+use crate::syntax::Spanned;
 use crate::Diagnostic;
 use crate::Item;
 use std::collections::BTreeSet;
@@ -464,7 +464,7 @@ impl Parser {
         }
     }
 
-    fn type_atom(&mut self) -> ParseResult<Type> {
+    fn type_atom(&mut self) -> ParseResult<Type<String>> {
         keep_left!(
             choices!(
                 self,
@@ -502,7 +502,7 @@ impl Parser {
         )
     }
 
-    fn type_app(&mut self) -> ParseResult<Type> {
+    fn type_app(&mut self) -> ParseResult<Type<String>> {
         self.type_atom().and_then(|first| {
             many!(self, self.type_atom()).map(|rest| {
                 rest.into_iter()
@@ -511,7 +511,7 @@ impl Parser {
         })
     }
 
-    fn type_arrow(&mut self) -> ParseResult<Type> {
+    fn type_arrow(&mut self) -> ParseResult<Type<String>> {
         self.type_app().and_then(|a| {
             optional!(
                 self,
@@ -528,7 +528,7 @@ impl Parser {
         })
     }
 
-    fn type_fatarrow(&mut self) -> ParseResult<Type> {
+    fn type_fatarrow(&mut self) -> ParseResult<Type<String>> {
         self.type_arrow().and_then(|a| {
             optional!(
                 self,
@@ -545,7 +545,7 @@ impl Parser {
         })
     }
 
-    fn type_(&mut self) -> ParseResult<Type> {
+    fn type_(&mut self) -> ParseResult<Type<String>> {
         self.type_fatarrow()
     }
 
@@ -647,16 +647,10 @@ impl Parser {
         choices!(self, self.expr_app(), self.expr_case())
     }
 
-    fn type_signature(&mut self) -> ParseResult<TypeSig> {
-        let ty_vars = todo!();
-        let body = todo!();
-        ParseResult::pure(TypeSig { ty_vars, body })
-    }
-
     fn definition(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.ident(), self.spaces()).and_then(|name| {
             keep_left!(self.token(&TokenType::Colon), self.spaces()).and_then(|_| {
-                keep_left!(self.type_signature(), self.newline()).and_then(|sig| {
+                keep_left!(self.type_(), self.newline()).and_then(|ty| {
                     keep_right!(
                         keep_left!(self.token(&TokenType::Ident(name.clone())), self.spaces()),
                         many!(self, self.pattern())
@@ -665,7 +659,7 @@ impl Parser {
                         keep_left!(self.token(&TokenType::Equals), self.spaces()).and_then(|_| {
                             self.expr().map(|body| Declaration::Definition {
                                 name,
-                                sig,
+                                ty,
                                 args,
                                 body,
                             })

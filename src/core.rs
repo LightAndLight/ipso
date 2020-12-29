@@ -135,7 +135,7 @@ pub enum Declaration {
     TypeAlias {
         name: String,
         args: Vec<String>,
-        body: syntax::Type,
+        body: syntax::Type<usize>,
     },
     Import {
         module: String,

@@ -196,7 +196,7 @@ pub struct IterVars<'a, A> {
     items: Vec<&'a Type<A>>,
 }
 
-impl<'a, A> Iterator for IterVars<'a, A> {
+impl<'a, A: Clone> Iterator for IterVars<'a, A> {
     type Item = A;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -207,10 +207,13 @@ impl<'a, A> Iterator for IterVars<'a, A> {
             Continue(Vec<&'a Type<A>>),
         }
 
-        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, A> {
+        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, A>
+        where
+            A: Clone,
+        {
             match ty {
                 Type::Name(_) => Step::Skip,
-                Type::Var(n) => Step::Yield(*n),
+                Type::Var(n) => Step::Yield(n.clone()),
                 Type::Bool => Step::Skip,
                 Type::Int => Step::Skip,
                 Type::Char => Step::Skip,
@@ -257,7 +260,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
 }
 
 impl<A> Type<A> {
-    pub fn map<B, F: Fn(&A) -> B>(&self, f: F) -> Type<B> {
+    pub fn map<B, F: FnMut(&A) -> B>(&self, f: &mut F) -> Type<B> {
         match self {
             Type::Name(n) => Type::Name(n.clone()),
             Type::Var(x) => Type::Var(f(x)),
@@ -568,16 +571,10 @@ pub enum Names {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct TypeSig {
-    pub ty_vars: Vec<String>,
-    pub body: Type<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     Definition {
         name: String,
-        sig: TypeSig,
+        ty: Type<String>,
         args: Vec<Pattern>,
         body: Spanned<Expr>,
     },

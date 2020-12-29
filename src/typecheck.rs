@@ -2,79 +2,49 @@ use crate::core;
 use crate::diagnostic;
 use crate::syntax;
 use crate::syntax::Spanned;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
 #[cfg(test)]
 mod test;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct BoundVarsEntry {
-    index: usize,
-    ty: syntax::Type<usize>,
+#[derive(Debug, PartialEq, Eq)]
+struct BoundVars<A> {
+    indices: HashMap<String, Vec<usize>>,
+    info: Vec<(String, A)>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct BoundVars(HashMap<String, Vec<BoundVarsEntry>>);
-
-impl BoundVars {
+impl<A> BoundVars<A> {
     fn new() -> Self {
-        BoundVars(HashMap::new())
+        BoundVars {
+            indices: HashMap::new(),
+            info: Vec::new(),
+        }
     }
 
-    fn lookup(&self, name: &String) -> Option<BoundVarsEntry> {
-        self.0
+    fn lookup_name(&self, name: &String) -> Option<(usize, &A)> {
+        self.indices
             .get(name)
-            .and_then(|entries| entries.last().map(|entry| entry.clone()))
+            .and_then(|entries| entries.last())
+            .and_then(|&ix| self.lookup_index(ix).map(|(_, item)| (ix, item)))
     }
 
-    fn insert(&mut self, vars: &Vec<(&String, syntax::Type<usize>)>) {
+    fn lookup_index(&self, ix: usize) -> Option<&(String, A)> {
+        self.info.get(self.info.len() - 1 - ix)
+    }
+
+    fn insert(&mut self, vars: &Vec<(&String, A)>)
+    where
+        A: Debug + Clone,
+    {
         debug_assert!(
             {
                 let mut seen: HashSet<&String> = HashSet::new();
-                vars.iter()
-                    .fold(true, |acc, el: &(&String, syntax::Type<usize>)| {
-                        let acc = acc && !seen.contains(&el.0);
-                        seen.insert(&el.0);
-                        acc
-                    })
-            },
-            "duplicate name in {:?}",
-            vars
-        );
-        let num_vars = vars.len();
-        for (_, entries) in &mut self.0 {
-            for mut entry in entries {
-                entry.index += num_vars;
-            }
-        }
-        for (index, (var, ty)) in vars.iter().rev().enumerate() {
-            match self.0.get_mut(*var) {
-                None => {
-                    self.0.insert(
-                        (*var).clone(),
-                        vec![BoundVarsEntry {
-                            index,
-                            ty: ty.clone(),
-                        }],
-                    );
-                }
-                Some(entries) => {
-                    entries.push(BoundVarsEntry {
-                        index,
-                        ty: ty.clone(),
-                    });
-                }
-            };
-        }
-    }
-
-    fn delete(&mut self, vars: &Vec<&String>) {
-        debug_assert!(
-            {
-                let mut seen: HashSet<&String> = HashSet::new();
-                vars.iter().fold(true, |acc, el: &&String| {
-                    let acc = acc && !seen.contains(el);
-                    seen.insert(&el);
+                vars.iter().fold(true, |acc, el: &(&String, A)| {
+                    let acc = acc && !seen.contains(&el.0);
+                    seen.insert(&el.0);
                     acc
                 })
             },
@@ -82,17 +52,48 @@ impl BoundVars {
             vars
         );
         let num_vars = vars.len();
-        for var in vars {
-            match self.0.get_mut(*var) {
-                Some(entries) if entries.len() > 0 => {
-                    entries.pop();
-                }
-                _ => {}
+        for (_, entries) in &mut self.indices {
+            for entry in entries {
+                *entry += num_vars;
             }
         }
-        for item in &mut self.0 {
+        for (index, (var, item)) in vars.iter().rev().enumerate() {
+            match self.indices.get_mut(*var) {
+                None => {
+                    self.indices.insert((*var).clone(), vec![index]);
+                }
+                Some(entries) => {
+                    entries.push(index);
+                }
+            };
+        }
+        self.info.extend(
+            vars.iter()
+                .map(|(name, item)| ((*name).clone(), item.clone())),
+        );
+    }
+
+    fn delete(&mut self, count: usize) {
+        for _ in 0..count {
+            match self.info.pop() {
+                None => panic!("unexpected empty context"),
+                Some((name, _)) => {
+                    let should_delete = match self.indices.get_mut(&name) {
+                        None => panic!("context missing entry {:?}", name),
+                        Some(ixs) => match ixs.pop() {
+                            None => panic!("context ran out of indices in {:?}", name),
+                            Some(_) => ixs.len() == 0,
+                        },
+                    };
+                    if should_delete {
+                        self.indices.remove(&name);
+                    }
+                }
+            }
+        }
+        for item in &mut self.indices {
             for entry in item.1 {
-                entry.index -= num_vars;
+                *entry -= count;
             }
         }
     }
@@ -103,7 +104,8 @@ pub struct Typechecker {
     type_solutions: Vec<(syntax::Kind, Option<syntax::Type<usize>>)>,
     evidence: core::Evidence,
     context: HashMap<String, core::TypeSig>,
-    bound_vars: BoundVars,
+    bound_vars: BoundVars<syntax::Type<usize>>,
+    bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
 }
 
@@ -436,6 +438,7 @@ impl Typechecker {
             evidence: core::Evidence::new(),
             context: HashMap::new(),
             bound_vars: BoundVars::new(),
+            bound_tyvars: BoundVars::new(),
             position: None,
         }
     }
@@ -459,26 +462,27 @@ impl Typechecker {
         match decl.item {
             syntax::Declaration::Definition {
                 name,
-                sig,
+                ty,
                 args,
                 body,
             } => {
-                let ty_var_kinds: Vec<syntax::Kind> =
-                    sig.ty_vars.iter().map(|_| self.fresh_kindvar()).collect();
-
-                let body_ty = {
+                let (body_ty, ty_var_kinds) = {
                     let mut vars = HashMap::new();
-                    sig.body.map(|x| match vars.get(x) {
+                    let mut kinds = Vec::new();
+                    let ty = ty.map(&mut |x: &String| match vars.get(x) {
                         None => {
                             let len = vars.len();
-                            vars.insert(x, len);
+                            let kind = self.fresh_kindvar();
+                            vars.insert(x.clone(), len);
+                            kinds.push(kind);
                             len
                         }
                         Some(&n) => n,
-                    })
+                    });
+                    (ty, kinds)
                 };
 
-                let body_ty = self.check_kind(|x| x, &body_ty, syntax::Kind::Type)?;
+                let body_ty = self.check_kind(&body_ty, syntax::Kind::Type)?;
 
                 let ty_var_kinds = ty_var_kinds
                     .into_iter()
@@ -522,9 +526,9 @@ impl Typechecker {
         }
     }
 
-    fn lookup_var(&self, name: String) -> Result<BoundVarsEntry, TypeError> {
-        match self.bound_vars.lookup(&name) {
-            Some(entry) => Ok(entry),
+    fn lookup_var(&self, name: String) -> Result<(usize, syntax::Type<usize>), TypeError> {
+        match self.bound_vars.lookup_name(&name) {
+            Some((ix, ty)) => Ok((ix, ty.clone())),
             None => Err(TypeError::NotInScope {
                 pos: self.current_position(),
                 name,
@@ -621,13 +625,13 @@ impl Typechecker {
 
     fn type_mismatch<A>(
         &self,
-        expected: syntax::Type<String>,
-        actual: syntax::Type<String>,
+        expected: syntax::Type<usize>,
+        actual: syntax::Type<usize>,
     ) -> Result<A, TypeError> {
         Err(TypeError::TypeMismatch {
             pos: self.current_position(),
-            expected,
-            actual,
+            expected: self.fill_ty_names(expected),
+            actual: self.fill_ty_names(actual),
         })
     }
 
@@ -695,14 +699,13 @@ impl Typechecker {
         }
     }
 
-    fn check_kind<A, F: Fn(A) -> usize>(
+    fn check_kind(
         &mut self,
-        map: F,
-        ty: &syntax::Type<A>,
+        ty: &syntax::Type<usize>,
         kind: syntax::Kind,
     ) -> Result<syntax::Type<usize>, TypeError> {
         let expected = kind;
-        let (ty, actual) = self.infer_kind(map, ty)?;
+        let (ty, actual) = self.infer_kind(ty)?;
         self.unify_kind(expected, actual)?;
         Ok(ty)
     }
@@ -714,10 +717,9 @@ impl Typechecker {
         }
     }
 
-    fn infer_kind<A, F: Fn(A) -> usize>(
+    fn infer_kind(
         &mut self,
-        map: F,
-        ty: &syntax::Type<A>,
+        ty: &syntax::Type<usize>,
     ) -> Result<(syntax::Type<usize>, syntax::Kind), TypeError> {
         match ty {
             syntax::Type::Name(n) => {
@@ -747,7 +749,7 @@ impl Typechecker {
             syntax::Type::Constraints(constraints) => {
                 let mut new_constraints = Vec::new();
                 for constraint in constraints {
-                    match self.check_kind(map, constraint, syntax::Kind::Constraint) {
+                    match self.check_kind(constraint, syntax::Kind::Constraint) {
                         Err(err) => return Err(err),
                         Ok(new_constraint) => {
                             new_constraints.push(new_constraint);
@@ -776,20 +778,20 @@ impl Typechecker {
                 syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
             )),
             syntax::Type::App(a, b) => {
-                let (a, a_kind) = self.infer_kind(map, a)?;
+                let (a, a_kind) = self.infer_kind(a)?;
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
                 self.unify_kind(
                     syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
                     a_kind,
                 )?;
-                let b = self.check_kind(map, b, in_kind)?;
+                let b = self.check_kind(b, in_kind)?;
                 Ok((syntax::Type::mk_app(a, b), out_kind))
             }
             syntax::Type::RowNil => Ok((syntax::Type::RowNil, syntax::Kind::Row)),
             syntax::Type::RowCons(field, ty, rest) => {
-                let ty = self.check_kind(map, ty, syntax::Kind::Type)?;
-                let rest = self.check_kind(map, rest, syntax::Kind::Row)?;
+                let ty = self.check_kind(ty, syntax::Kind::Type)?;
+                let rest = self.check_kind(rest, syntax::Kind::Row)?;
                 Ok((
                     syntax::Type::mk_rowcons(field.clone(), ty, rest),
                     syntax::Kind::Row,
@@ -809,13 +811,17 @@ impl Typechecker {
         syntax::Type::Meta(n)
     }
 
+    fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<String> {
+        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
+    }
+
     fn unify_type(
         &mut self,
         expected: syntax::Type<usize>,
         actual: syntax::Type<usize>,
     ) -> Result<(), TypeError> {
-        let (_, expected_kind) = self.infer_kind(|x| x, &expected)?;
-        let (_, actual_kind) = self.infer_kind(|x| x, &actual)?;
+        let (_, expected_kind) = self.infer_kind(&expected)?;
+        let (_, actual_kind) = self.infer_kind(&actual)?;
         self.unify_kind(expected_kind, actual_kind)?;
         match expected {
             syntax::Type::App(a1, b1) => match actual {
@@ -916,8 +922,9 @@ impl Typechecker {
 
                     let mut rows2_remaining = Rope::from_vec(&rows2);
 
-                    let mut sames: Vec<(&String, &syntax::Type, &syntax::Type)> = Vec::new();
-                    let mut not_in_rows2: Vec<(String, syntax::Type)> = Vec::new();
+                    let mut sames: Vec<(&String, &syntax::Type<usize>, &syntax::Type<usize>)> =
+                        Vec::new();
+                    let mut not_in_rows2: Vec<(String, syntax::Type<usize>)> = Vec::new();
 
                     for (field1, ty1) in &rows1 {
                         match rows2_remaining.iter().find(|(field2, _)| field1 == field2) {
@@ -937,7 +944,7 @@ impl Typechecker {
 
                     // every field in rows1 that has a partner in rows2 has been deleted from rows2
                     // therefore whatever's left in rows2_remaining is necessarily not in rows_1
-                    let mut not_in_rows1: Vec<(String, syntax::Type)> = rows2_remaining
+                    let not_in_rows1: Vec<(String, syntax::Type<usize>)> = rows2_remaining
                         .iter()
                         .map(|(a, b)| ((**a).clone(), (**b).clone()))
                         .collect();
@@ -1005,7 +1012,11 @@ impl Typechecker {
     fn infer_pattern<'a, 'b>(
         &'a mut self,
         arg: &'b syntax::Pattern,
-    ) -> (core::Pattern, syntax::Type, Vec<(&'b String, syntax::Type)>) {
+    ) -> (
+        core::Pattern,
+        syntax::Type<usize>,
+        Vec<(&'b String, syntax::Type<usize>)>,
+    ) {
         match arg {
             syntax::Pattern::Wildcard => (
                 core::Pattern::Wildcard,
@@ -1017,11 +1028,11 @@ impl Typechecker {
                 (core::Pattern::Name, ty.clone(), vec![(&n.item, ty)])
             }
             syntax::Pattern::Record { names, rest } => {
-                let mut names_tys: Vec<(&String, syntax::Type)> = names
+                let mut names_tys: Vec<(&String, syntax::Type<usize>)> = names
                     .iter()
                     .map(|name| (&name.item, self.fresh_typevar(syntax::Kind::Type)))
                     .collect();
-                let rest_ty: Option<(&String, syntax::Type)> = match rest {
+                let rest_ty: Option<(&String, syntax::Type<usize>)> = match rest {
                     None => None,
                     Some(name) => Some((&name.item, self.fresh_typevar(syntax::Kind::Type))),
                 };
@@ -1051,7 +1062,7 @@ impl Typechecker {
                 )
             }
             syntax::Pattern::Variant { name, arg } => {
-                let arg_ty: syntax::Type = self.fresh_typevar(syntax::Kind::Type);
+                let arg_ty: syntax::Type<usize> = self.fresh_typevar(syntax::Kind::Type);
                 let rest_ty = Some(self.fresh_typevar(syntax::Kind::Row));
                 let ty = syntax::Type::mk_variant(vec![(name.clone(), arg_ty.clone())], rest_ty);
                 (
@@ -1066,8 +1077,8 @@ impl Typechecker {
     fn check_pattern<'a, 'b>(
         &'a mut self,
         arg: &'b syntax::Pattern,
-        expected: syntax::Type,
-    ) -> Result<(core::Pattern, Vec<(&'b String, syntax::Type)>), TypeError> {
+        expected: syntax::Type<usize>,
+    ) -> Result<(core::Pattern, Vec<(&'b String, syntax::Type<usize>)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
         self.unify_type(expected, actual)?;
         Ok((pat, binds))
@@ -1089,14 +1100,14 @@ impl Typechecker {
     fn infer_expr(
         &mut self,
         expr: syntax::Spanned<syntax::Expr>,
-    ) -> Result<(core::Expr, syntax::Type), TypeError> {
+    ) -> Result<(core::Expr, syntax::Type<usize>), TypeError> {
         with_position!(
             self,
             expr.pos,
             match expr.item {
                 syntax::Expr::Var(name) => {
                     let entry = self.lookup_var(name)?;
-                    Ok((core::Expr::Var(entry.index), entry.ty))
+                    Ok((core::Expr::Var(entry.0), entry.1))
                 }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(*f)?;
@@ -1127,8 +1138,7 @@ impl Typechecker {
 
                     self.bound_vars.insert(&args_names_tys);
                     let (body_core, body_ty) = self.infer_expr(*body)?;
-                    self.bound_vars
-                        .delete(&args_names_tys.iter().map(|el| el.0).collect());
+                    self.bound_vars.delete(args_names_tys.len());
 
                     let mut expr_core = body_core;
                     for arg_core in args_core.into_iter().rev() {
@@ -1379,27 +1389,21 @@ impl Typechecker {
                                         };
                                     }
                                 }
-                                self.bound_vars
-                                    .delete(&pattern_bind.iter().map(|x| x.0).collect());
+                                self.bound_vars.delete(pattern_bind.len());
                                 seen.insert(current_seen);
                             }
                         }
                     }
 
-                    println!("in_ty before: {:?}", self.zonk_type(in_ty.clone()));
                     match self.zonk_type(in_ty.clone()).unwrap_variant() {
                         Some((ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
                             None => {}
                             Some(rest) => {
-                                println!("rest before: {:?}", self.zonk_type(rest.clone()));
                                 self.unify_type(syntax::Type::RowNil, rest.clone())?;
-                                println!("rest after: {:?}", self.zonk_type(rest.clone()));
                             }
                         },
                         _ => {}
                     }
-                    println!("solutions after: {:?}", self.type_solutions);
-                    println!("in_ty after: {:?}", self.zonk_type(in_ty.clone()));
                     let expr_core = self.check_expr(*expr, in_ty)?;
 
                     Ok((core::Expr::mk_case(expr_core, branches_core), out_ty))
@@ -1411,7 +1415,7 @@ impl Typechecker {
     fn check_expr(
         &mut self,
         expr: syntax::Spanned<syntax::Expr>,
-        ty: syntax::Type,
+        ty: syntax::Type<usize>,
     ) -> Result<core::Expr, TypeError> {
         with_position!(self, expr.pos, {
             let expected = ty;
