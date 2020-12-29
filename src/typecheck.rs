@@ -35,14 +35,14 @@ impl<A> BoundVars<A> {
         self.info.get(self.info.len() - 1 - ix)
     }
 
-    fn insert(&mut self, vars: &Vec<(&String, A)>)
+    fn insert(&mut self, vars: &Vec<(String, A)>)
     where
         A: Debug + Clone,
     {
         debug_assert!(
             {
                 let mut seen: HashSet<&String> = HashSet::new();
-                vars.iter().fold(true, |acc, el: &(&String, A)| {
+                vars.iter().fold(true, |acc, el: &(String, A)| {
                     let acc = acc && !seen.contains(&el.0);
                     seen.insert(&el.0);
                     acc
@@ -57,8 +57,8 @@ impl<A> BoundVars<A> {
                 *entry += num_vars;
             }
         }
-        for (index, (var, item)) in vars.iter().rev().enumerate() {
-            match self.indices.get_mut(*var) {
+        for (index, (var, _)) in vars.iter().rev().enumerate() {
+            match self.indices.get_mut(var) {
                 None => {
                     self.indices.insert((*var).clone(), vec![index]);
                 }
@@ -474,7 +474,7 @@ impl Typechecker {
                             let len = vars.len();
                             let kind = self.fresh_kindvar();
                             vars.insert(x.clone(), len);
-                            kinds.push(kind);
+                            kinds.push((x.clone(), kind));
                             len
                         }
                         Some(&n) => n,
@@ -482,11 +482,14 @@ impl Typechecker {
                     (ty, kinds)
                 };
 
+                let ty_var_kinds_len = ty_var_kinds.len();
+                self.bound_tyvars.insert(&ty_var_kinds);
+
                 let body_ty = self.check_kind(&body_ty, syntax::Kind::Type)?;
 
                 let ty_var_kinds = ty_var_kinds
                     .into_iter()
-                    .map(|kind| match self.zonk_kind(kind) {
+                    .map(|(_, kind)| match self.zonk_kind(kind) {
                         syntax::Kind::Meta(_) => syntax::Kind::Type,
                         kind => kind,
                     })
@@ -504,6 +507,8 @@ impl Typechecker {
                     },
                     sig.body.clone(),
                 )?;
+
+                self.bound_tyvars.delete(ty_var_kinds_len);
 
                 Ok(core::Declaration::Definition { name, sig, body })
             }
@@ -725,9 +730,10 @@ impl Typechecker {
             syntax::Type::Name(n) => {
                 todo!()
             }
-            syntax::Type::Var(n) => {
-                todo!()
-            }
+            syntax::Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
+                None => panic!("missing tyvar {:?}", ix),
+                Some((_, kind)) => Ok((syntax::Type::Var(*ix), kind.clone())),
+            },
             syntax::Type::Bool => Ok((syntax::Type::Bool, syntax::Kind::Type)),
             syntax::Type::Int => Ok((syntax::Type::Int, syntax::Kind::Type)),
             syntax::Type::Char => Ok((syntax::Type::Char, syntax::Kind::Type)),
@@ -1015,7 +1021,7 @@ impl Typechecker {
     ) -> (
         core::Pattern,
         syntax::Type<usize>,
-        Vec<(&'b String, syntax::Type<usize>)>,
+        Vec<(String, syntax::Type<usize>)>,
     ) {
         match arg {
             syntax::Pattern::Wildcard => (
@@ -1025,12 +1031,12 @@ impl Typechecker {
             ),
             syntax::Pattern::Name(n) => {
                 let ty = self.fresh_typevar(syntax::Kind::Type);
-                (core::Pattern::Name, ty.clone(), vec![(&n.item, ty)])
+                (core::Pattern::Name, ty.clone(), vec![(n.item.clone(), ty)])
             }
             syntax::Pattern::Record { names, rest } => {
-                let mut names_tys: Vec<(&String, syntax::Type<usize>)> = names
+                let mut names_tys: Vec<(String, syntax::Type<usize>)> = names
                     .iter()
-                    .map(|name| (&name.item, self.fresh_typevar(syntax::Kind::Type)))
+                    .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
                     .collect();
                 let rest_ty: Option<(&String, syntax::Type<usize>)> = match rest {
                     None => None,
@@ -1045,7 +1051,7 @@ impl Typechecker {
                 );
                 rest_ty.map(|(rest_name, rest_ty)| {
                     names_tys.push((
-                        rest_name,
+                        rest_name.clone(),
                         syntax::Type::mk_record(Vec::new(), Some(rest_ty)),
                     ))
                 });
@@ -1068,7 +1074,7 @@ impl Typechecker {
                 (
                     core::Pattern::Variant { name: name.clone() },
                     ty,
-                    vec![(&arg.item, arg_ty)],
+                    vec![(arg.item.clone(), arg_ty)],
                 )
             }
         }
@@ -1078,7 +1084,7 @@ impl Typechecker {
         &'a mut self,
         arg: &'b syntax::Pattern,
         expected: syntax::Type<usize>,
-    ) -> Result<(core::Pattern, Vec<(&'b String, syntax::Type<usize>)>), TypeError> {
+    ) -> Result<(core::Pattern, Vec<(String, syntax::Type<usize>)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
         self.unify_type(expected, actual)?;
         Ok((pat, binds))
@@ -1128,7 +1134,7 @@ impl Typechecker {
 
                     let mut args_core = Vec::new();
                     let mut args_tys = Vec::new();
-                    let mut args_names_tys = Vec::new();
+                    let mut args_names_tys: Vec<(String, syntax::Type<usize>)> = Vec::new();
                     for arg in &args {
                         let (arg_core, arg_tys, arg_names_tys) = self.infer_pattern(&arg);
                         args_core.push(arg_core);

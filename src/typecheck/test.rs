@@ -54,9 +54,9 @@ fn infer_kind_test_4() {
 fn context_test_1() {
     let mut ctx = BoundVars::new();
     ctx.insert(&vec![
-        (&String::from("a"), Type::Unit::<usize>),
-        (&String::from("b"), Type::Bool),
-        (&String::from("c"), Type::String),
+        (String::from("a"), Type::Unit::<usize>),
+        (String::from("b"), Type::Bool),
+        (String::from("c"), Type::String),
     ]);
     assert_eq!(
         ctx,
@@ -88,16 +88,16 @@ fn context_test_1() {
 fn context_test_2() {
     let mut ctx = BoundVars::new();
     ctx.insert(&vec![
-        (&String::from("a"), Type::Unit::<usize>),
-        (&String::from("a"), Type::Bool),
-        (&String::from("c"), Type::String),
+        (String::from("a"), Type::Unit::<usize>),
+        (String::from("a"), Type::Bool),
+        (String::from("c"), Type::String),
     ]);
 }
 
 #[test]
 fn context_test_3() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -105,7 +105,7 @@ fn context_test_3() {
             info: vec![(String::from("a"), Type::Unit),]
         }
     );
-    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -118,7 +118,7 @@ fn context_test_3() {
             ]
         }
     );
-    ctx.insert(&vec![(&String::from("c"), Type::String)]);
+    ctx.insert(&vec![(String::from("c"), Type::String)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -141,7 +141,7 @@ fn context_test_3() {
 #[test]
 fn context_test_4() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -156,8 +156,8 @@ fn context_test_4() {
 #[test]
 fn context_test_5() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -183,8 +183,8 @@ fn context_test_5() {
 #[test]
 fn context_test_6() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(&String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&vec![(&String::from("b"), Type::Bool)]);
+    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -213,7 +213,7 @@ fn infer_pattern_test_1() {
         (
             core::Pattern::Name,
             syntax::Type::Meta(0),
-            vec![(&String::from("x"), syntax::Type::Meta(0))]
+            vec![(String::from("x"), syntax::Type::Meta(0))]
         )
     )
 }
@@ -254,9 +254,9 @@ fn infer_pattern_test_2() {
                 None
             ),
             vec![
-                (&String::from("x"), syntax::Type::Meta(0)),
-                (&String::from("y"), syntax::Type::Meta(1)),
-                (&String::from("z"), syntax::Type::Meta(2)),
+                (String::from("x"), syntax::Type::Meta(0)),
+                (String::from("y"), syntax::Type::Meta(1)),
+                (String::from("z"), syntax::Type::Meta(2)),
             ]
         )
     )
@@ -301,11 +301,11 @@ fn infer_pattern_test_3() {
                 Some(syntax::Type::Meta(3))
             ),
             vec![
-                (&String::from("x"), syntax::Type::Meta(0)),
-                (&String::from("y"), syntax::Type::Meta(1)),
-                (&String::from("z"), syntax::Type::Meta(2)),
+                (String::from("x"), syntax::Type::Meta(0)),
+                (String::from("y"), syntax::Type::Meta(1)),
+                (String::from("z"), syntax::Type::Meta(2)),
                 (
-                    &String::from("w"),
+                    String::from("w"),
                     syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(3)))
                 ),
             ]
@@ -333,7 +333,7 @@ fn infer_pattern_test_4() {
                 vec![(String::from("just"), syntax::Type::Meta(0))],
                 Some(syntax::Type::Meta(1))
             ),
-            vec![(&String::from("x"), syntax::Type::Meta(0))]
+            vec![(String::from("x"), syntax::Type::Meta(0))]
         )
     )
 }
@@ -1271,5 +1271,43 @@ fn infer_case_4() {
         tc.infer_expr(term)
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Err(TypeError::RedundantPattern { pos: 32 })
+    )
+}
+
+#[test]
+fn check_definition_1() {
+    let mut tc = Typechecker::new();
+    /*
+    id : a -> a
+    id x = x
+    */
+    let decl = syntax::Spanned {
+        pos: 0,
+        item: syntax::Declaration::Definition {
+            name: String::from("id"),
+            ty: syntax::Type::mk_arrow(
+                syntax::Type::Var(String::from("a")),
+                syntax::Type::Var(String::from("a")),
+            ),
+            args: vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 14,
+                item: String::from("x"),
+            })],
+            body: syntax::Spanned {
+                pos: 18,
+                item: syntax::Expr::Var(String::from("x")),
+            },
+        },
+    };
+    assert_eq!(
+        tc.check_declaration(decl),
+        Ok(core::Declaration::Definition {
+            name: String::from("id"),
+            sig: core::TypeSig {
+                ty_vars: vec![syntax::Kind::Type],
+                body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
+            },
+            body: core::Expr::mk_lam(core::Pattern::Name, core::Expr::Var(0))
+        })
     )
 }
