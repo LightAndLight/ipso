@@ -46,6 +46,7 @@ impl Evidence {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
     Var(usize),
+    Name(String),
 
     App(Box<Expr>, Box<Expr>),
     Lam {
@@ -119,7 +120,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
     pub ty_vars: Vec<syntax::Kind>,
     pub body: syntax::Type<usize>,

@@ -531,14 +531,14 @@ impl Typechecker {
         }
     }
 
-    fn lookup_var(&self, name: String) -> Result<(usize, syntax::Type<usize>), TypeError> {
-        match self.bound_vars.lookup_name(&name) {
-            Some((ix, ty)) => Ok((ix, ty.clone())),
-            None => Err(TypeError::NotInScope {
-                pos: self.current_position(),
-                name,
-            }),
-        }
+    fn lookup_var(&self, name: &String) -> Option<(usize, syntax::Type<usize>)> {
+        self.bound_vars
+            .lookup_name(name)
+            .map(|(ix, ty)| (ix, ty.clone()))
+    }
+
+    fn lookup_name(&self, name: &String) -> Option<core::TypeSig> {
+        self.context.get(name).map(|sig| sig.clone())
     }
 
     fn zonk_type(&self, ty: syntax::Type<usize>) -> syntax::Type<usize> {
@@ -626,6 +626,13 @@ impl Typechecker {
             }
             Some(expected) => self.unify_kind(expected, actual),
         }
+    }
+
+    fn not_in_scope<A>(&self, name: &String) -> Result<A, TypeError> {
+        Err(TypeError::NotInScope {
+            pos: self.current_position(),
+            name: name.clone(),
+        })
     }
 
     fn type_mismatch<A>(
@@ -1112,8 +1119,21 @@ impl Typechecker {
             expr.pos,
             match expr.item {
                 syntax::Expr::Var(name) => {
-                    let entry = self.lookup_var(name)?;
-                    Ok((core::Expr::Var(entry.0), entry.1))
+                    match self.lookup_var(&name) {
+                        Some(entry) => Ok((core::Expr::Var(entry.0), entry.1)),
+                        None => match self.lookup_name(&name) {
+                            Some(sig) => {
+                                let metas: Vec<syntax::Type<usize>> = sig
+                                    .ty_vars
+                                    .into_iter()
+                                    .map(|kind| self.fresh_typevar(kind))
+                                    .collect();
+                                let ty = sig.body.subst(&|&ix| metas[ix].clone());
+                                Ok((core::Expr::Name(name), ty))
+                            }
+                            None => self.not_in_scope(&name),
+                        },
+                    }
                 }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(*f)?;

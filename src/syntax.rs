@@ -285,6 +285,31 @@ impl<A> Type<A> {
         }
     }
 
+    pub fn subst<B, F: Fn(&A) -> Type<B>>(&self, f: &F) -> Type<B> {
+        match self {
+            Type::Name(n) => Type::Name(n.clone()),
+            Type::Var(n) => f(n),
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.subst(f)).collect()),
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(a, b) => Type::mk_app(a.subst(f), b.subst(f)),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(field, ty, rest) => {
+                Type::mk_rowcons(field.clone(), ty.subst(f), rest.subst(f))
+            }
+            Type::Unit => Type::Unit,
+            Type::Meta(n) => Type::Meta(*n),
+        }
+    }
+
     pub fn iter_vars<'a>(&'a self) -> IterVars<'a, A> {
         IterVars { items: vec![&self] }
     }
