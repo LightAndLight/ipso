@@ -18,16 +18,35 @@ struct Interpreter {
 }
 
 impl Interpreter {
-    fn eval(&self, expr: &Expr) -> Value {
+    fn eval(&mut self, expr: &Expr) -> Value {
         match expr {
             Expr::Var(ix) => self.bound_vars[self.bound_vars.len() - 1 - ix].clone(),
-            Expr::Name(name) => self.eval(self.context.get(name).unwrap()),
+            Expr::Name(name) => {
+                let next: Expr = self.context.get(name).unwrap().clone();
+                self.eval(&next)
+            }
 
             Expr::App(a, b) => {
                 let a = self.eval(a);
                 let b = self.eval(b);
                 match a {
-                    Value::Closure { env, arg, body } => todo!(),
+                    Value::Closure { env, arg, body } => match arg {
+                        Pattern::Name => todo!(),
+                        Pattern::Record { names, rest } => {
+                            if rest {
+                                todo!()
+                            } else {
+                                // we can assume we're destructuring the whole record
+                                // but we need to know the order in which to bind fields
+                                todo!()
+                            }
+                        }
+                        Pattern::Variant { name } => todo!("pattern matching for variant"),
+                        Pattern::Wildcard => {
+                            self.bound_vars = env;
+                            self.eval(&body)
+                        }
+                    },
                     a => panic!("expected closure, got {:?}", a),
                 }
             }
