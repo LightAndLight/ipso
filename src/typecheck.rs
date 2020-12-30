@@ -1259,7 +1259,26 @@ impl Typechecker {
 
                     let mut expr_core = body_core;
                     for arg_core in args_core.into_iter().rev() {
-                        expr_core = core::Expr::mk_lam(arg_core, expr_core);
+                        match arg_core {
+                            core::Pattern::Name => {
+                                expr_core = core::Expr::mk_lam(true, expr_core);
+                            }
+                            core::Pattern::Wildcard => {
+                                expr_core = core::Expr::mk_lam(false, expr_core);
+                            }
+                            arg_core => {
+                                expr_core = core::Expr::mk_lam(
+                                    true,
+                                    core::Expr::mk_case(
+                                        core::Expr::Var(0),
+                                        vec![core::Branch {
+                                            pattern: arg_core,
+                                            body: expr_core,
+                                        }],
+                                    ),
+                                );
+                            }
+                        }
                     }
                     let mut expr_ty = body_ty;
                     for arg_ty in args_tys.into_iter().rev() {

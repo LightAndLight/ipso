@@ -50,7 +50,7 @@ pub enum Expr {
 
     App(Box<Expr>, Box<Expr>),
     Lam {
-        arg: Pattern,
+        arg: bool,
         body: Box<Expr>,
     },
 
@@ -85,7 +85,7 @@ impl Expr {
         Expr::App(Box::new(a), Box::new(b))
     }
 
-    pub fn mk_lam(arg: Pattern, body: Expr) -> Expr {
+    pub fn mk_lam(arg: bool, body: Expr) -> Expr {
         Expr::Lam {
             arg,
             body: Box::new(body),

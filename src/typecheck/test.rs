@@ -361,7 +361,7 @@ fn infer_lam_test_1() {
     assert_eq!(
         tc.infer_expr(term),
         Ok((
-            core::Expr::mk_lam(core::Pattern::Name, core::Expr::Var(0)),
+            core::Expr::mk_lam(true, core::Expr::Var(0)),
             syntax::Type::mk_arrow(syntax::Type::Meta(0), syntax::Type::Meta(0))
         ))
     )
@@ -397,11 +397,17 @@ fn infer_lam_test_2() {
         tc.infer_expr(term),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Record {
-                    names: 2,
-                    rest: false
-                },
-                core::Expr::Var(1)
+                true,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![core::Branch {
+                        pattern: core::Pattern::Record {
+                            names: 2,
+                            rest: false
+                        },
+                        body: core::Expr::Var(1)
+                    }]
+                )
             ),
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
@@ -447,11 +453,17 @@ fn infer_lam_test_3() {
         tc.infer_expr(term),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Record {
-                    names: 2,
-                    rest: false
-                },
-                core::Expr::Var(0)
+                true,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![core::Branch {
+                        pattern: core::Pattern::Record {
+                            names: 2,
+                            rest: false
+                        },
+                        body: core::Expr::Var(0)
+                    }]
+                )
             ),
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
@@ -500,11 +512,17 @@ fn infer_lam_test_4() {
         tc.infer_expr(term),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Record {
-                    names: 2,
-                    rest: true
-                },
-                core::Expr::Var(0)
+                true,
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![core::Branch {
+                        pattern: core::Pattern::Record {
+                            names: 2,
+                            rest: true
+                        },
+                        body: core::Expr::Var(0)
+                    }]
+                )
             ),
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
@@ -554,9 +572,9 @@ fn infer_lam_test_5() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Name,
+                true,
                 core::Expr::mk_lam(
-                    core::Pattern::Name,
+                    true,
                     core::Expr::mk_app(core::Expr::Var(1), core::Expr::Var(0))
                 )
             ),
@@ -1017,7 +1035,7 @@ fn infer_case_1() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Name,
+                true,
                 core::Expr::mk_case(
                     core::Expr::Var(0),
                     vec![core::Branch {
@@ -1101,7 +1119,7 @@ fn infer_case_2() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Name,
+                true,
                 core::Expr::mk_case(
                     core::Expr::Var(0),
                     vec![
@@ -1210,7 +1228,7 @@ fn infer_case_3() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_lam(
-                core::Pattern::Name,
+                true,
                 core::Expr::mk_case(
                     core::Expr::Var(0),
                     vec![
@@ -1358,7 +1376,7 @@ fn check_definition_1() {
                 ty_vars: vec![syntax::Kind::Type],
                 body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
             },
-            body: core::Expr::mk_lam(core::Pattern::Name, core::Expr::Var(0))
+            body: core::Expr::mk_lam(true, core::Expr::Var(0))
         })
     )
 }
