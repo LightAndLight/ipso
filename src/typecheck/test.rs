@@ -521,6 +521,54 @@ fn infer_lam_test_4() {
 }
 
 #[test]
+fn infer_lam_test_5() {
+    let mut tc = Typechecker::new();
+    // \f x -> f x
+    let term = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_lam(
+            vec![
+                syntax::Pattern::Name(syntax::Spanned {
+                    pos: 1,
+                    item: String::from("f"),
+                }),
+                syntax::Pattern::Name(syntax::Spanned {
+                    pos: 1,
+                    item: String::from("x"),
+                }),
+            ],
+            syntax::Expr::mk_app(
+                syntax::Spanned {
+                    pos: 8,
+                    item: syntax::Expr::Var(String::from("f")),
+                },
+                syntax::Spanned {
+                    pos: 10,
+                    item: syntax::Expr::Var(String::from("x")),
+                },
+            ),
+        ),
+    };
+    assert_eq!(
+        tc.infer_expr(term)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+        Ok((
+            core::Expr::mk_lam(
+                core::Pattern::Name,
+                core::Expr::mk_lam(
+                    core::Pattern::Name,
+                    core::Expr::mk_app(core::Expr::Var(1), core::Expr::Var(0))
+                )
+            ),
+            syntax::Type::mk_arrow(
+                syntax::Type::mk_arrow(syntax::Type::Meta(1), syntax::Type::Meta(3)),
+                syntax::Type::mk_arrow(syntax::Type::Meta(1), syntax::Type::Meta(3))
+            )
+        ))
+    )
+}
+
+#[test]
 fn infer_array_test_1() {
     let mut tc = Typechecker::new();
     // [1, 2, 3]

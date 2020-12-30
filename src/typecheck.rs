@@ -1230,7 +1230,7 @@ impl Typechecker {
                     let (f_core, f_ty) = self.infer_expr(*f)?;
                     let in_ty = self.fresh_typevar(syntax::Kind::Type);
                     let out_ty = self.fresh_typevar(syntax::Kind::Type);
-                    self.unify_type(syntax::Type::mk_app(in_ty.clone(), out_ty.clone()), f_ty)?;
+                    self.unify_type(syntax::Type::mk_arrow(in_ty.clone(), out_ty.clone()), f_ty)?;
                     let x_core = self.check_expr(*x, in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
