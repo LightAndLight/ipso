@@ -1,6 +1,6 @@
 use crate::syntax;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
     Name,
     Record { names: usize, rest: bool },
@@ -8,19 +8,19 @@ pub enum Pattern {
     Wildcard,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Branch {
     pub pattern: Pattern,
     pub body: Expr,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StringPart {
     String(String),
     Expr(Expr),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EVar(usize);
 
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
@@ -43,7 +43,7 @@ impl Evidence {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
     Name(String),

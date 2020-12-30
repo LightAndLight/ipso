@@ -6,6 +6,7 @@ use std::{env, io};
 mod builtins;
 mod core;
 mod diagnostic;
+mod eval;
 mod lex;
 mod parse;
 mod syntax;
