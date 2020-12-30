@@ -1335,13 +1335,18 @@ impl Typechecker {
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
-                    let mut fields_core = Vec::new();
+                    let out_row = self.fresh_typevar(syntax::Kind::Row);
+                    let mut fields_core: Vec<(core::EVar, core::Expr)> = Vec::new();
                     let mut fields_rows = Vec::new();
                     for (field, expr) in fields {
                         match self.infer_expr(expr) {
                             Err(err) => return Err(err),
                             Ok((expr_core, expr_ty)) => {
-                                fields_core.push(expr_core);
+                                let index = self.evidence.fresh_evar(core::Constraint::HasField {
+                                    field: field.clone(),
+                                    actual: out_row.clone(),
+                                });
+                                fields_core.push((index, expr_core));
                                 fields_rows.push((field, expr_ty));
                             }
                         }
@@ -1363,9 +1368,14 @@ impl Typechecker {
                         }
                     }
 
+                    self.unify_type(
+                        out_row.clone(),
+                        syntax::Type::mk_rows(fields_rows, rest_row),
+                    )?;
+
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),
-                        syntax::Type::mk_record(fields_rows, rest_row),
+                        syntax::Type::mk_app(syntax::Type::Record, out_row),
                     ))
                 }
                 syntax::Expr::Project(expr, field) => {

@@ -851,7 +851,8 @@ fn infer_record_test_1() {
     // {}
     let term = syntax::Expr::mk_record(Vec::new(), None);
     assert_eq!(
-        tc.infer_expr(syntax::Spanned { pos: 0, item: term }),
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(Vec::new(), None),
             syntax::Type::mk_record(Vec::new(), None)
@@ -883,9 +884,16 @@ fn infer_record_test_2() {
         None,
     );
     assert_eq!(
-        tc.infer_expr(syntax::Spanned { pos: 0, item: term }),
+        tc.infer_expr(syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
-            core::Expr::mk_record(vec![core::Expr::Int(1), core::Expr::True], None),
+            core::Expr::mk_record(
+                vec![
+                    (core::EVar(0), core::Expr::Int(1)),
+                    (core::EVar(1), core::Expr::True)
+                ],
+                None
+            ),
             syntax::Type::mk_record(
                 vec![
                     (String::from("x"), syntax::Type::Int),
@@ -937,8 +945,14 @@ fn infer_record_test_3() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
-                vec![core::Expr::Int(1), core::Expr::True],
-                Some(core::Expr::mk_record(vec![core::Expr::Char('c')], None))
+                vec![
+                    (core::EVar(0), core::Expr::Int(1)),
+                    (core::EVar(1), core::Expr::True)
+                ],
+                Some(core::Expr::mk_record(
+                    vec![(core::EVar(2), core::Expr::Char('c'))],
+                    None
+                ))
             ),
             syntax::Type::mk_record(
                 vec![
@@ -983,7 +997,7 @@ fn infer_record_test_4() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Err(TypeError::TypeMismatch {
             pos: 22,
-            expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+            expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(1))),
             actual: syntax::Type::Int
         })
     )

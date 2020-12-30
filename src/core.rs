@@ -21,7 +21,7 @@ pub enum StringPart {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EVar(usize);
+pub struct EVar(pub usize);
 
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
 
@@ -49,10 +49,7 @@ pub enum Expr {
     Name(String),
 
     App(Box<Expr>, Box<Expr>),
-    Lam {
-        arg: bool,
-        body: Box<Expr>,
-    },
+    Lam { arg: bool, body: Box<Expr> },
 
     True,
     False,
@@ -68,11 +65,8 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
-    Append(Vec<Expr>, Box<Expr>),
-    Record {
-        fields: Vec<Expr>,
-        rest: Option<Box<Expr>>,
-    },
+    Extend(Vec<(EVar, Expr)>, Box<Expr>),
+    Record(Vec<(EVar, Expr)>),
     Project(Box<Expr>, EVar),
 
     Variant(EVar, Box<Expr>),
@@ -96,10 +90,10 @@ impl Expr {
         Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
     }
 
-    pub fn mk_record(fields: Vec<Expr>, rest: Option<Expr>) -> Expr {
-        Expr::Record {
-            fields,
-            rest: rest.map(|x| Box::new(x)),
+    pub fn mk_record(fields: Vec<(EVar, Expr)>, rest: Option<Expr>) -> Expr {
+        match rest {
+            None => Expr::Record(fields),
+            Some(rest) => Expr::Extend(fields, Box::new(rest)),
         }
     }
 

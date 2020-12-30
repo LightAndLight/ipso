@@ -1,4 +1,4 @@
-use crate::core::{Expr, Pattern, StringPart};
+use crate::core::{Expr, StringPart};
 use crate::syntax::Binop;
 use std::collections::HashMap;
 
@@ -108,8 +108,8 @@ impl Interpreter {
                 Value::Array(items)
             }
 
-            Expr::Append(a, b) => todo!("wat's this"),
-            Expr::Record { fields, rest } => todo!(),
+            Expr::Extend(fields, rest) => todo!(),
+            Expr::Record(fields) => todo!(),
             Expr::Project(expr, index) => todo!(),
 
             Expr::Variant(tag, value) => todo!(),
