@@ -9,6 +9,7 @@ mod diagnostic;
 mod eval;
 mod lex;
 mod parse;
+mod rope;
 mod syntax;
 mod typecheck;
 

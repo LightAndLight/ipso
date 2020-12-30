@@ -1,6 +1,6 @@
 use crate::core;
 use crate::syntax::{self, Kind, Type};
-use crate::typecheck::{BoundVars, Rope, UnifyKindContext};
+use crate::typecheck::{BoundVars, UnifyKindContext};
 
 use super::{TypeError, Typechecker};
 
@@ -652,94 +652,6 @@ fn infer_array_test_2() {
 }
 
 #[test]
-fn rope_test_1() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1, 2, 3, 4])
-            .delete(1)
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&0, &2, &3, &4])
-    )
-}
-
-#[test]
-fn rope_test_2() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1, 2, 3, 4])
-            .delete(0)
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&1, &2, &3, &4])
-    )
-}
-
-#[test]
-fn rope_test_3() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1, 2, 3, 4])
-            .delete(4)
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&0, &1, &2, &3])
-    )
-}
-
-#[test]
-fn rope_test_4() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1, 2, 3, 4])
-            .delete(1)
-            .unwrap()
-            .delete(2)
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&0, &2, &4])
-    )
-}
-
-#[test]
-fn rope_test_5() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1, 2, 3, 4])
-            .delete(3)
-            .unwrap()
-            .delete(1)
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&0, &2, &4])
-    )
-}
-
-#[test]
-fn rope_test_6() {
-    assert_eq!(
-        Rope::from_vec(&vec![0, 1])
-            .delete(0)
-            .unwrap()
-            .delete(0)
-            .map(|xs| xs.iter().collect()),
-        Ok(Vec::new())
-    )
-}
-
-#[test]
-fn rope_test_7() {
-    assert_eq!(
-        Rope::from_vec(&vec![("a", 0), ("b", 1), ("b", 2), ("c", 3)])
-            .delete_first(&|(x, _)| *x == "b")
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&("a", 0), &("b", 2), &("c", 3)])
-    )
-}
-
-#[test]
-fn rope_test_8() {
-    assert_eq!(
-        Rope::from_vec(&vec![("a", 0), ("b", 1), ("b", 2), ("c", 3)])
-            .delete_first(&|(x, _)| *x == "b")
-            .unwrap()
-            .delete_first(&|(x, _)| *x == "b")
-            .map(|xs| xs.iter().collect()),
-        Ok(vec![&("a", 0), &("c", 3)])
-    )
-}
-
-#[test]
 fn unify_rows_test_1() {
     let mut tc = Typechecker::new();
     assert_eq!(
@@ -889,8 +801,8 @@ fn infer_record_test_2() {
         Ok((
             core::Expr::mk_record(
                 vec![
-                    (core::EVar(0), core::Expr::Int(1)),
-                    (core::EVar(1), core::Expr::True)
+                    (core::EVar(1), core::Expr::Int(1)),
+                    (core::EVar(0), core::Expr::True)
                 ],
                 None
             ),
@@ -946,8 +858,8 @@ fn infer_record_test_3() {
         Ok((
             core::Expr::mk_record(
                 vec![
-                    (core::EVar(0), core::Expr::Int(1)),
-                    (core::EVar(1), core::Expr::True)
+                    (core::EVar(1), core::Expr::Int(1)),
+                    (core::EVar(0), core::Expr::True)
                 ],
                 Some(core::Expr::mk_record(
                     vec![(core::EVar(2), core::Expr::Char('c'))],
@@ -997,7 +909,7 @@ fn infer_record_test_4() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Err(TypeError::TypeMismatch {
             pos: 22,
-            expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(1))),
+            expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
             actual: syntax::Type::Int
         })
     )

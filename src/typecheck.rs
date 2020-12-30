@@ -1,6 +1,7 @@
 use crate::builtins;
 use crate::core;
 use crate::diagnostic;
+use crate::rope::Rope;
 use crate::syntax;
 use crate::syntax::Spanned;
 use std::{
@@ -271,200 +272,6 @@ impl TypeError {
             message: self.message(),
             addendum: self.addendum(),
         })
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-enum Rope<'a, A> {
-    Empty,
-    Leaf(&'a [A]),
-    Branch(usize, Box<Rope<'a, A>>, Box<Rope<'a, A>>),
-}
-
-impl<'a, A> Rope<'a, A> {
-    pub fn from_vec(v: &'a Vec<A>) -> Rope<'a, A> {
-        Rope::Leaf(v)
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            Rope::Empty => 0,
-            Rope::Leaf(slice) => slice.len(),
-            Rope::Branch(size, _, _) => *size,
-        }
-    }
-
-    pub fn delete_first<P: Fn(&A) -> bool>(
-        self,
-        predicate: &P,
-    ) -> Result<Rope<'a, A>, Rope<'a, A>> {
-        match self {
-            Rope::Empty => Err(Rope::Empty),
-            Rope::Leaf(slice) => match slice.iter().position(predicate) {
-                Some(ix) => {
-                    let (prefix, suffix) = slice.split_at(ix);
-                    let suffix = &suffix[1..];
-                    let prefix_len = prefix.len();
-                    let suffix_len = suffix.len();
-                    if prefix_len == 0 {
-                        Ok(Rope::Leaf(suffix))
-                    } else if suffix_len == 0 {
-                        Ok(Rope::Leaf(prefix))
-                    } else {
-                        Ok(Rope::Branch(
-                            prefix_len + suffix_len,
-                            Box::new(Rope::Leaf(prefix)),
-                            Box::new(Rope::Leaf(suffix)),
-                        ))
-                    }
-                }
-                None => Err(self),
-            },
-            Rope::Branch(size, mut left, mut right) => match left.delete_first(predicate) {
-                Err(new_left) => {
-                    *left = new_left;
-                    match right.delete_first(predicate) {
-                        Err(new_right) => {
-                            *right = new_right;
-                            Err(Rope::Branch(size, left, right))
-                        }
-                        Ok(new_right) => {
-                            *right = new_right;
-                            let left_size = left.size();
-                            let right_size = right.size();
-                            if right.size() == 0 {
-                                Ok(*left)
-                            } else {
-                                Ok(Rope::Branch(left_size + right_size, left, right))
-                            }
-                        }
-                    }
-                }
-                Ok(new_left) => {
-                    *left = new_left;
-                    let left_size = left.size();
-                    let right_size = right.size();
-                    if left.size() == 0 {
-                        Ok(*right)
-                    } else {
-                        Ok(Rope::Branch(left_size + right_size, left, right))
-                    }
-                }
-            },
-        }
-    }
-
-    pub fn delete(self, ix: usize) -> Result<Rope<'a, A>, Rope<'a, A>> {
-        match self {
-            Rope::Empty => Err(Rope::Empty),
-            Rope::Leaf(slice) => {
-                if ix < slice.len() {
-                    let (prefix, suffix) = slice.split_at(ix);
-                    let suffix = &suffix[1..];
-                    let prefix_len = prefix.len();
-                    let suffix_len = suffix.len();
-                    if prefix_len == 0 {
-                        if suffix_len == 0 {
-                            Ok(Rope::Empty)
-                        } else {
-                            Ok(Rope::Leaf(suffix))
-                        }
-                    } else if suffix_len == 0 {
-                        Ok(Rope::Leaf(prefix))
-                    } else {
-                        Ok(Rope::Branch(
-                            prefix_len + suffix_len,
-                            Box::new(Rope::Leaf(prefix)),
-                            Box::new(Rope::Leaf(suffix)),
-                        ))
-                    }
-                } else {
-                    Err(Rope::Leaf(slice))
-                }
-            }
-            Rope::Branch(size, mut left, mut right) => {
-                let left_size = left.size();
-                if ix >= left_size {
-                    match (*right).delete(ix - left_size) {
-                        Err(new) => {
-                            *right = new;
-                            Err(Rope::Branch(size, left, right))
-                        }
-                        Ok(new) => {
-                            if new.size() == 0 {
-                                Ok(*left)
-                            } else {
-                                *right = new;
-                                Ok(Rope::Branch(size - 1, left, right))
-                            }
-                        }
-                    }
-                } else {
-                    match (*left).delete(ix) {
-                        Err(new) => {
-                            *left = new;
-                            Err(Rope::Branch(size, left, right))
-                        }
-                        Ok(new) => {
-                            if new.size() == 0 {
-                                Ok(*right)
-                            } else {
-                                *left = new;
-                                Ok(Rope::Branch(size - 1, left, right))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn iter<'b>(&'b self) -> RopeIter<'b, 'a, A> {
-        RopeIter {
-            next: vec![self],
-            current: [].iter(),
-        }
-    }
-}
-
-struct RopeIter<'b, 'a, A> {
-    next: Vec<&'b Rope<'a, A>>,
-    current: std::slice::Iter<'a, A>,
-}
-
-impl<'b, 'a, A> Iterator for RopeIter<'b, 'a, A> {
-    type Item = &'a A;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.current.next() {
-            Some(val) => Some(val),
-            None => match self.next.pop() {
-                None => None,
-                Some(next) => {
-                    let mut next = next;
-                    loop {
-                        match next {
-                            Rope::Empty => match self.next.pop() {
-                                None => return None,
-                                Some(val) => {
-                                    next = val;
-                                }
-                            },
-                            Rope::Branch(_, a, b) => {
-                                next = &*a;
-                                self.next.push(&*b);
-                            }
-                            Rope::Leaf(slice) => {
-                                let mut slice_iter = slice.iter();
-                                let next = slice_iter.next();
-                                self.current = slice_iter;
-                                return next;
-                            }
-                        }
-                    }
-                }
-            },
-        }
     }
 }
 
@@ -1335,47 +1142,51 @@ impl Typechecker {
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
-                    let out_row = self.fresh_typevar(syntax::Kind::Row);
-                    let mut fields_core: Vec<(core::EVar, core::Expr)> = Vec::new();
+                    let mut fields_result: Vec<(String, core::Expr, syntax::Type<usize>)> =
+                        Vec::new();
                     let mut fields_rows = Vec::new();
                     for (field, expr) in fields {
                         match self.infer_expr(expr) {
                             Err(err) => return Err(err),
                             Ok((expr_core, expr_ty)) => {
-                                let index = self.evidence.fresh_evar(core::Constraint::HasField {
-                                    field: field.clone(),
-                                    actual: out_row.clone(),
-                                });
-                                fields_core.push((index, expr_core));
-                                fields_rows.push((field, expr_ty));
+                                fields_result.push((field.clone(), expr_core, expr_ty.clone()));
+                                fields_rows.push((field.clone(), expr_ty));
                             }
                         }
                     }
+
+                    let rest_row_var = self.fresh_typevar(syntax::Kind::Row);
+                    let mut extending_row = rest_row_var.clone();
+                    let mut fields_core = Vec::with_capacity(fields_result.len());
+                    for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
+                        let index = self.evidence.fresh_evar(core::Constraint::HasField {
+                            field: field.clone(),
+                            rest: extending_row.clone(),
+                        });
+                        fields_core.push((index, expr_core));
+                        extending_row = syntax::Type::mk_rowcons(field, expr_ty, extending_row);
+                    }
+                    // we did a right fold to build extending_row, but we want fields_core too look like we did a left fold
+                    fields_core.reverse();
 
                     let mut rest_core = None;
                     let mut rest_row = None;
                     for expr in rest {
-                        let rest_tyvar = self.fresh_typevar(syntax::Kind::Row);
                         match self.check_expr(
                             *expr,
-                            syntax::Type::mk_app(syntax::Type::Record, rest_tyvar.clone()),
+                            syntax::Type::mk_app(syntax::Type::Record, rest_row_var.clone()),
                         ) {
                             Err(err) => return Err(err),
                             Ok(expr_core) => {
                                 rest_core = Some(expr_core);
-                                rest_row = Some(rest_tyvar);
+                                rest_row = Some(rest_row_var.clone());
                             }
                         }
                     }
 
-                    self.unify_type(
-                        out_row.clone(),
-                        syntax::Type::mk_rows(fields_rows, rest_row),
-                    )?;
-
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),
-                        syntax::Type::mk_app(syntax::Type::Record, out_row),
+                        syntax::Type::mk_record(fields_rows, rest_row),
                     ))
                 }
                 syntax::Expr::Project(expr, field) => {
@@ -1387,20 +1198,18 @@ impl Typechecker {
                         *expr,
                         syntax::Type::mk_app(syntax::Type::Record, rows.clone()),
                     )?;
-                    let offset = self.evidence.fresh_evar(core::Constraint::HasField {
-                        field,
-                        actual: rows,
-                    });
+                    let offset = self
+                        .evidence
+                        .fresh_evar(core::Constraint::HasField { field, rest: rows });
                     Ok((core::Expr::mk_project(expr_core, offset), out_ty))
                 }
                 syntax::Expr::Variant(ctor, arg) => {
                     let (arg_core, arg_ty) = self.infer_expr(*arg)?;
                     let rest = self.fresh_typevar(syntax::Kind::Row);
-                    let rows =
-                        syntax::Type::mk_rows(vec![(ctor.clone(), arg_ty.clone())], Some(rest));
+                    let rows = syntax::Type::mk_rows(vec![], Some(rest));
                     let tag = self.evidence.fresh_evar(core::Constraint::HasField {
                         field: ctor,
-                        actual: rows.clone(),
+                        rest: rows.clone(),
                     });
                     Ok((
                         core::Expr::mk_variant(tag, arg_core),

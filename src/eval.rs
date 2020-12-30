@@ -1,4 +1,4 @@
-use crate::core::{Expr, StringPart};
+use crate::core::{EVar, Expr, StringPart};
 use crate::syntax::Binop;
 use std::collections::HashMap;
 
@@ -15,15 +15,17 @@ enum Value {
     Char(char),
     String(String),
     Array(Vec<Value>),
+    Record(Vec<Value>),
 }
 
 struct Interpreter {
     context: HashMap<String, Expr>,
     bound_vars: Vec<Value>,
+    evidence: Vec<Value>,
 }
 
 impl Interpreter {
-    fn eval(&mut self, expr: &Expr) -> Value {
+    pub fn eval(&mut self, expr: &Expr) -> Value {
         match expr {
             Expr::Var(ix) => self.bound_vars[self.bound_vars.len() - 1 - ix].clone(),
             Expr::Name(name) => {
@@ -108,8 +110,43 @@ impl Interpreter {
                 Value::Array(items)
             }
 
-            Expr::Extend(fields, rest) => todo!(),
-            Expr::Record(fields) => todo!(),
+            Expr::Extend(ev, value, rest) => {
+                let value = self.eval(value);
+                let rest = self.eval(rest);
+                match rest {
+                    Value::Record(fields) => match &self.evidence[ev.0] {
+                        Value::Int(ix) => {
+                            // assume: all stacks in fields are non-empty
+                            let ix = *ix as usize;
+                            let mut record = Vec::with_capacity(fields.len() + 1);
+                            record.extend_from_slice(&fields[0..ix]);
+                            record.push(value);
+                            record.extend_from_slice(&fields[ix..]);
+
+                            debug_assert!(record.len() == fields.len() + 1);
+
+                            Value::Record(record)
+                        }
+                        evidence => panic!("expected int, got {:?}", evidence),
+                    },
+                    rest => panic!("expected record, got {:?}", rest),
+                }
+            }
+            Expr::Record(fields) => {
+                let mut record: Vec<Value> = Vec::with_capacity(fields.len());
+                let fields: Vec<(EVar, Value)> = fields
+                    .iter()
+                    .map(|(ev, field)| (*ev, self.eval(field)))
+                    .collect();
+                for (ev, field) in fields.into_iter().rev() {
+                    let index = match &self.evidence[ev.0] {
+                        Value::Int(ix) => *ix as usize,
+                        evidence => panic!("expected int, got {:?}", evidence),
+                    };
+                    record.insert(index, field);
+                }
+                Value::Record(record)
+            }
             Expr::Project(expr, index) => todo!(),
 
             Expr::Variant(tag, value) => todo!(),

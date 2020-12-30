@@ -20,7 +20,7 @@ pub enum StringPart {
     Expr(Expr),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EVar(pub usize);
 
 pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
@@ -28,7 +28,7 @@ pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
 pub enum Constraint {
     HasField {
         field: String,
-        actual: syntax::Type<usize>,
+        rest: syntax::Type<usize>,
     },
 }
 
@@ -65,7 +65,7 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
-    Extend(Vec<(EVar, Expr)>, Box<Expr>),
+    Extend(EVar, Box<Expr>, Box<Expr>),
     Record(Vec<(EVar, Expr)>),
     Project(Box<Expr>, EVar),
 
@@ -93,7 +93,9 @@ impl Expr {
     pub fn mk_record(fields: Vec<(EVar, Expr)>, rest: Option<Expr>) -> Expr {
         match rest {
             None => Expr::Record(fields),
-            Some(rest) => Expr::Extend(fields, Box::new(rest)),
+            Some(rest) => fields.into_iter().rev().fold(rest, |acc, (ev, field)| {
+                Expr::Extend(ev, Box::new(field), Box::new(acc))
+            }),
         }
     }
 
