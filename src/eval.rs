@@ -16,6 +16,8 @@ enum Value {
     String(String),
     Array(Vec<Value>),
     Record(Vec<Value>),
+    Variant(usize, Box<Value>),
+    Unit,
 }
 
 struct Interpreter {
@@ -147,11 +149,27 @@ impl Interpreter {
                 }
                 Value::Record(record)
             }
-            Expr::Project(expr, index) => todo!(),
+            Expr::Project(expr, index) => {
+                let expr = self.eval(expr);
+                match expr {
+                    Value::Record(fields) => match &self.evidence[index.0] {
+                        Value::Int(ix) => fields[*ix as usize].clone(),
+                        evidence => panic!("expected int, got {:?}", evidence),
+                    },
+                    expr => panic!("expected record, got {:?}", expr),
+                }
+            }
 
-            Expr::Variant(tag, value) => todo!(),
-            Expr::Case(expr, branches) => todo!(),
-            Expr::Unit => todo!(),
+            Expr::Variant(tag, value) => {
+                let tag = match &self.evidence[tag.0] {
+                    Value::Int(tag) => *tag as usize,
+                    evidence => panic!("expected int, got {:?}", evidence),
+                };
+                let value: Value = self.eval(value).clone();
+                Value::Variant(tag, Box::new(value))
+            }
+            Expr::Case(expr, branches) => todo!("eval case"),
+            Expr::Unit => Value::Unit,
         }
     }
 }
