@@ -1,7 +1,6 @@
 use crate::core;
 use crate::syntax::{self, Kind, Type};
-use crate::typecheck::BoundVars;
-use crate::typecheck::Rope;
+use crate::typecheck::{BoundVars, Rope, UnifyKindContext};
 
 use super::{TypeError, Typechecker};
 
@@ -26,6 +25,10 @@ fn infer_kind_test_3() {
     let mut tc = Typechecker::new();
     let expected = Err(TypeError::KindMismatch {
         pos: 0,
+        context: UnifyKindContext::Checking {
+            ty: Type::RowNil,
+            has_kind: Kind::Type,
+        },
         expected: Kind::Type,
         actual: Kind::Row,
     });

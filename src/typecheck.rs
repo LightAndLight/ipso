@@ -120,6 +120,14 @@ macro_rules! with_position {
     }};
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum UnifyKindContext {
+    Checking {
+        ty: syntax::Type<String>,
+        has_kind: syntax::Kind,
+    },
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
@@ -132,6 +140,7 @@ pub enum TypeError {
     },
     KindMismatch {
         pos: usize,
+        context: UnifyKindContext,
         expected: syntax::Kind,
         actual: syntax::Kind,
     },
@@ -177,6 +186,7 @@ impl TypeError {
         match self {
             TypeError::KindMismatch {
                 pos,
+                context: _,
                 expected: _,
                 actual: _,
             } => *pos,
@@ -195,6 +205,7 @@ impl TypeError {
         match self {
             TypeError::KindMismatch {
                 pos: _,
+                context: _,
                 expected,
                 actual,
             } => {
@@ -229,10 +240,36 @@ impl TypeError {
         }
     }
 
+    pub fn addendum(&self) -> Option<String> {
+        match self {
+            TypeError::KindMismatch {
+                pos: _,
+                context,
+                expected: _,
+                actual: _,
+            } => match context {
+                UnifyKindContext::Checking { ty, has_kind } => Some(format!(
+                    "While checking that \"{}\" has kind \"{}\"",
+                    ty.render(),
+                    has_kind.render()
+                )),
+            },
+            TypeError::DuplicateArgument { pos: _, name: _ } => None,
+            TypeError::TypeMismatch {
+                pos: _,
+                expected: _,
+                actual: _,
+            } => None,
+            TypeError::RedundantPattern { pos: _ } => None,
+            TypeError::NotInScope { pos: _, name: _ } => None,
+        }
+    }
+
     pub fn report(&self, diagnostic: &mut diagnostic::Diagnostic) {
         diagnostic.item(diagnostic::Item {
             pos: self.position(),
             message: self.message(),
+            addendum: self.addendum(),
         })
     }
 }
@@ -639,18 +676,58 @@ impl Typechecker {
 
     fn kind_mismatch<A>(
         &self,
+        context: UnifyKindContext,
         expected: syntax::Kind,
         actual: syntax::Kind,
     ) -> Result<A, TypeError> {
         Err(TypeError::KindMismatch {
             pos: self.current_position(),
+            context,
             expected,
             actual,
         })
     }
 
+    fn unify_kind(
+        &mut self,
+        context: UnifyKindContext,
+        expected: syntax::Kind,
+        actual: syntax::Kind,
+    ) -> Result<(), TypeError> {
+        match expected.clone() {
+            syntax::Kind::Type => match actual {
+                syntax::Kind::Type => Ok(()),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                _ => self.kind_mismatch(context, expected, actual),
+            },
+            syntax::Kind::Row => match actual {
+                syntax::Kind::Row => Ok(()),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                _ => self.kind_mismatch(context, expected, actual),
+            },
+            syntax::Kind::Constraint => match actual {
+                syntax::Kind::Constraint => Ok(()),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                _ => self.kind_mismatch(context, expected, actual),
+            },
+            syntax::Kind::Arrow(expected_a, expected_b) => match actual {
+                syntax::Kind::Arrow(actual_a, actual_b) => {
+                    self.unify_kind(context.clone(), *expected_a, *actual_a)?;
+                    self.unify_kind(context, *expected_b, *actual_b)
+                }
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                _ => self.kind_mismatch(context, expected, actual),
+            },
+            syntax::Kind::Meta(expected_m) => match actual {
+                syntax::Kind::Meta(actual_m) if expected_m == actual_m => Ok(()),
+                actual => self.solve_kindvar_left(context, expected_m, actual),
+            },
+        }
+    }
+
     fn solve_kindvar_right(
         &mut self,
+        context: UnifyKindContext,
         expected: syntax::Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -659,17 +736,22 @@ impl Typechecker {
                 self.kind_solutions[meta] = Some(expected);
                 Ok(())
             }
-            Some(actual) => self.unify_kind(expected, actual),
+            Some(actual) => self.unify_kind(context, expected, actual),
         }
     }
 
-    fn solve_kindvar_left(&mut self, meta: usize, actual: syntax::Kind) -> Result<(), TypeError> {
+    fn solve_kindvar_left(
+        &mut self,
+        context: UnifyKindContext,
+        meta: usize,
+        actual: syntax::Kind,
+    ) -> Result<(), TypeError> {
         match self.kind_solutions[meta].clone() {
             None => {
                 self.kind_solutions[meta] = Some(actual);
                 Ok(())
             }
-            Some(expected) => self.unify_kind(expected, actual),
+            Some(expected) => self.unify_kind(context, expected, actual),
         }
     }
 
@@ -720,42 +802,6 @@ impl Typechecker {
         }
     }
 
-    fn unify_kind(
-        &mut self,
-        expected: syntax::Kind,
-        actual: syntax::Kind,
-    ) -> Result<(), TypeError> {
-        match expected.clone() {
-            syntax::Kind::Type => match actual {
-                syntax::Kind::Type => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(expected, m),
-                _ => self.kind_mismatch(expected, actual),
-            },
-            syntax::Kind::Row => match actual {
-                syntax::Kind::Row => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(expected, m),
-                _ => self.kind_mismatch(expected, actual),
-            },
-            syntax::Kind::Constraint => match actual {
-                syntax::Kind::Constraint => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(expected, m),
-                _ => self.kind_mismatch(expected, actual),
-            },
-            syntax::Kind::Arrow(expected_a, expected_b) => match actual {
-                syntax::Kind::Arrow(actual_a, actual_b) => {
-                    self.unify_kind(*expected_a, *actual_a)?;
-                    self.unify_kind(*expected_b, *actual_b)
-                }
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(expected, m),
-                _ => self.kind_mismatch(expected, actual),
-            },
-            syntax::Kind::Meta(expected_m) => match actual {
-                syntax::Kind::Meta(actual_m) if expected_m == actual_m => Ok(()),
-                actual => self.solve_kindvar_left(expected_m, actual),
-            },
-        }
-    }
-
     fn check_kind(
         &mut self,
         ty: &syntax::Type<usize>,
@@ -763,7 +809,11 @@ impl Typechecker {
     ) -> Result<syntax::Type<usize>, TypeError> {
         let expected = kind;
         let (ty, actual) = self.infer_kind(ty)?;
-        self.unify_kind(expected, actual)?;
+        let context = UnifyKindContext::Checking {
+            ty: self.fill_ty_names(self.zonk_type(ty.clone())),
+            has_kind: self.zonk_kind(expected.clone()),
+        };
+        self.unify_kind(context, expected, actual)?;
         Ok(ty)
     }
 
@@ -836,13 +886,10 @@ impl Typechecker {
                 syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
             )),
             syntax::Type::App(a, b) => {
-                let (a, a_kind) = self.infer_kind(a)?;
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
-                self.unify_kind(
-                    syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
-                    a_kind,
-                )?;
+                let a =
+                    self.check_kind(a, syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()))?;
                 let b = self.check_kind(b, in_kind)?;
                 Ok((syntax::Type::mk_app(a, b), out_kind))
             }
@@ -879,8 +926,7 @@ impl Typechecker {
         actual: syntax::Type<usize>,
     ) -> Result<(), TypeError> {
         let (_, expected_kind) = self.infer_kind(&expected)?;
-        let (_, actual_kind) = self.infer_kind(&actual)?;
-        self.unify_kind(expected_kind, actual_kind)?;
+        let _ = self.check_kind(&actual, expected_kind)?;
         match expected {
             syntax::Type::App(a1, b1) => match actual {
                 syntax::Type::App(a2, b2) => {

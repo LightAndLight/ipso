@@ -51,6 +51,7 @@ impl ParseError {
         diagnostic.item(Item {
             pos: self.position(),
             message: self.message(),
+            addendum: None,
         })
     }
 }

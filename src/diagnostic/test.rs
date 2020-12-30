@@ -9,7 +9,8 @@ fn test_1() {
             3,
             "test/file",
             &String::from("abcdefg"),
-            &String::from("some error")
+            &String::from("some error"),
+            &None
         ),
         [
             "test/file:5:3: error: some error",
@@ -29,7 +30,8 @@ fn test_2() {
             2,
             "test/file",
             &String::from("abcdefg"),
-            &String::from("some error")
+            &String::from("some error"),
+            &None
         ),
         [
             "test/file:10:2: error: some error",

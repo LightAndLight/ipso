@@ -10,6 +10,7 @@ mod test;
 pub struct Item {
     pub pos: usize,
     pub message: String,
+    pub addendum: Option<String>,
 }
 
 pub struct Diagnostic {
@@ -34,6 +35,7 @@ impl Diagnostic {
         path: &str,
         line_str: &str,
         message: &String,
+        addendum: &Option<String>,
     ) -> String {
         let mut result = String::new();
         let caret: String = {
@@ -56,6 +58,13 @@ impl Diagnostic {
         result.push_str(&line3);
         result.push('\n');
         result.push_str(&line4);
+        match addendum {
+            None => {}
+            Some(addendum) => {
+                result.push('\n');
+                result.push_str(addendum.as_str());
+            }
+        }
         result
     }
 
@@ -92,6 +101,7 @@ impl Diagnostic {
                 path.to_str().unwrap(),
                 line_str.trim_end_matches('\n'),
                 &item.message,
+                &item.addendum,
             );
             match io::stderr().write(result.as_bytes()) {
                 Ok(_) => {}
