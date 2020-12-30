@@ -1,15 +1,20 @@
-use crate::core::{Expr, Pattern};
+use crate::core::{Expr, Pattern, StringPart};
+use crate::syntax::Binop;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum Value {
     Closure {
         env: Vec<Value>,
-        arg: Pattern,
+        arg: bool,
         body: Expr,
     },
     True,
     False,
+    Int(u32),
+    Char(char),
+    String(String),
+    Array(Vec<Value>),
 }
 
 struct Interpreter {
@@ -30,43 +35,80 @@ impl Interpreter {
                 let a = self.eval(a);
                 let b = self.eval(b);
                 match a {
-                    Value::Closure { env, arg, body } => match arg {
-                        Pattern::Name => todo!(),
-                        Pattern::Record { names, rest } => {
-                            if rest {
-                                todo!()
-                            } else {
-                                // we can assume we're destructuring the whole record
-                                // but we need to know the order in which to bind fields
-                                todo!()
-                            }
+                    Value::Closure { env, arg, body } => {
+                        self.bound_vars = env;
+                        if arg {
+                            self.bound_vars.push(b);
                         }
-                        Pattern::Variant { name } => todo!("pattern matching for variant"),
-                        Pattern::Wildcard => {
-                            self.bound_vars = env;
-                            self.eval(&body)
-                        }
-                    },
+                        self.eval(&body)
+                    }
                     a => panic!("expected closure, got {:?}", a),
                 }
             }
-            Expr::Lam { arg, body } => todo!(),
+            Expr::Lam { arg, body } => Value::Closure {
+                env: self.bound_vars.clone(),
+                arg: *arg,
+                body: (**body).clone(),
+            },
 
-            Expr::True => todo!(),
-            Expr::False => todo!(),
-            Expr::IfThenElse(a, b, c) => todo!(),
+            Expr::True => Value::True,
+            Expr::False => Value::False,
+            Expr::IfThenElse(cond, t, e) => {
+                let cond = self.eval(cond);
+                match cond {
+                    Value::True => self.eval(t),
+                    Value::False => self.eval(e),
+                    cond => panic!("expected bool, got {:?}", cond),
+                }
+            }
 
-            Expr::Int(u32) => todo!(),
+            Expr::Int(n) => Value::Int(*n),
 
-            Expr::Binop(op, a, b) => todo!(),
+            Expr::Binop(op, a, b) => {
+                let a = self.eval(a);
+                let b = self.eval(b);
+                match op {
+                    Binop::Add => todo!(),
+                    Binop::Multiply => todo!(),
+                    Binop::Subtract => todo!(),
+                    Binop::Divide => todo!(),
+                    Binop::Append => todo!(),
+                    Binop::Or => todo!(),
+                    Binop::And => todo!(),
+                    Binop::Eq => todo!(),
+                    Binop::Neq => todo!(),
+                    Binop::Gt => todo!(),
+                    Binop::Gte => todo!(),
+                    Binop::Lt => todo!(),
+                    Binop::Lte => todo!(),
+                }
+            }
 
-            Expr::Char(char) => todo!(),
+            Expr::Char(c) => Value::Char(*c),
 
-            Expr::String(parts) => todo!(),
+            Expr::String(parts) => {
+                let mut value = String::new();
+                for part in parts {
+                    match part {
+                        StringPart::Expr(expr) => {
+                            let expr = self.eval(expr);
+                            match expr {
+                                Value::String(s) => value.push_str(s.as_str()),
+                                expr => panic!("expected string, got {:?}", expr),
+                            }
+                        }
+                        StringPart::String(s) => value.push_str(s.as_str()),
+                    }
+                }
+                Value::String(value)
+            }
 
-            Expr::Array(items) => todo!(),
+            Expr::Array(items) => {
+                let items = items.iter().map(|item| self.eval(item)).collect();
+                Value::Array(items)
+            }
 
-            Expr::Append(a, b) => todo!(),
+            Expr::Append(a, b) => todo!("wat's this"),
             Expr::Record { fields, rest } => todo!(),
             Expr::Project(expr, index) => todo!(),
 
