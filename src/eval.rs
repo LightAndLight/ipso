@@ -1,19 +1,21 @@
 use crate::core::{Builtin, EVar, Expr, StringPart};
 use crate::syntax::Binop;
-use std::fmt::Debug;
 use std::{collections::HashMap, rc::Rc};
+use std::{fmt::Debug, io::Write};
 use typed_arena::Arena;
+
+mod test;
 
 type ValueRef<'heap> = &'heap Value<'heap>;
 
 #[derive(Clone)]
-struct Closure2Body<'heap>(
-    fn(&mut Interpreter<'heap>, Vec<ValueRef<'heap>>, ValueRef<'heap>) -> ValueRef<'heap>,
+struct StaticClosureBody<'heap>(
+    fn(&mut Interpreter<'_, 'heap>, Vec<ValueRef<'heap>>, ValueRef<'heap>) -> ValueRef<'heap>,
 );
 
-impl<'heap> Debug for Closure2Body<'heap> {
+impl<'heap> Debug for StaticClosureBody<'heap> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Closure2()")
+        f.write_str("StaticClosure()")
     }
 }
 
@@ -24,9 +26,9 @@ enum Value<'heap> {
         arg: bool,
         body: Expr,
     },
-    Closure2 {
+    StaticClosure {
         env: Vec<ValueRef<'heap>>,
-        body: Closure2Body<'heap>,
+        body: StaticClosureBody<'heap>,
     },
     True,
     False,
@@ -39,18 +41,136 @@ enum Value<'heap> {
     Unit,
 }
 
-struct Interpreter<'heap> {
+impl<'heap> Value<'heap> {
+    pub fn render(&self) -> String {
+        match self {
+            Value::Closure { env, arg, body } => String::from("<closure>"),
+            Value::StaticClosure { env, body } => String::from("<static builtin>"),
+            Value::True => String::from("true"),
+            Value::False => String::from("false"),
+            Value::Int(n) => String::from(format!("{:?}", n)),
+            Value::Char(c) => String::from(format!("{:?}", c)),
+            Value::String(s) => String::from(format!("{:?}", s)),
+            Value::Array(items) => {
+                let mut s = String::new();
+                s.push_str("[ ");
+                let mut items_iter = items.iter();
+                match items_iter.next() {
+                    None => {}
+                    Some(item) => {
+                        s.push_str(item.render().as_str());
+                        for item in items_iter {
+                            s.push_str(", ");
+                            s.push_str(item.render().as_str());
+                        }
+                    }
+                }
+                s.push_str(" ]");
+                s
+            }
+            Value::Record(items) => {
+                let mut s = String::new();
+                s.push_str("{ ");
+                let mut items_iter = items.iter();
+                match items_iter.next() {
+                    None => {}
+                    Some(item) => {
+                        s.push_str(item.render().as_str());
+                        for item in items_iter {
+                            s.push_str(", ");
+                            s.push_str(item.render().as_str());
+                        }
+                    }
+                }
+                s.push_str(" }");
+                s
+            }
+            Value::Variant(tag, value) => {
+                let mut s = String::new();
+                s.push_str("ctor(");
+                s.push_str(format!("{:?}", tag).as_str());
+                s.push_str(", ");
+                s.push_str(value.render().as_str());
+                s.push(')');
+                s
+            }
+            Value::Unit => String::from("()"),
+        }
+    }
+}
+
+impl<'heap> PartialEq for Value<'heap> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Value::Closure { env, arg, body } => match other {
+                Value::Closure {
+                    env: env2,
+                    arg: arg2,
+                    body: body2,
+                } => env == env2 && arg == arg2 && body == body2,
+                _ => false,
+            },
+            Value::StaticClosure { env, body } => match other {
+                Value::StaticClosure {
+                    env: env2,
+                    body: body2,
+                } => env == env2 && std::ptr::eq(body, body2),
+                _ => false,
+            },
+            Value::True => match other {
+                Value::True => true,
+                _ => false,
+            },
+            Value::False => match other {
+                Value::False => true,
+                _ => false,
+            },
+            Value::Int(n) => match other {
+                Value::Int(n2) => n == n2,
+                _ => false,
+            },
+            Value::Char(c) => match other {
+                Value::Char(c2) => c == c2,
+                _ => false,
+            },
+            Value::String(s) => match other {
+                Value::String(s2) => s == s2,
+                _ => false,
+            },
+            Value::Array(items) => match other {
+                Value::Array(items2) => items == items2,
+                _ => false,
+            },
+            Value::Record(items) => match other {
+                Value::Record(items2) => items == items2,
+                _ => false,
+            },
+            Value::Variant(tag, value) => match other {
+                Value::Variant(tag2, value2) => tag == tag2 && value == value2,
+                _ => false,
+            },
+            Value::Unit => match other {
+                Value::Unit => true,
+                _ => false,
+            },
+        }
+    }
+}
+
+struct Interpreter<'stdout, 'heap> {
+    stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Value<'heap>>,
     context: HashMap<String, fn() -> ValueRef<'heap>>,
     bound_vars: Vec<ValueRef<'heap>>,
     evidence: Vec<ValueRef<'heap>>,
 }
 
-impl<'heap> Interpreter<'heap> {
-    pub fn new(heap: &'heap Arena<Value<'heap>>) -> Self {
+impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
+    pub fn new(stdout: &'stdout mut dyn Write, heap: &'heap Arena<Value<'heap>>) -> Self {
         let context = HashMap::new();
         let evidence = Vec::new();
         Interpreter {
+            stdout,
             context,
             heap,
             bound_vars: Vec::new(),
@@ -67,28 +187,28 @@ impl<'heap> Interpreter<'heap> {
             Builtin::MapIO => todo!(),
             Builtin::PureIO => todo!(),
             Builtin::Trace => {
-                fn code<'heap>(
-                    interpreter: &mut Interpreter<'heap>,
+                fn code_outer<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
                     env: Vec<ValueRef<'heap>>,
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
-                    fn code<'heap>(
-                        _: &mut Interpreter<'heap>,
+                    fn code_inner<'stdout, 'heap>(
+                        interpreter: &mut Interpreter<'stdout, 'heap>,
                         env: Vec<ValueRef<'heap>>,
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
-                        println!("trace: {:?}", env[0]);
+                        writeln!(interpreter.stdout, "trace: {}", env[0].render());
                         arg
                     }
-                    let closure = Value::Closure2 {
+                    let closure = Value::StaticClosure {
                         env: vec![arg],
-                        body: Closure2Body(code),
+                        body: StaticClosureBody(code_inner),
                     };
                     interpreter.alloc_value(closure)
                 }
-                let closure = self.alloc_value(Value::Closure2 {
+                let closure = self.alloc_value(Value::StaticClosure {
                     env: vec![],
-                    body: Closure2Body(code),
+                    body: StaticClosureBody(code_outer),
                 });
                 closure
             }
@@ -112,7 +232,7 @@ impl<'heap> Interpreter<'heap> {
                         }
                         self.eval(body.clone())
                     }
-                    Value::Closure2 { env, body } => body.0(self, env.clone(), b),
+                    Value::StaticClosure { env, body } => body.0(self, env.clone(), b),
                     a => panic!("expected closure, got {:?}", a),
                 }
             }
