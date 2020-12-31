@@ -9,6 +9,11 @@ pub enum TokenType {
     Ident(String),
     Int { value: usize, length: usize },
 
+    DoubleQuote,
+    Dollar,
+    DollarCurly,
+    String(String),
+
     LBrace,
     RBrace,
     LParen,
@@ -42,7 +47,7 @@ pub enum TokenType {
 impl TokenType {
     pub fn render(&self) -> String {
         match self {
-            TokenType::Unexpected(c) => String::from("unexpected"),
+            TokenType::Unexpected(_) => String::from("unexpected"),
             TokenType::Ident(s) => {
                 if s.len() == 0 {
                     String::from("identifier")
@@ -57,6 +62,10 @@ impl TokenType {
                     format!("\"{}\"", value)
                 }
             }
+            TokenType::DoubleQuote => String::from("'\"'"),
+            TokenType::Dollar => String::from("'$'"),
+            TokenType::DollarCurly => String::from("'${'"),
+            TokenType::String(s) => format!("{:?}", s),
             TokenType::LBrace => String::from("'{'"),
             TokenType::RBrace => String::from("'}'"),
             TokenType::LParen => String::from("'('"),
@@ -110,6 +119,10 @@ impl TokenType {
             TokenType::Slash => 1,
             TokenType::Indent(n) => n + 1,
             TokenType::Space => 1,
+            TokenType::DoubleQuote => 1,
+            TokenType::Dollar => 1,
+            TokenType::DollarCurly => 2,
+            TokenType::String(s) => s.len(),
         }
     }
 }
@@ -120,10 +133,17 @@ pub struct Token {
     pub pos: usize,
 }
 
+enum Mode {
+    String,
+    Ident,
+    Normal,
+}
+
 pub struct Lexer<'input> {
     pos: usize,
     current: Option<char>,
     input: Chars<'input>,
+    mode: Vec<Mode>,
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -141,6 +161,7 @@ impl<'input> Lexer<'input> {
             pos: 0,
             current: input.next(),
             input,
+            mode: vec![Mode::Normal],
         }
     }
 
@@ -153,203 +174,275 @@ impl<'input> Lexer<'input> {
         let pos = self.pos;
         match self.current {
             None => None,
-            Some(c) => match c {
-                '\n' => {
-                    self.consume();
-                    let mut depth = 0;
-                    loop {
-                        match self.current {
-                            Some(c) if c == ' ' => {
-                                self.consume();
-                                depth += 1;
-                            }
-                            _ => break,
-                        }
-                    }
-                    Some(Token {
-                        token_type: TokenType::Indent(depth),
-                        pos,
-                    })
-                }
-                ' ' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Space,
-                        pos,
-                    })
-                }
-                '{' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::LBrace,
-                        pos,
-                    })
-                }
-                '}' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::RBrace,
-                        pos,
-                    })
-                }
-                '(' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::LParen,
-                        pos,
-                    })
-                }
-                ')' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::RParen,
-                        pos,
-                    })
-                }
-                '[' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::LBracket,
-                        pos,
-                    })
-                }
-                ']' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::RBracket,
-                        pos,
-                    })
-                }
-                ',' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Comma,
-                        pos,
-                    })
-                }
-                ':' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Colon,
-                        pos,
-                    })
-                }
-                '.' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Dot,
-                        pos,
-                    })
-                }
-                '=' => {
-                    self.consume();
-                    match self.current {
-                        Some('>') => {
-                            self.consume();
-
-                            Some(Token {
-                                token_type: TokenType::FatArrow,
-                                pos,
-                            })
-                        }
-                        _ => Some(Token {
-                            token_type: TokenType::Equals,
-                            pos,
-                        }),
-                    }
-                }
-                '-' => {
-                    self.consume();
-                    match self.current {
-                        Some('>') => {
-                            self.consume();
-
-                            Some(Token {
-                                token_type: TokenType::Arrow,
-                                pos,
-                            })
-                        }
-                        _ => Some(Token {
-                            token_type: TokenType::Hyphen,
-                            pos,
-                        }),
-                    }
-                }
-                '+' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Plus,
-                        pos,
-                    })
-                }
-                '/' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Slash,
-                        pos,
-                    })
-                }
-                '\\' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Backslash,
-                        pos,
-                    })
-                }
-                '*' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Asterisk,
-                        pos,
-                    })
-                }
-                '_' => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Underscore,
-                        pos,
-                    })
-                }
-                _ if is_ident_start(c) => {
-                    self.consume();
-                    let mut ident = String::new();
-                    ident.push(c);
-                    loop {
-                        match self.current {
-                            Some(c) if is_ident_continue(c) => {
-                                self.consume();
-                                ident.push(c);
-                            }
-                            _ => break,
-                        }
-                    }
-                    Some(Token {
-                        token_type: TokenType::Ident(ident),
-                        pos,
-                    })
-                }
-                _ if c.is_digit(10) => {
-                    self.consume();
-                    let mut length = 1;
-                    let mut value: usize = c.to_digit(10).unwrap() as usize;
-                    while let Some(n) = self.current.and_then(|cur| cur.to_digit(10)) {
+            Some(c) => match &self.mode[self.mode.len() - 1] {
+                Mode::Ident => {
+                    if is_ident_start(c) {
                         self.consume();
-                        value *= 10;
-                        value += n as usize;
-                        length += 1;
+                        let mut ident = String::new();
+                        ident.push(c);
+                        loop {
+                            match self.current {
+                                Some(c) if is_ident_continue(c) => {
+                                    self.consume();
+                                    ident.push(c);
+                                }
+                                _ => break,
+                            }
+                        }
+                        let _ = self.mode.pop().unwrap();
+                        Some(Token {
+                            token_type: TokenType::Ident(ident),
+                            pos,
+                        })
+                    } else {
+                        Some(Token {
+                            token_type: TokenType::Unexpected(c),
+                            pos,
+                        })
                     }
-                    Some(Token {
-                        token_type: TokenType::Int { value, length },
-                        pos,
-                    })
                 }
-                _ => {
-                    self.consume();
-                    Some(Token {
-                        token_type: TokenType::Unexpected(c),
-                        pos,
-                    })
-                }
+                Mode::String => match c {
+                    '"' => {
+                        self.consume();
+                        let _ = self.mode.pop().unwrap();
+                        Some(Token {
+                            token_type: TokenType::DoubleQuote,
+                            pos,
+                        })
+                    }
+                    '$' => {
+                        self.consume();
+
+                        match self.current {
+                            Some(c) if c == '{' => {
+                                self.consume();
+                                self.mode.push(Mode::Normal);
+                                Some(Token {
+                                    token_type: TokenType::DollarCurly,
+                                    pos,
+                                })
+                            }
+                            _ => {
+                                self.mode.push(Mode::Ident);
+                                Some(Token {
+                                    token_type: TokenType::Dollar,
+                                    pos,
+                                })
+                            }
+                        }
+                    }
+                    _ => {
+                        todo!()
+                    }
+                },
+                Mode::Normal => match c {
+                    '\n' => {
+                        self.consume();
+                        let mut depth = 0;
+                        loop {
+                            match self.current {
+                                Some(c) if c == ' ' => {
+                                    self.consume();
+                                    depth += 1;
+                                }
+                                _ => break,
+                            }
+                        }
+                        Some(Token {
+                            token_type: TokenType::Indent(depth),
+                            pos,
+                        })
+                    }
+                    '"' => {
+                        self.consume();
+                        self.mode.push(Mode::String);
+                        Some(Token {
+                            token_type: TokenType::DoubleQuote,
+                            pos,
+                        })
+                    }
+                    ' ' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Space,
+                            pos,
+                        })
+                    }
+                    '{' => {
+                        self.consume();
+                        self.mode.push(Mode::Normal);
+                        Some(Token {
+                            token_type: TokenType::LBrace,
+                            pos,
+                        })
+                    }
+                    '}' => {
+                        self.consume();
+                        let _ = self.mode.pop().unwrap();
+                        Some(Token {
+                            token_type: TokenType::RBrace,
+                            pos,
+                        })
+                    }
+                    '(' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::LParen,
+                            pos,
+                        })
+                    }
+                    ')' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::RParen,
+                            pos,
+                        })
+                    }
+                    '[' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::LBracket,
+                            pos,
+                        })
+                    }
+                    ']' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::RBracket,
+                            pos,
+                        })
+                    }
+                    ',' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Comma,
+                            pos,
+                        })
+                    }
+                    ':' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Colon,
+                            pos,
+                        })
+                    }
+                    '.' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Dot,
+                            pos,
+                        })
+                    }
+                    '=' => {
+                        self.consume();
+                        match self.current {
+                            Some('>') => {
+                                self.consume();
+
+                                Some(Token {
+                                    token_type: TokenType::FatArrow,
+                                    pos,
+                                })
+                            }
+                            _ => Some(Token {
+                                token_type: TokenType::Equals,
+                                pos,
+                            }),
+                        }
+                    }
+                    '-' => {
+                        self.consume();
+                        match self.current {
+                            Some('>') => {
+                                self.consume();
+
+                                Some(Token {
+                                    token_type: TokenType::Arrow,
+                                    pos,
+                                })
+                            }
+                            _ => Some(Token {
+                                token_type: TokenType::Hyphen,
+                                pos,
+                            }),
+                        }
+                    }
+                    '+' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Plus,
+                            pos,
+                        })
+                    }
+                    '/' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Slash,
+                            pos,
+                        })
+                    }
+                    '\\' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Backslash,
+                            pos,
+                        })
+                    }
+                    '*' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Asterisk,
+                            pos,
+                        })
+                    }
+                    '_' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Underscore,
+                            pos,
+                        })
+                    }
+                    _ if is_ident_start(c) => {
+                        self.consume();
+                        let mut ident = String::new();
+                        ident.push(c);
+                        loop {
+                            match self.current {
+                                Some(c) if is_ident_continue(c) => {
+                                    self.consume();
+                                    ident.push(c);
+                                }
+                                _ => break,
+                            }
+                        }
+                        Some(Token {
+                            token_type: TokenType::Ident(ident),
+                            pos,
+                        })
+                    }
+                    _ if c.is_digit(10) => {
+                        self.consume();
+                        let mut length = 1;
+                        let mut value: usize = c.to_digit(10).unwrap() as usize;
+                        while let Some(n) = self.current.and_then(|cur| cur.to_digit(10)) {
+                            self.consume();
+                            value *= 10;
+                            value += n as usize;
+                            length += 1;
+                        }
+                        Some(Token {
+                            token_type: TokenType::Int { value, length },
+                            pos,
+                        })
+                    }
+                    _ => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Unexpected(c),
+                            pos,
+                        })
+                    }
+                },
             },
         }
     }
