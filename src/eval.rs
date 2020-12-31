@@ -1,8 +1,13 @@
-use crate::core::{EVar, Expr, StringPart};
+use crate::core::{Builtin, EVar, Expr, StringPart};
 use crate::syntax::Binop;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+struct Thunk(Box<dyn Fn() -> Value>);
+
+impl Debug for Thunk {}
+
+#[derive(Debug)]
 enum Value {
     Closure {
         env: Vec<Value>,
@@ -18,22 +23,37 @@ enum Value {
     Record(Vec<Value>),
     Variant(usize, Box<Value>),
     Unit,
+    IO(Thunk),
 }
 
 struct Interpreter {
-    context: HashMap<String, Expr>,
+    context: HashMap<String, fn() -> Value>,
     bound_vars: Vec<Value>,
     evidence: Vec<Value>,
 }
 
 impl Interpreter {
+    pub fn new() -> Self {
+        let context = HashMap::new();
+        let evidence = Vec::new();
+        Interpreter {
+            context,
+            bound_vars: Vec::new(),
+            evidence,
+        }
+    }
+
+    pub fn eval_builtin(&self, name: &Builtin) -> Value {
+        match name {
+            Builtin::MapIO => todo!(),
+            Builtin::PureIO => todo!(),
+        }
+    }
     pub fn eval(&mut self, expr: &Expr) -> Value {
         match expr {
             Expr::Var(ix) => self.bound_vars[self.bound_vars.len() - 1 - ix].clone(),
-            Expr::Name(name) => {
-                let next: Expr = self.context.get(name).unwrap().clone();
-                self.eval(&next)
-            }
+            Expr::Name(name) => self.context.get(name).unwrap().clone()(),
+            Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {
                 let a = self.eval(a);

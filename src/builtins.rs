@@ -1,4 +1,4 @@
-use crate::core::{Declaration, Expr, Module, TypeSig};
+use crate::core::{Builtin, Declaration, Expr, Module, TypeSig};
 use crate::syntax::{Kind, Type};
 use lazy_static::lazy_static;
 
@@ -26,7 +26,7 @@ lazy_static! {
                         )
                     )
                 },
-                body: Expr::Name(String::from("mapIO_impl"))
+                body: Expr::Builtin(Builtin::MapIO)
             },
             // pureIO : a -> IO a
             Declaration::Definition {
@@ -41,7 +41,7 @@ lazy_static! {
                             Type::mk_app(Type::IO, Type::Var(0))
                     )
                 },
-                body: Expr::Name(String::from("pureIO_impl"))
+                body: Expr::Builtin(Builtin::PureIO)
             },
         ]
     };

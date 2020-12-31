@@ -47,6 +47,7 @@ impl Evidence {
 pub enum Expr {
     Var(usize),
     Name(String),
+    Builtin(Builtin),
 
     App(Box<Expr>, Box<Expr>),
     Lam { arg: bool, body: Box<Expr> },
@@ -126,6 +127,12 @@ pub struct TypeSig {
 pub struct ClassMember {
     name: String,
     sig: TypeSig,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Builtin {
+    MapIO,
+    PureIO,
 }
 
 #[derive(Debug, PartialEq, Eq)]
