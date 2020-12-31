@@ -43,6 +43,26 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::PureIO)
             },
+            // trace : a -> b -> b
+            Declaration::Definition {
+                name: String::from("trace"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                        // a : Type
+                        Kind::Type,
+                        // b : Type
+                        Kind::Type,
+                    ],
+                    body: Type::mk_arrow(
+                            Type::Var(1),
+                            Type::mk_arrow(
+                                Type::Var(0),
+                                Type::Var(0)
+                            )
+                    )
+                },
+                body: Expr::Builtin(Builtin::Trace)
+            },
         ]
     };
 }

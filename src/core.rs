@@ -133,6 +133,7 @@ pub struct ClassMember {
 pub enum Builtin {
     MapIO,
     PureIO,
+    Trace,
 }
 
 #[derive(Debug, PartialEq, Eq)]

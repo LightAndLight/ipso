@@ -6,12 +6,27 @@ use typed_arena::Arena;
 
 type ValueRef<'heap> = &'heap Value<'heap>;
 
+#[derive(Clone)]
+struct Closure2Body<'heap>(
+    fn(&mut Interpreter<'heap>, Vec<ValueRef<'heap>>, ValueRef<'heap>) -> ValueRef<'heap>,
+);
+
+impl<'heap> Debug for Closure2Body<'heap> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Closure2()")
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Value<'heap> {
     Closure {
         env: Vec<ValueRef<'heap>>,
         arg: bool,
         body: Expr,
+    },
+    Closure2 {
+        env: Vec<ValueRef<'heap>>,
+        body: Closure2Body<'heap>,
     },
     True,
     False,
@@ -51,6 +66,32 @@ impl<'heap> Interpreter<'heap> {
         match name {
             Builtin::MapIO => todo!(),
             Builtin::PureIO => todo!(),
+            Builtin::Trace => {
+                fn code<'heap>(
+                    interpreter: &mut Interpreter<'heap>,
+                    env: Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    fn code<'heap>(
+                        _: &mut Interpreter<'heap>,
+                        env: Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>,
+                    ) -> ValueRef<'heap> {
+                        println!("trace: {:?}", env[0]);
+                        arg
+                    }
+                    let closure = Value::Closure2 {
+                        env: vec![arg],
+                        body: Closure2Body(code),
+                    };
+                    interpreter.alloc_value(closure)
+                }
+                let closure = self.alloc_value(Value::Closure2 {
+                    env: vec![],
+                    body: Closure2Body(code),
+                });
+                closure
+            }
         }
     }
 
@@ -71,6 +112,7 @@ impl<'heap> Interpreter<'heap> {
                         }
                         self.eval(body.clone())
                     }
+                    Value::Closure2 { env, body } => body.0(self, env.clone(), b),
                     a => panic!("expected closure, got {:?}", a),
                 }
             }
