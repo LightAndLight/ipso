@@ -6,7 +6,7 @@ use crate::Item;
 use std::collections::BTreeSet;
 use std::{fs::File, io::Read, vec::IntoIter};
 
-use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, Type};
+use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, StringPart, Type};
 use crate::{
     lex::{Lexer, Token, TokenType},
     syntax::{Keyword, Names},
@@ -575,6 +575,48 @@ impl Parser {
         )
     }
 
+    fn string_part_expr(&mut self) -> ParseResult<StringPart> {
+        choices!(
+            self,
+            keep_right!(
+                self.token(&TokenType::DollarLBrace),
+                keep_left!(
+                    self.expr().map(|x| StringPart::Expr(x)),
+                    self.token(&TokenType::RBrace)
+                )
+            ),
+            keep_right!(
+                self.token(&TokenType::Dollar),
+                spanned!(self, self.ident().map(|x| Expr::Var(x))).map(|x| StringPart::Expr(x))
+            )
+        )
+    }
+
+    fn string_part_string(&mut self) -> ParseResult<StringPart> {
+        self.expecting.insert(TokenType::String(String::new()));
+        let str = match &self.current {
+            Some(current) => match &current.token_type {
+                TokenType::String(str) => str.clone(),
+                _ => return self.unexpected(false),
+            },
+            None => return self.unexpected(false),
+        };
+        self.consume();
+        ParseResult::pure(StringPart::String(str))
+    }
+
+    fn string(&mut self) -> ParseResult<Vec<StringPart>> {
+        self.token(&TokenType::DoubleQuote).and_then(|_| {
+            keep_left!(
+                many!(
+                    self,
+                    choices!(self, self.string_part_expr(), self.string_part_string())
+                ),
+                self.token(&TokenType::DoubleQuote)
+            )
+        })
+    }
+
     fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
             spanned!(
@@ -592,7 +634,8 @@ impl Parser {
                             }),
                             self.token(&TokenType::RParen)
                         )
-                    )
+                    ),
+                    self.string().map(|parts| Expr::String(parts))
                 )
             ),
             self.spaces()

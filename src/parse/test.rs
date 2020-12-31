@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::syntax::Spanned;
+use crate::syntax::{Binop, Spanned, StringPart};
 #[cfg(test)]
 use crate::{
     keep_left,
@@ -553,5 +553,51 @@ fn parse_case_5() {
             .into_iter()
             .collect()
         })
+    )
+}
+
+#[test]
+fn parse_string_1() {
+    parse_test!(
+        "\"hello\"",
+        string,
+        Ok(vec![StringPart::String(String::from("hello"))])
+    )
+}
+
+#[test]
+fn parse_string_2() {
+    parse_test!(
+        "\"hello $name\"",
+        string,
+        Ok(vec![
+            StringPart::String(String::from("hello ")),
+            StringPart::Expr(Spanned {
+                pos: 8,
+                item: Expr::Var(String::from("name"))
+            })
+        ])
+    )
+}
+
+#[test]
+fn parse_string_3() {
+    parse_test!(
+        "\"a ${b c} d\"",
+        string,
+        Ok(vec![
+            StringPart::String(String::from("a ")),
+            StringPart::Expr(Expr::mk_app(
+                Spanned {
+                    pos: 5,
+                    item: Expr::Var(String::from("b"))
+                },
+                Spanned {
+                    pos: 7,
+                    item: Expr::Var(String::from("c"))
+                }
+            )),
+            StringPart::String(String::from(" d")),
+        ])
     )
 }

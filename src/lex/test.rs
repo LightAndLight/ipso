@@ -474,3 +474,33 @@ fn lex_string_5() {
     let actual = lexer.tokenize();
     assert_eq!(expected, actual)
 }
+
+#[test]
+fn lex_string_6() {
+    let input = String::from("\"hello $name\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("hello ")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::Dollar,
+            pos: 7,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("name")),
+            pos: 8,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 12,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
