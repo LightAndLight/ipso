@@ -292,3 +292,185 @@ fn lex_ann_1() {
         ]
     )
 }
+
+#[test]
+fn lex_string_1() {
+    let input = String::from("\"hello\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("hello")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 6,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_string_2() {
+    let input = String::from("\"x $y z\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("x ")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::Dollar,
+            pos: 3,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("y")),
+            pos: 4,
+        },
+        Token {
+            token_type: TokenType::String(String::from(" z")),
+            pos: 5,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 7,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_string_3() {
+    let input = String::from("\"x $yy z\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("x ")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::Dollar,
+            pos: 3,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("yy")),
+            pos: 4,
+        },
+        Token {
+            token_type: TokenType::String(String::from(" z")),
+            pos: 6,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 8,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_string_4() {
+    let input = String::from("\"x ${yy} z\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("x ")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::DollarLBrace,
+            pos: 3,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("yy")),
+            pos: 5,
+        },
+        Token {
+            token_type: TokenType::RBrace,
+            pos: 7,
+        },
+        Token {
+            token_type: TokenType::String(String::from(" z")),
+            pos: 8,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 10,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_string_5() {
+    let input = String::from("\"x ${a + b} z\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String(String::from("x ")),
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::DollarLBrace,
+            pos: 3,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("a")),
+            pos: 5,
+        },
+        Token {
+            token_type: TokenType::Space,
+            pos: 6,
+        },
+        Token {
+            token_type: TokenType::Plus,
+            pos: 7,
+        },
+        Token {
+            token_type: TokenType::Space,
+            pos: 8,
+        },
+        Token {
+            token_type: TokenType::Ident(String::from("b")),
+            pos: 9,
+        },
+        Token {
+            token_type: TokenType::RBrace,
+            pos: 10,
+        },
+        Token {
+            token_type: TokenType::String(String::from(" z")),
+            pos: 11,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 13,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}

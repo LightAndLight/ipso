@@ -11,7 +11,7 @@ pub enum TokenType {
 
     DoubleQuote,
     Dollar,
-    DollarCurly,
+    DollarLBrace,
     String(String),
 
     LBrace,
@@ -64,7 +64,7 @@ impl TokenType {
             }
             TokenType::DoubleQuote => String::from("'\"'"),
             TokenType::Dollar => String::from("'$'"),
-            TokenType::DollarCurly => String::from("'${'"),
+            TokenType::DollarLBrace => String::from("'${'"),
             TokenType::String(s) => format!("{:?}", s),
             TokenType::LBrace => String::from("'{'"),
             TokenType::RBrace => String::from("'}'"),
@@ -121,7 +121,7 @@ impl TokenType {
             TokenType::Space => 1,
             TokenType::DoubleQuote => 1,
             TokenType::Dollar => 1,
-            TokenType::DollarCurly => 2,
+            TokenType::DollarLBrace => 2,
             TokenType::String(s) => s.len(),
         }
     }
@@ -218,7 +218,7 @@ impl<'input> Lexer<'input> {
                                 self.consume();
                                 self.mode.push(Mode::Normal);
                                 Some(Token {
-                                    token_type: TokenType::DollarCurly,
+                                    token_type: TokenType::DollarLBrace,
                                     pos,
                                 })
                             }
@@ -231,8 +231,55 @@ impl<'input> Lexer<'input> {
                             }
                         }
                     }
-                    _ => {
-                        todo!()
+                    c => {
+                        self.consume();
+
+                        let mut str = String::new();
+                        str.push(c);
+
+                        loop {
+                            match self.current {
+                                None => {
+                                    break;
+                                }
+                                Some(c) => match c {
+                                    '$' | '"' => {
+                                        break;
+                                    }
+                                    '\\' => {
+                                        self.consume();
+                                        match self.current {
+                                            None => {
+                                                return Some(Token {
+                                                    token_type: TokenType::Unexpected('\\'),
+                                                    pos: self.pos,
+                                                })
+                                            }
+                                            Some(c) => match c {
+                                                '$' | '"' => {
+                                                    str.push(c);
+                                                }
+                                                _ => {
+                                                    return Some(Token {
+                                                        token_type: TokenType::Unexpected('\\'),
+                                                        pos: self.pos,
+                                                    });
+                                                }
+                                            },
+                                        }
+                                    }
+                                    c => {
+                                        self.consume();
+                                        str.push(c);
+                                    }
+                                },
+                            }
+                        }
+
+                        Some(Token {
+                            token_type: TokenType::String(str),
+                            pos,
+                        })
                     }
                 },
                 Mode::Normal => match c {
