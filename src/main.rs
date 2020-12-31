@@ -1,3 +1,6 @@
+use eval::Interpreter;
+use typed_arena::Arena;
+
 use crate::diagnostic::{Diagnostic, Item};
 use crate::typecheck::Typechecker;
 use std::path::Path;
@@ -69,6 +72,7 @@ fn report_config_error(err: ConfigError) {
 enum InterpreterError {
     ParseError(parse::ParseError),
     TypeError(typecheck::TypeError),
+    MissingEntrypoint(String),
 }
 
 impl From<parse::ParseError> for InterpreterError {
@@ -88,6 +92,11 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
     match err {
         InterpreterError::ParseError(err) => err.report(&mut diagnostic),
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
+        InterpreterError::MissingEntrypoint(name) => diagnostic.item(diagnostic::Item {
+            pos: 0,
+            message: format!("Missing entrypoint {:?}", name),
+            addendum: None,
+        }),
     }
     diagnostic.report_all(&Path::new(&config.filename))
 }
@@ -102,7 +111,21 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let module: syntax::Module = parse::parse_file(filename)?;
     let mut tc: Typechecker = Typechecker::new_with_builtins();
     let module: core::Module = tc.check_module(module)?;
-    panic!("{:?} {:?} {:?}", filename, entrypoint, module)
+
+    let target = match module.decls.iter().find_map(|decl| match decl {
+        core::Declaration::Definition { name, body, .. } if name == entrypoint => {
+            Some(body.clone())
+        }
+        _ => None,
+    }) {
+        None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
+        Some(body) => Ok(body),
+    }?;
+    let mut stdout = io::stdout();
+    let heap = Arena::new();
+    let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
+    let result = interpreter.eval(target);
+    panic!("{:?} {:?}", filename, result)
 }
 
 fn main() -> io::Result<()> {

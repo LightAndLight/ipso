@@ -3,6 +3,8 @@ use super::{Interpreter, Value};
 #[cfg(test)]
 use crate::core::{Builtin, Expr};
 #[cfg(test)]
+use std::collections::HashMap;
+#[cfg(test)]
 use typed_arena::Arena;
 
 #[test]
@@ -13,7 +15,7 @@ fn eval_1() {
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
     );
-    let mut interpreter = Interpreter::new(&mut stdout, &heap);
+    let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), &heap);
 
     let expected_value = heap.alloc(Value::Int(1));
     let actual_value = interpreter.eval(term);

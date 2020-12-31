@@ -1,6 +1,9 @@
-use crate::core::{Builtin, EVar, Expr, StringPart};
 use crate::syntax::Binop;
-use std::{collections::HashMap, rc::Rc};
+use crate::{
+    builtins,
+    core::{Builtin, Declaration, EVar, Expr, StringPart},
+};
+use std::collections::HashMap;
 use std::{fmt::Debug, io::Write};
 use typed_arena::Arena;
 
@@ -20,7 +23,7 @@ impl<'heap> Debug for StaticClosureBody<'heap> {
 }
 
 #[derive(Debug, Clone)]
-enum Value<'heap> {
+pub enum Value<'heap> {
     Closure {
         env: Vec<ValueRef<'heap>>,
         arg: bool,
@@ -157,17 +160,20 @@ impl<'heap> PartialEq for Value<'heap> {
     }
 }
 
-struct Interpreter<'stdout, 'heap> {
+pub struct Interpreter<'stdout, 'heap> {
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Value<'heap>>,
-    context: HashMap<String, fn() -> ValueRef<'heap>>,
+    context: HashMap<String, Expr>,
     bound_vars: Vec<ValueRef<'heap>>,
     evidence: Vec<ValueRef<'heap>>,
 }
 
 impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
-    pub fn new(stdout: &'stdout mut dyn Write, heap: &'heap Arena<Value<'heap>>) -> Self {
-        let context = HashMap::new();
+    pub fn new(
+        stdout: &'stdout mut dyn Write,
+        context: HashMap<String, Expr>,
+        heap: &'heap Arena<Value<'heap>>,
+    ) -> Self {
         let evidence = Vec::new();
         Interpreter {
             stdout,
@@ -176,6 +182,21 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             bound_vars: Vec::new(),
             evidence,
         }
+    }
+
+    pub fn new_with_builtins(
+        stdout: &'stdout mut dyn Write,
+        heap: &'heap Arena<Value<'heap>>,
+    ) -> Self {
+        let context = builtins::BUILTINS
+            .decls
+            .iter()
+            .filter_map(|decl| match decl {
+                Declaration::Definition { name, sig, body } => Some((name.clone(), body.clone())),
+                _ => None,
+            })
+            .collect();
+        Self::new(stdout, context, heap)
     }
 
     pub fn alloc_value(&self, val: Value<'heap>) -> ValueRef<'heap> {
@@ -189,7 +210,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::Trace => {
                 fn code_outer<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: Vec<ValueRef<'heap>>,
+                    _: Vec<ValueRef<'heap>>,
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     fn code_inner<'stdout, 'heap>(
@@ -197,7 +218,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         env: Vec<ValueRef<'heap>>,
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
-                        writeln!(interpreter.stdout, "trace: {}", env[0].render());
+                        let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
                     let closure = Value::StaticClosure {
@@ -218,7 +239,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn eval(&mut self, expr: Expr) -> ValueRef<'heap> {
         match expr {
             Expr::Var(ix) => self.bound_vars[self.bound_vars.len() - 1 - ix],
-            Expr::Name(name) => self.context.get(&name).unwrap().clone()(),
+            Expr::Name(name) => self.eval(self.context.get(&name).unwrap().clone()),
             Expr::Builtin(name) => self.eval_builtin(&name),
 
             Expr::App(a, b) => {
