@@ -3,39 +3,13 @@ use crate::syntax::Binop;
 use std::fmt::Debug;
 use std::{collections::HashMap, rc::Rc};
 
-#[derive(Clone)]
-struct Thunk(Rc<dyn Fn() -> Value>);
-
-impl Debug for Thunk {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Thunk()")
-    }
-}
-
-#[derive(Clone)]
-enum Function {
-    Dynamic(Rc<dyn Fn(&mut Interpreter, Vec<Value>, Value) -> Value>),
-    Static(fn(&mut Interpreter, Vec<Value>, Value) -> Value),
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Function()")
-    }
-}
-
-impl Function {
-    fn call(&self, me: &mut Interpreter, env: Vec<Value>, arg: Value) -> Value {
-        match self {
-            Function::Dynamic(f) => f(me, env, arg),
-            Function::Static(f) => f(me, env, arg),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 enum Value {
-    Closure { env: Vec<Value>, body: Function },
+    Closure {
+        env: Vec<Value>,
+        arg: bool,
+        body: Expr,
+    },
     True,
     False,
     Int(u32),
@@ -45,17 +19,12 @@ enum Value {
     Record(Vec<Value>),
     Variant(usize, Box<Value>),
     Unit,
-    IO(Thunk),
 }
 
 struct Interpreter {
     context: HashMap<String, fn() -> Value>,
     bound_vars: Vec<Value>,
     evidence: Vec<Value>,
-}
-
-fn pureio_impl(_: &mut Interpreter, _: Vec<Value>, arg: Value) -> Value {
-    Value::IO(Thunk(Rc::new(move || arg)))
 }
 
 impl Interpreter {
@@ -72,10 +41,7 @@ impl Interpreter {
     pub fn eval_builtin(&self, name: &Builtin) -> Value {
         match name {
             Builtin::MapIO => todo!(),
-            Builtin::PureIO => Value::Closure {
-                env: Vec::new(),
-                body: Function::Static(pureio_impl),
-            },
+            Builtin::PureIO => todo!(),
         }
     }
 
@@ -89,19 +55,20 @@ impl Interpreter {
                 let a = self.eval(*a);
                 let b = self.eval(*b);
                 match a {
-                    Value::Closure { env, body } => body.call(self, env, b),
+                    Value::Closure { env, arg, body } => {
+                        self.bound_vars = env;
+                        if arg {
+                            self.bound_vars.push(b)
+                        }
+                        self.eval(body)
+                    }
                     a => panic!("expected closure, got {:?}", a),
                 }
             }
             Expr::Lam { arg, body } => Value::Closure {
                 env: self.bound_vars.clone(),
-                body: Function::Dynamic(Rc::new(move |me, env, x| {
-                    me.bound_vars = env.clone();
-                    if arg {
-                        me.bound_vars.push(x);
-                    }
-                    me.eval((*body).clone())
-                })),
+                arg,
+                body: *body,
             },
 
             Expr::True => Value::True,
