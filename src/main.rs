@@ -101,6 +101,21 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
     diagnostic.report_all(&Path::new(&config.filename))
 }
 
+fn find_entrypoint_body(
+    entrypoint: &String,
+    module: &core::Module,
+) -> Result<core::Expr, InterpreterError> {
+    match module.decls.iter().find_map(|decl| match decl {
+        core::Declaration::Definition { name, body, .. } if name == entrypoint => {
+            Some(body.clone())
+        }
+        _ => None,
+    }) {
+        None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
+        Some(body) => Ok(body),
+    }
+}
+
 fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let filename: &String = &config.filename;
     let main = String::from("main");
@@ -112,19 +127,15 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let mut tc: Typechecker = Typechecker::new_with_builtins();
     let module: core::Module = tc.check_module(module)?;
 
-    let target = match module.decls.iter().find_map(|decl| match decl {
-        core::Declaration::Definition { name, body, .. } if name == entrypoint => {
-            Some(body.clone())
-        }
-        _ => None,
-    }) {
-        None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
-        Some(body) => Ok(body),
-    }?;
-    let mut stdout = io::stdout();
+    let target = find_entrypoint_body(entrypoint, &module)?;
+
     let heap = Arena::new();
-    let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
-    let result = interpreter.eval(target);
+    let result = {
+        let mut stdout = io::stdout();
+        let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
+        interpreter.eval(target)
+    };
+
     panic!("{:?} {:?}", filename, result)
 }
 
