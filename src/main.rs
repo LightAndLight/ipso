@@ -104,11 +104,11 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
 fn find_entrypoint_body(
     entrypoint: &String,
     module: &core::Module,
-) -> Result<core::Expr, InterpreterError> {
+) -> Result<(core::Expr, core::TypeSig), InterpreterError> {
     match module.decls.iter().find_map(|decl| match decl {
-        core::Declaration::Definition { name, body, .. } if name == entrypoint => {
-            Some(body.clone())
-        }
+        core::Declaration::Definition {
+            name, sig, body, ..
+        } if name == entrypoint => Some((body.clone(), sig.clone())),
         _ => None,
     }) {
         None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
@@ -127,16 +127,21 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let mut tc: Typechecker = Typechecker::new_with_builtins();
     let module: core::Module = tc.check_module(module)?;
 
-    let target = find_entrypoint_body(entrypoint, &module)?;
+    let (target, target_sig) = find_entrypoint_body(entrypoint, &module)?;
+    {
+        let var = tc.fresh_typevar(syntax::Kind::Type);
+        let _ = tc.unify_type(syntax::Type::mk_app(syntax::Type::IO, var), target_sig.body)?;
+    }
 
     let heap = Arena::new();
-    let result = {
+    let env = Vec::new();
+    let _result = {
         let mut stdout = io::stdout();
         let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
-        interpreter.eval(Vec::new(), target)
+        let action = interpreter.eval(&env, target);
+        action.perform_io(&mut interpreter)
     };
-
-    panic!("{:?} {:?}", filename, result)
+    Ok(())
 }
 
 fn main() -> io::Result<()> {

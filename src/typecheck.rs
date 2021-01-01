@@ -717,7 +717,7 @@ impl Typechecker {
         }
     }
 
-    fn fresh_typevar<A>(&mut self, kind: syntax::Kind) -> syntax::Type<A> {
+    pub fn fresh_typevar<A>(&mut self, kind: syntax::Kind) -> syntax::Type<A> {
         let n = self.type_solutions.len();
         self.type_solutions.push((kind, None));
         syntax::Type::Meta(n)
@@ -727,7 +727,7 @@ impl Typechecker {
         ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
     }
 
-    fn unify_type(
+    pub fn unify_type(
         &mut self,
         expected: syntax::Type<usize>,
         actual: syntax::Type<usize>,

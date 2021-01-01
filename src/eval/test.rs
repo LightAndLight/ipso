@@ -16,9 +16,10 @@ fn eval_1() {
         Expr::Int(1),
     );
     let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), &heap);
+    let env = interpreter.alloc_env(Vec::new());
 
-    let expected_value = heap.alloc(Value::Int(1));
-    let actual_value = interpreter.eval(Vec::new(), term);
+    let expected_value = interpreter.alloc_value(Value::Int(1));
+    let actual_value = interpreter.eval(env, term);
     assert_eq!(expected_value, actual_value);
 
     let actual_stdout = String::from_utf8(stdout).unwrap();
