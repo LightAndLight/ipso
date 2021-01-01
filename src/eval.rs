@@ -62,6 +62,8 @@ pub enum Value<'heap> {
     Record(Vec<ValueRef<'heap>>),
     Variant(usize, ValueRef<'heap>),
     Unit,
+
+    Stdout,
 }
 
 impl<'heap> Value<'heap> {
@@ -79,6 +81,20 @@ impl<'heap> Value<'heap> {
         match self {
             Value::String(str) => str,
             val => panic!("expected string, got {:?}", val),
+        }
+    }
+
+    pub fn unpack_bytes<'stdout>(&'heap self) -> &'heap [u8] {
+        match self {
+            Value::Bytes(bs) => bs,
+            val => panic!("expected bytes, got {:?}", val),
+        }
+    }
+
+    pub fn unpack_stdout<'stdout>(&'heap self) -> () {
+        match self {
+            Value::Stdout => (),
+            val => panic!("expected stdout, got {:?}", val),
         }
     }
 
@@ -122,6 +138,7 @@ impl<'heap> Value<'heap> {
             Value::Char(c) => String::from(format!("{:?}", c)),
             Value::String(s) => String::from(format!("{:?}", s)),
             Value::Bytes(bs) => String::from(format!("{:?}", bs)),
+            Value::Stdout => String::from("Stdout"),
             Value::Array(items) => {
                 let mut s = String::new();
                 s.push_str("[ ");
@@ -233,6 +250,10 @@ impl<'heap> PartialEq for Value<'heap> {
             },
             Value::Unit => match other {
                 Value::Unit => true,
+                _ => false,
+            },
+            Value::Stdout => match other {
+                Value::Stdout => true,
                 _ => false,
             },
         }
@@ -473,6 +494,58 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let closure = self.alloc_value(Value::StaticClosure {
                     env,
                     body: StaticClosureBody(to_utf8_0),
+                });
+                closure
+            }
+            Builtin::Stdout => self.alloc_value(Value::Stdout),
+            Builtin::WriteStdout => {
+                fn write_stdout_0<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>, // Stdout
+                ) -> ValueRef<'heap> {
+                    fn write_stdout_1<'stdout, 'heap>(
+                        interpreter: &mut Interpreter<'stdout, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>, // Bytes
+                    ) -> ValueRef<'heap> {
+                        fn write_stdout_2<'stdout, 'heap>(
+                            interpreter: &mut Interpreter<'stdout, 'heap>,
+                            env: &'heap Vec<ValueRef<'heap>>,
+                        ) -> ValueRef<'heap> {
+                            // env[0] : Stdout
+                            // env[1] : Bytes
+                            let () = env[0].unpack_stdout();
+                            let bs = env[1].unpack_bytes();
+                            let _ = std::io::stdout().write_all(bs).unwrap();
+                            interpreter.alloc_value(Value::Unit)
+                        }
+
+                        let env = interpreter.alloc_env({
+                            let mut env = env.clone();
+                            env.push(arg);
+                            env
+                        });
+                        interpreter.alloc_value(Value::IO {
+                            env,
+                            body: IOBody(write_stdout_2),
+                        })
+                    }
+                    let env = interpreter.alloc_env({
+                        let mut env = env.clone();
+                        env.push(arg);
+                        env
+                    });
+                    let closure = interpreter.alloc_value(Value::StaticClosure {
+                        env,
+                        body: StaticClosureBody(write_stdout_1),
+                    });
+                    closure
+                }
+                let env = self.alloc_env(Vec::new());
+                let closure = self.alloc_value(Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(write_stdout_0),
                 });
                 closure
             }

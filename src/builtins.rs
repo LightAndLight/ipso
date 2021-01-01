@@ -100,6 +100,41 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::ToUtf8)
             },
+
+            // Stdout : Type
+            Declaration::BuiltinType {
+                name: String::from("Stdout"),
+                kind: Kind::Type
+            },
+
+            // stdout : Stdout
+            Declaration::Definition {
+                name: String::from("stdout"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body:
+                            Type::Name(String::from("Stdout"))
+                },
+                body: Expr::Builtin(Builtin::Stdout)
+            },
+
+            // writeStdout : Stdout -> Bytes -> IO ()
+            Declaration::Definition {
+                name: String::from("writeStdout"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body: Type::mk_arrow(
+                            Type::Name(String::from("Stdout")),
+                            Type::mk_arrow(
+                                Type::Bytes,
+                                Type::mk_app(Type::IO, Type::Unit)
+                            )
+                    )
+                },
+                body: Expr::Builtin(Builtin::WriteStdout)
+            },
         ]
     };
 }

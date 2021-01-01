@@ -105,6 +105,7 @@ pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
     type_solutions: Vec<(syntax::Kind, Option<syntax::Type<usize>>)>,
     evidence: core::Evidence,
+    type_context: HashMap<String, syntax::Kind>,
     context: HashMap<String, core::TypeSig>,
     bound_vars: BoundVars<syntax::Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
@@ -281,6 +282,7 @@ impl Typechecker {
             kind_solutions: vec![],
             type_solutions: vec![],
             evidence: core::Evidence::new(),
+            type_context: HashMap::new(),
             context: HashMap::new(),
             bound_vars: BoundVars::new(),
             bound_tyvars: BoundVars::new(),
@@ -315,6 +317,11 @@ impl Typechecker {
         };
         for decl in &module.decls {
             match decl {
+                core::Declaration::BuiltinType { name, kind } => {
+                    if should_import(name) {
+                        self.type_context.insert(name.clone(), kind.clone());
+                    }
+                }
                 core::Declaration::Definition { name, sig, body: _ } => {
                     if should_import(name) {
                         self.context.insert(name.clone(), sig.clone());
@@ -643,9 +650,10 @@ impl Typechecker {
         ty: &syntax::Type<usize>,
     ) -> Result<(syntax::Type<usize>, syntax::Kind), TypeError> {
         match ty {
-            syntax::Type::Name(n) => {
-                todo!("infer name kind {:?}", n)
-            }
+            syntax::Type::Name(n) => match self.type_context.get(n) {
+                None => self.not_in_scope(n),
+                Some(kind) => Ok((syntax::Type::Name(n.clone()), kind.clone())),
+            },
             syntax::Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
                 None => panic!("missing tyvar {:?}", ix),
                 Some((_, kind)) => Ok((syntax::Type::Var(*ix), kind.clone())),

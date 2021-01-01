@@ -50,6 +50,8 @@ pub enum Builtin {
     BindIO,
     Trace,
     ToUtf8,
+    Stdout,
+    WriteStdout,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -140,6 +142,10 @@ pub struct ClassMember {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
+    BuiltinType {
+        name: String,
+        kind: syntax::Kind,
+    },
     Definition {
         name: String,
         sig: TypeSig,
