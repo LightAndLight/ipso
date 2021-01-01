@@ -57,7 +57,7 @@ runExample config example = do
     readProcessWithExitCode
       (cfgBin config)
       args
-      ""
+      (maybe "" Text.unpack $ exStdin example)
 
   errorRef <- newIORef $ Option Nothing
 

@@ -688,15 +688,20 @@ impl Parser {
     }
 
     fn expr_lam(&mut self) -> ParseResult<Spanned<Expr>> {
-        todo!()
+        spanned!(
+            self,
+            keep_right!(
+                keep_left!(self.token(&TokenType::Backslash), self.spaces()),
+                many!(self, self.pattern()).and_then(|args| keep_right!(
+                    keep_left!(self.token(&TokenType::Arrow), self.spaces()),
+                    self.expr().map(|body| syntax::Expr::mk_lam(args, body))
+                ))
+            )
+        )
     }
 
     fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
-        choices!(
-            self,
-            self.expr_app(),
-            self.expr_case() // self.expr_lam()
-        )
+        choices!(self, self.expr_app(), self.expr_case(), self.expr_lam())
     }
 
     fn definition(&mut self) -> ParseResult<Declaration> {
