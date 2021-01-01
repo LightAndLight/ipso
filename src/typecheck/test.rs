@@ -1356,3 +1356,25 @@ fn kind_occurs_1() {
         })
     )
 }
+
+#[test]
+fn type_occurs_1() {
+    let mut tc = Typechecker::new();
+    let v1 = tc.fresh_typevar(Kind::Type);
+    let v2 = tc.fresh_typevar(Kind::Type);
+    assert_eq!(
+        tc.unify_type(
+            &UnifyTypeContext {
+                expected: Type::Unit,
+                actual: Type::Unit,
+            },
+            v1.clone(),
+            Type::mk_arrow(v1.clone(), v2.clone())
+        ),
+        Err(TypeError::TypeOccurs {
+            pos: 0,
+            meta: 0,
+            ty: Type::mk_arrow(tc.fill_ty_names(v1), tc.fill_ty_names(v2))
+        })
+    )
+}

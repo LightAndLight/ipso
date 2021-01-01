@@ -166,6 +166,11 @@ pub enum TypeError {
         meta: usize,
         kind: syntax::Kind,
     },
+    TypeOccurs {
+        pos: usize,
+        meta: usize,
+        ty: syntax::Type<String>,
+    },
 }
 
 impl syntax::Pattern {
@@ -214,6 +219,7 @@ impl TypeError {
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
             TypeError::RedundantPattern { pos } => *pos,
             TypeError::KindOccurs { pos, .. } => *pos,
+            TypeError::TypeOccurs { pos, .. } => *pos,
         }
     }
 
@@ -261,6 +267,13 @@ impl TypeError {
                     kind.render()
                 )
             }
+            TypeError::TypeOccurs { meta, ty, .. } => {
+                format!(
+                    "infinite type from equating ?{} with \"{}\"",
+                    meta,
+                    ty.render()
+                )
+            }
         }
     }
 
@@ -288,6 +301,7 @@ impl TypeError {
             TypeError::RedundantPattern { pos: _ } => None,
             TypeError::NotInScope { pos: _, name: _ } => None,
             TypeError::KindOccurs { .. } => None,
+            TypeError::TypeOccurs { .. } => None,
         }
     }
 
@@ -582,7 +596,7 @@ impl Typechecker {
             Some(_) => Err(TypeError::KindOccurs {
                 pos: self.current_position(),
                 meta,
-                kind: kind.clone(),
+                kind: self.zonk_kind(kind.clone()),
             }),
         }
     }
@@ -648,6 +662,23 @@ impl Typechecker {
         })
     }
 
+    fn occurs_type(&self, meta: usize, ty: &syntax::Type<usize>) -> Result<(), TypeError> {
+        match ty.iter_metas().find(|&other| {
+            meta == other
+                || match &self.type_solutions[other].1 {
+                    None => false,
+                    Some(ty) => self.occurs_type(meta, ty).is_err(),
+                }
+        }) {
+            None => Ok(()),
+            Some(_) => Err(TypeError::TypeOccurs {
+                pos: self.current_position(),
+                meta,
+                ty: self.fill_ty_names(self.zonk_type(ty.clone())),
+            }),
+        }
+    }
+
     fn solve_typevar_right(
         &mut self,
         context: &UnifyTypeContext<usize>,
@@ -656,6 +687,7 @@ impl Typechecker {
     ) -> Result<(), TypeError> {
         match self.type_solutions[meta].1.clone() {
             None => {
+                let _ = self.occurs_type(meta, &expected)?;
                 self.type_solutions[meta].1 = Some(expected);
                 Ok(())
             }
@@ -671,6 +703,7 @@ impl Typechecker {
     ) -> Result<(), TypeError> {
         match self.type_solutions[meta].1.clone() {
             None => {
+                let _ = self.occurs_type(meta, &actual)?;
                 self.type_solutions[meta].1 = Some(actual);
                 Ok(())
             }

@@ -193,6 +193,63 @@ pub enum Type<A> {
     Meta(usize),
 }
 
+pub struct TypeIterMetas<'a, A> {
+    items: Vec<&'a Type<A>>,
+}
+
+impl<'a, A> Iterator for TypeIterMetas<'a, A> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn step_kind<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, usize> {
+            match ty {
+                Type::Name(_) => Step::Skip,
+                Type::Var(_) => Step::Skip,
+                Type::Bool => Step::Skip,
+                Type::Int => Step::Skip,
+                Type::Char => Step::Skip,
+                Type::String => Step::Skip,
+                Type::Bytes => Step::Skip,
+                Type::Arrow => Step::Skip,
+                Type::FatArrow => Step::Skip,
+                Type::Constraints(cs) => Step::Continue(cs.iter().map(|x| x).collect()),
+                Type::Array => Step::Skip,
+                Type::Record => Step::Skip,
+                Type::Variant => Step::Skip,
+                Type::IO => Step::Skip,
+                Type::App(a, b) => Step::Continue(vec![a, b]),
+                Type::RowNil => Step::Skip,
+                Type::RowCons(_, a, b) => Step::Continue(vec![a, b]),
+                Type::Unit => Step::Skip,
+                Type::Meta(n) => Step::Yield(*n),
+            }
+        }
+
+        let mut res = None;
+        loop {
+            match self.items.pop() {
+                None => {
+                    break;
+                }
+                Some(kind) => match step_kind(kind) {
+                    Step::Yield(n) => {
+                        res = Some(n);
+                        break;
+                    }
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue(items) => {
+                        self.items.extend(items.iter().rev());
+                        continue;
+                    }
+                },
+            }
+        }
+        res
+    }
+}
+
 #[derive(Debug)]
 pub struct IterVars<'a, A> {
     items: Vec<&'a Type<A>>,
@@ -310,6 +367,10 @@ impl<A> Type<A> {
 
     pub fn iter_vars<'a>(&'a self) -> IterVars<'a, A> {
         IterVars { items: vec![&self] }
+    }
+
+    pub fn iter_metas<'a>(&'a self) -> TypeIterMetas<'a, A> {
+        TypeIterMetas { items: vec![&self] }
     }
 
     fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
