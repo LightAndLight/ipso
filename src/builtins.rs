@@ -43,6 +43,26 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::PureIO)
             },
+            // bindIO : IO a -> (a -> IO b) -> IO b
+            Declaration::Definition {
+                name: String::from("bindIO"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                        // a : Type
+                        Kind::Type,
+                        // b : Type
+                        Kind::Type,
+                    ],
+                    body: Type::mk_arrow(
+                            Type::mk_app(Type::IO, Type::Var(1)),
+                            Type::mk_arrow(
+                                Type::mk_arrow(Type::Var(1), Type::mk_app(Type::IO, Type::Var(0))),
+                                Type::mk_app(Type::IO, Type::Var(0))
+                            )
+                    )
+                },
+                body: Expr::Builtin(Builtin::BindIO)
+            },
             // trace : a -> b -> b
             Declaration::Definition {
                 name: String::from("trace"),

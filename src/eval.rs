@@ -12,13 +12,22 @@ mod test;
 type ValueRef<'heap> = &'heap Value<'heap>;
 
 #[derive(Clone)]
-struct StaticClosureBody<'heap>(
+pub struct StaticClosureBody<'heap>(
     fn(&mut Interpreter<'_, 'heap>, Vec<ValueRef<'heap>>, ValueRef<'heap>) -> ValueRef<'heap>,
 );
 
 impl<'heap> Debug for StaticClosureBody<'heap> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("StaticClosure()")
+    }
+}
+
+#[derive(Clone)]
+pub struct IOBody<'heap>(fn(Vec<ValueRef<'heap>>) -> ValueRef<'heap>);
+
+impl<'heap> Debug for IOBody<'heap> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("IO()")
     }
 }
 
@@ -33,6 +42,10 @@ pub enum Value<'heap> {
         env: Vec<ValueRef<'heap>>,
         body: StaticClosureBody<'heap>,
     },
+    IO {
+        env: Vec<ValueRef<'heap>>,
+        body: IOBody<'heap>,
+    },
     True,
     False,
     Int(u32),
@@ -45,10 +58,33 @@ pub enum Value<'heap> {
 }
 
 impl<'heap> Value<'heap> {
+    pub fn apply<'stdout>(
+        &self,
+        interpreter: &mut Interpreter<'stdout, 'heap>,
+        arg: ValueRef<'heap>,
+    ) -> ValueRef<'heap> {
+        match self {
+            Value::Closure {
+                env,
+                arg: use_arg,
+                body,
+            } => {
+                let mut env = env.clone();
+                if *use_arg {
+                    env.push(arg);
+                }
+                interpreter.eval(env, body.clone())
+            }
+            Value::StaticClosure { env, body } => body.0(interpreter, env.clone(), arg),
+            a => panic!("expected closure, got {:?}", a),
+        }
+    }
+
     pub fn render(&self) -> String {
         match self {
             Value::Closure { env, arg, body } => String::from("<closure>"),
             Value::StaticClosure { env, body } => String::from("<static builtin>"),
+            Value::IO { env, body } => String::from("<io>"),
             Value::True => String::from("true"),
             Value::False => String::from("false"),
             Value::Int(n) => String::from(format!("{:?}", n)),
@@ -117,7 +153,14 @@ impl<'heap> PartialEq for Value<'heap> {
                 Value::StaticClosure {
                     env: env2,
                     body: body2,
-                } => env == env2 && std::ptr::eq(body, body2),
+                } => env == env2 && (body.0 as usize) == (body2.0 as usize),
+                _ => false,
+            },
+            Value::IO { env, body } => match other {
+                Value::IO {
+                    env: env2,
+                    body: body2,
+                } => env == env2 && (body.0 as usize) == (body2.0 as usize),
                 _ => false,
             },
             Value::True => match other {
@@ -164,7 +207,6 @@ pub struct Interpreter<'stdout, 'heap> {
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Value<'heap>>,
     context: HashMap<String, Expr>,
-    bound_vars: Vec<ValueRef<'heap>>,
     evidence: Vec<ValueRef<'heap>>,
 }
 
@@ -179,7 +221,6 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             stdout,
             context,
             heap,
-            bound_vars: Vec::new(),
             evidence,
         }
     }
@@ -206,7 +247,71 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn eval_builtin(&self, name: &Builtin) -> ValueRef<'heap> {
         match name {
             Builtin::MapIO => todo!(),
-            Builtin::PureIO => todo!(),
+            Builtin::PureIO => {
+                fn code_outer<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    _: Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    fn code_inner<'stdout, 'heap>(env: Vec<ValueRef<'heap>>) -> ValueRef<'heap> {
+                        env[0]
+                    }
+                    let closure = Value::IO {
+                        env: vec![arg],
+                        body: IOBody(code_inner),
+                    };
+                    interpreter.alloc_value(closure)
+                }
+                let closure = Value::StaticClosure {
+                    env: vec![],
+                    body: StaticClosureBody(code_outer),
+                };
+                self.alloc_value(closure)
+            }
+            Builtin::BindIO => {
+                fn bind_io_0<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    _: Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>, // IO a
+                ) -> ValueRef<'heap> {
+                    fn bind_io_1<'stdout, 'heap>(
+                        interpreter: &mut Interpreter<'stdout, 'heap>,
+                        env: Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>, // a -> IO b
+                    ) -> ValueRef<'heap> {
+                        fn bind_io_2<'stdout, 'heap>(env: Vec<ValueRef<'heap>>) -> ValueRef<'heap> {
+                            // env = [IO a, a -> IO b]
+                            match env[0] {
+                                Value::IO {
+                                    env: env0,
+                                    body: body0,
+                                } => {
+                                    let a = body0.0(env);
+                                    todo!()
+                                }
+                                val => panic!("expected io, got {:?}", val),
+                            }
+                        }
+                        let mut env = env.clone();
+                        env.push(arg);
+                        let closure = Value::IO {
+                            env,
+                            body: IOBody(bind_io_2),
+                        };
+                        interpreter.alloc_value(closure)
+                    }
+                    let closure = Value::StaticClosure {
+                        env: vec![arg],
+                        body: StaticClosureBody(bind_io_1),
+                    };
+                    interpreter.alloc_value(closure)
+                }
+                let closure = Value::StaticClosure {
+                    env: vec![],
+                    body: StaticClosureBody(bind_io_0),
+                };
+                self.alloc_value(closure)
+            }
             Builtin::Trace => {
                 fn code_outer<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
@@ -236,29 +341,19 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         }
     }
 
-    pub fn eval(&mut self, expr: Expr) -> ValueRef<'heap> {
+    pub fn eval(&mut self, env: Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
         match expr {
-            Expr::Var(ix) => self.bound_vars[self.bound_vars.len() - 1 - ix],
-            Expr::Name(name) => self.eval(self.context.get(&name).unwrap().clone()),
+            Expr::Var(ix) => env[env.len() - 1 - ix],
+            Expr::Name(name) => self.eval(Vec::new(), self.context.get(&name).unwrap().clone()),
             Expr::Builtin(name) => self.eval_builtin(&name),
 
             Expr::App(a, b) => {
-                let a = self.eval(*a);
-                let b = self.eval(*b);
-                match a {
-                    Value::Closure { env, arg, body } => {
-                        self.bound_vars = env.clone();
-                        if *arg {
-                            self.bound_vars.push(b)
-                        }
-                        self.eval(body.clone())
-                    }
-                    Value::StaticClosure { env, body } => body.0(self, env.clone(), b),
-                    a => panic!("expected closure, got {:?}", a),
-                }
+                let a = self.eval(env, *a);
+                let b = self.eval(env, *b);
+                a.apply(self, b)
             }
             Expr::Lam { arg, body } => self.alloc_value(Value::Closure {
-                env: self.bound_vars.clone(),
+                env,
                 arg,
                 body: *body,
             }),
@@ -266,10 +361,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::True => self.alloc_value(Value::True),
             Expr::False => self.alloc_value(Value::False),
             Expr::IfThenElse(cond, t, e) => {
-                let cond = self.eval(*cond);
+                let cond = self.eval(env, *cond);
                 match cond {
-                    Value::True => self.eval(*t),
-                    Value::False => self.eval(*e),
+                    Value::True => self.eval(env, *t),
+                    Value::False => self.eval(env, *e),
                     cond => panic!("expected bool, got {:?}", cond),
                 }
             }
@@ -277,8 +372,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Int(n) => self.alloc_value(Value::Int(n)),
 
             Expr::Binop(op, a, b) => {
-                let a = self.eval(*a);
-                let b = self.eval(*b);
+                let a = self.eval(env, *a);
+                let b = self.eval(env, *b);
                 match op {
                     Binop::Add => todo!(),
                     Binop::Multiply => todo!(),
@@ -303,7 +398,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 for part in parts {
                     match part {
                         StringPart::Expr(expr) => {
-                            let expr = self.eval(expr);
+                            let expr = self.eval(env, expr);
                             match expr {
                                 Value::String(s) => value.push_str(s.as_str()),
                                 expr => panic!("expected string, got {:?}", expr),
@@ -316,13 +411,13 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
 
             Expr::Array(items) => {
-                let items = items.into_iter().map(|item| self.eval(item)).collect();
+                let items = items.into_iter().map(|item| self.eval(env, item)).collect();
                 self.alloc_value(Value::Array(items))
             }
 
             Expr::Extend(ev, value, rest) => {
-                let value = self.eval(*value);
-                let rest = self.eval(*rest);
+                let value = self.eval(env, *value);
+                let rest = self.eval(env, *rest);
                 match rest {
                     Value::Record(fields) => match &self.evidence[ev.0] {
                         Value::Int(ix) => {
@@ -346,7 +441,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let mut record: Vec<ValueRef<'heap>> = Vec::with_capacity(fields.len());
                 let fields: Vec<(EVar, ValueRef<'heap>)> = fields
                     .into_iter()
-                    .map(|(ev, field)| (ev, self.eval(field)))
+                    .map(|(ev, field)| (ev, self.eval(env, field)))
                     .collect();
                 for (ev, field) in fields.into_iter().rev() {
                     let index = match &self.evidence[ev.0] {
@@ -358,7 +453,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 self.alloc_value(Value::Record(record))
             }
             Expr::Project(expr, index) => {
-                let expr = self.eval(*expr);
+                let expr = self.eval(env, *expr);
                 match expr {
                     Value::Record(fields) => match &self.evidence[index.0] {
                         Value::Int(ix) => fields[*ix as usize],
@@ -373,7 +468,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     Value::Int(tag) => *tag as usize,
                     evidence => panic!("expected int, got {:?}", evidence),
                 };
-                let value: ValueRef<'heap> = self.eval(*value);
+                let value: ValueRef<'heap> = self.eval(env, *value);
                 self.alloc_value(Value::Variant(tag, value))
             }
             Expr::Case(expr, branches) => todo!("eval case"),

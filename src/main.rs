@@ -133,7 +133,7 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let result = {
         let mut stdout = io::stdout();
         let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
-        interpreter.eval(target)
+        interpreter.eval(Vec::new(), target)
     };
 
     panic!("{:?} {:?}", filename, result)
