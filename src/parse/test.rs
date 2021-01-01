@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::syntax::{Binop, Spanned, StringPart};
+use crate::syntax::{Spanned, StringPart};
 #[cfg(test)]
 use crate::{
     keep_left,

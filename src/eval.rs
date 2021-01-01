@@ -101,9 +101,13 @@ impl<'heap> Value<'heap> {
 
     pub fn render(&self) -> String {
         match self {
-            Value::Closure { env, arg, body } => String::from("<closure>"),
-            Value::StaticClosure { env, body } => String::from("<static builtin>"),
-            Value::IO { env, body } => String::from("<io>"),
+            Value::Closure {
+                env: _,
+                arg: _,
+                body: _,
+            } => String::from("<closure>"),
+            Value::StaticClosure { env: _, body: _ } => String::from("<static builtin>"),
+            Value::IO { env: _, body: _ } => String::from("<io>"),
             Value::True => String::from("true"),
             Value::False => String::from("false"),
             Value::Int(n) => String::from(format!("{:?}", n)),
@@ -257,7 +261,9 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             .decls
             .iter()
             .filter_map(|decl| match decl {
-                Declaration::Definition { name, sig, body } => Some((name.clone(), body.clone())),
+                Declaration::Definition { name, sig: _, body } => {
+                    Some((name.clone(), body.clone()))
+                }
                 _ => None,
             })
             .collect();
@@ -478,19 +484,19 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let a = self.eval(env, *a);
                 let b = self.eval(env, *b);
                 match op {
-                    Binop::Add => todo!(),
-                    Binop::Multiply => todo!(),
-                    Binop::Subtract => todo!(),
-                    Binop::Divide => todo!(),
-                    Binop::Append => todo!(),
-                    Binop::Or => todo!(),
-                    Binop::And => todo!(),
-                    Binop::Eq => todo!(),
-                    Binop::Neq => todo!(),
-                    Binop::Gt => todo!(),
-                    Binop::Gte => todo!(),
-                    Binop::Lt => todo!(),
-                    Binop::Lte => todo!(),
+                    Binop::Add => todo!("eval add {:?} {:?}", a, b),
+                    Binop::Multiply => todo!("eval multiply {:?} {:?}", a, b),
+                    Binop::Subtract => todo!("eval subtract {:?} {:?}", a, b),
+                    Binop::Divide => todo!("eval divide {:?} {:?}", a, b),
+                    Binop::Append => todo!("eval append {:?} {:?}", a, b),
+                    Binop::Or => todo!("eval or {:?} {:?}", a, b),
+                    Binop::And => todo!("eval and {:?} {:?}", a, b),
+                    Binop::Eq => todo!("eval eq {:?} {:?}", a, b),
+                    Binop::Neq => todo!("eval neq {:?} {:?}", a, b),
+                    Binop::Gt => todo!("eval gt {:?} {:?}", a, b),
+                    Binop::Gte => todo!("eval gte {:?} {:?}", a, b),
+                    Binop::Lt => todo!("eval lt {:?} {:?}", a, b),
+                    Binop::Lte => todo!("eval lte {:?} {:?}", a, b),
                 }
             }
 
@@ -574,7 +580,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let value: ValueRef<'heap> = self.eval(env, *value);
                 self.alloc_value(Value::Variant(tag, value))
             }
-            Expr::Case(expr, branches) => todo!("eval case"),
+            Expr::Case(expr, branches) => todo!("eval case {:?} {:?}", expr, branches),
             Expr::Unit => self.alloc_value(Value::Unit),
         }
     }

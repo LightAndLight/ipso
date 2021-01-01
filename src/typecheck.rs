@@ -322,7 +322,7 @@ impl Typechecker {
                 }
                 core::Declaration::TypeAlias { name, args, body } => {
                     if should_import(name) {
-                        todo!("import type alias")
+                        todo!("import type alias {:?}", (name, args, body))
                     }
                 }
                 core::Declaration::Import { module: _, name: _ } => {}
@@ -333,13 +333,19 @@ impl Typechecker {
                     name,
                     args,
                     members,
-                } => todo!("import type class"),
+                } => todo!(
+                    "import type class {:?}",
+                    (ty_vars, supers, name, args, members)
+                ),
                 core::Declaration::Instance {
                     ty_vars,
                     assumes,
                     head,
                     dict,
-                } => todo!("import type class instance"),
+                } => todo!(
+                    "import type class instance {:?}",
+                    (ty_vars, assumes, head, dict)
+                ),
             }
         }
     }
@@ -402,13 +408,13 @@ impl Typechecker {
                 Ok(core::Declaration::Definition { name, sig, body })
             }
             syntax::Declaration::TypeAlias { name, args, body } => {
-                todo!()
+                todo!("check type alias {:?}", (name, args, body))
             }
             syntax::Declaration::Import { module, name } => {
-                todo!()
+                todo!("check import {:?}", (module, name))
             }
             syntax::Declaration::FromImport { module, names } => {
-                todo!()
+                todo!("check from-import {:?}", (module, names))
             }
         }
     }
@@ -637,7 +643,7 @@ impl Typechecker {
     ) -> Result<(syntax::Type<usize>, syntax::Kind), TypeError> {
         match ty {
             syntax::Type::Name(n) => {
-                todo!()
+                todo!("infer name kind {:?}", n)
             }
             syntax::Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
                 None => panic!("missing tyvar {:?}", ix),
@@ -863,7 +869,7 @@ impl Typechecker {
                     // now we're working with: sames, not_in_rows1, not_in_rows2
                     //
                     // unify sames
-                    for (field, ty1, ty2) in sames {
+                    for (_field, ty1, ty2) in sames {
                         match self.unify_type((*ty1).clone(), (*ty2).clone()) {
                             Err(err) => return Err(err),
                             Ok(()) => {}
@@ -1094,7 +1100,7 @@ impl Typechecker {
                     Ok((expr_core, expr_ty))
                 }
                 syntax::Expr::True => Ok((core::Expr::True, syntax::Type::Bool)),
-                syntax::Expr::False => Ok((core::Expr::True, syntax::Type::Bool)),
+                syntax::Expr::False => Ok((core::Expr::False, syntax::Type::Bool)),
                 syntax::Expr::IfThenElse(cond, then_, else_) => {
                     let cond_core = self.check_expr(*cond, syntax::Type::Bool)?;
                     let (then_core, then_ty) = self.infer_expr(*then_)?;
@@ -1206,14 +1212,16 @@ impl Typechecker {
                 syntax::Expr::Variant(ctor, arg) => {
                     let (arg_core, arg_ty) = self.infer_expr(*arg)?;
                     let rest = self.fresh_typevar(syntax::Kind::Row);
-                    let rows = syntax::Type::mk_rows(vec![], Some(rest));
                     let tag = self.evidence.fresh_evar(core::Constraint::HasField {
-                        field: ctor,
-                        rest: rows.clone(),
+                        field: ctor.clone(),
+                        rest: syntax::Type::mk_rows(vec![], Some(rest.clone())),
                     });
                     Ok((
                         core::Expr::mk_variant(tag, arg_core),
-                        syntax::Type::mk_app(syntax::Type::Variant, rows),
+                        syntax::Type::mk_app(
+                            syntax::Type::Variant,
+                            syntax::Type::mk_rows(vec![(ctor, arg_ty)], Some(rest)),
+                        ),
                     ))
                 }
                 syntax::Expr::Binop(op, left, right) => {
@@ -1351,7 +1359,7 @@ impl Typechecker {
                     }
 
                     match self.zonk_type(in_ty.clone()).unwrap_variant() {
-                        Some((ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
+                        Some((_ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
                             None => {}
                             Some(rest) => {
                                 self.unify_type(syntax::Type::RowNil, rest.clone())?;

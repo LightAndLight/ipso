@@ -687,8 +687,12 @@ impl Parser {
         })
     }
 
+    fn expr_lam(&mut self) -> ParseResult<Spanned<Expr>> {
+        todo!()
+    }
+
     fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
-        choices!(self, self.expr_app(), self.expr_case())
+        choices!(self, self.expr_app(), self.expr_case(), self.expr_lam())
     }
 
     fn definition(&mut self) -> ParseResult<Declaration> {
