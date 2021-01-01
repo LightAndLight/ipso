@@ -10,6 +10,7 @@ mod builtins;
 mod core;
 mod diagnostic;
 mod eval;
+mod iter;
 mod lex;
 mod parse;
 mod rope;

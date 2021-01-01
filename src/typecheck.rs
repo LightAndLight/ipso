@@ -161,6 +161,11 @@ pub enum TypeError {
     RedundantPattern {
         pos: usize,
     },
+    KindOccurs {
+        pos: usize,
+        meta: usize,
+        kind: syntax::Kind,
+    },
 }
 
 impl syntax::Pattern {
@@ -208,6 +213,7 @@ impl TypeError {
             TypeError::NotInScope { pos, name: _ } => *pos,
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
             TypeError::RedundantPattern { pos } => *pos,
+            TypeError::KindOccurs { pos, .. } => *pos,
         }
     }
 
@@ -248,6 +254,13 @@ impl TypeError {
             TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
             TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
             TypeError::RedundantPattern { pos: _ } => String::from("redundant pattern"),
+            TypeError::KindOccurs { meta, kind, .. } => {
+                format!(
+                    "infinite kind from equating ?{} with \"{}\"",
+                    meta,
+                    kind.render()
+                )
+            }
         }
     }
 
@@ -274,6 +287,7 @@ impl TypeError {
             } => None,
             TypeError::RedundantPattern { pos: _ } => None,
             TypeError::NotInScope { pos: _, name: _ } => None,
+            TypeError::KindOccurs { .. } => None,
         }
     }
 
@@ -556,6 +570,23 @@ impl Typechecker {
         }
     }
 
+    fn occurs_kind(&self, meta: usize, kind: &syntax::Kind) -> Result<(), TypeError> {
+        match kind.iter_metas().find(|&other| {
+            meta == other
+                || match &self.kind_solutions[other] {
+                    None => false,
+                    Some(kind) => self.occurs_kind(meta, kind).is_err(),
+                }
+        }) {
+            None => Ok(()),
+            Some(_) => Err(TypeError::KindOccurs {
+                pos: self.current_position(),
+                meta,
+                kind: kind.clone(),
+            }),
+        }
+    }
+
     fn solve_kindvar_right(
         &mut self,
         context: UnifyKindContext,
@@ -564,6 +595,7 @@ impl Typechecker {
     ) -> Result<(), TypeError> {
         match self.kind_solutions[meta].clone() {
             None => {
+                let _ = self.occurs_kind(meta, &expected)?;
                 self.kind_solutions[meta] = Some(expected);
                 Ok(())
             }
@@ -579,6 +611,7 @@ impl Typechecker {
     ) -> Result<(), TypeError> {
         match self.kind_solutions[meta].clone() {
             None => {
+                let _ = self.occurs_kind(meta, &actual)?;
                 self.kind_solutions[meta] = Some(actual);
                 Ok(())
             }

@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::iter::Step;
 use lazy_static::lazy_static;
 
 #[cfg(test)]
@@ -201,14 +202,7 @@ impl<'a, A: Clone> Iterator for IterVars<'a, A> {
     type Item = A;
 
     fn next(&mut self) -> Option<Self::Item> {
-        #[derive(Debug)]
-        enum Step<'a, A> {
-            Yield(A),
-            Skip,
-            Continue(Vec<&'a Type<A>>),
-        }
-
-        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, A>
+        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, A>
         where
             A: Clone,
         {
@@ -637,7 +631,54 @@ pub enum Kind {
     Meta(usize),
 }
 
+pub struct KindIterMetas<'a> {
+    items: Vec<&'a Kind>,
+}
+
+impl<'a> Iterator for KindIterMetas<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn step_kind<'a>(kind: &'a Kind) -> Step<'a, Kind, usize> {
+            match kind {
+                Kind::Type => Step::Skip,
+                Kind::Row => Step::Skip,
+                Kind::Constraint => Step::Skip,
+                Kind::Arrow(a, b) => Step::Continue(vec![a, b]),
+                Kind::Meta(n) => Step::Yield(*n),
+            }
+        }
+
+        let mut res = None;
+        loop {
+            match self.items.pop() {
+                None => {
+                    break;
+                }
+                Some(kind) => match step_kind(kind) {
+                    Step::Yield(n) => {
+                        res = Some(n);
+                        break;
+                    }
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue(items) => {
+                        self.items.extend(items.iter().rev());
+                        continue;
+                    }
+                },
+            }
+        }
+        res
+    }
+}
+
 impl Kind {
+    pub fn iter_metas<'a>(&'a self) -> KindIterMetas<'a> {
+        KindIterMetas { items: vec![self] }
+    }
+
     pub fn mk_arrow(a: Kind, b: Kind) -> Kind {
         Kind::Arrow(Box::new(a), Box::new(b))
     }

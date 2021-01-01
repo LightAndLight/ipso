@@ -1334,3 +1334,25 @@ fn check_definition_1() {
         })
     )
 }
+
+#[test]
+fn kind_occurs_1() {
+    let mut tc = Typechecker::new();
+    let v1 = tc.fresh_kindvar();
+    let v2 = tc.fresh_kindvar();
+    assert_eq!(
+        tc.unify_kind(
+            UnifyKindContext::Checking {
+                ty: Type::Unit,
+                has_kind: Kind::Type
+            },
+            v1.clone(),
+            Kind::mk_arrow(v1.clone(), v2.clone())
+        ),
+        Err(TypeError::KindOccurs {
+            pos: 0,
+            meta: 0,
+            kind: Kind::mk_arrow(v1, v2)
+        })
+    )
+}
