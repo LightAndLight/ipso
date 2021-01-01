@@ -130,6 +130,12 @@ pub enum UnifyKindContext {
     },
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct UnifyTypeContext<A> {
+    pub expected: syntax::Type<A>,
+    pub actual: syntax::Type<A>,
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
@@ -148,6 +154,7 @@ pub enum TypeError {
     },
     TypeMismatch {
         pos: usize,
+        context: UnifyTypeContext<String>,
         expected: syntax::Type<String>,
         actual: syntax::Type<String>,
     },
@@ -194,6 +201,7 @@ impl TypeError {
             } => *pos,
             TypeError::TypeMismatch {
                 pos,
+                context: _,
                 expected: _,
                 actual: _,
             } => *pos,
@@ -223,16 +231,17 @@ impl TypeError {
             }
             TypeError::TypeMismatch {
                 pos: _,
-                expected,
-                actual,
+                context,
+                expected: _,
+                actual: _,
             } => {
                 let mut message = String::from("expected type ");
                 message.push('"');
-                message.push_str(expected.render().as_str());
+                message.push_str(context.expected.render().as_str());
                 message.push('"');
                 message.push_str(", got type ");
                 message.push('"');
-                message.push_str(actual.render().as_str());
+                message.push_str(context.actual.render().as_str());
                 message.push('"');
                 message
             }
@@ -259,6 +268,7 @@ impl TypeError {
             TypeError::DuplicateArgument { pos: _, name: _ } => None,
             TypeError::TypeMismatch {
                 pos: _,
+                context: _,
                 expected: _,
                 actual: _,
             } => None,
@@ -583,13 +593,23 @@ impl Typechecker {
         })
     }
 
+    pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<String> {
+        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
+    }
+
     fn type_mismatch<A>(
         &self,
+        context: &UnifyTypeContext<usize>,
         expected: syntax::Type<usize>,
         actual: syntax::Type<usize>,
     ) -> Result<A, TypeError> {
+        let context = UnifyTypeContext {
+            expected: self.fill_ty_names(self.zonk_type(context.expected.clone())),
+            actual: self.fill_ty_names(self.zonk_type(context.actual.clone())),
+        };
         Err(TypeError::TypeMismatch {
             pos: self.current_position(),
+            context,
             expected: self.fill_ty_names(expected),
             actual: self.fill_ty_names(actual),
         })
@@ -597,6 +617,7 @@ impl Typechecker {
 
     fn solve_typevar_right(
         &mut self,
+        context: &UnifyTypeContext<usize>,
         expected: syntax::Type<usize>,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -605,12 +626,13 @@ impl Typechecker {
                 self.type_solutions[meta].1 = Some(expected);
                 Ok(())
             }
-            Some(actual) => self.unify_type(expected, actual),
+            Some(actual) => self.unify_type(context, expected, actual),
         }
     }
 
     fn solve_typevar_left(
         &mut self,
+        context: &UnifyTypeContext<usize>,
         meta: usize,
         actual: syntax::Type<usize>,
     ) -> Result<(), TypeError> {
@@ -619,7 +641,7 @@ impl Typechecker {
                 self.type_solutions[meta].1 = Some(actual);
                 Ok(())
             }
-            Some(expected) => self.unify_type(expected, actual),
+            Some(expected) => self.unify_type(context, expected, actual),
         }
     }
 
@@ -739,12 +761,9 @@ impl Typechecker {
         syntax::Type::Meta(n)
     }
 
-    fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<String> {
-        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
-    }
-
     pub fn unify_type(
         &mut self,
+        context: &UnifyTypeContext<usize>,
         expected: syntax::Type<usize>,
         actual: syntax::Type<usize>,
     ) -> Result<(), TypeError> {
@@ -753,67 +772,73 @@ impl Typechecker {
         match expected {
             syntax::Type::App(a1, b1) => match actual {
                 syntax::Type::App(a2, b2) => {
-                    self.unify_type(*a1, *a2)?;
-                    self.unify_type(*b1, *b2)?;
+                    self.unify_type(context, *a1, *a2)?;
+                    self.unify_type(context, *b1, *b2)?;
                     Ok(())
                 }
-                syntax::Type::Meta(n) => self.solve_typevar_right(syntax::Type::App(a1, b1), n),
-                actual => self.type_mismatch(syntax::Type::App(a1, b1), actual),
+                syntax::Type::Meta(n) => {
+                    self.solve_typevar_right(context, syntax::Type::App(a1, b1), n)
+                }
+                actual => self.type_mismatch(context, syntax::Type::App(a1, b1), actual),
             },
             syntax::Type::Name(n) => match actual {
                 syntax::Type::Name(nn) if n == nn => Ok(()),
-                syntax::Type::Meta(nn) => self.solve_typevar_right(syntax::Type::Name(n), nn),
-                actual => self.type_mismatch(syntax::Type::Name(n), actual),
+                syntax::Type::Meta(nn) => {
+                    self.solve_typevar_right(context, syntax::Type::Name(n), nn)
+                }
+                actual => self.type_mismatch(context, syntax::Type::Name(n), actual),
             },
             syntax::Type::Var(n) => match actual {
                 syntax::Type::Var(nn) if n == nn => Ok(()),
-                syntax::Type::Meta(nn) => self.solve_typevar_right(syntax::Type::Var(n), nn),
-                actual => self.type_mismatch(syntax::Type::Var(n), actual),
+                syntax::Type::Meta(nn) => {
+                    self.solve_typevar_right(context, syntax::Type::Var(n), nn)
+                }
+                actual => self.type_mismatch(context, syntax::Type::Var(n), actual),
             },
             syntax::Type::Bool => match actual {
                 syntax::Type::Bool => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Int => match actual {
                 syntax::Type::Int => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Char => match actual {
                 syntax::Type::Char => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::String => match actual {
                 syntax::Type::String => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Bytes => match actual {
                 syntax::Type::Bytes => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Array => match actual {
                 syntax::Type::Array => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Arrow => match actual {
                 syntax::Type::Arrow => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::FatArrow => match actual {
                 syntax::Type::FatArrow => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Constraints(constraints1) => match actual {
                 syntax::Type::Constraints(constraints2) => {
                     for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
-                        match self.unify_type(c1, c2) {
+                        match self.unify_type(context, c1, c2) {
                             Err(err) => return Err(err),
                             Ok(_) => {}
                         }
@@ -821,29 +846,31 @@ impl Typechecker {
                     Ok(())
                 }
                 syntax::Type::Meta(n) => {
-                    self.solve_typevar_right(syntax::Type::Constraints(constraints1), n)
+                    self.solve_typevar_right(context, syntax::Type::Constraints(constraints1), n)
                 }
-                actual => self.type_mismatch(syntax::Type::Constraints(constraints1), actual),
+                actual => {
+                    self.type_mismatch(context, syntax::Type::Constraints(constraints1), actual)
+                }
             },
             syntax::Type::Record => match actual {
                 syntax::Type::Record => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Variant => match actual {
                 syntax::Type::Variant => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::IO => match actual {
                 syntax::Type::IO => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::RowNil => match actual {
                 syntax::Type::RowNil => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::RowCons(field1, ty1, rest1) => match actual {
                 syntax::Type::RowCons(field2, ty2, rest2) => {
@@ -885,7 +912,7 @@ impl Typechecker {
                     //
                     // unify sames
                     for (_field, ty1, ty2) in sames {
-                        match self.unify_type((*ty1).clone(), (*ty2).clone()) {
+                        match self.unify_type(context, (*ty1).clone(), (*ty2).clone()) {
                             Err(err) => return Err(err),
                             Ok(()) => {}
                         }
@@ -893,6 +920,7 @@ impl Typechecker {
 
                     let rest3 = Some(self.fresh_typevar(syntax::Kind::Row));
                     self.unify_type(
+                        context,
                         match rest1 {
                             None => syntax::Type::RowNil,
                             Some(ty) => (*ty).clone(),
@@ -900,6 +928,7 @@ impl Typechecker {
                         syntax::Type::mk_rows(not_in_rows1, rest3.clone()),
                     )?;
                     self.unify_type(
+                        context,
                         syntax::Type::mk_rows(not_in_rows2, rest3),
                         match rest2 {
                             None => syntax::Type::RowNil,
@@ -910,18 +939,20 @@ impl Typechecker {
                     Ok(())
                 }
                 syntax::Type::Meta(n) => {
-                    self.solve_typevar_right(syntax::Type::RowCons(field1, ty1, rest1), n)
+                    self.solve_typevar_right(context, syntax::Type::RowCons(field1, ty1, rest1), n)
                 }
-                actual => self.type_mismatch(syntax::Type::RowCons(field1, ty1, rest1), actual),
+                actual => {
+                    self.type_mismatch(context, syntax::Type::RowCons(field1, ty1, rest1), actual)
+                }
             },
             syntax::Type::Unit => match actual {
                 syntax::Type::Unit => Ok(()),
-                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
-                _ => self.type_mismatch(expected, actual),
+                syntax::Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
             syntax::Type::Meta(n) => match actual {
                 syntax::Type::Meta(nn) if n == nn => Ok(()),
-                _ => self.solve_typevar_left(n, actual),
+                _ => self.solve_typevar_left(context, n, actual),
             },
         }
     }
@@ -1012,7 +1043,11 @@ impl Typechecker {
         expected: syntax::Type<usize>,
     ) -> Result<(core::Pattern, Vec<(String, syntax::Type<usize>)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
-        self.unify_type(expected, actual)?;
+        let context = UnifyTypeContext {
+            expected: expected.clone(),
+            actual: actual.clone(),
+        };
+        self.unify_type(&context, expected, actual)?;
         Ok((pat, binds))
     }
 
@@ -1058,7 +1093,13 @@ impl Typechecker {
                     let (f_core, f_ty) = self.infer_expr(*f)?;
                     let in_ty = self.fresh_typevar(syntax::Kind::Type);
                     let out_ty = self.fresh_typevar(syntax::Kind::Type);
-                    self.unify_type(syntax::Type::mk_arrow(in_ty.clone(), out_ty.clone()), f_ty)?;
+                    let expected = syntax::Type::mk_arrow(in_ty.clone(), out_ty.clone());
+                    let actual = f_ty;
+                    let context = UnifyTypeContext {
+                        expected: expected.clone(),
+                        actual: actual.clone(),
+                    };
+                    self.unify_type(&context, expected, actual)?;
                     let x_core = self.check_expr(*x, in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
@@ -1374,10 +1415,18 @@ impl Typechecker {
                     }
 
                     match self.zonk_type(in_ty.clone()).unwrap_variant() {
-                        Some((_ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
+                        Some((ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
                             None => {}
                             Some(rest) => {
-                                self.unify_type(syntax::Type::RowNil, rest.clone())?;
+                                let ctors: Vec<(String, syntax::Type<usize>)> = ctors
+                                    .into_iter()
+                                    .map(|(a, b)| (a.clone(), b.clone()))
+                                    .collect();
+                                let context = UnifyTypeContext {
+                                    expected: syntax::Type::mk_variant(ctors.clone(), None),
+                                    actual: syntax::Type::mk_variant(ctors, Some(rest.clone())),
+                                };
+                                self.unify_type(&context, syntax::Type::RowNil, rest.clone())?;
                             }
                         },
                         _ => {}
@@ -1398,7 +1447,11 @@ impl Typechecker {
         with_position!(self, expr.pos, {
             let expected = ty;
             let (expr, actual) = self.infer_expr(expr)?;
-            self.unify_type(expected, actual)?;
+            let context = UnifyTypeContext {
+                expected: expected.clone(),
+                actual: actual.clone(),
+            };
+            self.unify_type(&context, expected, actual)?;
             Ok(expr)
         })
     }

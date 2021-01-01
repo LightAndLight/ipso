@@ -2,7 +2,7 @@ use crate::core;
 use crate::syntax::{self, Kind, Type};
 use crate::typecheck::{BoundVars, UnifyKindContext};
 
-use super::{TypeError, Typechecker};
+use super::{TypeError, Typechecker, UnifyTypeContext};
 
 #[test]
 fn infer_kind_test_1() {
@@ -645,6 +645,10 @@ fn infer_array_test_2() {
         tc.infer_expr(term),
         Err(TypeError::TypeMismatch {
             pos: 4,
+            context: UnifyTypeContext {
+                expected: syntax::Type::Int,
+                actual: syntax::Type::Bool,
+            },
             expected: syntax::Type::Int,
             actual: syntax::Type::Bool
         })
@@ -656,6 +660,10 @@ fn unify_rows_test_1() {
     let mut tc = Typechecker::new();
     assert_eq!(
         tc.unify_type(
+            &UnifyTypeContext {
+                expected: syntax::Type::Unit,
+                actual: syntax::Type::Unit
+            },
             Type::mk_record(
                 vec![
                     (String::from("x"), Type::Int),
@@ -680,6 +688,10 @@ fn unify_rows_test_2() {
     let mut tc = Typechecker::new();
     assert_eq!(
         tc.unify_type(
+            &UnifyTypeContext {
+                expected: syntax::Type::Unit,
+                actual: syntax::Type::Unit,
+            },
             Type::mk_record(
                 vec![
                     (String::from("x"), Type::Int),
@@ -706,6 +718,10 @@ fn unify_rows_test_3() {
     let mut tc = Typechecker::new();
     assert_eq!(
         tc.unify_type(
+            &UnifyTypeContext {
+                expected: syntax::Type::Unit,
+                actual: syntax::Type::Unit,
+            },
             Type::mk_record(
                 vec![
                     (String::from("x"), Type::Int),
@@ -732,6 +748,10 @@ fn unify_rows_test_4() {
     let mut tc = Typechecker::new();
     assert_eq!(
         tc.unify_type(
+            &UnifyTypeContext {
+                expected: syntax::Type::Unit,
+                actual: syntax::Type::Unit
+            },
             Type::mk_record(
                 vec![
                     (String::from("x"), Type::Int),
@@ -751,6 +771,10 @@ fn unify_rows_test_4() {
         ),
         Err(TypeError::TypeMismatch {
             pos: 0,
+            context: UnifyTypeContext {
+                expected: syntax::Type::Unit,
+                actual: syntax::Type::Unit
+            },
             expected: Type::Bool,
             actual: Type::Int
         })
@@ -909,6 +933,10 @@ fn infer_record_test_4() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Err(TypeError::TypeMismatch {
             pos: 22,
+            context: UnifyTypeContext {
+                expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                actual: syntax::Type::Int
+            },
             expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
             actual: syntax::Type::Int
         })

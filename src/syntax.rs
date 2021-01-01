@@ -320,9 +320,9 @@ impl<A> Type<A> {
 
     fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
         match self {
-            Type::App(a, b) => match **a {
-                Type::App(ref c, ref d) => match **c {
-                    Type::Arrow => Some((b, d)),
+            Type::App(a, out_ty) => match **a {
+                Type::App(ref c, ref in_ty) => match **c {
+                    Type::Arrow => Some((in_ty, out_ty)),
                     _ => None,
                 },
                 _ => None,

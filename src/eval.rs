@@ -64,6 +64,7 @@ pub enum Value<'heap> {
     Unit,
 
     Stdout,
+    Stdin,
 }
 
 impl<'heap> Value<'heap> {
@@ -95,6 +96,13 @@ impl<'heap> Value<'heap> {
         match self {
             Value::Stdout => (),
             val => panic!("expected stdout, got {:?}", val),
+        }
+    }
+
+    pub fn unpack_stdin<'stdout>(&'heap self) -> () {
+        match self {
+            Value::Stdin => (),
+            val => panic!("expected stdin, got {:?}", val),
         }
     }
 
@@ -138,7 +146,6 @@ impl<'heap> Value<'heap> {
             Value::Char(c) => String::from(format!("{:?}", c)),
             Value::String(s) => String::from(format!("{:?}", s)),
             Value::Bytes(bs) => String::from(format!("{:?}", bs)),
-            Value::Stdout => String::from("Stdout"),
             Value::Array(items) => {
                 let mut s = String::new();
                 s.push_str("[ ");
@@ -183,6 +190,8 @@ impl<'heap> Value<'heap> {
                 s
             }
             Value::Unit => String::from("()"),
+            Value::Stdout => String::from("Stdout"),
+            Value::Stdin => String::from("Stdin"),
         }
     }
 }
@@ -254,6 +263,10 @@ impl<'heap> PartialEq for Value<'heap> {
             },
             Value::Stdout => match other {
                 Value::Stdout => true,
+                _ => false,
+            },
+            Value::Stdin => match other {
+                Value::Stdin => true,
                 _ => false,
             },
         }
@@ -498,6 +511,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 closure
             }
             Builtin::Stdout => self.alloc_value(Value::Stdout),
+            Builtin::Stdin => self.alloc_value(Value::Stdin),
             Builtin::WriteStdout => {
                 fn write_stdout_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
@@ -546,6 +560,40 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let closure = self.alloc_value(Value::StaticClosure {
                     env,
                     body: StaticClosureBody(write_stdout_0),
+                });
+                closure
+            }
+            Builtin::ReadLineStdin => {
+                fn read_line_stdin_0<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>, // Stdout
+                ) -> ValueRef<'heap> {
+                    fn read_line_stdin_1<'stdout, 'heap>(
+                        interpreter: &mut Interpreter<'stdout, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                    ) -> ValueRef<'heap> {
+                        // env[0] : Stdin
+                        let () = env[0].unpack_stdin();
+                        let mut str = String::new();
+                        let _ = std::io::stdin().read_line(&mut str).unwrap();
+                        interpreter.alloc_value(Value::String(str))
+                    }
+                    let env = interpreter.alloc_env({
+                        let mut env = env.clone();
+                        env.push(arg);
+                        env
+                    });
+                    let closure = interpreter.alloc_value(Value::IO {
+                        env,
+                        body: IOBody(read_line_stdin_1),
+                    });
+                    closure
+                }
+                let env = self.alloc_env(Vec::new());
+                let closure = self.alloc_value(Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(read_line_stdin_0),
                 });
                 closure
             }

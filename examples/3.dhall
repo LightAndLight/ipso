@@ -1,5 +1,6 @@
 {
   args = ["3.ipso"],
+  stdin = None Text,
   stdout = "",
   stderr = 
     ''

@@ -51,7 +51,9 @@ pub enum Builtin {
     Trace,
     ToUtf8,
     Stdout,
+    Stdin,
     WriteStdout,
+    ReadLineStdin,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

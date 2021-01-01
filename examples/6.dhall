@@ -1,6 +1,6 @@
 {
-  args = ["5.ipso"],
-  stdin = None Text,
+  args = ["6.ipso"],
+  stdin = Some "hello",
   stdout = "hello",
   stderr = "",
   exitcode = 0

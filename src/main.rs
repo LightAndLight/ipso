@@ -130,7 +130,13 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let (target, target_sig) = find_entrypoint_body(entrypoint, &module)?;
     {
         let var = tc.fresh_typevar(syntax::Kind::Type);
-        let _ = tc.unify_type(syntax::Type::mk_app(syntax::Type::IO, var), target_sig.body)?;
+        let expected = syntax::Type::mk_app(syntax::Type::IO, var);
+        let actual = target_sig.body;
+        let context = typecheck::UnifyTypeContext {
+            expected: expected.clone(),
+            actual: actual.clone(),
+        };
+        let _ = tc.unify_type(&context, expected, actual)?;
     }
 
     let heap = Arena::new();

@@ -135,6 +135,38 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::WriteStdout)
             },
+
+            // Stdin : Type
+            Declaration::BuiltinType {
+                name: String::from("Stdin"),
+                kind: Kind::Type
+            },
+
+            // stdin : Stdin
+            Declaration::Definition {
+                name: String::from("stdin"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body:
+                            Type::Name(String::from("Stdin"))
+                },
+                body: Expr::Builtin(Builtin::Stdin)
+            },
+
+            // readLineStdin : Stdin -> IO String
+            Declaration::Definition {
+                name: String::from("readLineStdin"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body: Type::mk_arrow(
+                            Type::Name(String::from("Stdin")),
+                            Type::mk_app(Type::IO, Type::String)
+                    )
+                },
+                body: Expr::Builtin(Builtin::ReadLineStdin)
+            },
         ]
     };
 }

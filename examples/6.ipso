@@ -1,0 +1,2 @@
+main : IO ()
+main = bindIO (readLineStdin stdin) (writeStdout stdout)
