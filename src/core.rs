@@ -43,6 +43,15 @@ impl Evidence {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Builtin {
+    MapIO,
+    PureIO,
+    BindIO,
+    Trace,
+    ToUtf8,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
@@ -127,14 +136,6 @@ pub struct TypeSig {
 pub struct ClassMember {
     name: String,
     sig: TypeSig,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Builtin {
-    MapIO,
-    PureIO,
-    BindIO,
-    Trace,
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -57,6 +57,7 @@ pub enum Value<'heap> {
     Int(u32),
     Char(char),
     String(String),
+    Bytes(&'heap [u8]),
     Array(Vec<ValueRef<'heap>>),
     Record(Vec<ValueRef<'heap>>),
     Variant(usize, ValueRef<'heap>),
@@ -71,6 +72,13 @@ impl<'heap> Value<'heap> {
         match self {
             Value::IO { env, body } => body.0(interpreter, env),
             val => panic!("expected io, got {:?}", val),
+        }
+    }
+
+    pub fn unpack_string<'stdout>(&'heap self) -> &'heap String {
+        match self {
+            Value::String(str) => str,
+            val => panic!("expected string, got {:?}", val),
         }
     }
 
@@ -113,6 +121,7 @@ impl<'heap> Value<'heap> {
             Value::Int(n) => String::from(format!("{:?}", n)),
             Value::Char(c) => String::from(format!("{:?}", c)),
             Value::String(s) => String::from(format!("{:?}", s)),
+            Value::Bytes(bs) => String::from(format!("{:?}", bs)),
             Value::Array(items) => {
                 let mut s = String::new();
                 s.push_str("[ ");
@@ -204,6 +213,10 @@ impl<'heap> PartialEq for Value<'heap> {
             },
             Value::String(s) => match other {
                 Value::String(s2) => s == s2,
+                _ => false,
+            },
+            Value::Bytes(bs) => match other {
+                Value::Bytes(bs2) => bs == bs2,
                 _ => false,
             },
             Value::Array(items) => match other {
@@ -444,6 +457,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let closure = self.alloc_value(Value::StaticClosure {
                     env,
                     body: StaticClosureBody(code_outer),
+                });
+                closure
+            }
+            Builtin::ToUtf8 => {
+                fn to_utf8_0<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    _env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    let a = arg.unpack_string();
+                    interpreter.alloc_value(Value::Bytes(a.as_bytes()))
+                }
+                let env = self.alloc_env(Vec::new());
+                let closure = self.alloc_value(Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(to_utf8_0),
                 });
                 closure
             }

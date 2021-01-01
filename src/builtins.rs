@@ -28,6 +28,7 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::MapIO)
             },
+
             // pureIO : a -> IO a
             Declaration::Definition {
                 name: String::from("pureIO"),
@@ -43,6 +44,7 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::PureIO)
             },
+
             // bindIO : IO a -> (a -> IO b) -> IO b
             Declaration::Definition {
                 name: String::from("bindIO"),
@@ -63,6 +65,7 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::BindIO)
             },
+
             // trace : a -> b -> b
             Declaration::Definition {
                 name: String::from("trace"),
@@ -82,6 +85,20 @@ lazy_static! {
                     )
                 },
                 body: Expr::Builtin(Builtin::Trace)
+            },
+
+            // toUtf8 : String -> Bytes
+            Declaration::Definition {
+                name: String::from("toUtf8"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body: Type::mk_arrow(
+                            Type::String,
+                            Type::Bytes
+                    )
+                },
+                body: Expr::Builtin(Builtin::ToUtf8)
             },
         ]
     };

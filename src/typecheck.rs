@@ -444,6 +444,7 @@ impl Typechecker {
             syntax::Type::Int => syntax::Type::Int,
             syntax::Type::Char => syntax::Type::Char,
             syntax::Type::String => syntax::Type::String,
+            syntax::Type::Bytes => syntax::Type::Bytes,
             syntax::Type::Arrow => syntax::Type::Arrow,
             syntax::Type::FatArrow => syntax::Type::FatArrow,
             syntax::Type::Constraints(cs) => {
@@ -653,6 +654,7 @@ impl Typechecker {
             syntax::Type::Int => Ok((syntax::Type::Int, syntax::Kind::Type)),
             syntax::Type::Char => Ok((syntax::Type::Char, syntax::Kind::Type)),
             syntax::Type::String => Ok((syntax::Type::String, syntax::Kind::Type)),
+            syntax::Type::Bytes => Ok((syntax::Type::Bytes, syntax::Kind::Type)),
             syntax::Type::Arrow => Ok((
                 syntax::Type::Arrow,
                 syntax::Kind::mk_arrow(
@@ -777,6 +779,11 @@ impl Typechecker {
             },
             syntax::Type::String => match actual {
                 syntax::Type::String => Ok(()),
+                syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
+                _ => self.type_mismatch(expected, actual),
+            },
+            syntax::Type::Bytes => match actual {
+                syntax::Type::Bytes => Ok(()),
                 syntax::Type::Meta(n) => self.solve_typevar_right(expected, n),
                 _ => self.type_mismatch(expected, actual),
             },

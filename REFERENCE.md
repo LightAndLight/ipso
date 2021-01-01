@@ -26,10 +26,12 @@
     - [Functions](#functions)
     - [Arrays](#arrays)
       - [Builtins](#builtins-3)
+    - [Byte Arrays](#byte-arrays)
+      - [Builtins](#builtins-4)
     - [Records](#records)
     - [Variants](#variants)
     - [IO](#io)
-      - [Builtins](#builtins-4)
+      - [Builtins](#builtins-5)
   - [Type Classes](#type-classes)
     - [Equality](#equality)
     - [Comparison](#comparison)
@@ -250,6 +252,8 @@ map : (Char -> Char) -> String -> String
 pack : Array Char -> String
 
 unpack : String -> Array Char
+
+toUtf8 : String -> Bytes
 ```
 
 ### Functions
@@ -323,6 +327,19 @@ foldl : (b -> a -> b) -> b -> Array a -> b
 map : (a -> b) -> Array a -> Array b
 ```
 
+### Byte Arrays
+
+```ipso-repl
+> :kind Bytes
+Type
+```
+
+#### Builtins
+
+```ipso
+(++) : Bytes -> Bytes -> Bytes
+```
+
 ### Records
 
 ```ipso-repl
@@ -394,6 +411,11 @@ x : < None >
 ### IO
 
 ```ipso-repl
+> :kind IO
+Type -> Type
+```
+
+```ipso-repl
 > do
 .   line <- getLine
 .   print line
@@ -401,20 +423,28 @@ hello
 hello
 ```
 
+```ipso-repl
+> :kind Stdout
+Type
+```
+
+```ipso-repl
+> :info IOError
+type IOError = < EBADF | EINTR | ENOSPC | EIO >
+```
+
 #### Builtins
 
 ```ipso
-pure : a -> IO a
+pureIO : a -> IO a
 
-(>>=) : IO a -> (a -> IO b) -> IO b
+mapIO : (a -> b) -> IO a -> IO b
 
-open : String -> < ReadOnly | Replace | Append > -> IO File
+bindIO : IO a -> (a -> IO b) -> IO b
+```
 
-close : File -> IO ()
-
-readChars : Int -> File -> IO String
-
-readAll : File -> IO String
+```ipso
+writeStdout : Stdout -> Bytes -> IO < Err : IOError | Ok : () >
 ```
 
 ## Type Classes
