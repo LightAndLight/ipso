@@ -1,7 +1,8 @@
+use crate::evidence::EVar;
 use crate::syntax::Binop;
 use crate::{
     builtins,
-    core::{Builtin, Declaration, EVar, Expr, StringPart},
+    core::{Builtin, Declaration, Expr, StringPart},
 };
 use std::collections::HashMap;
 use std::{fmt::Debug, io::Write};

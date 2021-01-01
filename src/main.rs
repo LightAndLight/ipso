@@ -10,6 +10,7 @@ mod builtins;
 mod core;
 mod diagnostic;
 mod eval;
+mod evidence;
 mod iter;
 mod lex;
 mod parse;

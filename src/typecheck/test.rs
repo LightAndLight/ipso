@@ -1,7 +1,11 @@
-use crate::core;
+#[cfg(test)]
 use crate::syntax::{self, Kind, Type};
+#[cfg(test)]
 use crate::typecheck::{BoundVars, UnifyKindContext};
+#[cfg(test)]
+use crate::{core, evidence::EVar};
 
+#[cfg(test)]
 use super::{TypeError, Typechecker, UnifyTypeContext};
 
 #[test]
@@ -824,10 +828,7 @@ fn infer_record_test_2() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
-                vec![
-                    (core::EVar(1), core::Expr::Int(1)),
-                    (core::EVar(0), core::Expr::True)
-                ],
+                vec![(EVar(1), core::Expr::Int(1)), (EVar(0), core::Expr::True)],
                 None
             ),
             syntax::Type::mk_record(
@@ -881,12 +882,9 @@ fn infer_record_test_3() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
-                vec![
-                    (core::EVar(1), core::Expr::Int(1)),
-                    (core::EVar(0), core::Expr::True)
-                ],
+                vec![(EVar(1), core::Expr::Int(1)), (EVar(0), core::Expr::True)],
                 Some(core::Expr::mk_record(
-                    vec![(core::EVar(2), core::Expr::Char('c'))],
+                    vec![(EVar(2), core::Expr::Char('c'))],
                     None
                 ))
             ),

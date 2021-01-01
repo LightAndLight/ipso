@@ -1,9 +1,9 @@
-use crate::builtins;
-use crate::core;
 use crate::diagnostic;
 use crate::rope::Rope;
 use crate::syntax;
 use crate::syntax::Spanned;
+use crate::{builtins, evidence::Evidence};
+use crate::{core, evidence};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -104,7 +104,7 @@ impl<A> BoundVars<A> {
 pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
     type_solutions: Vec<(syntax::Kind, Option<syntax::Type<usize>>)>,
-    evidence: core::Evidence,
+    evidence: Evidence<core::Expr>,
     type_context: HashMap<String, syntax::Kind>,
     context: HashMap<String, core::TypeSig>,
     bound_vars: BoundVars<syntax::Type<usize>>,
@@ -319,7 +319,7 @@ impl Typechecker {
         Typechecker {
             kind_solutions: vec![],
             type_solutions: vec![],
-            evidence: core::Evidence::new(),
+            evidence: Evidence::new(),
             type_context: HashMap::new(),
             context: HashMap::new(),
             bound_vars: BoundVars::new(),
@@ -1287,7 +1287,7 @@ impl Typechecker {
                     let mut extending_row = rest_row_var.clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
-                        let index = self.evidence.fresh_evar(core::Constraint::HasField {
+                        let index = self.evidence.fresh_evar(evidence::Constraint::HasField {
                             field: field.clone(),
                             rest: extending_row.clone(),
                         });
@@ -1328,13 +1328,13 @@ impl Typechecker {
                     )?;
                     let offset = self
                         .evidence
-                        .fresh_evar(core::Constraint::HasField { field, rest: rows });
+                        .fresh_evar(evidence::Constraint::HasField { field, rest: rows });
                     Ok((core::Expr::mk_project(expr_core, offset), out_ty))
                 }
                 syntax::Expr::Variant(ctor, arg) => {
                     let (arg_core, arg_ty) = self.infer_expr(*arg)?;
                     let rest = self.fresh_typevar(syntax::Kind::Row);
-                    let tag = self.evidence.fresh_evar(core::Constraint::HasField {
+                    let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
                         field: ctor.clone(),
                         rest: syntax::Type::mk_rows(vec![], Some(rest.clone())),
                     });

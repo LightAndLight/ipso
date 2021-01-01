@@ -1,3 +1,4 @@
+use crate::evidence::EVar;
 use crate::syntax;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -18,29 +19,6 @@ pub struct Branch {
 pub enum StringPart {
     String(String),
     Expr(Expr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct EVar(pub usize);
-
-pub struct Evidence(Vec<(Constraint, Option<Expr>)>);
-
-pub enum Constraint {
-    HasField {
-        field: String,
-        rest: syntax::Type<usize>,
-    },
-}
-
-impl Evidence {
-    pub fn new() -> Self {
-        Evidence(Vec::new())
-    }
-    pub fn fresh_evar(&mut self, constraint: Constraint) -> EVar {
-        let ix = self.0.len();
-        self.0.push((constraint, None));
-        EVar(ix)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
