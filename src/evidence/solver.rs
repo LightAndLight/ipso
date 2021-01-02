@@ -101,6 +101,7 @@ pub fn solve_constraint<'a>(
                 | syntax::Type::Arrow
                 | syntax::Type::FatArrow
                 | syntax::Type::Constraints(_)
+                | syntax::Type::HasField(_, _)
                 | syntax::Type::Array
                 | syntax::Type::Record
                 | syntax::Type::Variant

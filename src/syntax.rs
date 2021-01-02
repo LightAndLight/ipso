@@ -189,6 +189,7 @@ pub enum Type<A> {
     App(Box<Type<A>>, Box<Type<A>>),
     RowNil,
     RowCons(String, Box<Type<A>>, Box<Type<A>>),
+    HasField(String, Box<Type<A>>),
     Unit,
     Meta(usize),
 }
@@ -220,6 +221,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::App(a, b) => Step::Continue(vec![a, b]),
                 Type::RowNil => Step::Skip,
                 Type::RowCons(_, a, b) => Step::Continue(vec![a, b]),
+                Type::HasField(_, a) => Step::Continue(vec![a]),
                 Type::Unit => Step::Skip,
                 Type::Meta(n) => Step::Yield(*n),
             }
@@ -281,6 +283,7 @@ impl<'a, A: Clone> Iterator for IterVars<'a, A> {
                 Type::App(a, b) => Step::Continue(vec![&*a, &*b]),
                 Type::RowNil => Step::Skip,
                 Type::RowCons(_, a, b) => Step::Continue(vec![&*a, &*b]),
+                Type::HasField(_, a) => Step::Continue(vec![&*a]),
                 Type::Unit => Step::Skip,
                 Type::Meta(_) => Step::Skip,
             }
@@ -334,6 +337,7 @@ impl<A> Type<A> {
             Type::RowCons(field, ty, rest) => {
                 Type::mk_rowcons(field.clone(), ty.map(f), rest.map(f))
             }
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.map(f)),
             Type::Unit => Type::Unit,
             Type::Meta(n) => Type::Meta(*n),
         }
@@ -360,6 +364,7 @@ impl<A> Type<A> {
             Type::RowCons(field, ty, rest) => {
                 Type::mk_rowcons(field.clone(), ty.subst(f), rest.subst(f))
             }
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst(f)),
             Type::Unit => Type::Unit,
             Type::Meta(n) => Type::Meta(*n),
         }
@@ -456,6 +461,10 @@ impl<A> Type<A> {
 
     pub fn mk_rowcons(field: String, a: Type<A>, b: Type<A>) -> Type<A> {
         Type::RowCons(field, Box::new(a), Box::new(b))
+    }
+
+    pub fn mk_hasfield(field: String, rest: Type<A>) -> Type<A> {
+        Type::HasField(field, Box::new(rest))
     }
 
     pub fn mk_rows(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
@@ -626,19 +635,37 @@ impl<A> Type<A> {
                 s.push_str(rest.render().as_str());
                 s.push(')');
             }
-            Type::App(a, b) => {
-                s.push_str(a.render().as_str());
+            Type::HasField(a, b) => {
+                s.push_str(format!("HasField {:?}", a).as_str());
                 s.push(' ');
 
                 match **b {
-                    Type::App(_, _) => {
+                    Type::App(_, _) | Type::HasField(_, _) => {
                         s.push('(');
                     }
                     _ => {}
                 }
                 s.push_str(b.render().as_str());
                 match **b {
-                    Type::App(_, _) => {
+                    Type::App(_, _) | Type::HasField(_, _) => {
+                        s.push(')');
+                    }
+                    _ => {}
+                }
+            }
+            Type::App(a, b) => {
+                s.push_str(a.render().as_str());
+                s.push(' ');
+
+                match **b {
+                    Type::App(_, _) | Type::HasField(_, _) => {
+                        s.push('(');
+                    }
+                    _ => {}
+                }
+                s.push_str(b.render().as_str());
+                match **b {
+                    Type::App(_, _) | Type::HasField(_, _) => {
                         s.push(')');
                     }
                     _ => {}

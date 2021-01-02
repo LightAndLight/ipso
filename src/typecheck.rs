@@ -435,6 +435,10 @@ impl Typechecker {
                 }
                 _ => false,
             },
+            Type::HasField(a, b) => match t2 {
+                Type::HasField(a2, b2) => a == a2 && self.eq_zonked_type(b, b2),
+                _ => false,
+            },
             Type::Meta(n) => match &self.type_solutions[*n].1 {
                 None => match t2 {
                     Type::Meta(n2) => n == n2,
@@ -655,6 +659,7 @@ impl Typechecker {
             Type::RowCons(field, ty, rest) => {
                 Type::mk_rowcons(field, self.zonk_type(*ty), self.zonk_type(*rest))
             }
+            Type::HasField(field, rest) => Type::mk_hasfield(field, self.zonk_type(*rest)),
             Type::Meta(n) => match self.type_solutions[n].1 {
                 None => Type::Meta(n),
                 Some(ref ty) => self.zonk_type(ty.clone()),
@@ -939,6 +944,13 @@ impl Typechecker {
                 let rest = self.check_kind(rest, syntax::Kind::Row)?;
                 Ok((Type::mk_rowcons(field.clone(), ty, rest), syntax::Kind::Row))
             }
+            Type::HasField(field, rest) => {
+                let rest = self.check_kind(rest, syntax::Kind::Row)?;
+                Ok((
+                    Type::mk_hasfield(field.clone(), rest),
+                    syntax::Kind::Constraint,
+                ))
+            }
             Type::Unit => Ok((Type::Unit, syntax::Kind::Type)),
             Type::Meta(n) => {
                 let kind = self.lookup_typevar(*n)?;
@@ -1125,6 +1137,13 @@ impl Typechecker {
                     self.solve_typevar_right(context, Type::RowCons(field1, ty1, rest1), n)
                 }
                 actual => self.type_mismatch(context, Type::RowCons(field1, ty1, rest1), actual),
+            },
+            Type::HasField(field, rest) => match actual {
+                Type::HasField(field2, rest2) if field == field2 => {
+                    self.unify_type(context, *rest, *rest2)
+                }
+                Type::Meta(n) => self.solve_typevar_right(context, Type::HasField(field, rest), n),
+                _ => self.type_mismatch(context, Type::HasField(field, rest), actual),
             },
             Type::Unit => match actual {
                 Type::Unit => Ok(()),
