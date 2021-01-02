@@ -25,7 +25,6 @@ impl From<TypeError> for SolveError {
 
 pub fn solve_constraint<'a>(
     tc: &mut Typechecker,
-    implications: &Vec<Implication>,
     constraint: &Constraint,
 ) -> Result<core::Expr, SolveError> {
     match constraint {
@@ -37,7 +36,6 @@ pub fn solve_constraint<'a>(
                     if field <= other_field {
                         solve_constraint(
                             tc,
-                            implications,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: (**other_rest).clone(),
@@ -46,7 +44,6 @@ pub fn solve_constraint<'a>(
                     } else {
                         let ev = solve_constraint(
                             tc,
-                            implications,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: (**other_rest).clone(),
@@ -88,7 +85,6 @@ pub fn solve_constraint<'a>(
                         ))),
                         Some(sol) => solve_constraint(
                             tc,
-                            implications,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: sol.clone(),
@@ -116,14 +112,10 @@ pub fn solve_constraint<'a>(
     }
 }
 
-pub fn solve_evar(
-    tc: &mut Typechecker,
-    implications: &Vec<Implication>,
-    ev: EVar,
-) -> Result<core::Expr, SolveError> {
+pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<core::Expr, SolveError> {
     let (constraint, evidence) = tc.evidence.0[ev.0].clone();
     match evidence.clone() {
-        None => solve_constraint(tc, implications, &constraint),
+        None => solve_constraint(tc, &constraint),
         Some(evidence) => Ok(evidence),
     }
 }
