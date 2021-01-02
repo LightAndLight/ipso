@@ -536,6 +536,61 @@ impl Typechecker {
         Ok(ty)
     }
 
+    fn check_definition(
+        &mut self,
+        pos: usize,
+        name: String,
+        ty: Type<String>,
+        args: Vec<syntax::Pattern>,
+        body: Spanned<syntax::Expr>,
+    ) -> Result<core::Declaration, TypeError> {
+        let (body_ty, ty_var_kinds) = {
+            let mut vars = HashMap::new();
+            let mut kinds = Vec::new();
+            let ty = ty.map(&mut |x: &String| match vars.get(x) {
+                None => {
+                    let len = vars.len();
+                    let kind = self.fresh_kindvar();
+                    vars.insert(x.clone(), len);
+                    kinds.push((x.clone(), kind));
+                    len
+                }
+                Some(&n) => n,
+            });
+            (ty, kinds)
+        };
+
+        let ty_var_kinds_len = ty_var_kinds.len();
+        self.bound_tyvars.insert(&ty_var_kinds);
+
+        let body_ty = self.check_kind(&body_ty, syntax::Kind::Type)?;
+
+        let ty_var_kinds = ty_var_kinds
+            .into_iter()
+            .map(|(_, kind)| match self.zonk_kind(kind) {
+                syntax::Kind::Meta(_) => syntax::Kind::Type,
+                kind => kind,
+            })
+            .collect();
+
+        let sig: core::TypeSig = core::TypeSig {
+            ty_vars: ty_var_kinds,
+            body: body_ty,
+        };
+
+        let body = self.check_expr(
+            syntax::Spanned {
+                pos,
+                item: syntax::Expr::mk_lam(args, body),
+            },
+            sig.body.clone(),
+        )?;
+
+        self.bound_tyvars.delete(ty_var_kinds_len);
+
+        Ok(core::Declaration::Definition { name, sig, body })
+    }
+
     fn check_declaration(
         &mut self,
         decl: syntax::Spanned<syntax::Declaration>,
@@ -546,53 +601,7 @@ impl Typechecker {
                 ty,
                 args,
                 body,
-            } => {
-                let (body_ty, ty_var_kinds) = {
-                    let mut vars = HashMap::new();
-                    let mut kinds = Vec::new();
-                    let ty = ty.map(&mut |x: &String| match vars.get(x) {
-                        None => {
-                            let len = vars.len();
-                            let kind = self.fresh_kindvar();
-                            vars.insert(x.clone(), len);
-                            kinds.push((x.clone(), kind));
-                            len
-                        }
-                        Some(&n) => n,
-                    });
-                    (ty, kinds)
-                };
-
-                let ty_var_kinds_len = ty_var_kinds.len();
-                self.bound_tyvars.insert(&ty_var_kinds);
-
-                let body_ty = self.check_kind(&body_ty, syntax::Kind::Type)?;
-
-                let ty_var_kinds = ty_var_kinds
-                    .into_iter()
-                    .map(|(_, kind)| match self.zonk_kind(kind) {
-                        syntax::Kind::Meta(_) => syntax::Kind::Type,
-                        kind => kind,
-                    })
-                    .collect();
-
-                let sig: core::TypeSig = core::TypeSig {
-                    ty_vars: ty_var_kinds,
-                    body: body_ty,
-                };
-
-                let body = self.check_expr(
-                    syntax::Spanned {
-                        pos: decl.pos,
-                        item: syntax::Expr::mk_lam(args, body),
-                    },
-                    sig.body.clone(),
-                )?;
-
-                self.bound_tyvars.delete(ty_var_kinds_len);
-
-                Ok(core::Declaration::Definition { name, sig, body })
-            }
+            } => self.check_definition(decl.pos, name, ty, args, body),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
