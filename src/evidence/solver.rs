@@ -116,10 +116,13 @@ pub fn solve_constraint<'a>(
     }
 }
 
-pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<core::Expr, SolveError> {
+pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<(core::Expr, Constraint), SolveError> {
     let (constraint, evidence) = tc.evidence.0[ev.0].clone();
     match evidence.clone() {
-        None => solve_constraint(tc, &constraint),
-        Some(evidence) => Ok(evidence),
+        None => {
+            let expr = solve_constraint(tc, &constraint)?;
+            Ok((expr, constraint.clone()))
+        }
+        Some(evidence) => Ok((evidence, constraint.clone())),
     }
 }

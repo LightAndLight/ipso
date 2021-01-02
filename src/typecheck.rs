@@ -1,3 +1,5 @@
+use evidence::solver::solve_evar;
+
 use crate::diagnostic;
 use crate::rope::Rope;
 use crate::syntax;
@@ -545,6 +547,47 @@ impl Typechecker {
         Ok(ty)
     }
 
+    fn generalise(&mut self, expr: core::Expr, ty: Type<usize>) -> (core::Expr, core::TypeSig) {
+        let mut unsolved_constraints: Vec<(evidence::EVar, evidence::Constraint)> = Vec::new();
+        let mut first_error: Option<evidence::solver::SolveError> = None;
+        let mut expr = expr.subst_evar(&mut |ev| {
+            match solve_evar(self, *ev) {
+                Err(err) => match first_error {
+                    // This error handling is bad. I want a `Traversal Expr EVar`
+                    None => {
+                        first_error = Some(err);
+                        todo!()
+                    }
+                    Some(_) => {
+                        todo!()
+                    }
+                },
+                Ok((expr, solved_constraint)) => match expr {
+                    core::Expr::EVar(new_ev) if *ev == new_ev => {
+                        // unsolved
+                        unsolved_constraints.push((*ev, solved_constraint));
+                        expr
+                    }
+                    _ => expr,
+                },
+            }
+        });
+
+        let mut ty = ty;
+        for (ev, constraint) in unsolved_constraints.iter().rev() {
+            todo!(); // abstract over `ev` in `expr`
+            ty = Type::mk_arrow(constraint.to_type(), ty);
+        }
+        let sig = core::TypeSig {
+            ty_vars: todo!(),
+            body: ty,
+        };
+
+        self.evidence = Evidence::new();
+
+        (expr, sig)
+    }
+
     fn check_definition(
         &mut self,
         pos: usize,
@@ -553,7 +596,7 @@ impl Typechecker {
         args: Vec<syntax::Pattern>,
         body: Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
-        let (body_ty, ty_var_kinds) = {
+        let (ty, ty_var_kinds) = {
             let mut vars = HashMap::new();
             let mut kinds = Vec::new();
             let ty = ty.map(&mut |x: &String| match vars.get(x) {
@@ -572,28 +615,21 @@ impl Typechecker {
         let ty_var_kinds_len = ty_var_kinds.len();
         self.bound_tyvars.insert(&ty_var_kinds);
 
-        let body_ty = self.check_kind(&body_ty, syntax::Kind::Type)?;
+        let ty = self.check_kind(&ty, syntax::Kind::Type)?;
 
-        let ty_var_kinds = ty_var_kinds
-            .into_iter()
-            .map(|(_, kind)| match self.zonk_kind(kind) {
-                syntax::Kind::Meta(_) => syntax::Kind::Type,
-                kind => kind,
-            })
-            .collect();
-
-        let sig: core::TypeSig = core::TypeSig {
-            ty_vars: ty_var_kinds,
-            body: body_ty,
-        };
-
+        let (constraints, ty) = ty.unwrap_constraints();
+        for constraint in constraints {
+            self.evidence
+                .fresh_evar(evidence::Constraint::from_type(constraint));
+        }
         let body = self.check_expr(
             syntax::Spanned {
                 pos,
                 item: syntax::Expr::mk_lam(args, body),
             },
-            sig.body.clone(),
+            ty.clone(),
         )?;
+        let (body, sig) = self.generalise(body, ty.clone());
 
         self.bound_tyvars.delete(ty_var_kinds_len);
 

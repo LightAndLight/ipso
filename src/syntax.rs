@@ -57,7 +57,7 @@ pub fn is_keyword(val: &String) -> bool {
     KEYWORDS.contains(&val.as_str())
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Binop {
     Add,
     Multiply,

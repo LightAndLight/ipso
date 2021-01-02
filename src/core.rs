@@ -15,10 +15,28 @@ pub struct Branch {
     pub body: Expr,
 }
 
+impl Branch {
+    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Self {
+        Branch {
+            pattern: self.pattern.clone(),
+            body: self.body.subst_evar(f),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StringPart {
     String(String),
     Expr(Expr),
+}
+
+impl StringPart {
+    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Self {
+        match self {
+            StringPart::String(s) => StringPart::String(s.clone()),
+            StringPart::Expr(e) => StringPart::Expr(e.subst_evar(f)),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -96,6 +114,10 @@ impl Expr {
         Expr::Project(Box::new(expr), Box::new(offset))
     }
 
+    pub fn mk_extend(field: Expr, value: Expr, rest: Expr) -> Expr {
+        Expr::Extend(Box::new(field), Box::new(value), Box::new(rest))
+    }
+
     pub fn mk_variant(tag: Expr, expr: Expr) -> Expr {
         Expr::Variant(Box::new(tag), Box::new(expr))
     }
@@ -110,6 +132,42 @@ impl Expr {
 
     pub fn mk_evar(ev: usize) -> Expr {
         Expr::EVar(EVar(ev))
+    }
+
+    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Expr {
+        match self {
+            Expr::Var(n) => Expr::Var(*n),
+            Expr::EVar(v) => f(v),
+            Expr::Name(n) => Expr::Name(n.clone()),
+            Expr::Builtin(b) => Expr::Builtin(*b),
+            Expr::App(a, b) => Expr::mk_app(a.subst_evar(f), b.subst_evar(f)),
+            Expr::Lam { arg, body } => Expr::mk_lam(*arg, body.subst_evar(f)),
+            Expr::True => Expr::True,
+            Expr::False => Expr::False,
+            Expr::IfThenElse(a, b, c) => {
+                Expr::mk_ifthenelse(a.subst_evar(f), b.subst_evar(f), c.subst_evar(f))
+            }
+            Expr::Int(n) => Expr::Int(*n),
+            Expr::Binop(a, b, c) => Expr::mk_binop(*a, b.subst_evar(f), c.subst_evar(f)),
+            Expr::Char(c) => Expr::Char(*c),
+            Expr::String(s) => Expr::String(s.iter().map(|x| x.subst_evar(f)).collect()),
+            Expr::Array(xs) => Expr::Array(xs.iter().map(|x| x.subst_evar(f)).collect()),
+            Expr::Extend(a, b, c) => {
+                Expr::mk_extend(a.subst_evar(f), b.subst_evar(f), c.subst_evar(f))
+            }
+            Expr::Record(xs) => Expr::Record(
+                xs.iter()
+                    .map(|(x, y)| (x.subst_evar(f), y.subst_evar(f)))
+                    .collect(),
+            ),
+            Expr::Project(a, b) => Expr::mk_project(a.subst_evar(f), b.subst_evar(f)),
+            Expr::Variant(a, b) => Expr::mk_variant(a.subst_evar(f), b.subst_evar(f)),
+            Expr::Case(a, bs) => Expr::mk_case(
+                a.subst_evar(f),
+                bs.iter().map(|b| b.subst_evar(f)).collect(),
+            ),
+            Expr::Unit => Expr::Unit,
+        }
     }
 }
 
