@@ -1,9 +1,9 @@
 #[cfg(test)]
+use crate::core;
+#[cfg(test)]
 use crate::syntax::{self, Kind, Type};
 #[cfg(test)]
 use crate::typecheck::{BoundVars, UnifyKindContext};
-#[cfg(test)]
-use crate::{core, evidence::EVar};
 
 #[cfg(test)]
 use super::{TypeError, Typechecker, UnifyTypeContext};

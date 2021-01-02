@@ -30,119 +30,6 @@ impl From<TypeError> for SolveError {
     }
 }
 
-fn eq_zonked_type(tc: &Typechecker, t1: &Type<usize>, t2: &Type<usize>) -> bool {
-    fn zonk_just_enough<'a>(tc: &'a Typechecker, t: &'a Type<usize>) -> &'a Type<usize> {
-        match t {
-            Type::Meta(n) => match &tc.type_solutions[*n].1 {
-                None => t,
-                Some(sol) => zonk_just_enough(tc, sol),
-            },
-            t => t,
-        }
-    }
-    let t2: &Type<usize> = zonk_just_enough(tc, t2);
-    match t1 {
-        Type::Name(n) => match t2 {
-            Type::Name(n2) => n == n2,
-            _ => false,
-        },
-        Type::Var(v) => match t2 {
-            Type::Var(v2) => v == v2,
-            _ => false,
-        },
-        Type::Bool => match t2 {
-            Type::Bool => true,
-            _ => false,
-        },
-        Type::Int => match t2 {
-            Type::Int => true,
-            _ => false,
-        },
-        Type::Char => match t2 {
-            Type::Char => true,
-            _ => false,
-        },
-        Type::String => match t2 {
-            Type::String => true,
-            _ => false,
-        },
-        Type::Bytes => match t2 {
-            Type::Bytes => true,
-            _ => false,
-        },
-        Type::Arrow => match t2 {
-            Type::Arrow => true,
-            _ => false,
-        },
-        Type::FatArrow => match t2 {
-            Type::FatArrow => true,
-            _ => false,
-        },
-        Type::Array => match t2 {
-            Type::Arrow => true,
-            _ => false,
-        },
-        Type::Record => match t2 {
-            Type::Record => true,
-            _ => false,
-        },
-        Type::Variant => match t2 {
-            Type::Variant => true,
-            _ => false,
-        },
-        Type::IO => match t2 {
-            Type::IO => true,
-            _ => false,
-        },
-        Type::RowNil => match t2 {
-            Type::RowNil => true,
-            _ => false,
-        },
-        Type::Unit => match t2 {
-            Type::Unit => true,
-            _ => false,
-        },
-        Type::Constraints(cs) => match t2 {
-            Type::Constraints(cs2) => {
-                cs.len() == cs2.len()
-                    && cs
-                        .iter()
-                        .zip(cs2.iter())
-                        .all(|(a, b)| eq_zonked_type(tc, a, b))
-            }
-            _ => false,
-        },
-        Type::App(a, b) => match t2 {
-            Type::App(a2, b2) => eq_zonked_type(tc, a, a2) && eq_zonked_type(tc, b, b2),
-            _ => false,
-        },
-        Type::RowCons(a, b, c) => match t2 {
-            Type::RowCons(a2, b2, c2) => {
-                a == a2 && eq_zonked_type(tc, b, b2) && eq_zonked_type(tc, c, c2)
-            }
-            _ => false,
-        },
-        Type::Meta(n) => match &tc.type_solutions[*n].1 {
-            None => match t2 {
-                Type::Meta(n2) => n == n2,
-                _ => false,
-            },
-            Some(sol) => eq_zonked_type(tc, sol, t2),
-        },
-    }
-}
-
-fn eq_zonked_constraint(tc: &Typechecker, c1: &Constraint, c2: &Constraint) -> bool {
-    match c1 {
-        Constraint::HasField { field, rest } => match c2 {
-            Constraint::HasField {
-                field: field2,
-                rest: rest2,
-            } => field == field2 && eq_zonked_type(tc, rest, rest2),
-        },
-    }
-}
-
 pub fn solve_constraint<'a>(
     tc: &mut Typechecker,
     implications: &Vec<Implication>,
@@ -184,7 +71,7 @@ pub fn solve_constraint<'a>(
                             .0
                             .iter()
                             .find_map(|(other_constraint, other_evidence)| {
-                                if eq_zonked_constraint(tc, constraint, other_constraint) {
+                                if tc.eq_zonked_constraint(constraint, other_constraint) {
                                     other_evidence.clone()
                                 } else {
                                     None
