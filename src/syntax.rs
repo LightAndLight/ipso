@@ -378,6 +378,29 @@ impl<A> Type<A> {
         TypeIterMetas { items: vec![&self] }
     }
 
+    pub fn unwrap_constraints<'a>(&'a self) -> (Vec<&'a Type<A>>, &'a Type<A>) {
+        fn flatten_constraints<'a, A>(ty: &'a Type<A>) -> Vec<&'a Type<A>> {
+            match ty {
+                Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
+                _ => vec![ty],
+            }
+        }
+        pub fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) -> &'a Type<A> {
+            match ty.unwrap_fatarrow() {
+                None => ty,
+                Some((c, ty)) => {
+                    let mut more_constraints = flatten_constraints(c);
+                    constraints.extend(more_constraints.iter());
+
+                    go(constraints, ty)
+                }
+            }
+        }
+        let mut constraints = Vec::new();
+        let ty = go(&mut constraints, self);
+        (constraints, ty)
+    }
+
     fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
         match self {
             Type::App(a, out_ty) => match **a {

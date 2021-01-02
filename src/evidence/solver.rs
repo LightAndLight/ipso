@@ -28,6 +28,9 @@ pub fn solve_constraint<'a>(
     constraint: &Constraint,
 ) -> Result<core::Expr, SolveError> {
     match constraint {
+        Constraint::Type(constraint) => {
+            todo!("solve constraint {:?}", constraint)
+        }
         Constraint::HasField { field, rest } => {
             let _ = tc.check_kind(rest, Kind::Row)?;
             let new_evidence = match rest {

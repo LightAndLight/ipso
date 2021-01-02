@@ -1,4 +1,4 @@
-use crate::syntax;
+use crate::syntax::{self, Type};
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -13,6 +13,19 @@ pub enum Constraint {
         field: String,
         rest: syntax::Type<usize>,
     },
+    Type(Type<usize>),
+}
+
+impl Constraint {
+    pub fn from_type(ty: &Type<usize>) -> Self {
+        match ty {
+            Type::HasField(field, rest) => Constraint::HasField {
+                field: field.clone(),
+                rest: (**rest).clone(),
+            },
+            _ => Constraint::Type(ty.clone()),
+        }
+    }
 }
 
 impl<A> Evidence<A> {

@@ -460,6 +460,11 @@ impl Typechecker {
                     field: field2,
                     rest: rest2,
                 } => field == field2 && self.eq_zonked_type(rest, rest2),
+                _ => false,
+            },
+            evidence::Constraint::Type(ty) => match c2 {
+                evidence::Constraint::Type(ty2) => self.eq_zonked_type(ty, ty2),
+                _ => false,
             },
         }
     }
@@ -1260,13 +1265,22 @@ impl Typechecker {
         }
     }
 
-    fn instantiate(&mut self, sig: core::TypeSig) -> Type<usize> {
+    fn instantiate(&mut self, name: String, sig: core::TypeSig) -> (core::Expr, Type<usize>) {
         let metas: Vec<Type<usize>> = sig
             .ty_vars
             .into_iter()
             .map(|kind| self.fresh_typevar(kind))
             .collect();
-        sig.body.subst(&|&ix| metas[ix].clone())
+        let ty = sig.body.subst(&|&ix| metas[ix].clone());
+        let (constraints, ty) = ty.unwrap_constraints();
+        let mut expr = core::Expr::Name(name);
+        for constraint in constraints {
+            let ev = self
+                .evidence
+                .fresh_evar(evidence::Constraint::from_type(constraint));
+            expr = core::Expr::mk_app(expr, core::Expr::EVar(ev));
+        }
+        (expr, ty.clone())
     }
 
     fn infer_expr(
@@ -1282,8 +1296,8 @@ impl Typechecker {
                         Some(entry) => Ok((core::Expr::Var(entry.0), entry.1)),
                         None => match self.lookup_name(&name) {
                             Some(sig) => {
-                                let ty = self.instantiate(sig);
-                                Ok((core::Expr::Name(name), ty))
+                                let (expr, ty) = self.instantiate(name, sig);
+                                Ok((expr, ty))
                             }
                             None => self.not_in_scope(&name),
                         },
