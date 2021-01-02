@@ -1,16 +1,14 @@
 #[cfg(test)]
-use super::solve_constraint;
-#[cfg(test)]
-use crate::{core::Expr, evidence::Constraint, syntax::Type, typecheck::Typechecker};
 use crate::{
-    evidence::Evidence,
-    syntax::{Binop, Kind},
+    core::Expr,
+    evidence::{solver::solve_constraint, Constraint, Evidence},
+    syntax::{Binop, Kind, Type},
+    typecheck::Typechecker,
 };
 
 #[test]
 fn solve_constraint_1() {
     let mut tc = Typechecker::new();
-    let implications = Vec::new();
     let constraint = Constraint::HasField {
         field: String::from("x"),
         rest: Type::mk_rows(
@@ -21,7 +19,7 @@ fn solve_constraint_1() {
             None,
         ),
     };
-    let expected = solve_constraint(&mut tc, &implications, &constraint);
+    let expected = solve_constraint(&mut tc, &constraint);
     let actual = Ok(Expr::Int(0));
     assert_eq!(expected, actual)
 }
@@ -29,7 +27,6 @@ fn solve_constraint_1() {
 #[test]
 fn solve_constraint_2() {
     let mut tc = Typechecker::new();
-    let implications = Vec::new();
     let constraint = Constraint::HasField {
         field: String::from("y"),
         rest: Type::mk_rows(
@@ -40,7 +37,7 @@ fn solve_constraint_2() {
             None,
         ),
     };
-    let expected = solve_constraint(&mut tc, &implications, &constraint);
+    let expected = solve_constraint(&mut tc, &constraint);
     let actual = Ok(Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0)));
     assert_eq!(expected, actual)
 }
@@ -49,7 +46,6 @@ fn solve_constraint_2() {
 fn solve_constraint_3() {
     let mut tc = Typechecker::new();
     let var = tc.fresh_typevar(Kind::Row);
-    let implications = Vec::new();
     let constraint = Constraint::HasField {
         field: String::from("z"),
         rest: Type::mk_rows(
@@ -61,7 +57,7 @@ fn solve_constraint_3() {
         ),
     };
 
-    let expected_result = solve_constraint(&mut tc, &implications, &constraint);
+    let expected_result = solve_constraint(&mut tc, &constraint);
     let actual_result = Ok(Expr::mk_binop(
         Binop::Add,
         Expr::Int(1),
