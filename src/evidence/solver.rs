@@ -1,7 +1,7 @@
 use crate::{
     core,
-    syntax::{Binop, Type},
-    typecheck::Typechecker,
+    syntax::Binop,
+    typecheck::{Implication, Typechecker},
 };
 use crate::{
     syntax::{self, Kind},
@@ -11,13 +11,6 @@ use crate::{
 use super::{Constraint, EVar};
 
 mod test;
-
-pub struct Implication {
-    pub ty_vars: Vec<syntax::Kind>,
-    pub antecedents: Vec<syntax::Type<usize>>,
-    pub consequent: syntax::Type<usize>,
-    pub evidence: core::Expr,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SolveError {

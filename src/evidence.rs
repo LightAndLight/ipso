@@ -1,5 +1,5 @@
 use crate::syntax;
-mod solver;
+pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EVar(pub usize);

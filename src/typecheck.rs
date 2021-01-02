@@ -101,9 +101,17 @@ impl<A> BoundVars<A> {
     }
 }
 
+pub struct Implication {
+    pub ty_vars: Vec<syntax::Kind>,
+    pub antecedents: Vec<syntax::Type<usize>>,
+    pub consequent: syntax::Type<usize>,
+    pub evidence: core::Expr,
+}
+
 pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
     pub type_solutions: Vec<(syntax::Kind, Option<Type<usize>>)>,
+    implications: Vec<Implication>,
     pub evidence: Evidence<core::Expr>,
     type_context: HashMap<String, syntax::Kind>,
     context: HashMap<String, core::TypeSig>,
@@ -317,8 +325,9 @@ impl TypeError {
 impl Typechecker {
     pub fn new() -> Self {
         Typechecker {
-            kind_solutions: vec![],
-            type_solutions: vec![],
+            kind_solutions: Vec::new(),
+            type_solutions: Vec::new(),
+            implications: Vec::new(),
             evidence: Evidence::new(),
             type_context: HashMap::new(),
             context: HashMap::new(),
