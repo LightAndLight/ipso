@@ -1260,6 +1260,15 @@ impl Typechecker {
         }
     }
 
+    fn instantiate(&mut self, sig: core::TypeSig) -> Type<usize> {
+        let metas: Vec<Type<usize>> = sig
+            .ty_vars
+            .into_iter()
+            .map(|kind| self.fresh_typevar(kind))
+            .collect();
+        sig.body.subst(&|&ix| metas[ix].clone())
+    }
+
     fn infer_expr(
         &mut self,
         expr: syntax::Spanned<syntax::Expr>,
@@ -1273,12 +1282,7 @@ impl Typechecker {
                         Some(entry) => Ok((core::Expr::Var(entry.0), entry.1)),
                         None => match self.lookup_name(&name) {
                             Some(sig) => {
-                                let metas: Vec<Type<usize>> = sig
-                                    .ty_vars
-                                    .into_iter()
-                                    .map(|kind| self.fresh_typevar(kind))
-                                    .collect();
-                                let ty = sig.body.subst(&|&ix| metas[ix].clone());
+                                let ty = self.instantiate(sig);
                                 Ok((core::Expr::Name(name), ty))
                             }
                             None => self.not_in_scope(&name),
