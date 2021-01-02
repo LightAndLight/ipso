@@ -103,8 +103,8 @@ impl<A> BoundVars<A> {
 
 pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
-    type_solutions: Vec<(syntax::Kind, Option<syntax::Type<usize>>)>,
-    evidence: Evidence<core::Expr>,
+    pub type_solutions: Vec<(syntax::Kind, Option<syntax::Type<usize>>)>,
+    pub evidence: Evidence<core::Expr>,
     type_context: HashMap<String, syntax::Kind>,
     context: HashMap<String, core::TypeSig>,
     bound_vars: BoundVars<syntax::Type<usize>>,
@@ -393,6 +393,21 @@ impl Typechecker {
                 ),
             }
         }
+    }
+
+    pub fn check_kind(
+        &mut self,
+        ty: &syntax::Type<usize>,
+        kind: syntax::Kind,
+    ) -> Result<syntax::Type<usize>, TypeError> {
+        let expected = kind;
+        let (ty, actual) = self.infer_kind(ty)?;
+        let context = UnifyKindContext::Checking {
+            ty: self.fill_ty_names(self.zonk_type(ty.clone())),
+            has_kind: self.zonk_kind(expected.clone()),
+        };
+        self.unify_kind(context, expected, actual)?;
+        Ok(ty)
     }
 
     fn check_declaration(
@@ -709,21 +724,6 @@ impl Typechecker {
             }
             Some(expected) => self.unify_type(context, expected, actual),
         }
-    }
-
-    fn check_kind(
-        &mut self,
-        ty: &syntax::Type<usize>,
-        kind: syntax::Kind,
-    ) -> Result<syntax::Type<usize>, TypeError> {
-        let expected = kind;
-        let (ty, actual) = self.infer_kind(ty)?;
-        let context = UnifyKindContext::Checking {
-            ty: self.fill_ty_names(self.zonk_type(ty.clone())),
-            has_kind: self.zonk_kind(expected.clone()),
-        };
-        self.unify_kind(context, expected, actual)?;
-        Ok(ty)
     }
 
     fn lookup_typevar(&self, n: usize) -> Result<syntax::Kind, TypeError> {
@@ -1291,7 +1291,7 @@ impl Typechecker {
                             field: field.clone(),
                             rest: extending_row.clone(),
                         });
-                        fields_core.push((index, expr_core));
+                        fields_core.push((core::Expr::EVar(index), expr_core));
                         extending_row = syntax::Type::mk_rowcons(field, expr_ty, extending_row);
                     }
                     // we did a right fold to build extending_row, but we want fields_core too look like we did a left fold
@@ -1329,7 +1329,10 @@ impl Typechecker {
                     let offset = self
                         .evidence
                         .fresh_evar(evidence::Constraint::HasField { field, rest: rows });
-                    Ok((core::Expr::mk_project(expr_core, offset), out_ty))
+                    Ok((
+                        core::Expr::mk_project(expr_core, core::Expr::EVar(offset)),
+                        out_ty,
+                    ))
                 }
                 syntax::Expr::Variant(ctor, arg) => {
                     let (arg_core, arg_ty) = self.infer_expr(*arg)?;
@@ -1339,7 +1342,7 @@ impl Typechecker {
                         rest: syntax::Type::mk_rows(vec![], Some(rest.clone())),
                     });
                     Ok((
-                        core::Expr::mk_variant(tag, arg_core),
+                        core::Expr::mk_variant(core::Expr::EVar(tag), arg_core),
                         syntax::Type::mk_app(
                             syntax::Type::Variant,
                             syntax::Type::mk_rows(vec![(ctor, arg_ty)], Some(rest)),

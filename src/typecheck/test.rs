@@ -828,7 +828,10 @@ fn infer_record_test_2() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
-                vec![(EVar(1), core::Expr::Int(1)), (EVar(0), core::Expr::True)],
+                vec![
+                    (core::Expr::mk_evar(1), core::Expr::Int(1)),
+                    (core::Expr::mk_evar(0), core::Expr::True)
+                ],
                 None
             ),
             syntax::Type::mk_record(
@@ -882,9 +885,12 @@ fn infer_record_test_3() {
             .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
         Ok((
             core::Expr::mk_record(
-                vec![(EVar(1), core::Expr::Int(1)), (EVar(0), core::Expr::True)],
+                vec![
+                    (core::Expr::mk_evar(1), core::Expr::Int(1)),
+                    (core::Expr::mk_evar(0), core::Expr::True)
+                ],
                 Some(core::Expr::mk_record(
-                    vec![(EVar(2), core::Expr::Char('c'))],
+                    vec![(core::Expr::mk_evar(2), core::Expr::Char('c'))],
                     None
                 ))
             ),

@@ -79,6 +79,13 @@ impl<'heap> Value<'heap> {
         }
     }
 
+    pub fn unpack_int<'stdout>(&'heap self) -> u32 {
+        match self {
+            Value::Int(n) => *n,
+            val => panic!("expected int, got {:?}", val),
+        }
+    }
+
     pub fn unpack_string<'stdout>(&'heap self) -> &'heap String {
         match self {
             Value::String(str) => str,
@@ -604,6 +611,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn eval(&mut self, env: &'heap Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
         match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
+            Expr::EVar(n) => self.evidence[n.0],
             Expr::Name(name) => self.eval(env, self.context.get(&name).unwrap().clone()),
             Expr::Builtin(name) => self.eval_builtin(&name),
 
@@ -676,60 +684,49 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
 
             Expr::Extend(ev, value, rest) => {
+                let ix = self.eval(env, *ev).unpack_int();
                 let value = self.eval(env, *value);
                 let rest = self.eval(env, *rest);
                 match rest {
-                    Value::Record(fields) => match &self.evidence[ev.0] {
-                        Value::Int(ix) => {
-                            // assume: all stacks in fields are non-empty
-                            let ix = *ix as usize;
-                            let mut record = Vec::with_capacity(fields.len() + 1);
-                            record.extend_from_slice(&fields[0..ix]);
-                            record.push(value);
-                            record.extend_from_slice(&fields[ix..]);
+                    Value::Record(fields) => {
+                        // assume: all stacks in fields are non-empty
+                        let ix = ix as usize;
+                        let mut record = Vec::with_capacity(fields.len() + 1);
+                        record.extend_from_slice(&fields[0..ix]);
+                        record.push(value);
+                        record.extend_from_slice(&fields[ix..]);
 
-                            debug_assert!(record.len() == fields.len() + 1);
+                        debug_assert!(record.len() == fields.len() + 1);
 
-                            self.alloc_value(Value::Record(record))
-                        }
-                        evidence => panic!("expected int, got {:?}", evidence),
-                    },
+                        self.alloc_value(Value::Record(record))
+                    }
                     rest => panic!("expected record, got {:?}", rest),
                 }
             }
             Expr::Record(fields) => {
                 let mut record: Vec<ValueRef<'heap>> = Vec::with_capacity(fields.len());
-                let fields: Vec<(EVar, ValueRef<'heap>)> = fields
+                let fields: Vec<(u32, ValueRef<'heap>)> = fields
                     .into_iter()
-                    .map(|(ev, field)| (ev, self.eval(env, field)))
+                    .map(|(ev, field)| (self.eval(env, ev).unpack_int(), self.eval(env, field)))
                     .collect();
-                for (ev, field) in fields.into_iter().rev() {
-                    let index = match &self.evidence[ev.0] {
-                        Value::Int(ix) => *ix as usize,
-                        evidence => panic!("expected int, got {:?}", evidence),
-                    };
-                    record.insert(index, field);
+                for (index, field) in fields.into_iter().rev() {
+                    record.insert(index as usize, field);
                 }
                 self.alloc_value(Value::Record(record))
             }
             Expr::Project(expr, index) => {
+                let index = self.eval(env, *index).unpack_int();
                 let expr = self.eval(env, *expr);
                 match expr {
-                    Value::Record(fields) => match &self.evidence[index.0] {
-                        Value::Int(ix) => fields[*ix as usize],
-                        evidence => panic!("expected int, got {:?}", evidence),
-                    },
+                    Value::Record(fields) => fields[index as usize],
                     expr => panic!("expected record, got {:?}", expr),
                 }
             }
 
             Expr::Variant(tag, value) => {
-                let tag = match &self.evidence[tag.0] {
-                    Value::Int(tag) => *tag as usize,
-                    evidence => panic!("expected int, got {:?}", evidence),
-                };
+                let tag = self.eval(env, *tag).unpack_int();
                 let value: ValueRef<'heap> = self.eval(env, *value);
-                self.alloc_value(Value::Variant(tag, value))
+                self.alloc_value(Value::Variant(tag as usize, value))
             }
             Expr::Case(expr, branches) => todo!("eval case {:?} {:?}", expr, branches),
             Expr::Unit => self.alloc_value(Value::Unit),

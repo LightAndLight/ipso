@@ -1,10 +1,13 @@
 use crate::syntax;
+mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EVar(pub usize);
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evidence<A>(Vec<(Constraint, Option<A>)>);
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
     HasField {
         field: String,

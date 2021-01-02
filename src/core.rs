@@ -37,6 +37,7 @@ pub enum Builtin {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
+    EVar(EVar),
     Name(String),
     Builtin(Builtin),
 
@@ -57,11 +58,11 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
-    Extend(EVar, Box<Expr>, Box<Expr>),
-    Record(Vec<(EVar, Expr)>),
-    Project(Box<Expr>, EVar),
+    Extend(Box<Expr>, Box<Expr>, Box<Expr>),
+    Record(Vec<(Expr, Expr)>),
+    Project(Box<Expr>, Box<Expr>),
 
-    Variant(EVar, Box<Expr>),
+    Variant(Box<Expr>, Box<Expr>),
     Case(Box<Expr>, Vec<Branch>),
     Unit,
 }
@@ -82,21 +83,21 @@ impl Expr {
         Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
     }
 
-    pub fn mk_record(fields: Vec<(EVar, Expr)>, rest: Option<Expr>) -> Expr {
+    pub fn mk_record(fields: Vec<(Expr, Expr)>, rest: Option<Expr>) -> Expr {
         match rest {
             None => Expr::Record(fields),
             Some(rest) => fields.into_iter().rev().fold(rest, |acc, (ev, field)| {
-                Expr::Extend(ev, Box::new(field), Box::new(acc))
+                Expr::Extend(Box::new(ev), Box::new(field), Box::new(acc))
             }),
         }
     }
 
-    pub fn mk_project(expr: Expr, offset: EVar) -> Expr {
-        Expr::Project(Box::new(expr), offset)
+    pub fn mk_project(expr: Expr, offset: Expr) -> Expr {
+        Expr::Project(Box::new(expr), Box::new(offset))
     }
 
-    pub fn mk_variant(tag: EVar, expr: Expr) -> Expr {
-        Expr::Variant(tag, Box::new(expr))
+    pub fn mk_variant(tag: Expr, expr: Expr) -> Expr {
+        Expr::Variant(Box::new(tag), Box::new(expr))
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
@@ -105,6 +106,10 @@ impl Expr {
 
     pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
         Expr::Case(Box::new(expr), branches)
+    }
+
+    pub fn mk_evar(ev: usize) -> Expr {
+        Expr::EVar(EVar(ev))
     }
 }
 
