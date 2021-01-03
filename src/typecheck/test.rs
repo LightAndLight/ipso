@@ -1404,6 +1404,83 @@ fn check_definition_2() {
 }
 
 #[test]
+fn check_definition_3() {
+    let mut tc = Typechecker::new();
+    /*
+    thing : { z : Bool, y : String x : Int }
+    thing = { z = False, y = "", x = 0 }
+    */
+    let decl = syntax::Spanned {
+        pos: 0,
+        item: syntax::Declaration::Definition {
+            name: String::from("thing"),
+            ty: syntax::Type::mk_record(
+                vec![
+                    (String::from("z"), Type::Bool),
+                    (String::from("y"), Type::String),
+                    (String::from("x"), Type::Int),
+                ],
+                None,
+            ),
+            args: Vec::new(),
+            body: syntax::Spanned {
+                pos: 1,
+                item: syntax::Expr::mk_record(
+                    vec![
+                        (
+                            String::from("z"),
+                            syntax::Spanned {
+                                pos: 3,
+                                item: syntax::Expr::False,
+                            },
+                        ),
+                        (
+                            String::from("y"),
+                            syntax::Spanned {
+                                pos: 4,
+                                item: syntax::Expr::String(Vec::new()),
+                            },
+                        ),
+                        (
+                            String::from("x"),
+                            syntax::Spanned {
+                                pos: 5,
+                                item: syntax::Expr::Int(0),
+                            },
+                        ),
+                    ],
+                    None,
+                ),
+            },
+        },
+    };
+    let expected = Ok(core::Declaration::Definition {
+        name: String::from("thing"),
+        sig: core::TypeSig {
+            ty_vars: Vec::new(),
+            body: syntax::Type::mk_record(
+                vec![
+                    (String::from("z"), Type::Bool),
+                    (String::from("y"), Type::String),
+                    (String::from("x"), Type::Int),
+                ],
+                None,
+            ),
+        },
+        body: core::Expr::mk_record(
+            vec![
+                (core::Expr::Int(2), core::Expr::False),
+                (core::Expr::Int(1), core::Expr::String(Vec::new())),
+                (core::Expr::Int(0), core::Expr::Int(0)),
+            ],
+            None,
+        ),
+    });
+    let actual = tc.check_declaration(decl);
+    assert_eq!(expected, actual)
+}
+
+#[test]
 fn kind_occurs_1() {
     let mut tc = Typechecker::new();
     let v1 = tc.fresh_kindvar();
