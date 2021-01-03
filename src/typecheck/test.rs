@@ -1,8 +1,13 @@
 #[cfg(test)]
+use std::collections::HashSet;
+
+#[cfg(test)]
 use crate::{
     core,
-    syntax::{self, Kind, Type},
+    evidence::{solver::solve_evar, Constraint, EVar},
+    syntax::{self, Binop, Kind, Type},
     typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
+    void::Void,
 };
 
 #[test]
@@ -1299,6 +1304,118 @@ fn infer_case_4() {
 }
 
 #[test]
+fn infer_record_1() {
+    let mut tc = Typechecker::new();
+    let expected_expr = core::Expr::mk_record(
+        vec![
+            (core::Expr::EVar(EVar(2)), core::Expr::False),
+            (core::Expr::EVar(EVar(1)), core::Expr::String(Vec::new())),
+            (core::Expr::EVar(EVar(0)), core::Expr::Int(0)),
+        ],
+        None,
+    );
+    let expected_ty = Type::mk_record(
+        vec![
+            (String::from("z"), Type::Bool),
+            (String::from("y"), Type::String),
+            (String::from("x"), Type::Int),
+        ],
+        None,
+    );
+    let expected_result = Ok((expected_expr, expected_ty));
+    let expr = syntax::Spanned {
+        pos: 0,
+        item: syntax::Expr::mk_record(
+            vec![
+                (
+                    String::from("z"),
+                    syntax::Spanned {
+                        pos: 1,
+                        item: syntax::Expr::False,
+                    },
+                ),
+                (
+                    String::from("y"),
+                    syntax::Spanned {
+                        pos: 2,
+                        item: syntax::Expr::String(Vec::new()),
+                    },
+                ),
+                (
+                    String::from("x"),
+                    syntax::Spanned {
+                        pos: 3,
+                        item: syntax::Expr::Int(0),
+                    },
+                ),
+            ],
+            None,
+        ),
+    };
+    let actual_result = tc
+        .infer_expr(expr)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected_result, actual_result, "checking results");
+
+    let (actual_expr, _actual_ty) = actual_result.unwrap();
+
+    let mut evars: HashSet<EVar> = HashSet::new();
+    let _: Result<core::Expr, Void> = actual_expr.subst_evar(&mut |ev| {
+        evars.insert(*ev);
+        Ok(core::Expr::EVar(*ev))
+    });
+
+    assert_eq!(3, evars.len(), "checking number of EVars");
+
+    let ev0 = evars.get(&EVar(0)).unwrap();
+    let ev1 = evars.get(&EVar(1)).unwrap();
+    let ev2 = evars.get(&EVar(2)).unwrap();
+
+    assert_eq!(
+        Ok((
+            core::Expr::Int(0),
+            Constraint::HasField {
+                field: String::from("x"),
+                rest: Type::RowNil
+            }
+        )),
+        solve_evar(&mut tc, *ev0).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+    );
+
+    assert_eq!(
+        Ok((
+            core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0)),
+            Constraint::HasField {
+                field: String::from("y"),
+                rest: Type::mk_rows(vec![(String::from("x"), Type::Int)], None)
+            }
+        )),
+        solve_evar(&mut tc, *ev1).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+    );
+
+    assert_eq!(
+        Ok((
+            core::Expr::mk_binop(
+                Binop::Add,
+                core::Expr::Int(1),
+                core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0))
+            ),
+            Constraint::HasField {
+                field: String::from("z"),
+                rest: Type::mk_rows(
+                    vec![
+                        (String::from("y"), Type::String),
+                        (String::from("x"), Type::Int)
+                    ],
+                    None
+                )
+            }
+        )),
+        solve_evar(&mut tc, *ev2).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+    );
+}
+
+#[test]
 fn check_definition_1() {
     let mut tc = Typechecker::new();
     /*
@@ -1407,7 +1524,7 @@ fn check_definition_2() {
 fn check_definition_3() {
     let mut tc = Typechecker::new();
     /*
-    thing : { z : Bool, y : String x : Int }
+    thing : { z : Bool, y : String, x : Int }
     thing = { z = False, y = "", x = 0 }
     */
     let decl = syntax::Spanned {

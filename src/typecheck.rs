@@ -1,4 +1,4 @@
-use evidence::solver::solve_evar;
+use evidence::{solver::solve_evar, Constraint};
 
 use crate::diagnostic;
 use crate::rope::Rope;
@@ -691,6 +691,16 @@ impl Typechecker {
 
     fn lookup_name(&self, name: &String) -> Option<core::TypeSig> {
         self.context.get(name).map(|sig| sig.clone())
+    }
+
+    pub fn zonk_constraint(&self, constraint: Constraint) -> Constraint {
+        match constraint {
+            Constraint::HasField { field, rest } => Constraint::HasField {
+                field: field.clone(),
+                rest: self.zonk_type(rest.clone()),
+            },
+            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty.clone())),
+        }
     }
 
     fn zonk_type(&self, ty: Type<usize>) -> Type<usize> {
@@ -1496,17 +1506,24 @@ impl Typechecker {
 
                     let mut rest_core = None;
                     let mut rest_row = None;
-                    for expr in rest {
-                        match self
-                            .check_expr(*expr, Type::mk_app(Type::Record, rest_row_var.clone()))
-                        {
-                            Err(err) => return Err(err),
-                            Ok(expr_core) => {
-                                rest_core = Some(expr_core);
-                                rest_row = Some(rest_row_var.clone());
-                            }
+                    let _ = match rest {
+                        None => {
+                            let expected = Type::mk_record(fields_rows.clone(), None);
+                            let actual =
+                                Type::mk_record(fields_rows.clone(), Some(rest_row_var.clone()));
+                            let context = UnifyTypeContext { expected, actual };
+                            self.unify_type(&context, Type::RowNil, rest_row_var)
                         }
-                    }
+                        Some(expr) => {
+                            let expr_core = self.check_expr(
+                                *expr,
+                                Type::mk_app(Type::Record, rest_row_var.clone()),
+                            )?;
+                            rest_core = Some(expr_core);
+                            rest_row = Some(rest_row_var);
+                            Ok(())
+                        }
+                    }?;
 
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),

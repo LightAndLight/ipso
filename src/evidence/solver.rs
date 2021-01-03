@@ -88,6 +88,7 @@ pub fn solve_constraint<'a>(
                     let (_, sol) = &tc.type_solutions[*n];
                     match sol {
                         None => {
+                            println!("tys: {:?}", tc.type_solutions);
                             let evidence = lookup_evidence(tc, constraint);
                             match evidence {
                                 None => {

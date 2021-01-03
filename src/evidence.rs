@@ -1,7 +1,7 @@
 use crate::syntax::{self, Type};
 pub mod solver;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct EVar(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone)]

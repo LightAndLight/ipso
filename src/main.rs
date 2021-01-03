@@ -17,6 +17,7 @@ mod parse;
 mod rope;
 mod syntax;
 mod typecheck;
+mod void;
 
 #[derive(Debug)]
 struct Config {
