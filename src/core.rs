@@ -1,5 +1,8 @@
 use crate::{evidence::EVar, syntax, void::Void};
 
+#[cfg(test)]
+mod test;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
     Name,
@@ -22,11 +25,20 @@ impl Branch {
         })
     }
 
-    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
-        self.body.subst(f).map(|body| Branch {
+    pub fn __instantiate(&self, depth: usize, val: &Expr) -> Self {
+        Branch {
             pattern: self.pattern.clone(),
-            body,
-        })
+            body: self.body.__instantiate(
+                depth
+                    + match &self.pattern {
+                        Pattern::Name => 1,
+                        Pattern::Record { names, rest } => names + if *rest { 1 } else { 0 },
+                        Pattern::Variant { name } => 1,
+                        Pattern::Wildcard => 1,
+                    },
+                val,
+            ),
+        }
     }
 
     pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Self {
@@ -60,10 +72,10 @@ impl StringPart {
         }
     }
 
-    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+    pub fn __instantiate(&self, depth: usize, val: &Expr) -> Self {
         match self {
-            StringPart::String(s) => Ok(StringPart::String(s.clone())),
-            StringPart::Expr(e) => e.subst(f).map(|e| StringPart::Expr(e)),
+            StringPart::String(s) => StringPart::String(s.clone()),
+            StringPart::Expr(e) => StringPart::Expr(e.__instantiate(depth, val)),
         }
     }
 
@@ -128,17 +140,7 @@ impl Expr {
                 if arg {
                     // this potentially increases the number of redexes in the term.
                     // todo: bind the arg with a let?
-                    let body: Result<Expr, Void> = body.subst(&mut |v| {
-                        if *v == 0 {
-                            Ok(b.clone())
-                        } else {
-                            Ok(Expr::Var(*v - 1))
-                        }
-                    });
-                    match body {
-                        Err(err) => err.absurd(),
-                        Ok(body) => body,
-                    }
+                    body.instantiate(&b)
                 } else {
                     *body
                 }
@@ -200,95 +202,76 @@ impl Expr {
         Expr::EVar(EVar(ev))
     }
 
-    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Expr, E> {
-        match self {
-            Expr::Var(n) => f(n),
-            Expr::EVar(v) => Ok(Expr::EVar(*v)),
-            Expr::Name(n) => Ok(Expr::Name(n.clone())),
-            Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
-            Expr::App(a, b) => a
-                .subst(f)
-                .and_then(|a| b.subst(f).map(|b| Expr::mk_app(a, b))),
-            Expr::Lam { arg, body } => body.subst(f).map(|body| Expr::mk_lam(*arg, body)),
-            Expr::True => Ok(Expr::True),
-            Expr::False => Ok(Expr::False),
-            Expr::IfThenElse(a, b, c) => a.subst(f).and_then(|a| {
-                b.subst(f)
-                    .and_then(|b| c.subst(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
-            }),
-            Expr::Int(n) => Ok(Expr::Int(*n)),
-            Expr::Binop(a, b, c) => b
-                .subst(f)
-                .and_then(|b| c.subst(f).map(|c| Expr::mk_binop(*a, b, c))),
-            Expr::Char(c) => Ok(Expr::Char(*c)),
-            Expr::String(parts) => {
-                let mut new_parts = Vec::new();
-                for part in parts {
-                    match part.subst(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(new_part) => {
-                            new_parts.push(new_part);
-                        }
-                    }
-                }
-                Ok(Expr::String(new_parts))
-            }
-            Expr::Array(items) => {
-                let mut new_items = Vec::new();
-                for item in items {
-                    match item.subst(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(new_item) => {
-                            new_items.push(new_item);
-                        }
-                    }
-                }
-                Ok(Expr::Array(new_items))
-            }
-            Expr::Extend(a, b, c) => a.subst(f).and_then(|a| {
-                b.subst(f)
-                    .and_then(|b| c.subst(f).map(|c| Expr::mk_extend(a, b, c)))
-            }),
-            Expr::Record(items) => {
-                let mut new_items = Vec::new();
-                for (a, b) in items {
-                    match a.subst(f).and_then(|a| b.subst(f).map(|b| (a, b))) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(new_item) => {
-                            new_items.push(new_item);
-                        }
-                    }
-                }
-                Ok(Expr::Record(new_items))
-            }
-            Expr::Project(a, b) => a
-                .subst(f)
-                .and_then(|a| b.subst(f).map(|b| Expr::mk_project(a, b))),
-            Expr::Variant(a, b) => a
-                .subst(f)
-                .and_then(|a| b.subst(f).map(|b| Expr::mk_variant(a, b))),
-            Expr::Case(a, bs) => a.subst(f).and_then(|a| {
-                let mut new_bs = Vec::new();
-                for b in bs {
-                    match b.subst(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(new_b) => {
-                            new_bs.push(new_b);
-                        }
-                    }
-                }
-                Ok(Expr::mk_case(a, new_bs))
-            }),
+    pub fn instantiate(&self, val: &Expr) -> Expr {
+        self.__instantiate(0, val)
+    }
 
-            Expr::Unit => Ok(Expr::Unit),
+    pub fn __instantiate(&self, depth: usize, val: &Expr) -> Expr {
+        match self {
+            Expr::Var(n) => {
+                if *n == depth {
+                    val.clone()
+                } else {
+                    Expr::Var(*n)
+                }
+            }
+            Expr::EVar(v) => Expr::EVar(*v),
+            Expr::Name(n) => Expr::Name(n.clone()),
+            Expr::Builtin(b) => Expr::Builtin(*b),
+            Expr::App(a, b) => {
+                Expr::mk_app(a.__instantiate(depth, val), b.__instantiate(depth, val))
+            }
+            Expr::Lam { arg, body } => Expr::mk_lam(
+                *arg,
+                body.__instantiate(if *arg { depth + 1 } else { depth }, val),
+            ),
+            Expr::True => Expr::True,
+            Expr::False => Expr::False,
+            Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(
+                a.__instantiate(depth, val),
+                b.__instantiate(depth, val),
+                c.__instantiate(depth, val),
+            ),
+            Expr::Int(n) => Expr::Int(*n),
+            Expr::Binop(a, b, c) => {
+                Expr::mk_binop(*a, b.__instantiate(depth, val), c.__instantiate(depth, val))
+            }
+            Expr::Char(c) => Expr::Char(*c),
+            Expr::String(parts) => Expr::String(
+                parts
+                    .iter()
+                    .map(|part| part.__instantiate(depth, val))
+                    .collect(),
+            ),
+            Expr::Array(items) => Expr::Array(
+                items
+                    .iter()
+                    .map(|item| item.__instantiate(depth, val))
+                    .collect(),
+            ),
+            Expr::Extend(a, b, c) => Expr::mk_extend(
+                a.__instantiate(depth, val),
+                b.__instantiate(depth, val),
+                c.__instantiate(depth, val),
+            ),
+            Expr::Record(items) => Expr::Record(
+                items
+                    .iter()
+                    .map(|(a, b)| (a.__instantiate(depth, val), b.__instantiate(depth, val)))
+                    .collect(),
+            ),
+            Expr::Project(a, b) => {
+                Expr::mk_project(a.__instantiate(depth, val), b.__instantiate(depth, val))
+            }
+            Expr::Variant(a, b) => {
+                Expr::mk_variant(a.__instantiate(depth, val), b.__instantiate(depth, val))
+            }
+            Expr::Case(a, bs) => Expr::mk_case(
+                a.__instantiate(depth, val),
+                bs.iter().map(|b| b.__instantiate(depth, val)).collect(),
+            ),
+
+            Expr::Unit => Expr::Unit,
         }
     }
 

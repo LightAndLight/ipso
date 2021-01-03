@@ -1,4 +1,4 @@
-{ pkgs ? import <nixos-unstable> {} }:
+{ pkgs ? import <nixos-unstable> {}, RUST_BACKTRACE ? false }:
 let
   ipso = import ./. { inherit pkgs; };
   ipso-golden = import ./golden { inherit pkgs; };
@@ -22,6 +22,8 @@ in
     checkInputs = [
       ipso-golden
     ];
+
+    RUST_BACKTRACE = if RUST_BACKTRACE then "1" else "0";
     checkPhase = ''
       ipso-golden \
         --bin ${ipso}/bin/ipso \
