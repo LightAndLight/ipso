@@ -26,6 +26,13 @@ impl Constraint {
             _ => Constraint::Type(ty.clone()),
         }
     }
+
+    pub fn to_type(&self) -> Type<usize> {
+        match self {
+            Constraint::HasField { field, rest } => Type::mk_hasfield(field.clone(), rest.clone()),
+            Constraint::Type(ty) => ty.clone(),
+        }
+    }
 }
 
 impl<A> Evidence<A> {

@@ -550,7 +550,7 @@ impl Typechecker {
     fn generalise(&mut self, expr: core::Expr, ty: Type<usize>) -> (core::Expr, core::TypeSig) {
         let mut unsolved_constraints: Vec<(evidence::EVar, evidence::Constraint)> = Vec::new();
         let mut first_error: Option<evidence::solver::SolveError> = None;
-        let mut expr = expr.subst_evar(&mut |ev| {
+        let expr = expr.subst_evar(&mut |ev| {
             match solve_evar(self, *ev) {
                 Err(err) => match first_error {
                     // This error handling is bad. I want a `Traversal Expr EVar`
@@ -573,15 +573,26 @@ impl Typechecker {
             }
         });
 
+        let mut expr = expr;
         let mut ty = ty;
         for (ev, constraint) in unsolved_constraints.iter().rev() {
-            todo!(); // abstract over `ev` in `expr`
+            expr = expr.abstract_evar(0, *ev);
             ty = Type::mk_arrow(constraint.to_type(), ty);
         }
-        let sig = core::TypeSig {
-            ty_vars: todo!(),
-            body: ty,
+
+        let ty = self.zonk_type(ty);
+        let ty_vars = {
+            let mut seen: HashSet<usize> = HashSet::new();
+            let mut kinds: Vec<syntax::Kind> = Vec::new();
+            for meta in ty.iter_metas() {
+                if !seen.contains(&meta) {
+                    seen.insert(meta);
+                    kinds.push(self.type_solutions[meta].0.clone());
+                }
+            }
+            kinds
         };
+        let sig = core::TypeSig { ty_vars, body: ty };
 
         self.evidence = Evidence::new();
 
