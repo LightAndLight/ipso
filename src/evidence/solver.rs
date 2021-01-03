@@ -1,32 +1,17 @@
 use crate::{
     core,
-    syntax::Binop,
-    typecheck::{Implication, Typechecker},
-};
-use crate::{
-    syntax::{self, Kind},
-    typecheck::TypeError,
+    syntax::{self, Binop, Kind},
+    typecheck::{TypeError, Typechecker},
 };
 
 use super::{Constraint, EVar};
 
 mod test;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum SolveError {
-    TypeError(TypeError),
-}
-
-impl From<TypeError> for SolveError {
-    fn from(err: TypeError) -> Self {
-        SolveError::TypeError(err)
-    }
-}
-
 pub fn solve_constraint<'a>(
     tc: &mut Typechecker,
     constraint: &Constraint,
-) -> Result<core::Expr, SolveError> {
+) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
             todo!("solve constraint {:?}", constraint)
@@ -116,7 +101,7 @@ pub fn solve_constraint<'a>(
     }
 }
 
-pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<(core::Expr, Constraint), SolveError> {
+pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<(core::Expr, Constraint), TypeError> {
     let (constraint, evidence) = tc.evidence.0[ev.0].clone();
     match evidence.clone() {
         None => {

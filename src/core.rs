@@ -16,11 +16,11 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Self {
-        Branch {
+    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+        self.body.subst_evar(f).map(|body| Branch {
             pattern: self.pattern.clone(),
-            body: self.body.subst_evar(f),
-        }
+            body,
+        })
     }
 
     pub fn abstract_evar(&self, depth: usize, ev: EVar) -> Self {
@@ -28,9 +28,9 @@ impl Branch {
             pattern: self.pattern.clone(),
             body: self.body.abstract_evar(
                 depth
-                    + match self.pattern {
+                    + match &self.pattern {
                         Pattern::Name => 1,
-                        Pattern::Record { names, rest } => names + if rest { 1 } else { 0 },
+                        Pattern::Record { names, rest } => names + if *rest { 1 } else { 0 },
                         Pattern::Variant { name } => 1,
                         Pattern::Wildcard => 0,
                     },
@@ -47,10 +47,10 @@ pub enum StringPart {
 }
 
 impl StringPart {
-    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Self {
+    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
         match self {
-            StringPart::String(s) => StringPart::String(s.clone()),
-            StringPart::Expr(e) => StringPart::Expr(e.subst_evar(f)),
+            StringPart::String(s) => Ok(StringPart::String(s.clone())),
+            StringPart::Expr(e) => e.subst_evar(f).map(|e| StringPart::Expr(e)),
         }
     }
 
@@ -157,39 +157,98 @@ impl Expr {
         Expr::EVar(EVar(ev))
     }
 
-    pub fn subst_evar<F: FnMut(&EVar) -> Expr>(&self, f: &mut F) -> Expr {
+    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Expr, E> {
         match self {
-            Expr::Var(n) => Expr::Var(*n),
+            Expr::Var(n) => Ok(Expr::Var(*n)),
             Expr::EVar(v) => f(v),
-            Expr::Name(n) => Expr::Name(n.clone()),
-            Expr::Builtin(b) => Expr::Builtin(*b),
-            Expr::App(a, b) => Expr::mk_app(a.subst_evar(f), b.subst_evar(f)),
-            Expr::Lam { arg, body } => Expr::mk_lam(*arg, body.subst_evar(f)),
-            Expr::True => Expr::True,
-            Expr::False => Expr::False,
-            Expr::IfThenElse(a, b, c) => {
-                Expr::mk_ifthenelse(a.subst_evar(f), b.subst_evar(f), c.subst_evar(f))
+            Expr::Name(n) => Ok(Expr::Name(n.clone())),
+            Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
+            Expr::App(a, b) => a
+                .subst_evar(f)
+                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_app(a, b))),
+            Expr::Lam { arg, body } => body.subst_evar(f).map(|body| Expr::mk_lam(*arg, body)),
+            Expr::True => Ok(Expr::True),
+            Expr::False => Ok(Expr::False),
+            Expr::IfThenElse(a, b, c) => a.subst_evar(f).and_then(|a| {
+                b.subst_evar(f)
+                    .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
+            }),
+            Expr::Int(n) => Ok(Expr::Int(*n)),
+            Expr::Binop(a, b, c) => b
+                .subst_evar(f)
+                .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_binop(*a, b, c))),
+            Expr::Char(c) => Ok(Expr::Char(*c)),
+            Expr::String(parts) => {
+                let mut new_parts = Vec::new();
+                for part in parts {
+                    match part.subst_evar(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_part) => {
+                            new_parts.push(new_part);
+                        }
+                    }
+                }
+                Ok(Expr::String(new_parts))
             }
-            Expr::Int(n) => Expr::Int(*n),
-            Expr::Binop(a, b, c) => Expr::mk_binop(*a, b.subst_evar(f), c.subst_evar(f)),
-            Expr::Char(c) => Expr::Char(*c),
-            Expr::String(s) => Expr::String(s.iter().map(|x| x.subst_evar(f)).collect()),
-            Expr::Array(xs) => Expr::Array(xs.iter().map(|x| x.subst_evar(f)).collect()),
-            Expr::Extend(a, b, c) => {
-                Expr::mk_extend(a.subst_evar(f), b.subst_evar(f), c.subst_evar(f))
+            Expr::Array(items) => {
+                let mut new_items = Vec::new();
+                for item in items {
+                    match item.subst_evar(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_item) => {
+                            new_items.push(new_item);
+                        }
+                    }
+                }
+                Ok(Expr::Array(new_items))
             }
-            Expr::Record(xs) => Expr::Record(
-                xs.iter()
-                    .map(|(x, y)| (x.subst_evar(f), y.subst_evar(f)))
-                    .collect(),
-            ),
-            Expr::Project(a, b) => Expr::mk_project(a.subst_evar(f), b.subst_evar(f)),
-            Expr::Variant(a, b) => Expr::mk_variant(a.subst_evar(f), b.subst_evar(f)),
-            Expr::Case(a, bs) => Expr::mk_case(
-                a.subst_evar(f),
-                bs.iter().map(|b| b.subst_evar(f)).collect(),
-            ),
-            Expr::Unit => Expr::Unit,
+            Expr::Extend(a, b, c) => a.subst_evar(f).and_then(|a| {
+                b.subst_evar(f)
+                    .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_extend(a, b, c)))
+            }),
+            Expr::Record(items) => {
+                let mut new_items = Vec::new();
+                for (a, b) in items {
+                    match a
+                        .subst_evar(f)
+                        .and_then(|a| b.subst_evar(f).map(|b| (a, b)))
+                    {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_item) => {
+                            new_items.push(new_item);
+                        }
+                    }
+                }
+                Ok(Expr::Record(new_items))
+            }
+            Expr::Project(a, b) => a
+                .subst_evar(f)
+                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_project(a, b))),
+            Expr::Variant(a, b) => a
+                .subst_evar(f)
+                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_variant(a, b))),
+            Expr::Case(a, bs) => a.subst_evar(f).and_then(|a| {
+                let mut new_bs = Vec::new();
+                for b in bs {
+                    match b.subst_evar(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_b) => {
+                            new_bs.push(new_b);
+                        }
+                    }
+                }
+                Ok(Expr::mk_case(a, new_bs))
+            }),
+
+            Expr::Unit => Ok(Expr::Unit),
         }
     }
 

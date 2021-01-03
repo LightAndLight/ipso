@@ -1,4 +1,3 @@
-use crate::evidence::EVar;
 use crate::syntax::Binop;
 use crate::{
     builtins,

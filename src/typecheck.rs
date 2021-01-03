@@ -547,31 +547,22 @@ impl Typechecker {
         Ok(ty)
     }
 
-    fn generalise(&mut self, expr: core::Expr, ty: Type<usize>) -> (core::Expr, core::TypeSig) {
+    fn generalise(
+        &mut self,
+        expr: core::Expr,
+        ty: Type<usize>,
+    ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let mut unsolved_constraints: Vec<(evidence::EVar, evidence::Constraint)> = Vec::new();
-        let mut first_error: Option<evidence::solver::SolveError> = None;
         let expr = expr.subst_evar(&mut |ev| {
-            match solve_evar(self, *ev) {
-                Err(err) => match first_error {
-                    // This error handling is bad. I want a `Traversal Expr EVar`
-                    None => {
-                        first_error = Some(err);
-                        todo!()
-                    }
-                    Some(_) => {
-                        todo!()
-                    }
-                },
-                Ok((expr, solved_constraint)) => match expr {
-                    core::Expr::EVar(new_ev) if *ev == new_ev => {
-                        // unsolved
-                        unsolved_constraints.push((*ev, solved_constraint));
-                        expr
-                    }
-                    _ => expr,
-                },
+            let (expr, solved_constraint) = solve_evar(self, *ev)?;
+            match expr {
+                core::Expr::EVar(new_ev) if *ev == new_ev => {
+                    unsolved_constraints.push((*ev, solved_constraint));
+                }
+                _ => {}
             }
-        });
+            Ok(expr)
+        })?;
 
         let mut expr = expr;
         let mut ty = ty;
@@ -596,7 +587,7 @@ impl Typechecker {
 
         self.evidence = Evidence::new();
 
-        (expr, sig)
+        Ok((expr, sig))
     }
 
     fn check_definition(
@@ -640,7 +631,7 @@ impl Typechecker {
             },
             ty.clone(),
         )?;
-        let (body, sig) = self.generalise(body, ty.clone());
+        let (body, sig) = self.generalise(body, ty.clone())?;
 
         self.bound_tyvars.delete(ty_var_kinds_len);
 
