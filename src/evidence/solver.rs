@@ -8,6 +8,23 @@ use super::{Constraint, EVar};
 
 mod test;
 
+pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
+    tc.evidence
+        .0
+        .iter()
+        .enumerate()
+        .find_map(|(ix, (other_constraint, other_evidence))| {
+            if tc.eq_zonked_constraint(constraint, other_constraint) {
+                match other_evidence {
+                    None => Some(core::Expr::mk_evar(ix)),
+                    Some(expr) => Some(expr.clone()),
+                }
+            } else {
+                None
+            }
+        })
+}
+
 pub fn solve_constraint<'a>(
     tc: &mut Typechecker,
     constraint: &Constraint,
@@ -43,21 +60,26 @@ pub fn solve_constraint<'a>(
 
                 syntax::Type::Name(n) => todo!("deduce HasField for Name({})", n),
 
-                syntax::Type::Var(_) | syntax::Type::App(_, _) => {
-                    let evidence =
-                        tc.evidence
-                            .0
-                            .iter()
-                            .find_map(|(other_constraint, other_evidence)| {
-                                if tc.eq_zonked_constraint(constraint, other_constraint) {
-                                    other_evidence.clone()
-                                } else {
-                                    None
-                                }
-                            });
+                syntax::Type::Var(_) => {
+                    let evidence = lookup_evidence(tc, constraint);
                     match evidence {
                         None => {
-                            panic!("impossible: cannot deduce HasField({:?}, {:?}", field, rest)
+                            // we're allow to conjure evidence for non-extistent HasField constraints,
+                            // so the user doesn't have to write them
+                            let ev = tc.evidence.fresh_evar(constraint.clone());
+                            Ok(core::Expr::EVar(ev))
+                        }
+                        Some(evidence) => Ok(evidence),
+                    }
+                }
+                syntax::Type::App(_, _) => {
+                    let evidence = lookup_evidence(tc, constraint);
+                    match evidence {
+                        None => {
+                            panic!(
+                                "impossible: cannot deduce HasField({:?}, {:?})",
+                                field, rest
+                            )
                         }
                         Some(evidence) => Ok(evidence),
                     }
@@ -65,12 +87,18 @@ pub fn solve_constraint<'a>(
                 syntax::Type::Meta(n) => {
                     let (_, sol) = &tc.type_solutions[*n];
                     match sol {
-                        None => Ok(core::Expr::EVar(tc.evidence.fresh_evar(
-                            Constraint::HasField {
-                                field: field.clone(),
-                                rest: rest.clone(),
-                            },
-                        ))),
+                        None => {
+                            let evidence = lookup_evidence(tc, constraint);
+                            match evidence {
+                                None => {
+                                    panic!(
+                                        "impossible: cannot deduce HasField({:?}, {:?}) given {:?}",
+                                        field, rest, tc.evidence
+                                    )
+                                }
+                                Some(evidence) => Ok(evidence),
+                            }
+                        }
                         Some(sol) => solve_constraint(
                             tc,
                             &Constraint::HasField {
@@ -106,6 +134,7 @@ pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<(core::Expr, Constra
     match evidence.clone() {
         None => {
             let expr = solve_constraint(tc, &constraint)?;
+            tc.evidence.0[ev.0].1 = Some(expr.clone());
             Ok((expr, constraint.clone()))
         }
         Some(evidence) => Ok((evidence, constraint.clone())),

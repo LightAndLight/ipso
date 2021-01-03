@@ -46,6 +46,11 @@ fn solve_constraint_2() {
 fn solve_constraint_3() {
     let mut tc = Typechecker::new();
     let var = tc.fresh_typevar(Kind::Row);
+    tc.evidence.fresh_evar(Constraint::HasField {
+        field: String::from("z"),
+        rest: var.clone(),
+    });
+    // HasField "z" (x : Int, y : Bool, ?0)
     let constraint = Constraint::HasField {
         field: String::from("z"),
         rest: Type::mk_rows(

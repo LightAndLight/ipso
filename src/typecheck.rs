@@ -567,10 +567,18 @@ impl Typechecker {
         let mut expr = expr;
         let mut ty = ty;
         for (ev, constraint) in unsolved_constraints.iter().rev() {
-            expr = expr.abstract_evar(0, *ev);
-            ty = Type::mk_arrow(constraint.to_type(), ty);
+            expr = expr.abstract_evar(*ev);
+            let constraint = self.zonk_type(constraint.to_type());
+            match constraint.iter_metas().next() {
+                None => {}
+                Some(_) => {
+                    todo!("handle ambiguous constraints")
+                }
+            }
+            ty = Type::mk_fatarrow(constraint, ty);
         }
 
+        /*
         let ty = self.zonk_type(ty);
         let ty_vars = {
             let mut seen: HashSet<usize> = HashSet::new();
@@ -583,6 +591,13 @@ impl Typechecker {
             }
             kinds
         };
+        */
+        let ty_vars = self
+            .bound_tyvars
+            .info
+            .iter()
+            .map(|x| self.zonk_kind(x.1.clone()))
+            .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
         self.evidence = Evidence::new();

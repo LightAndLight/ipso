@@ -23,10 +23,10 @@ impl Branch {
         })
     }
 
-    pub fn abstract_evar(&self, depth: usize, ev: EVar) -> Self {
+    pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Self {
         Branch {
             pattern: self.pattern.clone(),
-            body: self.body.abstract_evar(
+            body: self.body.__abstract_evar(
                 depth
                     + match &self.pattern {
                         Pattern::Name => 1,
@@ -54,10 +54,10 @@ impl StringPart {
         }
     }
 
-    pub fn abstract_evar(&self, depth: usize, ev: EVar) -> Self {
+    pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Self {
         match self {
             StringPart::String(s) => StringPart::String(s.clone()),
-            StringPart::Expr(e) => StringPart::Expr(e.abstract_evar(depth, ev)),
+            StringPart::Expr(e) => StringPart::Expr(e.__abstract_evar(depth, ev)),
         }
     }
 }
@@ -252,9 +252,9 @@ impl Expr {
         }
     }
 
-    pub fn abstract_evar(&self, depth: usize, ev: EVar) -> Expr {
-        let body = match self {
-            Expr::Var(n) => Expr::Var(n + 1),
+    pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Expr {
+        match self {
+            Expr::Var(n) => Expr::Var(if *n >= depth { *n + 1 } else { *n }),
             Expr::EVar(current_ev) => {
                 if ev == *current_ev {
                     Expr::Var(depth)
@@ -264,59 +264,66 @@ impl Expr {
             }
             Expr::Name(n) => Expr::Name(n.clone()),
             Expr::Builtin(b) => Expr::Builtin(*b),
-            Expr::App(a, b) => Expr::mk_app(a.abstract_evar(depth, ev), b.abstract_evar(depth, ev)),
+            Expr::App(a, b) => {
+                Expr::mk_app(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))
+            }
             Expr::Lam { arg, body } => Expr::mk_lam(
                 *arg,
-                body.abstract_evar(if *arg { depth + 1 } else { depth }, ev),
+                body.__abstract_evar(if *arg { depth + 1 } else { depth }, ev),
             ),
             Expr::True => Expr::True,
             Expr::False => Expr::False,
             Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(
-                a.abstract_evar(depth, ev),
-                b.abstract_evar(depth, ev),
-                c.abstract_evar(depth, ev),
+                a.__abstract_evar(depth, ev),
+                b.__abstract_evar(depth, ev),
+                c.__abstract_evar(depth, ev),
             ),
             Expr::Int(n) => Expr::Int(*n),
-            Expr::Binop(a, b, c) => {
-                Expr::mk_binop(*a, b.abstract_evar(depth, ev), c.abstract_evar(depth, ev))
-            }
+            Expr::Binop(a, b, c) => Expr::mk_binop(
+                *a,
+                b.__abstract_evar(depth, ev),
+                c.__abstract_evar(depth, ev),
+            ),
             Expr::Char(c) => Expr::Char(*c),
             Expr::String(parts) => Expr::String(
                 parts
                     .iter()
-                    .map(|part| part.abstract_evar(depth, ev))
+                    .map(|part| part.__abstract_evar(depth, ev))
                     .collect(),
             ),
             Expr::Array(items) => Expr::Array(
                 items
                     .iter()
-                    .map(|item| item.abstract_evar(depth, ev))
+                    .map(|item| item.__abstract_evar(depth, ev))
                     .collect(),
             ),
             Expr::Extend(a, b, c) => Expr::mk_extend(
-                a.abstract_evar(depth, ev),
-                b.abstract_evar(depth, ev),
-                c.abstract_evar(depth, ev),
+                a.__abstract_evar(depth, ev),
+                b.__abstract_evar(depth, ev),
+                c.__abstract_evar(depth, ev),
             ),
             Expr::Record(items) => Expr::Record(
                 items
                     .iter()
-                    .map(|(a, b)| (a.abstract_evar(depth, ev), b.abstract_evar(depth, ev)))
+                    .map(|(a, b)| (a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev)))
                     .collect(),
             ),
             Expr::Project(a, b) => {
-                Expr::mk_project(a.abstract_evar(depth, ev), b.abstract_evar(depth, ev))
+                Expr::mk_project(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))
             }
             Expr::Variant(a, b) => {
-                Expr::mk_variant(a.abstract_evar(depth, ev), b.abstract_evar(depth, ev))
+                Expr::mk_variant(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))
             }
             Expr::Case(a, bs) => Expr::mk_case(
-                a.abstract_evar(depth, ev),
-                bs.iter().map(|b| b.abstract_evar(depth, ev)).collect(),
+                a.__abstract_evar(depth, ev),
+                bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
-        };
-        Expr::mk_lam(true, body)
+        }
+    }
+
+    pub fn abstract_evar(&self, ev: EVar) -> Expr {
+        Expr::mk_lam(true, self.__abstract_evar(0, ev))
     }
 }
 

@@ -1,12 +1,9 @@
 #[cfg(test)]
-use crate::core;
-#[cfg(test)]
-use crate::syntax::{self, Kind, Type};
-#[cfg(test)]
-use crate::typecheck::{BoundVars, UnifyKindContext};
-
-#[cfg(test)]
-use super::{TypeError, Typechecker, UnifyTypeContext};
+use crate::{
+    core,
+    syntax::{self, Kind, Type},
+    typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
+};
 
 #[test]
 fn infer_kind_test_1() {
@@ -1337,6 +1334,73 @@ fn check_definition_1() {
             body: core::Expr::mk_lam(true, core::Expr::Var(0))
         })
     )
+}
+
+#[test]
+fn check_definition_2() {
+    let mut tc = Typechecker::new();
+    /*
+    thing : { r } -> { x : Int, r }
+    thing r = { x = 0, ..r }
+    */
+    let decl = syntax::Spanned {
+        pos: 0,
+        item: syntax::Declaration::Definition {
+            name: String::from("thing"),
+            ty: syntax::Type::mk_arrow(
+                syntax::Type::mk_record(Vec::new(), Some(Type::Var(String::from("r")))),
+                syntax::Type::mk_record(
+                    vec![(String::from("x"), Type::Int)],
+                    Some(syntax::Type::Var(String::from("r"))),
+                ),
+            ),
+            args: vec![syntax::Pattern::Name(syntax::Spanned {
+                pos: 37,
+                item: String::from("r"),
+            })],
+            body: syntax::Spanned {
+                pos: 41,
+                item: syntax::Expr::mk_record(
+                    vec![(
+                        String::from("x"),
+                        syntax::Spanned {
+                            pos: 47,
+                            item: syntax::Expr::Int(0),
+                        },
+                    )],
+                    Some(syntax::Spanned {
+                        pos: 52,
+                        item: syntax::Expr::Var(String::from("r")),
+                    }),
+                ),
+            },
+        },
+    };
+    let expected = Ok(core::Declaration::Definition {
+        name: String::from("thing"),
+        sig: core::TypeSig {
+            ty_vars: vec![syntax::Kind::Row],
+            body: syntax::Type::mk_fatarrow(
+                syntax::Type::mk_hasfield(String::from("x"), Type::Var(0)),
+                syntax::Type::mk_arrow(
+                    syntax::Type::mk_record(Vec::new(), Some(Type::Var(0))),
+                    syntax::Type::mk_record(
+                        vec![(String::from("x"), Type::Int)],
+                        Some(syntax::Type::Var(0)),
+                    ),
+                ),
+            ),
+        },
+        body: core::Expr::mk_lam(
+            true,
+            core::Expr::mk_lam(
+                true,
+                core::Expr::mk_extend(core::Expr::Var(1), core::Expr::Int(0), core::Expr::Var(0)),
+            ),
+        ),
+    });
+    let actual = tc.check_declaration(decl);
+    assert_eq!(expected, actual)
 }
 
 #[test]
