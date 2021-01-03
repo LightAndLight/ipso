@@ -1,5 +1,4 @@
-use crate::evidence::EVar;
-use crate::syntax;
+use crate::{evidence::EVar, syntax, void::Void};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
@@ -18,6 +17,13 @@ pub struct Branch {
 impl Branch {
     pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
         self.body.subst_evar(f).map(|body| Branch {
+            pattern: self.pattern.clone(),
+            body,
+        })
+    }
+
+    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+        self.body.subst(f).map(|body| Branch {
             pattern: self.pattern.clone(),
             body,
         })
@@ -51,6 +57,13 @@ impl StringPart {
         match self {
             StringPart::String(s) => Ok(StringPart::String(s.clone())),
             StringPart::Expr(e) => e.subst_evar(f).map(|e| StringPart::Expr(e)),
+        }
+    }
+
+    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+        match self {
+            StringPart::String(s) => Ok(StringPart::String(s.clone())),
+            StringPart::Expr(e) => e.subst(f).map(|e| StringPart::Expr(e)),
         }
     }
 
@@ -110,7 +123,28 @@ pub enum Expr {
 
 impl Expr {
     pub fn mk_app(a: Expr, b: Expr) -> Expr {
-        Expr::App(Box::new(a), Box::new(b))
+        match a {
+            Expr::Lam { arg, body } => {
+                if arg {
+                    // this potentially increases the number of redexes in the term.
+                    // todo: bind the arg with a let?
+                    let body: Result<Expr, Void> = body.subst(&mut |v| {
+                        if *v == 0 {
+                            Ok(b.clone())
+                        } else {
+                            Ok(Expr::Var(*v - 1))
+                        }
+                    });
+                    match body {
+                        Err(err) => err.absurd(),
+                        Ok(body) => body,
+                    }
+                } else {
+                    *body
+                }
+            }
+            a => Expr::App(Box::new(a), Box::new(b)),
+        }
     }
 
     pub fn mk_lam(arg: bool, body: Expr) -> Expr {
@@ -146,6 +180,15 @@ impl Expr {
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
+        match op {
+            syntax::Binop::Add => match (&a, &b) {
+                (Expr::Int(a), Expr::Int(b)) => {
+                    return Expr::Int(*a + *b);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
         Expr::Binop(op, Box::new(a), Box::new(b))
     }
 
@@ -155,6 +198,98 @@ impl Expr {
 
     pub fn mk_evar(ev: usize) -> Expr {
         Expr::EVar(EVar(ev))
+    }
+
+    pub fn subst<E, F: FnMut(&usize) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Expr, E> {
+        match self {
+            Expr::Var(n) => f(n),
+            Expr::EVar(v) => Ok(Expr::EVar(*v)),
+            Expr::Name(n) => Ok(Expr::Name(n.clone())),
+            Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
+            Expr::App(a, b) => a
+                .subst(f)
+                .and_then(|a| b.subst(f).map(|b| Expr::mk_app(a, b))),
+            Expr::Lam { arg, body } => body.subst(f).map(|body| Expr::mk_lam(*arg, body)),
+            Expr::True => Ok(Expr::True),
+            Expr::False => Ok(Expr::False),
+            Expr::IfThenElse(a, b, c) => a.subst(f).and_then(|a| {
+                b.subst(f)
+                    .and_then(|b| c.subst(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
+            }),
+            Expr::Int(n) => Ok(Expr::Int(*n)),
+            Expr::Binop(a, b, c) => b
+                .subst(f)
+                .and_then(|b| c.subst(f).map(|c| Expr::mk_binop(*a, b, c))),
+            Expr::Char(c) => Ok(Expr::Char(*c)),
+            Expr::String(parts) => {
+                let mut new_parts = Vec::new();
+                for part in parts {
+                    match part.subst(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_part) => {
+                            new_parts.push(new_part);
+                        }
+                    }
+                }
+                Ok(Expr::String(new_parts))
+            }
+            Expr::Array(items) => {
+                let mut new_items = Vec::new();
+                for item in items {
+                    match item.subst(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_item) => {
+                            new_items.push(new_item);
+                        }
+                    }
+                }
+                Ok(Expr::Array(new_items))
+            }
+            Expr::Extend(a, b, c) => a.subst(f).and_then(|a| {
+                b.subst(f)
+                    .and_then(|b| c.subst(f).map(|c| Expr::mk_extend(a, b, c)))
+            }),
+            Expr::Record(items) => {
+                let mut new_items = Vec::new();
+                for (a, b) in items {
+                    match a.subst(f).and_then(|a| b.subst(f).map(|b| (a, b))) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_item) => {
+                            new_items.push(new_item);
+                        }
+                    }
+                }
+                Ok(Expr::Record(new_items))
+            }
+            Expr::Project(a, b) => a
+                .subst(f)
+                .and_then(|a| b.subst(f).map(|b| Expr::mk_project(a, b))),
+            Expr::Variant(a, b) => a
+                .subst(f)
+                .and_then(|a| b.subst(f).map(|b| Expr::mk_variant(a, b))),
+            Expr::Case(a, bs) => a.subst(f).and_then(|a| {
+                let mut new_bs = Vec::new();
+                for b in bs {
+                    match b.subst(f) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(new_b) => {
+                            new_bs.push(new_b);
+                        }
+                    }
+                }
+                Ok(Expr::mk_case(a, new_bs))
+            }),
+
+            Expr::Unit => Ok(Expr::Unit),
+        }
     }
 
     pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Expr, E> {
