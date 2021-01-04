@@ -162,6 +162,12 @@ macro_rules! keep_left {
     };
 }
 
+macro_rules! between {
+    ($l:expr, $r:expr, $x:expr) => {
+        keep_right!($l, keep_left!($x, $r))
+    };
+}
+
 pub fn parse_string(input: String) -> Result<Module, ParseError> {
     let tokens: Vec<Token> = {
         let lexer = Lexer::new(&input);
@@ -445,10 +451,30 @@ impl Parser {
         self.expecting.insert(TokenType::Ident(String::new()));
         match self.current {
             Some(ref token) => match token.token_type {
-                TokenType::Ident(ref s) if !syntax::is_keyword(s) => {
-                    let s = s.clone();
-                    map0!(s, self.consume())
-                }
+                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().nth(0) {
+                    Some(c) if c.is_lowercase() => {
+                        let s = s.clone();
+                        map0!(s, self.consume())
+                    }
+                    _ => self.unexpected(false),
+                },
+                _ => self.unexpected(false),
+            },
+            None => self.unexpected(false),
+        }
+    }
+
+    fn ctor(&mut self) -> ParseResult<String> {
+        self.expecting.insert(TokenType::Ctor);
+        match self.current {
+            Some(ref token) => match token.token_type {
+                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().nth(0) {
+                    Some(c) if c.is_uppercase() => {
+                        let s = s.clone();
+                        map0!(s, self.consume())
+                    }
+                    _ => self.unexpected(false),
+                },
                 _ => self.unexpected(false),
             },
             None => self.unexpected(false),
@@ -525,6 +551,54 @@ impl Parser {
         )
     }
 
+    /*
+    type_variant ::=
+      '<' [type_variant_ctors] '>'
+
+    type_variant_ctors ::=
+      ident
+      ctor ':' type ['|' type_variant_ctors]
+     */
+    fn type_variant(&mut self) -> ParseResult<Type<String>> {
+        fn type_variant_ctors(
+            parser: &mut Parser,
+            ctors: &mut Vec<(String, Type<String>)>,
+        ) -> ParseResult<Option<Type<String>>> {
+            choices!(
+                parser,
+                keep_left!(parser.ident(), parser.spaces()).map(|x| Some(Type::Var(x))),
+                keep_left!(parser.ctor(), parser.spaces()).and_then(|ctor| keep_left!(
+                    parser.token(&TokenType::Colon),
+                    parser.spaces()
+                )
+                .and_then(|_| parser.type_().and_then(|ty| {
+                    ctors.push((ctor, ty));
+                    optional!(
+                        parser,
+                        keep_left!(parser.token(&TokenType::Pipe), parser.spaces())
+                            .and_then(|_| type_variant_ctors(parser, ctors))
+                    )
+                    .map(|m_rest| match m_rest {
+                        None => None,
+                        Some(rest) => rest,
+                    })
+                })))
+            )
+        }
+
+        between!(
+            keep_left!(self.token(&TokenType::LAngle), self.spaces()),
+            self.token(&TokenType::RAngle),
+            {
+                let mut ctors = Vec::new();
+                optional!(self, type_variant_ctors(self, &mut ctors)).map(|m_rest| match m_rest {
+                    None => Type::mk_variant(Vec::new(), None),
+                    Some(rest) => Type::mk_variant(ctors, rest),
+                })
+            }
+        )
+    }
+
     fn type_atom(&mut self) -> ParseResult<Type<String>> {
         keep_left!(
             choices!(
@@ -551,7 +625,8 @@ impl Parser {
                 ),
                 map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
                 self.type_record(),
-                self.ident().map(|s| Type::Name(s)),
+                self.type_variant(),
+                choices!(self, self.ident(), self.ctor()).map(|s| Type::Name(s)),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
                     keep_left!(
@@ -905,7 +980,7 @@ impl Parser {
     fn type_alias(&mut self) -> ParseResult<Declaration> {
         keep_right!(
             keep_left!(self.keyword(Keyword::Type), self.spaces()),
-            keep_left!(self.ident(), self.spaces()).and_then(|name| many!(
+            keep_left!(self.ctor(), self.spaces()).and_then(|name| many!(
                 self,
                 keep_left!(self.ident(), self.spaces())
             )

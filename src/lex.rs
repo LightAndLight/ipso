@@ -6,6 +6,7 @@ use std::str::Chars;
 pub enum TokenType {
     Unexpected(char),
 
+    Ctor,
     Ident(String),
     Int { value: usize, length: usize },
 
@@ -20,6 +21,8 @@ pub enum TokenType {
     RParen,
     LBracket,
     RBracket,
+    LAngle,
+    RAngle,
 
     Backslash,
     Arrow,
@@ -33,6 +36,7 @@ pub enum TokenType {
     Colon,
 
     Comma,
+    Pipe,
 
     Underscore,
 
@@ -92,8 +96,13 @@ impl TokenType {
                 }
             }
             TokenType::Space => String::from("space"),
+            TokenType::Ctor => String::from("constructor"),
+            TokenType::Pipe => String::from("'|'"),
+            TokenType::LAngle => String::from("'<'"),
+            TokenType::RAngle => String::from("'>'"),
         }
     }
+
     pub fn length(&self) -> usize {
         match self {
             TokenType::Unexpected(_) => 1,
@@ -123,6 +132,11 @@ impl TokenType {
             TokenType::Dollar => 1,
             TokenType::DollarLBrace => 2,
             TokenType::String(s) => s.len(),
+            TokenType::Pipe => 1,
+            TokenType::LAngle => 1,
+            TokenType::RAngle => 1,
+
+            TokenType::Ctor => panic!("TokenType::Ctor.len()"),
         }
     }
 }
@@ -356,6 +370,27 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         Some(Token {
                             token_type: TokenType::RBracket,
+                            pos,
+                        })
+                    }
+                    '<' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::LAngle,
+                            pos,
+                        })
+                    }
+                    '>' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::RAngle,
+                            pos,
+                        })
+                    }
+                    '|' => {
+                        self.consume();
+                        Some(Token {
+                            token_type: TokenType::Pipe,
                             pos,
                         })
                     }
