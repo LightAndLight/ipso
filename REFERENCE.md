@@ -286,7 +286,7 @@ f : { x : Int, y : Int } -> Int
 ```
 
 ```ipso-repl
-> :t \{ x, ...rest } -> x + rest.y + rest.z
+> :t \{ x, ..rest } -> x + rest.y + rest.z
 { x : Int, y : Int, z : Int } -> Int
 ```
 
@@ -359,7 +359,7 @@ false
 ```ipso-repl
 > rest = { more = false, words = ["a", "b"] }
 rest : { more : Bool, words : Array String }
-> :t { some = "some", ...rest }
+> :t { some = "some", ..rest }
 { some : String, more : Bool, words : Array String }
 ```
 
@@ -592,8 +592,8 @@ pattern ::=
   
 record_pattern ::=
   epsilon |
-  ident (',' ident)* [',' '...' ident] |
-  '...' ident |
+  ident (',' ident)* [',' '..' ident] |
+  '..' ident |
  
  
 expr ::=
@@ -685,8 +685,8 @@ record ::=
   
 record_content ::=
   epsilon |
-  record_item (',' record_item)* [',' '...' atom] |
-  '...' atom
+  record_item (',' record_item)* [',' '..' atom] |
+  '..' atom
   
 record_item ::=
   ident '=' expr
