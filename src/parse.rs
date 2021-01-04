@@ -253,6 +253,12 @@ macro_rules! many_ {
     }};
 }
 
+macro_rules! some_ {
+    ($self:expr, $x:expr) => {{
+        $x.and_then(|_| many_!($self, $x))
+    }};
+}
+
 macro_rules! sep_by {
     ($self:expr, $x:expr, $sep:expr) => {
         choices!(
@@ -465,6 +471,60 @@ impl Parser {
         }
     }
 
+    /*
+    type_record ::=
+      '{' record_fields '}'
+
+    type_record_fields ::=
+      [ident [':' type [',' record_fields]]]
+     */
+    fn type_record(&mut self) -> ParseResult<Type<String>> {
+        fn type_record_fields(
+            parser: &mut Parser,
+            fields: &mut Vec<(String, Type<String>)>,
+        ) -> ParseResult<Option<Type<String>>> {
+            optional!(self, keep_left!(parser.ident(), parser.spaces())).and_then(|m_ident| {
+                match m_ident {
+                    None => ParseResult::pure(None),
+                    Some(ident) => optional!(
+                        self,
+                        keep_right!(
+                            keep_left!(parser.token(&TokenType::Colon), parser.spaces()),
+                            parser.type_()
+                        )
+                    )
+                    .and_then(|m_ty| match m_ty {
+                        None => ParseResult::pure(Some(Type::Var(ident))),
+                        Some(ty) => {
+                            fields.push((ident, ty));
+                            optional!(
+                                parser,
+                                keep_right!(
+                                    keep_left!(parser.token(&TokenType::Comma), parser.spaces()),
+                                    type_record_fields(parser, fields)
+                                )
+                            )
+                            .map(|m_rest| match m_rest {
+                                None => None,
+                                Some(rest) => rest,
+                            })
+                        }
+                    }),
+                }
+            })
+        }
+        keep_right!(
+            keep_left!(self.token(&TokenType::LBrace), self.spaces()),
+            keep_left!(
+                {
+                    let mut fields = Vec::new();
+                    type_record_fields(self, &mut fields).map(|rest| Type::mk_record(fields, rest))
+                },
+                self.token(&TokenType::RBrace)
+            )
+        )
+    }
+
     fn type_atom(&mut self) -> ParseResult<Type<String>> {
         keep_left!(
             choices!(
@@ -490,6 +550,7 @@ impl Parser {
                     self.token(&TokenType::Ident(String::from("Array")))
                 ),
                 map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
+                self.type_record(),
                 self.ident().map(|s| Type::Name(s)),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
@@ -564,11 +625,65 @@ impl Parser {
         }
     }
 
+    /*
+    pattern_record ::=
+      '{' [pattern_record_fields] '}'
+
+    pattern_record_fields ::=
+      ident [',' pattern_record_fields]
+      '..' ident
+     */
+    fn pattern_record(&mut self) -> ParseResult<Pattern> {
+        fn pattern_record_fields(
+            parser: &mut Parser,
+            names: &mut Vec<Spanned<String>>,
+        ) -> ParseResult<Option<Spanned<String>>> {
+            choices!(
+                parser,
+                keep_left!(spanned!(parser, parser.ident()), parser.spaces()).and_then(|name| {
+                    names.push(name);
+                    optional!(
+                        parser,
+                        keep_right!(
+                            keep_left!(parser.token(&TokenType::Comma), parser.spaces()),
+                            pattern_record_fields(parser, names)
+                        )
+                    )
+                    .map(|m_rest| match m_rest {
+                        None => None,
+                        Some(rest) => rest,
+                    })
+                }),
+                keep_right!(
+                    keep_left!(
+                        keep_left!(parser.token(&TokenType::Dot), parser.token(&TokenType::Dot)),
+                        parser.spaces()
+                    ),
+                    keep_left!(spanned!(parser, parser.ident()), parser.spaces())
+                        .map(|ident| Some(ident))
+                )
+            )
+        }
+
+        keep_right!(
+            keep_left!(self.token(&TokenType::LBrace), self.spaces()),
+            keep_left!(
+                {
+                    let mut names = Vec::new();
+                    pattern_record_fields(self, &mut names)
+                        .map(|rest| Pattern::Record { names, rest })
+                },
+                keep_left!(self.token(&TokenType::RBrace), self.spaces())
+            )
+        )
+    }
+
     fn pattern(&mut self) -> ParseResult<Pattern> {
         keep_left!(
             choices!(
                 self,
                 spanned!(self, self.ident()).map(|s| Pattern::Name(s)),
+                self.pattern_record(),
                 map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
             ),
             self.spaces()
@@ -617,6 +732,65 @@ impl Parser {
         })
     }
 
+    /*
+    expr_record ::=
+      '{' [expr_record_fields] '}'
+
+    expr_record_fields ::=
+      ident '=' expr [',' expr_record_fields]
+      '..' expr_atom
+     */
+    fn expr_record(&mut self) -> ParseResult<Expr> {
+        fn expr_record_fields(
+            parser: &mut Parser,
+            fields: &mut Vec<(String, Spanned<Expr>)>,
+        ) -> ParseResult<Option<Spanned<Expr>>> {
+            choices!(
+                parser,
+                keep_left!(
+                    parser.ident(),
+                    keep_left!(
+                        parser.spaces(),
+                        keep_left!(parser.token(&TokenType::Equals), parser.spaces())
+                    )
+                )
+                .and_then(|name| {
+                    parser.expr().and_then(|expr| {
+                        fields.push((name, expr));
+                        optional!(
+                            parser,
+                            keep_right!(
+                                keep_left!(parser.token(&TokenType::Comma), parser.spaces()),
+                                expr_record_fields(parser, fields)
+                            )
+                        )
+                        .map(|m_rest| match m_rest {
+                            None => None,
+                            Some(rest) => rest,
+                        })
+                    })
+                }),
+                keep_right!(
+                    keep_left!(
+                        keep_left!(parser.token(&TokenType::Dot), parser.token(&TokenType::Dot)),
+                        parser.spaces()
+                    ),
+                    keep_left!(parser.expr_atom(), parser.spaces()).map(|expr| Some(expr))
+                )
+            )
+        }
+        keep_right!(
+            keep_left!(self.token(&TokenType::LBrace), self.spaces()),
+            keep_left!(
+                {
+                    let mut fields = Vec::new();
+                    expr_record_fields(self, &mut fields).map(|rest| Expr::mk_record(fields, rest))
+                },
+                keep_left!(self.token(&TokenType::RBrace), self.spaces())
+            )
+        )
+    }
+
     fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
             spanned!(
@@ -625,6 +799,7 @@ impl Parser {
                     self,
                     self.int().map(|n| Expr::Int(n)),
                     self.ident().map(|n| Expr::Var(n)),
+                    self.expr_record(),
                     keep_right!(
                         keep_left!(self.token(&TokenType::LParen), self.spaces()),
                         keep_left!(
@@ -789,6 +964,11 @@ impl Parser {
     }
 
     fn module(&mut self) -> ParseResult<Module> {
-        many!(self, spanned!(self, self.declaration())).map(|decls| Module { decls })
+        sep_by!(
+            self,
+            spanned!(self, self.declaration()),
+            some_!(self, self.newline())
+        )
+        .map(|decls| Module { decls })
     }
 }

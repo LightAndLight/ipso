@@ -148,6 +148,7 @@ fn parse_definition_3() {
                 TokenType::Ident(String::from("case")),
                 TokenType::Space,
                 TokenType::LParen,
+                TokenType::LBrace,
                 TokenType::DoubleQuote,
                 TokenType::Backslash
             ]
@@ -523,6 +524,7 @@ fn parse_case_4() {
                 TokenType::Space,
                 TokenType::Indent(2),
                 TokenType::LParen,
+                TokenType::LBrace,
                 TokenType::Ident(String::from("")),
                 TokenType::DoubleQuote,
                 TokenType::Int {
@@ -547,6 +549,7 @@ fn parse_case_5() {
                 TokenType::Space,
                 TokenType::Indent(2),
                 TokenType::LParen,
+                TokenType::LBrace,
                 TokenType::DoubleQuote,
                 TokenType::Ident(String::from("")),
                 TokenType::Int {
