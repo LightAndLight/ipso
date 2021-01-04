@@ -1385,10 +1385,15 @@ impl Typechecker {
             }
             syntax::Pattern::Variant { name, arg } => {
                 let arg_ty: Type<usize> = self.fresh_typevar(syntax::Kind::Type);
-                let rest_ty = Some(self.fresh_typevar(syntax::Kind::Row));
-                let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], rest_ty);
+                let rest_ty = self.fresh_typevar(syntax::Kind::Row);
+                let ty =
+                    Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_ty.clone()));
+                let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
+                    field: name.clone(),
+                    rest: rest_ty,
+                });
                 (
-                    core::Pattern::Variant { name: name.clone() },
+                    core::Pattern::mk_variant(core::Expr::EVar(tag)),
                     ty,
                     vec![(arg.item.clone(), arg_ty)],
                 )

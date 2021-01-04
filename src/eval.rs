@@ -1,6 +1,6 @@
 use crate::{
     builtins,
-    core::{Builtin, Declaration, Expr, Pattern, StringPart},
+    core::{Branch, Builtin, Declaration, Expr, Pattern, StringPart},
     rope::Rope,
     syntax::Binop,
 };
@@ -777,14 +777,44 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             pattern => panic!("expected record pattern, got {:?}", pattern),
                         }
                     }
-                    Value::Variant(_, _) => {
+                    Value::Variant(tag, value) => {
                         // expect variant patterns
-                        todo!()
+                        let mut target: Option<Expr> = None;
+                        for branch in branches {
+                            match branch.pattern {
+                                Pattern::Record { .. } => {
+                                    panic!("expected variant pattern, got {:?}", branch.pattern)
+                                }
+                                Pattern::Variant { tag: branch_tag } => {
+                                    let branch_tag =
+                                        self.eval(env, *branch_tag).unpack_int() as usize;
+                                    if *tag == branch_tag {
+                                        target = Some(branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Name | Pattern::Wildcard => {
+                                    target = Some(branch.body);
+                                    break;
+                                }
+                            }
+                        }
+                        match target {
+                            None => panic!("pattern match failure"),
+                            Some(body) => {
+                                let env = self.alloc_env({
+                                    let mut env = env.clone();
+                                    env.push(value);
+                                    env
+                                });
+                                self.eval(env, body)
+                            }
+                        }
                     }
                     _ => {
                         // expect a name or wildcard pattern
                         debug_assert!(branches.len() == 1);
-                        todo!()
+                        todo!("case of name/wildcard")
                     }
                 }
             }

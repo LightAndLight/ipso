@@ -344,9 +344,7 @@ fn infer_pattern_test_4() {
     assert_eq!(
         tc.infer_pattern(&pat),
         (
-            core::Pattern::Variant {
-                name: String::from("just")
-            },
+            core::Pattern::mk_variant(core::Expr::mk_evar(0)),
             syntax::Type::mk_variant(
                 vec![(String::from("just"), syntax::Type::Meta(0))],
                 Some(syntax::Type::Meta(1))
@@ -1007,9 +1005,7 @@ fn infer_case_1() {
                 core::Expr::mk_case(
                     core::Expr::Var(0),
                     vec![core::Branch {
-                        pattern: core::Pattern::Variant {
-                            name: String::from("X")
-                        },
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
                         body: core::Expr::Var(0)
                     }]
                 )
@@ -1092,15 +1088,11 @@ fn infer_case_2() {
                     core::Expr::Var(0),
                     vec![
                         core::Branch {
-                            pattern: core::Pattern::Variant {
-                                name: String::from("Left")
-                            },
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {
-                            pattern: core::Pattern::Variant {
-                                name: String::from("Right")
-                            },
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(1)),
                             body: core::Expr::Var(0)
                         },
                     ]
@@ -1201,15 +1193,11 @@ fn infer_case_3() {
                     core::Expr::Var(0),
                     vec![
                         core::Branch {
-                            pattern: core::Pattern::Variant {
-                                name: String::from("Left")
-                            },
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {
-                            pattern: core::Pattern::Variant {
-                                name: String::from("Right")
-                            },
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(1)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {

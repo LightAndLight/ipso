@@ -7,11 +7,15 @@ mod test;
 pub enum Pattern {
     Name,
     Record { names: Vec<Expr>, rest: bool },
-    Variant { name: String },
+    Variant { tag: Box<Expr> },
     Wildcard,
 }
 
 impl Pattern {
+    pub fn mk_variant(tag: Expr) -> Pattern {
+        Pattern::Variant { tag: Box::new(tag) }
+    }
+
     pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
         match self {
             Pattern::Name => Ok(Pattern::Name),
@@ -30,7 +34,7 @@ impl Pattern {
                 };
                 Ok(Pattern::Record { names, rest: *rest })
             }
-            Pattern::Variant { name } => Ok(Pattern::Variant { name: name.clone() }),
+            Pattern::Variant { tag } => tag.subst_evar(f).map(|tag| Pattern::mk_variant(tag)),
             Pattern::Wildcard => Ok(Pattern::Wildcard),
         }
     }
@@ -45,7 +49,7 @@ impl Pattern {
                     .collect(),
                 rest: *rest,
             },
-            Pattern::Variant { name } => Pattern::Variant { name: name.clone() },
+            Pattern::Variant { tag } => Pattern::mk_variant(tag.__instantiate(depth, val)),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -60,7 +64,7 @@ impl Pattern {
                     .collect(),
                 rest: *rest,
             },
-            Pattern::Variant { name } => Pattern::Variant { name: name.clone() },
+            Pattern::Variant { tag } => Pattern::mk_variant(tag.__abstract_evar(depth, ev)),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -89,7 +93,7 @@ impl Branch {
                     + match &self.pattern {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
-                        Pattern::Variant { name } => 1,
+                        Pattern::Variant { tag: _ } => 1,
                         Pattern::Wildcard => 1,
                     },
                 val,
@@ -105,7 +109,7 @@ impl Branch {
                     + match &self.pattern {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
-                        Pattern::Variant { name } => 1,
+                        Pattern::Variant { tag: _ } => 1,
                         Pattern::Wildcard => 0,
                     },
                 ev,

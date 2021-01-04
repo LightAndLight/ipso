@@ -1,0 +1,24 @@
+val1 : < A : () | B : () | C : () >
+val1 = A ()
+
+val2 : < A : () | B : () | C : () >
+val2 = B ()
+
+val3 : < A : () | B : () | C : () >
+val3 = C ()
+
+sayVal : < A : () | B : () | C : () > -> IO ()
+sayVal val =
+  writeStdout stdout
+  (toUtf8 (case val of 
+    A x -> "A\n"
+    B x -> "B\n"
+    C x -> "C\n"
+  ))
+
+main : IO ()
+main =
+  bindIO (sayVal val1) (\_ ->
+  bindIO (sayVal val2) (\_ ->
+  sayVal val3
+  ))
