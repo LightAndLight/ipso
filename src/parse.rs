@@ -412,6 +412,39 @@ impl Parser {
         }
     }
 
+    fn dedent(&mut self) -> ParseResult<()> {
+        self.expecting.insert(TokenType::Dedent);
+        let dedent_to = match &self.current {
+            Some(token) => match token.token_type {
+                TokenType::Indent(n) => Some(n),
+                _ => None,
+            },
+            None => Some(0),
+        };
+        match dedent_to {
+            None => {
+                return self.unexpected(false);
+            }
+            Some(n) => match self.indentation.binary_search(&n) {
+                Err(ix) if ix == 0 || ix == self.indentation.len() => {
+                    // n is outside the bounds of our indentation stack
+                    return self.unexpected(false);
+                }
+                Err(ix) => {
+                    // n is not an element of the indentation stack, but is somewhere between two elements
+                    self.consume();
+                    self.indentation = self.indentation.iter().map(|x| *x).take(ix).collect();
+                }
+                Ok(ix) => {
+                    // n is explictly an element of the indentation stack
+                    self.consume();
+                    self.indentation = self.indentation.iter().map(|x| *x).take(ix + 1).collect();
+                }
+            },
+        }
+        ParseResult::pure(())
+    }
+
     fn spaces(&mut self) -> ParseResult<()> {
         many_!(self, self.space())
     }
@@ -924,10 +957,8 @@ impl Parser {
                     )
                     .and_then(|_| {
                         keep_right!(self.indent(), sep_by!(self, self.branch(), self.newline()))
-                            .map(|branches| {
-                                self.indentation.pop();
-
-                                Expr::mk_case(cond, branches)
+                            .and_then(|branches| {
+                                self.dedent().map(|_| Expr::mk_case(cond, branches))
                             })
                     })
                 })

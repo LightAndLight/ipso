@@ -517,6 +517,11 @@ fn parse_case_3() {
 #[test]
 fn parse_case_4() {
     parse_test!(
+        /*
+        case x of
+          a -> b
+           c -> d
+         */
         "case x of\n  a -> b\n   c -> d",
         expr_case,
         Err(ParseError::Unexpected {
@@ -524,6 +529,7 @@ fn parse_case_4() {
             expecting: vec![
                 TokenType::Space,
                 TokenType::Indent(2),
+                TokenType::Dedent,
                 TokenType::LParen,
                 TokenType::LBrace,
                 TokenType::Ctor,
@@ -543,25 +549,16 @@ fn parse_case_4() {
 #[test]
 fn parse_case_5() {
     parse_test!(
+        /*
+        case x of
+          a -> b
+         c -> d
+         */
         "case x of\n  a -> b\n c -> d",
         expr_case,
         Err(ParseError::Unexpected {
-            pos: 18,
-            expecting: vec![
-                TokenType::Space,
-                TokenType::Indent(2),
-                TokenType::LParen,
-                TokenType::LBrace,
-                TokenType::DoubleQuote,
-                TokenType::Ctor,
-                TokenType::Ident(String::from("")),
-                TokenType::Int {
-                    value: 0,
-                    length: 0
-                }
-            ]
-            .into_iter()
-            .collect()
+            pos: 20,
+            expecting: vec![].into_iter().collect()
         })
     )
 }

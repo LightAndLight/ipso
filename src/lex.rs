@@ -45,6 +45,7 @@ pub enum TokenType {
     Slash,
 
     Indent(usize),
+    Dedent,
     Space,
 }
 
@@ -95,6 +96,7 @@ impl TokenType {
                     format!("indent ({})", n)
                 }
             }
+            TokenType::Dedent => String::from("dedent"),
             TokenType::Space => String::from("space"),
             TokenType::Ctor => String::from("constructor"),
             TokenType::Pipe => String::from("'|'"),
@@ -136,6 +138,7 @@ impl TokenType {
             TokenType::LAngle => 1,
             TokenType::RAngle => 1,
 
+            TokenType::Dedent => panic!("TokenType::Dedent.len()"),
             TokenType::Ctor => panic!("TokenType::Ctor.len()"),
         }
     }
