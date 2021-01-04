@@ -753,12 +753,18 @@ impl Parser {
         )
     }
 
+    fn pattern_variant(&mut self) -> ParseResult<Pattern> {
+        keep_left!(self.ctor(), self.spaces())
+            .and_then(|name| spanned!(self, self.ident()).map(|arg| Pattern::Variant { name, arg }))
+    }
+
     fn pattern(&mut self) -> ParseResult<Pattern> {
         keep_left!(
             choices!(
                 self,
                 spanned!(self, self.ident()).map(|s| Pattern::Name(s)),
                 self.pattern_record(),
+                self.pattern_variant(),
                 map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
             ),
             self.spaces()
