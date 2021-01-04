@@ -116,7 +116,7 @@ pub struct Typechecker {
     implications: Vec<Implication>,
     pub evidence: Evidence<core::Expr>,
     type_context: HashMap<String, syntax::Kind>,
-    context: HashMap<String, core::TypeSig>,
+    pub context: HashMap<String, (core::TypeSig, core::Expr)>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
@@ -476,8 +476,9 @@ impl Typechecker {
             core::Declaration::BuiltinType { name, kind } => {
                 self.type_context.insert(name.clone(), kind.clone());
             }
-            core::Declaration::Definition { name, sig, body: _ } => {
-                self.context.insert(name.clone(), sig.clone());
+            core::Declaration::Definition { name, sig, body } => {
+                self.context
+                    .insert(name.clone(), (sig.clone(), body.clone()));
             }
             core::Declaration::TypeAlias { name, args, body } => {
                 todo!("register TypeAlias {:?}", (name, args, body))
@@ -534,17 +535,17 @@ impl Typechecker {
             match decl {
                 core::Declaration::BuiltinType { name, kind } => {
                     if should_import(name) {
-                        self.type_context.insert(name.clone(), kind.clone());
+                        self.register_declaration(decl);
                     }
                 }
                 core::Declaration::Definition { name, sig, body: _ } => {
                     if should_import(name) {
-                        self.context.insert(name.clone(), sig.clone());
+                        self.register_declaration(decl);
                     }
                 }
                 core::Declaration::TypeAlias { name, args, body } => {
                     if should_import(name) {
-                        todo!("import type alias {:?}", (name, args, body))
+                        self.register_declaration(decl);
                     }
                 }
                 core::Declaration::Import { module: _, name: _ } => {}
@@ -733,7 +734,7 @@ impl Typechecker {
     }
 
     fn lookup_name(&self, name: &String) -> Option<core::TypeSig> {
-        self.context.get(name).map(|sig| sig.clone())
+        self.context.get(name).map(|(sig, _)| sig.clone())
     }
 
     pub fn zonk_constraint(&self, constraint: Constraint) -> Constraint {

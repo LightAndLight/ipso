@@ -146,7 +146,13 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let env = Vec::new();
     let _result = {
         let mut stdout = io::stdout();
-        let mut interpreter = Interpreter::new_with_builtins(&mut stdout, &heap);
+        let additional_context = tc
+            .context
+            .iter()
+            .map(|(name, (_, expr))| (name.clone(), expr.clone()))
+            .collect();
+        let mut interpreter =
+            Interpreter::new_with_builtins(&mut stdout, additional_context, &heap);
         let action = interpreter.eval(&env, target);
         action.perform_io(&mut interpreter)
     };

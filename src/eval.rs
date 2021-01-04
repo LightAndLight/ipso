@@ -309,9 +309,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
     pub fn new_with_builtins(
         stdout: &'stdout mut dyn Write,
+        additional_context: HashMap<String, Expr>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
-        let context = builtins::BUILTINS
+        let mut context: HashMap<String, Expr> = builtins::BUILTINS
             .decls
             .iter()
             .filter_map(|decl| match decl {
@@ -321,6 +322,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 _ => None,
             })
             .collect();
+        context.extend(additional_context);
         Self::new(stdout, context, heap)
     }
 
