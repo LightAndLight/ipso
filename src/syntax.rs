@@ -133,7 +133,7 @@ pub enum Expr {
     },
     Project(Box<Spanned<Expr>>, String),
 
-    Variant(String, Box<Spanned<Expr>>),
+    Variant(String),
     Case(Box<Spanned<Expr>>, Vec<Branch>),
 
     Unit,

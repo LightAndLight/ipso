@@ -1639,18 +1639,18 @@ impl Typechecker {
                         out_ty,
                     ))
                 }
-                syntax::Expr::Variant(ctor, arg) => {
-                    let (arg_core, arg_ty) = self.infer_expr(*arg)?;
+                syntax::Expr::Variant(ctor) => {
+                    let arg_ty = self.fresh_typevar(syntax::Kind::Type);
                     let rest = self.fresh_typevar(syntax::Kind::Row);
                     let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
                         field: ctor.clone(),
                         rest: Type::mk_rows(vec![], Some(rest.clone())),
                     });
                     Ok((
-                        core::Expr::mk_variant(core::Expr::EVar(tag), arg_core),
-                        Type::mk_app(
-                            Type::Variant,
-                            Type::mk_rows(vec![(ctor, arg_ty)], Some(rest)),
+                        core::Expr::mk_variant(core::Expr::EVar(tag)),
+                        Type::mk_arrow(
+                            arg_ty.clone(),
+                            Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
                         ),
                     ))
                 }

@@ -725,10 +725,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 }
             }
 
-            Expr::Variant(tag, value) => {
-                let tag = self.eval(env, *tag).unpack_int();
-                let value: ValueRef<'heap> = self.eval(env, *value);
-                self.alloc_value(Value::Variant(tag as usize, value))
+            Expr::Variant(tag) => {
+                let tag = self.eval(env, *tag);
+                let env = self.alloc_env(vec![tag]);
+                fn code<'heap>(
+                    interpreter: &mut Interpreter<'_, 'heap>,
+                    env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    let tag = env[0].unpack_int() as usize;
+                    interpreter.alloc_value(Value::Variant(tag, arg))
+                }
+                let closure = Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(code),
+                };
+                self.alloc_value(closure)
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, *expr);

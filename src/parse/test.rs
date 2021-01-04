@@ -146,6 +146,7 @@ fn parse_definition_3() {
                 },
                 TokenType::Ident(String::from("")),
                 TokenType::Ident(String::from("case")),
+                TokenType::Ctor,
                 TokenType::Space,
                 TokenType::LParen,
                 TokenType::LBrace,
@@ -525,6 +526,7 @@ fn parse_case_4() {
                 TokenType::Indent(2),
                 TokenType::LParen,
                 TokenType::LBrace,
+                TokenType::Ctor,
                 TokenType::Ident(String::from("")),
                 TokenType::DoubleQuote,
                 TokenType::Int {
@@ -551,6 +553,7 @@ fn parse_case_5() {
                 TokenType::LParen,
                 TokenType::LBrace,
                 TokenType::DoubleQuote,
+                TokenType::Ctor,
                 TokenType::Ident(String::from("")),
                 TokenType::Int {
                     value: 0,

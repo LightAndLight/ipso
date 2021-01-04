@@ -874,6 +874,7 @@ impl Parser {
                     self,
                     self.int().map(|n| Expr::Int(n)),
                     self.ident().map(|n| Expr::Var(n)),
+                    self.ctor().map(|n| Expr::Variant(n)),
                     self.expr_record(),
                     keep_right!(
                         keep_left!(self.token(&TokenType::LParen), self.spaces()),

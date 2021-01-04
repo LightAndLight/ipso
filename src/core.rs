@@ -184,7 +184,7 @@ pub enum Expr {
     Record(Vec<(Expr, Expr)>),
     Project(Box<Expr>, Box<Expr>),
 
-    Variant(Box<Expr>, Box<Expr>),
+    Variant(Box<Expr>),
     Case(Box<Expr>, Vec<Branch>),
     Unit,
 }
@@ -233,8 +233,8 @@ impl Expr {
         Expr::Extend(Box::new(field), Box::new(value), Box::new(rest))
     }
 
-    pub fn mk_variant(tag: Expr, expr: Expr) -> Expr {
-        Expr::Variant(Box::new(tag), Box::new(expr))
+    pub fn mk_variant(tag: Expr) -> Expr {
+        Expr::Variant(Box::new(tag))
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
@@ -319,9 +319,7 @@ impl Expr {
             Expr::Project(a, b) => {
                 Expr::mk_project(a.__instantiate(depth, val), b.__instantiate(depth, val))
             }
-            Expr::Variant(a, b) => {
-                Expr::mk_variant(a.__instantiate(depth, val), b.__instantiate(depth, val))
-            }
+            Expr::Variant(a) => Expr::mk_variant(a.__instantiate(depth, val)),
             Expr::Case(a, bs) => Expr::mk_case(
                 a.__instantiate(depth, val),
                 bs.iter().map(|b| b.__instantiate(depth, val)).collect(),
@@ -404,9 +402,7 @@ impl Expr {
             Expr::Project(a, b) => a
                 .subst_evar(f)
                 .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_project(a, b))),
-            Expr::Variant(a, b) => a
-                .subst_evar(f)
-                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_variant(a, b))),
+            Expr::Variant(a) => a.subst_evar(f).map(|a| Expr::mk_variant(a)),
             Expr::Case(a, bs) => a.subst_evar(f).and_then(|a| {
                 let mut new_bs = Vec::new();
                 for b in bs {
@@ -485,9 +481,7 @@ impl Expr {
             Expr::Project(a, b) => {
                 Expr::mk_project(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))
             }
-            Expr::Variant(a, b) => {
-                Expr::mk_variant(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))
-            }
+            Expr::Variant(a) => Expr::mk_variant(a.__abstract_evar(depth, ev)),
             Expr::Case(a, bs) => Expr::mk_case(
                 a.__abstract_evar(depth, ev),
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
