@@ -274,7 +274,16 @@ impl<'input> Lexer<'input> {
                                             }
                                             Some(c) => match c {
                                                 '$' | '"' => {
+                                                    self.consume();
                                                     str.push(c);
+                                                }
+                                                'n' => {
+                                                    self.consume();
+                                                    str.push('\n');
+                                                }
+                                                't' => {
+                                                    self.consume();
+                                                    str.push('\t');
                                                 }
                                                 _ => {
                                                     return Some(Token {
