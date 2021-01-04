@@ -1606,6 +1606,77 @@ fn check_definition_3() {
 }
 
 #[test]
+fn check_definition_4() {
+    let mut tc = Typechecker::new();
+    /*
+    getx : { x : Int, r } -> Int
+    getx { x, r } = x
+    */
+    let decl = syntax::Spanned {
+        pos: 0,
+        item: syntax::Declaration::Definition {
+            name: String::from("getx"),
+            ty: syntax::Type::mk_arrow(
+                syntax::Type::mk_record(
+                    vec![(String::from("x"), Type::Int)],
+                    Some(syntax::Type::Var(String::from("r"))),
+                ),
+                syntax::Type::Int,
+            ),
+            args: vec![syntax::Pattern::Record {
+                names: vec![syntax::Spanned {
+                    pos: 1,
+                    item: String::from("x"),
+                }],
+                rest: Some(syntax::Spanned {
+                    pos: 2,
+                    item: String::from("r"),
+                }),
+            }],
+            body: syntax::Spanned {
+                pos: 2,
+                item: syntax::Expr::Var(String::from("x")),
+            },
+        },
+    };
+    assert_eq!(
+        tc.check_declaration(decl),
+        Ok(core::Declaration::Definition {
+            name: String::from("getx"),
+            sig: core::TypeSig {
+                ty_vars: vec![syntax::Kind::Row],
+                body: syntax::Type::mk_fatarrow(
+                    syntax::Type::mk_hasfield(String::from("x"), syntax::Type::Var(0)),
+                    syntax::Type::mk_arrow(
+                        syntax::Type::mk_record(
+                            vec![(String::from("x"), syntax::Type::Int)],
+                            Some(syntax::Type::Var(0))
+                        ),
+                        syntax::Type::Int
+                    ),
+                )
+            },
+            body: core::Expr::mk_lam(
+                true,
+                core::Expr::mk_lam(
+                    true,
+                    core::Expr::mk_case(
+                        core::Expr::Var(0),
+                        vec![core::Branch {
+                            pattern: core::Pattern::Record {
+                                names: vec![core::Expr::Var(1)],
+                                rest: true
+                            },
+                            body: core::Expr::Var(1)
+                        }]
+                    )
+                )
+            )
+        })
+    )
+}
+
+#[test]
 fn kind_occurs_1() {
     let mut tc = Typechecker::new();
     let v1 = tc.fresh_kindvar();
