@@ -341,7 +341,7 @@ impl Typechecker {
 
     pub fn new_with_builtins() -> Self {
         let mut tc = Self::new();
-        tc.from_import(&builtins::BUILTINS, &syntax::Names::All);
+        tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
         tc
     }
 
@@ -471,10 +471,50 @@ impl Typechecker {
         }
     }
 
+    pub fn register_declaration(&mut self, decl: &core::Declaration) {
+        match decl {
+            core::Declaration::BuiltinType { name, kind } => {
+                self.type_context.insert(name.clone(), kind.clone());
+            }
+            core::Declaration::Definition { name, sig, body: _ } => {
+                self.context.insert(name.clone(), sig.clone());
+            }
+            core::Declaration::TypeAlias { name, args, body } => {
+                todo!("register TypeAlias {:?}", (name, args, body))
+            }
+            core::Declaration::Import { module, name } => {
+                todo!("register Import {:?}", (module, name))
+            }
+            core::Declaration::FromImport { module, names } => {
+                todo!("register FromImport {:?}", (module, names))
+            }
+            core::Declaration::Class {
+                ty_vars,
+                supers,
+                name,
+                args,
+                members,
+            } => todo!(
+                "register type class {:?}",
+                (ty_vars, supers, name, args, members)
+            ),
+            core::Declaration::Instance {
+                ty_vars,
+                assumes,
+                head,
+                dict,
+            } => todo!(
+                "register type class instance {:?}",
+                (ty_vars, assumes, head, dict)
+            ),
+        }
+    }
+
     pub fn check_module(&mut self, module: syntax::Module) -> Result<core::Module, TypeError> {
         let decls = module.decls.into_iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
                 self.check_declaration(decl).and_then(|decl| {
+                    self.register_declaration(&decl);
                     decls.push(decl);
                     Ok(decls)
                 })
@@ -483,7 +523,7 @@ impl Typechecker {
         Ok(core::Module { decls })
     }
 
-    fn from_import(&mut self, module: &core::Module, names: &syntax::Names) {
+    fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
         let should_import = |name: &String| -> bool {
             match names {
                 syntax::Names::All => true,
@@ -508,7 +548,10 @@ impl Typechecker {
                     }
                 }
                 core::Declaration::Import { module: _, name: _ } => {}
-                core::Declaration::FromImport { module: _, name: _ } => {}
+                core::Declaration::FromImport {
+                    module: _,
+                    names: _,
+                } => {}
                 core::Declaration::Class {
                     ty_vars,
                     supers,

@@ -479,7 +479,7 @@ pub enum Declaration {
     },
     FromImport {
         module: String,
-        name: syntax::Names,
+        names: syntax::Names,
     },
     Class {
         ty_vars: Vec<syntax::Kind>,
