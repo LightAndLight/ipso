@@ -1,4 +1,4 @@
-use crate::{evidence::EVar, syntax, void::Void};
+use crate::{evidence::EVar, syntax};
 
 #[cfg(test)]
 mod test;
@@ -6,9 +6,64 @@ mod test;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
     Name,
-    Record { names: usize, rest: bool },
+    Record { names: Vec<Expr>, rest: bool },
     Variant { name: String },
     Wildcard,
+}
+
+impl Pattern {
+    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+        match self {
+            Pattern::Name => Ok(Pattern::Name),
+            Pattern::Record { names, rest } => {
+                let names = {
+                    let mut new_names = Vec::new();
+                    for name in names {
+                        match name.subst_evar(f) {
+                            Err(err) => return Err(err),
+                            Ok(new_name) => {
+                                new_names.push(new_name);
+                            }
+                        }
+                    }
+                    new_names
+                };
+                Ok(Pattern::Record { names, rest: *rest })
+            }
+            Pattern::Variant { name } => Ok(Pattern::Variant { name: name.clone() }),
+            Pattern::Wildcard => Ok(Pattern::Wildcard),
+        }
+    }
+
+    pub fn __instantiate(&self, depth: usize, val: &Expr) -> Self {
+        match self {
+            Pattern::Name => Pattern::Name,
+            Pattern::Record { names, rest } => Pattern::Record {
+                names: names
+                    .iter()
+                    .map(|name| name.__instantiate(depth, val))
+                    .collect(),
+                rest: *rest,
+            },
+            Pattern::Variant { name } => Pattern::Variant { name: name.clone() },
+            Pattern::Wildcard => Pattern::Wildcard,
+        }
+    }
+
+    pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Self {
+        match self {
+            Pattern::Name => Pattern::Name,
+            Pattern::Record { names, rest } => Pattern::Record {
+                names: names
+                    .iter()
+                    .map(|name| name.__abstract_evar(depth, ev))
+                    .collect(),
+                rest: *rest,
+            },
+            Pattern::Variant { name } => Pattern::Variant { name: name.clone() },
+            Pattern::Wildcard => Pattern::Wildcard,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -19,20 +74,21 @@ pub struct Branch {
 
 impl Branch {
     pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
-        self.body.subst_evar(f).map(|body| Branch {
-            pattern: self.pattern.clone(),
-            body,
+        self.body.subst_evar(f).and_then(|body| {
+            self.pattern
+                .subst_evar(f)
+                .map(|pattern| Branch { pattern, body })
         })
     }
 
     pub fn __instantiate(&self, depth: usize, val: &Expr) -> Self {
         Branch {
-            pattern: self.pattern.clone(),
+            pattern: self.pattern.__instantiate(depth, val),
             body: self.body.__instantiate(
                 depth
                     + match &self.pattern {
                         Pattern::Name => 1,
-                        Pattern::Record { names, rest } => names + if *rest { 1 } else { 0 },
+                        Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { name } => 1,
                         Pattern::Wildcard => 1,
                     },
@@ -43,12 +99,12 @@ impl Branch {
 
     pub fn __abstract_evar(&self, depth: usize, ev: EVar) -> Self {
         Branch {
-            pattern: self.pattern.clone(),
+            pattern: self.pattern.__abstract_evar(depth, ev),
             body: self.body.__abstract_evar(
                 depth
                     + match &self.pattern {
                         Pattern::Name => 1,
-                        Pattern::Record { names, rest } => names + if *rest { 1 } else { 0 },
+                        Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { name } => 1,
                         Pattern::Wildcard => 0,
                     },

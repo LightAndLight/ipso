@@ -31,9 +31,10 @@ fn infer_kind_test_3() {
     let mut tc = Typechecker::new();
     let expected = Err(TypeError::KindMismatch {
         pos: 0,
-        context: UnifyKindContext::Checking {
+        context: UnifyKindContext {
             ty: Type::RowNil,
             has_kind: Kind::Type,
+            unifying_types: None,
         },
         expected: Kind::Type,
         actual: Kind::Row,
@@ -251,7 +252,11 @@ fn infer_pattern_test_2() {
         tc.infer_pattern(&pat),
         (
             core::Pattern::Record {
-                names: 3,
+                names: vec![
+                    core::Expr::mk_evar(2),
+                    core::Expr::mk_evar(1),
+                    core::Expr::mk_evar(0)
+                ],
                 rest: false
             },
             syntax::Type::mk_record(
@@ -298,7 +303,11 @@ fn infer_pattern_test_3() {
         tc.infer_pattern(&pat),
         (
             core::Pattern::Record {
-                names: 3,
+                names: vec![
+                    core::Expr::mk_evar(2),
+                    core::Expr::mk_evar(1),
+                    core::Expr::mk_evar(0)
+                ],
                 rest: true
             },
             syntax::Type::mk_record(
@@ -408,7 +417,7 @@ fn infer_lam_test_2() {
                     core::Expr::Var(0),
                     vec![core::Branch {
                         pattern: core::Pattern::Record {
-                            names: 2,
+                            names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
                             rest: false
                         },
                         body: core::Expr::Var(1)
@@ -464,7 +473,7 @@ fn infer_lam_test_3() {
                     core::Expr::Var(0),
                     vec![core::Branch {
                         pattern: core::Pattern::Record {
-                            names: 2,
+                            names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
                             rest: false
                         },
                         body: core::Expr::Var(0)
@@ -514,34 +523,33 @@ fn infer_lam_test_4() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![core::Branch {
-                        pattern: core::Pattern::Record {
-                            names: 2,
-                            rest: true
-                        },
-                        body: core::Expr::Var(0)
-                    }]
-                )
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![core::Branch {
+                    pattern: core::Pattern::Record {
+                        names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
+                        rest: true,
+                    },
+                    body: core::Expr::Var(0),
+                }],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_record(
-                    vec![
-                        (String::from("x"), syntax::Type::Meta(0)),
-                        (String::from("y"), syntax::Type::Meta(1))
-                    ],
-                    Some(syntax::Type::Meta(2))
-                ),
-                syntax::Type::mk_record(vec![], Some(syntax::Type::Meta(2)))
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_record(
+                vec![
+                    (String::from("x"), syntax::Type::Meta(0)),
+                    (String::from("y"), syntax::Type::Meta(1)),
+                ],
+                Some(syntax::Type::Meta(2)),
+            ),
+            syntax::Type::mk_record(vec![], Some(syntax::Type::Meta(2))),
+        ),
+    ));
+    let actual = tc.infer_expr(term);
+    assert_eq!(expected, actual,)
 }
 
 #[test]
@@ -1604,9 +1612,10 @@ fn kind_occurs_1() {
     let v2 = tc.fresh_kindvar();
     assert_eq!(
         tc.unify_kind(
-            UnifyKindContext::Checking {
+            &UnifyKindContext {
                 ty: Type::Unit,
-                has_kind: Kind::Type
+                has_kind: Kind::Type,
+                unifying_types: None
             },
             v1.clone(),
             Kind::mk_arrow(v1.clone(), v2.clone())

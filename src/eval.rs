@@ -1,7 +1,8 @@
-use crate::syntax::Binop;
 use crate::{
     builtins,
-    core::{Builtin, Declaration, Expr, StringPart},
+    core::{Builtin, Declaration, Expr, Pattern, StringPart},
+    rope::Rope,
+    syntax::Binop,
 };
 use std::collections::HashMap;
 use std::{fmt::Debug, io::Write};
@@ -729,7 +730,52 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let value: ValueRef<'heap> = self.eval(env, *value);
                 self.alloc_value(Value::Variant(tag as usize, value))
             }
-            Expr::Case(expr, branches) => todo!("eval case {:?} {:?}", expr, branches),
+            Expr::Case(expr, branches) => {
+                let expr = self.eval(env, *expr);
+                match expr {
+                    Value::Record(fields) => {
+                        // expect a record pattern
+                        debug_assert!(branches.len() == 1);
+                        let branch = &branches[0];
+                        match &branch.pattern {
+                            Pattern::Record { names, rest } => {
+                                let mut new_env = env.clone();
+                                let mut extracted = Vec::new();
+                                for name in names {
+                                    let ix = self.eval(env, name.clone()).unpack_int() as usize;
+                                    new_env.push(fields[ix]);
+                                    extracted.push(ix);
+                                }
+                                if *rest {
+                                    let mut leftover_fields = Rope::from_vec(fields);
+                                    extracted.sort();
+                                    for ix in extracted.iter().rev() {
+                                        leftover_fields = leftover_fields.delete(*ix).unwrap();
+                                    }
+                                    let leftover_fields: Vec<&Value> =
+                                        leftover_fields.iter().map(|x| *x).collect();
+                                    let leftover_record =
+                                        self.alloc_value(Value::Record(leftover_fields));
+                                    new_env.push(leftover_record);
+                                }
+
+                                let new_env = self.alloc_env(new_env);
+                                self.eval(new_env, branch.body.clone())
+                            }
+                            pattern => panic!("expected record pattern, got {:?}", pattern),
+                        }
+                    }
+                    Value::Variant(_, _) => {
+                        // expect variant patterns
+                        todo!()
+                    }
+                    _ => {
+                        // expect a name or wildcard pattern
+                        debug_assert!(branches.len() == 1);
+                        todo!()
+                    }
+                }
+            }
             Expr::Unit => self.alloc_value(Value::Unit),
         }
     }

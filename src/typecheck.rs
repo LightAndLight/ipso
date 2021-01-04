@@ -133,11 +133,10 @@ macro_rules! with_position {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum UnifyKindContext {
-    Checking {
-        ty: Type<String>,
-        has_kind: syntax::Kind,
-    },
+pub struct UnifyKindContext<A> {
+    ty: Type<A>,
+    has_kind: syntax::Kind,
+    unifying_types: Option<UnifyTypeContext<A>>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -158,7 +157,7 @@ pub enum TypeError {
     },
     KindMismatch {
         pos: usize,
-        context: UnifyKindContext,
+        context: UnifyKindContext<String>,
         expected: syntax::Kind,
         actual: syntax::Kind,
     },
@@ -295,11 +294,33 @@ impl TypeError {
                 expected: _,
                 actual: _,
             } => match context {
-                UnifyKindContext::Checking { ty, has_kind } => Some(format!(
-                    "While checking that \"{}\" has kind \"{}\"",
-                    ty.render(),
-                    has_kind.render()
-                )),
+                UnifyKindContext {
+                    ty,
+                    has_kind,
+                    unifying_types,
+                } => {
+                    let mut str = String::new();
+                    str.push_str(
+                        format!(
+                            "While checking that \"{}\" has kind \"{}\"",
+                            ty.render(),
+                            has_kind.render()
+                        )
+                        .as_str(),
+                    );
+                    match unifying_types {
+                        None => {}
+                        Some(context) => str.push_str(
+                            format!(
+                                "\nWhile unifying \"{}\" with \"{}\"",
+                                context.expected.render(),
+                                context.actual.render()
+                            )
+                            .as_str(),
+                        ),
+                    }
+                    Some(str)
+                }
             },
             TypeError::DuplicateArgument { pos: _, name: _ } => None,
             TypeError::TypeMismatch {
@@ -578,16 +599,18 @@ impl Typechecker {
 
     pub fn check_kind(
         &mut self,
+        context: Option<&UnifyTypeContext<usize>>,
         ty: &Type<usize>,
         kind: syntax::Kind,
     ) -> Result<Type<usize>, TypeError> {
         let expected = kind;
         let (ty, actual) = self.infer_kind(ty)?;
-        let context = UnifyKindContext::Checking {
-            ty: self.fill_ty_names(self.zonk_type(ty.clone())),
-            has_kind: self.zonk_kind(expected.clone()),
+        let context = UnifyKindContext {
+            ty: ty.clone(),
+            has_kind: expected.clone(),
+            unifying_types: context.map(|x| x.clone()),
         };
-        self.unify_kind(context, expected, actual)?;
+        self.unify_kind(&context, expected, actual)?;
         Ok(ty)
     }
 
@@ -676,7 +699,7 @@ impl Typechecker {
         let ty_var_kinds_len = ty_var_kinds.len();
         self.bound_tyvars.insert(&ty_var_kinds);
 
-        let ty = self.check_kind(&ty, syntax::Kind::Type)?;
+        let ty = self.check_kind(None, &ty, syntax::Kind::Type)?;
 
         let (constraints, ty) = ty.unwrap_constraints();
         for constraint in constraints {
@@ -802,10 +825,18 @@ impl Typechecker {
 
     fn kind_mismatch<A>(
         &self,
-        context: UnifyKindContext,
+        context: &UnifyKindContext<usize>,
         expected: syntax::Kind,
         actual: syntax::Kind,
     ) -> Result<A, TypeError> {
+        let context = UnifyKindContext {
+            ty: self.fill_ty_names(self.zonk_type(context.ty.clone())),
+            has_kind: self.zonk_kind(context.has_kind.clone()),
+            unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
+                expected: self.fill_ty_names(self.zonk_type(x.expected.clone())),
+                actual: self.fill_ty_names(self.zonk_type(x.actual.clone())),
+            }),
+        };
         Err(TypeError::KindMismatch {
             pos: self.current_position(),
             context,
@@ -816,7 +847,7 @@ impl Typechecker {
 
     fn unify_kind(
         &mut self,
-        context: UnifyKindContext,
+        context: &UnifyKindContext<usize>,
         expected: syntax::Kind,
         actual: syntax::Kind,
     ) -> Result<(), TypeError> {
@@ -838,7 +869,7 @@ impl Typechecker {
             },
             syntax::Kind::Arrow(expected_a, expected_b) => match actual {
                 syntax::Kind::Arrow(actual_a, actual_b) => {
-                    self.unify_kind(context.clone(), *expected_a, *actual_a)?;
+                    self.unify_kind(context, *expected_a, *actual_a)?;
                     self.unify_kind(context, *expected_b, *actual_b)
                 }
                 syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
@@ -870,7 +901,7 @@ impl Typechecker {
 
     fn solve_kindvar_right(
         &mut self,
-        context: UnifyKindContext,
+        context: &UnifyKindContext<usize>,
         expected: syntax::Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -886,7 +917,7 @@ impl Typechecker {
 
     fn solve_kindvar_left(
         &mut self,
-        context: UnifyKindContext,
+        context: &UnifyKindContext<usize>,
         meta: usize,
         actual: syntax::Kind,
     ) -> Result<(), TypeError> {
@@ -1017,7 +1048,7 @@ impl Typechecker {
             Type::Constraints(constraints) => {
                 let mut new_constraints = Vec::new();
                 for constraint in constraints {
-                    match self.check_kind(constraint, syntax::Kind::Constraint) {
+                    match self.check_kind(None, constraint, syntax::Kind::Constraint) {
                         Err(err) => return Err(err),
                         Ok(new_constraint) => {
                             new_constraints.push(new_constraint);
@@ -1045,19 +1076,22 @@ impl Typechecker {
             Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
-                let a =
-                    self.check_kind(a, syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()))?;
-                let b = self.check_kind(b, in_kind)?;
+                let a = self.check_kind(
+                    None,
+                    a,
+                    syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
+                )?;
+                let b = self.check_kind(None, b, in_kind)?;
                 Ok((Type::mk_app(a, b), out_kind))
             }
             Type::RowNil => Ok((Type::RowNil, syntax::Kind::Row)),
             Type::RowCons(field, ty, rest) => {
-                let ty = self.check_kind(ty, syntax::Kind::Type)?;
-                let rest = self.check_kind(rest, syntax::Kind::Row)?;
+                let ty = self.check_kind(None, ty, syntax::Kind::Type)?;
+                let rest = self.check_kind(None, rest, syntax::Kind::Row)?;
                 Ok((Type::mk_rowcons(field.clone(), ty, rest), syntax::Kind::Row))
             }
             Type::HasField(field, rest) => {
-                let rest = self.check_kind(rest, syntax::Kind::Row)?;
+                let rest = self.check_kind(None, rest, syntax::Kind::Row)?;
                 Ok((
                     Type::mk_hasfield(field.clone(), rest),
                     syntax::Kind::Constraint,
@@ -1084,7 +1118,7 @@ impl Typechecker {
         actual: Type<usize>,
     ) -> Result<(), TypeError> {
         let (_, expected_kind) = self.infer_kind(&expected)?;
-        let _ = self.check_kind(&actual, expected_kind)?;
+        let _ = self.check_kind(Some(context), &actual, expected_kind)?;
         match expected {
             Type::App(a1, b1) => match actual {
                 Type::App(a2, b2) => {
@@ -1303,9 +1337,9 @@ impl Typechecker {
                     .iter()
                     .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
                     .collect();
-                let rest_row: Option<(&String, Type<usize>)> = match rest {
+                let rest_row: Option<(String, Type<usize>)> = match rest {
                     None => None,
-                    Some(name) => Some((&name.item, self.fresh_typevar(syntax::Kind::Row))),
+                    Some(name) => Some((name.item.clone(), self.fresh_typevar(syntax::Kind::Row))),
                 };
                 let ty = Type::mk_record(
                     names_tys
@@ -1314,15 +1348,32 @@ impl Typechecker {
                         .collect(),
                     rest_row.clone().map(|x| x.1),
                 );
-                rest_row.map(|(rest_name, rest_row)| {
+
+                let mut extending_row = match &rest_row {
+                    Some((_, row)) => row.clone(),
+                    None => Type::RowNil,
+                };
+                let mut names_evidence = Vec::new();
+                for (name, ty) in names_tys.iter().rev() {
+                    let ev = self.evidence.fresh_evar(Constraint::HasField {
+                        field: name.clone(),
+                        rest: extending_row.clone(),
+                    });
+                    names_evidence.push(core::Expr::EVar(ev));
+                    extending_row = Type::mk_rowcons(name.clone(), ty.clone(), extending_row);
+                }
+                names_evidence.reverse();
+
+                rest_row.iter().for_each(|(rest_name, rest_row)| {
                     names_tys.push((
                         rest_name.clone(),
-                        Type::mk_record(Vec::new(), Some(rest_row)),
+                        Type::mk_record(Vec::new(), Some(rest_row.clone())),
                     ))
                 });
+
                 (
                     core::Pattern::Record {
-                        names: names.len(),
+                        names: names_evidence,
                         rest: match rest {
                             None => false,
                             Some(_) => true,

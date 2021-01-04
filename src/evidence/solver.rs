@@ -34,7 +34,7 @@ pub fn solve_constraint<'a>(
             todo!("solve constraint {:?}", constraint)
         }
         Constraint::HasField { field, rest } => {
-            let _ = tc.check_kind(rest, Kind::Row)?;
+            let _ = tc.check_kind(None, rest, Kind::Row)?;
             let new_evidence = match rest {
                 syntax::Type::RowNil => Ok(core::Expr::Int(0)),
                 syntax::Type::RowCons(other_field, _, other_rest) => {
