@@ -1259,21 +1259,21 @@ impl Typechecker {
                     .iter()
                     .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
                     .collect();
-                let rest_ty: Option<(&String, Type<usize>)> = match rest {
+                let rest_row: Option<(&String, Type<usize>)> = match rest {
                     None => None,
-                    Some(name) => Some((&name.item, self.fresh_typevar(syntax::Kind::Type))),
+                    Some(name) => Some((&name.item, self.fresh_typevar(syntax::Kind::Row))),
                 };
                 let ty = Type::mk_record(
                     names_tys
                         .iter()
                         .map(|(name, ty)| ((*name).clone(), ty.clone()))
                         .collect(),
-                    rest_ty.clone().map(|x| x.1),
+                    rest_row.clone().map(|x| x.1),
                 );
-                rest_ty.map(|(rest_name, rest_ty)| {
+                rest_row.map(|(rest_name, rest_row)| {
                     names_tys.push((
                         rest_name.clone(),
-                        Type::mk_record(Vec::new(), Some(rest_ty)),
+                        Type::mk_record(Vec::new(), Some(rest_row)),
                     ))
                 });
                 (
