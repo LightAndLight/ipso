@@ -1011,8 +1011,8 @@ fn infer_case_1() {
                 )
             ),
             syntax::Type::mk_arrow(
-                syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(3))], None),
-                syntax::Type::Meta(3)
+                syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(2))], None),
+                syntax::Type::Meta(2)
             )
         ))
     )
@@ -1101,12 +1101,12 @@ fn infer_case_2() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_variant(
                     vec![
-                        (String::from("Left"), syntax::Type::Meta(5)),
-                        (String::from("Right"), syntax::Type::Meta(5))
+                        (String::from("Left"), syntax::Type::Meta(4)),
+                        (String::from("Right"), syntax::Type::Meta(4))
                     ],
                     None
                 ),
-                syntax::Type::Meta(5)
+                syntax::Type::Meta(4)
             )
         ))
     )
@@ -1213,7 +1213,7 @@ fn infer_case_3() {
                         (String::from("Left"), syntax::Type::Int),
                         (String::from("Right"), syntax::Type::Int)
                     ],
-                    Some(syntax::Type::Meta(7))
+                    Some(syntax::Type::Meta(5))
                 ),
                 syntax::Type::Int
             )

@@ -1723,78 +1723,103 @@ impl Typechecker {
                     }
                 }
                 syntax::Expr::Case(expr, branches) => {
-                    #[derive(PartialEq, Eq, Hash)]
-                    enum Seen {
-                        Fallthrough,
-                        Record,
-                        Variant(String),
-                    }
-
-                    fn to_seen(pat: &syntax::Pattern) -> Seen {
-                        match pat {
-                            syntax::Pattern::Wildcard => Seen::Fallthrough,
-                            syntax::Pattern::Name(_) => Seen::Fallthrough,
-                            syntax::Pattern::Record { names: _, rest: _ } => Seen::Record,
-                            syntax::Pattern::Variant { name, arg: _ } => {
-                                Seen::Variant(name.clone())
-                            }
-                        }
-                    }
-
-                    let in_ty = self.fresh_typevar(syntax::Kind::Type);
-                    let out_ty = self.fresh_typevar(syntax::Kind::Type);
-
+                    let (expr_core, expr_ty) = self.infer_expr(*expr)?;
                     let mut branches_core = Vec::new();
-                    let mut seen: HashSet<Seen> = HashSet::new();
+
+                    let expected_body_ty = self.fresh_typevar(syntax::Kind::Type);
+                    let mut expected_pattern_ty = expr_ty.clone();
+                    let mut seen_fallthrough = false;
+                    let mut matching_variant = false;
+                    let mut seen_ctors: HashSet<String> = HashSet::new();
                     for branch in branches {
-                        let current_seen = to_seen(&branch.pattern.item);
-                        let saw_fallthrough = seen.contains(&Seen::Fallthrough);
-                        if saw_fallthrough || seen.contains(&current_seen) {
+                        if seen_fallthrough
+                            || match &branch.pattern.item {
+                                syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name),
+                                _ => false,
+                            }
+                        {
                             return Err(TypeError::RedundantPattern {
                                 pos: branch.pattern.pos,
                             });
                         }
-                        match self.check_pattern(&branch.pattern.item, in_ty.clone()) {
-                            Err(err) => return Err(err),
-                            Ok((pattern_core, pattern_bind)) => {
-                                self.bound_vars.insert(&pattern_bind);
-                                match self.check_expr(branch.body, out_ty.clone()) {
-                                    Err(err) => return Err(err),
-                                    Ok(body_core) => {
-                                        if !saw_fallthrough {
-                                            branches_core.push(core::Branch {
-                                                pattern: pattern_core,
-                                                body: body_core,
-                                            })
-                                        };
+                        let (pattern_core, _pattern_ty, pattern_binds) =
+                            with_position!(self, branch.pattern.pos, {
+                                let (pattern_core, pattern_ty, pattern_binds) =
+                                    self.infer_pattern(&branch.pattern.item);
+                                let context: UnifyTypeContext<usize> = UnifyTypeContext {
+                                    expected: expected_pattern_ty.clone(),
+                                    actual: pattern_ty.clone(),
+                                };
+                                match self.unify_type(
+                                    &context,
+                                    expected_pattern_ty.clone(),
+                                    pattern_ty.clone(),
+                                ) {
+                                    Err(err) => {
+                                        return Err(err);
+                                    }
+                                    Ok(()) => {
+                                        match branch.pattern.item {
+                                            syntax::Pattern::Wildcard
+                                            | syntax::Pattern::Name(_)
+                                            | syntax::Pattern::Record { .. } => {
+                                                seen_fallthrough = true;
+                                            }
+                                            syntax::Pattern::Variant { name, .. } => {
+                                                matching_variant = true;
+                                                seen_ctors.insert(name.clone());
+                                                match pattern_ty.unwrap_variant() {
+                                                    None => {
+                                                        panic!("impossible")
+                                                    }
+                                                    Some((ctors, rest)) => {
+                                                        debug_assert!(ctors.len() == 1);
+                                                        debug_assert!(ctors[0].0 == &name);
+                                                        expected_pattern_ty =
+                                                            syntax::Type::mk_variant(
+                                                                Vec::new(),
+                                                                rest.map(|x| x.clone()),
+                                                            );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Ok((pattern_core, pattern_ty, pattern_binds))
                                     }
                                 }
-                                self.bound_vars.delete(pattern_bind.len());
-                                seen.insert(current_seen);
-                            }
-                        }
+                            })?;
+                        self.bound_vars.insert(&pattern_binds);
+                        let body_core = self.check_expr(branch.body, expected_body_ty.clone())?;
+                        self.bound_vars.delete(pattern_binds.len());
+                        branches_core.push(core::Branch {
+                            pattern: pattern_core,
+                            body: body_core,
+                        });
                     }
 
-                    match self.zonk_type(in_ty.clone()).unwrap_variant() {
-                        Some((ctors, rest)) if !seen.contains(&Seen::Fallthrough) => match rest {
-                            None => {}
-                            Some(rest) => {
-                                let ctors: Vec<(String, Type<usize>)> = ctors
-                                    .into_iter()
-                                    .map(|(a, b)| (a.clone(), b.clone()))
-                                    .collect();
-                                let context = UnifyTypeContext {
-                                    expected: Type::mk_variant(ctors.clone(), None),
-                                    actual: Type::mk_variant(ctors, Some(rest.clone())),
-                                };
-                                self.unify_type(&context, Type::RowNil, rest.clone())?;
-                            }
-                        },
-                        _ => {}
+                    if matching_variant && !seen_fallthrough {
+                        let expr_ty = self.zonk_type(expr_ty);
+                        let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
+                        let ctors: Vec<(String, syntax::Type<usize>)> = ctors
+                            .iter()
+                            .map(|(x, y)| ((*x).clone(), (*y).clone()))
+                            .collect();
+                        let rest: Option<Type<usize>> = rest.map(|x| x.clone());
+                        let context = UnifyTypeContext {
+                            expected: syntax::Type::mk_variant(ctors.clone(), None),
+                            actual: syntax::Type::mk_variant(ctors, rest),
+                        };
+                        let _ = self.unify_type(
+                            &context,
+                            expected_pattern_ty,
+                            Type::mk_variant(Vec::new(), None),
+                        )?;
                     }
-                    let expr_core = self.check_expr(*expr, in_ty)?;
 
-                    Ok((core::Expr::mk_case(expr_core, branches_core), out_ty))
+                    Ok((
+                        core::Expr::mk_case(expr_core, branches_core),
+                        expected_body_ty,
+                    ))
                 }
             }
         )
