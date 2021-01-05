@@ -226,7 +226,7 @@ fn parse_type_alias_2() {
         Ok(Declaration::TypeAlias {
             name: String::from("Ap"),
             args: vec![String::from("a"), String::from("b")],
-            body: Type::mk_app(Type::mk_name("a"), Type::mk_name("b"))
+            body: Type::mk_app(Type::Var(String::from("a")), Type::Var(String::from("b")))
         })
     )
 }
@@ -336,10 +336,10 @@ fn parse_type_3() {
         "Eq a => a -> a -> Bool",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
             Type::mk_arrow(
-                Type::mk_name("a"),
-                Type::mk_arrow(Type::mk_name("a"), Type::Bool)
+                Type::Var(String::from("a")),
+                Type::mk_arrow(Type::Var(String::from("a")), Type::Bool)
             ),
         ))
     )
@@ -351,8 +351,8 @@ fn parse_type_3_1() {
         "Eq a => a",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
-            Type::mk_name("a"),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
+            Type::Var(String::from("a")),
         ))
     )
 }
@@ -363,10 +363,10 @@ fn parse_type_4() {
         "Eq a => F => a -> Bool",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::mk_name("a")),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
             Type::mk_fatarrow(
                 Type::mk_name("F"),
-                Type::mk_arrow(Type::mk_name("a"), Type::Bool)
+                Type::mk_arrow(Type::Var(String::from("a")), Type::Bool)
             )
         ))
     )

@@ -659,7 +659,8 @@ impl Parser {
                 map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
                 self.type_record(),
                 self.type_variant(),
-                choices!(self, self.ident(), self.ctor()).map(|s| Type::Name(s)),
+                self.ctor().map(|s| Type::Name(s)),
+                self.ident().map(|s| Type::Var(s)),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
                     keep_left!(
