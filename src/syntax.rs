@@ -559,6 +559,7 @@ impl<A> Type<A> {
                 match fields_iter.next() {
                     None => {}
                     Some((first_field, first_ty)) => {
+                        s.push(' ');
                         s.push_str(first_field.as_str());
                         s.push_str(" : ");
                         s.push_str(first_ty.render().as_str());
@@ -571,12 +572,17 @@ impl<A> Type<A> {
                     }
                 }
                 match rest {
-                    None => {}
+                    None => {
+                        if fields.len() > 0 {
+                            s.push(' ');
+                        }
+                    }
                     Some(ty) => {
                         if fields.len() > 0 {
                             s.push_str(" | ")
                         }
                         s.push_str(ty.render().as_str());
+                        s.push(' ');
                     }
                 }
                 s.push('>');
