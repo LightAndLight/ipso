@@ -680,23 +680,35 @@ impl Typechecker {
         args: Vec<syntax::Pattern>,
         body: Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
-        let (ty, ty_var_kinds) = {
+        let ty_var_positions: HashMap<String, usize> = {
             let mut vars = HashMap::new();
-            let mut kinds = Vec::new();
-            let ty = ty.map(&mut |x: &String| match vars.get(x) {
-                None => {
-                    let len = vars.len();
-                    let kind = self.fresh_kindvar();
-                    vars.insert(x.clone(), len);
-                    kinds.push((x.clone(), kind));
-                    len
+            for var in ty.iter_vars() {
+                match vars.get(&var) {
+                    None => {
+                        vars.insert(var, vars.len());
+                    }
+                    Some(_) => {}
                 }
-                Some(&n) => n,
+            }
+            vars
+        };
+        let ty_var_kinds_len = ty_var_positions.len();
+        let (ty, ty_var_kinds) = {
+            let mut kinds = Vec::new();
+            let ty = ty.map(&mut |name: &String| match ty_var_positions.get(name) {
+                None => {
+                    panic!("impossible")
+                }
+                Some(&pos) => {
+                    if kinds.len() <= pos {
+                        kinds.push((name.clone(), self.fresh_kindvar()));
+                    };
+                    ty_var_kinds_len - 1 - pos
+                }
             });
             (ty, kinds)
         };
 
-        let ty_var_kinds_len = ty_var_kinds.len();
         self.bound_tyvars.insert(&ty_var_kinds);
 
         let ty = self.check_kind(None, &ty, syntax::Kind::Type)?;
@@ -823,6 +835,10 @@ impl Typechecker {
         syntax::Kind::Meta(n)
     }
 
+    pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<String> {
+        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
+    }
+
     fn kind_mismatch<A>(
         &self,
         context: &UnifyKindContext<usize>,
@@ -936,10 +952,6 @@ impl Typechecker {
             pos: self.current_position(),
             name: name.clone(),
         })
-    }
-
-    pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<String> {
-        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
     }
 
     fn type_mismatch<A>(
