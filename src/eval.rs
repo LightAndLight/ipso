@@ -781,6 +781,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         // expect variant patterns
                         let mut target: Option<Expr> = None;
                         for branch in branches {
+                            println!("pattern: {:?}", branch.pattern);
                             match branch.pattern {
                                 Pattern::Record { .. } => {
                                     panic!("expected variant pattern, got {:?}", branch.pattern)

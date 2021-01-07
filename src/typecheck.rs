@@ -1330,86 +1330,113 @@ impl Typechecker {
         Ok(())
     }
 
+    fn infer_variant_pattern(
+        &mut self,
+        name: &String,
+        arg: &Spanned<String>,
+    ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
+        let arg_ty: Type<usize> = self.fresh_typevar(syntax::Kind::Type);
+        let rest_row = self.fresh_typevar(syntax::Kind::Row);
+        let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+
+        let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
+            field: name.clone(),
+            rest: rest_row,
+        });
+        (
+            core::Pattern::mk_variant(core::Expr::EVar(tag)),
+            ty,
+            vec![(arg.item.clone(), arg_ty)],
+        )
+    }
+
+    fn infer_wildcard_pattern(
+        &mut self,
+    ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
+        (
+            core::Pattern::Wildcard,
+            self.fresh_typevar(syntax::Kind::Type),
+            Vec::new(),
+        )
+    }
+
+    fn infer_name_pattern(
+        &mut self,
+        name: &Spanned<String>,
+    ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
+        let ty = self.fresh_typevar(syntax::Kind::Type);
+        (
+            core::Pattern::Name,
+            ty.clone(),
+            vec![(name.item.clone(), ty)],
+        )
+    }
+
+    fn infer_record_pattern(
+        &mut self,
+        names: &Vec<Spanned<String>>,
+        rest: &Option<Spanned<String>>,
+    ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
+        let mut names_tys: Vec<(String, Type<usize>)> = names
+            .iter()
+            .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
+            .collect();
+        let rest_row: Option<(String, Type<usize>)> = match rest {
+            None => None,
+            Some(name) => Some((name.item.clone(), self.fresh_typevar(syntax::Kind::Row))),
+        };
+        let ty = Type::mk_record(
+            names_tys
+                .iter()
+                .map(|(name, ty)| ((*name).clone(), ty.clone()))
+                .collect(),
+            rest_row.clone().map(|x| x.1),
+        );
+
+        let mut extending_row = match &rest_row {
+            Some((_, row)) => row.clone(),
+            None => Type::RowNil,
+        };
+        let mut names_evidence = Vec::new();
+        for (name, ty) in names_tys.iter().rev() {
+            let ev = self.evidence.fresh_evar(Constraint::HasField {
+                field: name.clone(),
+                rest: extending_row.clone(),
+            });
+            names_evidence.push(core::Expr::EVar(ev));
+            extending_row = Type::mk_rowcons(name.clone(), ty.clone(), extending_row);
+        }
+        names_evidence.reverse();
+
+        rest_row.iter().for_each(|(rest_name, rest_row)| {
+            names_tys.push((
+                rest_name.clone(),
+                Type::mk_record(Vec::new(), Some(rest_row.clone())),
+            ))
+        });
+
+        (
+            core::Pattern::Record {
+                names: names_evidence,
+                rest: match rest {
+                    None => false,
+                    Some(_) => true,
+                },
+            },
+            ty,
+            names_tys,
+        )
+    }
+
     fn infer_pattern<'a, 'b>(
         &'a mut self,
         arg: &'b syntax::Pattern,
     ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
         match arg {
-            syntax::Pattern::Wildcard => (
-                core::Pattern::Wildcard,
-                self.fresh_typevar(syntax::Kind::Type),
-                Vec::new(),
-            ),
-            syntax::Pattern::Name(n) => {
-                let ty = self.fresh_typevar(syntax::Kind::Type);
-                (core::Pattern::Name, ty.clone(), vec![(n.item.clone(), ty)])
-            }
-            syntax::Pattern::Record { names, rest } => {
-                let mut names_tys: Vec<(String, Type<usize>)> = names
-                    .iter()
-                    .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
-                    .collect();
-                let rest_row: Option<(String, Type<usize>)> = match rest {
-                    None => None,
-                    Some(name) => Some((name.item.clone(), self.fresh_typevar(syntax::Kind::Row))),
-                };
-                let ty = Type::mk_record(
-                    names_tys
-                        .iter()
-                        .map(|(name, ty)| ((*name).clone(), ty.clone()))
-                        .collect(),
-                    rest_row.clone().map(|x| x.1),
-                );
-
-                let mut extending_row = match &rest_row {
-                    Some((_, row)) => row.clone(),
-                    None => Type::RowNil,
-                };
-                let mut names_evidence = Vec::new();
-                for (name, ty) in names_tys.iter().rev() {
-                    let ev = self.evidence.fresh_evar(Constraint::HasField {
-                        field: name.clone(),
-                        rest: extending_row.clone(),
-                    });
-                    names_evidence.push(core::Expr::EVar(ev));
-                    extending_row = Type::mk_rowcons(name.clone(), ty.clone(), extending_row);
-                }
-                names_evidence.reverse();
-
-                rest_row.iter().for_each(|(rest_name, rest_row)| {
-                    names_tys.push((
-                        rest_name.clone(),
-                        Type::mk_record(Vec::new(), Some(rest_row.clone())),
-                    ))
-                });
-
-                (
-                    core::Pattern::Record {
-                        names: names_evidence,
-                        rest: match rest {
-                            None => false,
-                            Some(_) => true,
-                        },
-                    },
-                    ty,
-                    names_tys,
-                )
-            }
-            syntax::Pattern::Variant { name, arg } => {
-                let arg_ty: Type<usize> = self.fresh_typevar(syntax::Kind::Type);
-                let rest_ty = self.fresh_typevar(syntax::Kind::Row);
-                let ty =
-                    Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_ty.clone()));
-                let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
-                    field: name.clone(),
-                    rest: rest_ty,
-                });
-                (
-                    core::Pattern::mk_variant(core::Expr::EVar(tag)),
-                    ty,
-                    vec![(arg.item.clone(), arg_ty)],
-                )
-            }
+            syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
+            syntax::Pattern::Name(n) => self.infer_name_pattern(n),
+            syntax::Pattern::Record { names, rest } => self.infer_record_pattern(names, rest),
+            syntax::Pattern::Variant { name, arg } => self.infer_variant_pattern(name, arg),
         }
     }
 
@@ -1757,7 +1784,20 @@ impl Typechecker {
                         let (pattern_core, _pattern_ty, pattern_binds) =
                             with_position!(self, branch.pattern.pos, {
                                 let (pattern_core, pattern_ty, pattern_binds) =
-                                    self.infer_pattern(&branch.pattern.item);
+                                    match &branch.pattern.item {
+                                        syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
+                                        syntax::Pattern::Name(n) => self.infer_name_pattern(n),
+                                        syntax::Pattern::Record { names, rest } => {
+                                            self.infer_record_pattern(names, rest)
+                                        }
+                                        syntax::Pattern::Variant { name, arg } => {
+                                            let tag = todo!();
+                                            let pattern_core = core::Pattern::mk_variant(tag);
+                                            let pattern_ty = todo!();
+                                            let pattern_binds = todo!();
+                                            (pattern_core, pattern_ty, pattern_binds)
+                                        }
+                                    };
                                 let context: UnifyTypeContext<usize> = UnifyTypeContext {
                                     expected: expected_pattern_ty.clone(),
                                     actual: pattern_ty.clone(),
