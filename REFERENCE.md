@@ -408,6 +408,11 @@ x : < None >
 1
 ```
 
+```ipso-repl
+> :t \x -> < A | x >
+< r > -> < A : a | r >
+```
+
 ### IO
 
 ```ipso-repl
