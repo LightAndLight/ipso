@@ -376,12 +376,12 @@ b : Bool
 
 ```ipso-repl
 > :t None
-forall r0. < None | r0 >
+forall r. < None | r >
 ```
 
 ```ipso-repl
 > x = None
-x : forall r0. < None | r0 >
+x : forall r. < None | r >
 > case x of
 .   None -> 1
 .   _ -> 2
@@ -391,7 +391,7 @@ x : forall r0. < None | r0 >
 
 ```ipso-repl
 > x = None
-x : forall r0 . < None | r0 >
+x : forall r. < None | r >
 > case x of
 .   None -> 1
 .
