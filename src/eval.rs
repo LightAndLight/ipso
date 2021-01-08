@@ -742,6 +742,21 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 };
                 self.alloc_value(closure)
             }
+            Expr::Embed(tag, rest) => {
+                let tag = self.eval(env, *tag).unpack_int() as usize;
+                let rest = self.eval(env, *rest);
+                match rest {
+                    Value::Variant(old_tag, arg) => self.alloc_value(Value::Variant(
+                        if tag <= *old_tag {
+                            old_tag + 1
+                        } else {
+                            *old_tag
+                        },
+                        arg,
+                    )),
+                    rest => panic!("expected variant, got {:?}", rest),
+                }
+            }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, *expr);
                 match expr {

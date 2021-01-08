@@ -906,6 +906,24 @@ impl Parser {
         )
     }
 
+    /*
+    expr_embed ::=
+      '<' ctor '|' expr '>'
+     */
+    fn expr_embed(&mut self) -> ParseResult<Expr> {
+        keep_right!(
+            keep_left!(self.token(&TokenType::LAngle), self.spaces()),
+            keep_left!(
+                keep_left!(self.ctor(), self.spaces()).and_then(|ctor| keep_left!(
+                    self.token(&TokenType::Pipe),
+                    self.spaces()
+                )
+                .and_then(|_| self.expr().map(|rest| Expr::mk_embed(ctor, rest)))),
+                keep_left!(self.token(&TokenType::RAngle), self.spaces())
+            )
+        )
+    }
+
     fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
             spanned!(
@@ -916,6 +934,7 @@ impl Parser {
                     self.ident().map(|n| Expr::Var(n)),
                     self.ctor().map(|n| Expr::Variant(n)),
                     self.expr_record(),
+                    self.expr_embed(),
                     keep_right!(
                         keep_left!(self.token(&TokenType::LParen), self.spaces()),
                         keep_left!(

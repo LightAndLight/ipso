@@ -2,7 +2,7 @@ atob : < A : x | r > -> < B : x | r >
 atob val =
   case val of
     A x -> B x
-    r -> r
+    r -> < B | r >
 
 sayb : < B : x > -> IO ()
 sayb _ = writeStdout stdout (toUtf8 "B")

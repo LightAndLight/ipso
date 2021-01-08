@@ -134,6 +134,7 @@ pub enum Expr {
     Project(Box<Spanned<Expr>>, String),
 
     Variant(String),
+    Embed(String, Box<Spanned<Expr>>),
     Case(Box<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
@@ -167,6 +168,10 @@ impl Expr {
             fields,
             rest: rest.map(|x| Box::new(x)),
         }
+    }
+
+    pub fn mk_embed(ctor: String, rest: Spanned<Expr>) -> Expr {
+        Expr::Embed(ctor, Box::new(rest))
     }
 }
 

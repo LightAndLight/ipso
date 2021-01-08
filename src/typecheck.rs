@@ -1698,6 +1698,25 @@ impl Typechecker {
                         ),
                     ))
                 }
+                syntax::Expr::Embed(ctor, rest) => {
+                    let arg_ty = self.fresh_typevar(syntax::Kind::Type);
+                    let rest_rows = self.fresh_typevar(syntax::Kind::Row);
+                    let rest_core =
+                        self.check_expr(*rest, Type::mk_app(Type::Variant, rest_rows.clone()))?;
+                    let tag = core::Expr::EVar(self.evidence.fresh_evar(
+                        evidence::Constraint::HasField {
+                            field: ctor.clone(),
+                            rest: rest_rows.clone(),
+                        },
+                    ));
+                    Ok((
+                        core::Expr::mk_embed(tag, rest_core),
+                        Type::mk_app(
+                            Type::Variant,
+                            Type::mk_rowcons(ctor.clone(), arg_ty, rest_rows),
+                        ),
+                    ))
+                }
                 syntax::Expr::Binop(op, left, right) => {
                     match op {
                         syntax::Binop::Add => {
