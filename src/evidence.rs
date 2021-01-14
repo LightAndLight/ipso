@@ -1,11 +1,14 @@
-use crate::syntax::{self, Type};
+use crate::{
+    core::{EVar, Expr, Placeholder},
+    syntax::{self, Type},
+};
 pub mod solver;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct EVar(pub usize);
-
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Evidence<A>(Vec<(Constraint, Option<A>)>);
+pub struct Evidence {
+    evars: usize,
+    environment: Vec<(Constraint, Option<Expr>)>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
@@ -35,14 +38,25 @@ impl Constraint {
     }
 }
 
-impl<A> Evidence<A> {
+impl Evidence {
     pub fn new() -> Self {
-        Evidence(Vec::new())
+        Evidence {
+            evars: 0,
+            environment: Vec::new(),
+        }
     }
 
-    pub fn fresh_evar(&mut self, constraint: Constraint) -> EVar {
-        let ix = self.0.len();
-        self.0.push((constraint, None));
-        EVar(ix)
+    pub fn placeholder(&mut self, constraint: Constraint) -> Placeholder {
+        let ix = self.environment.len();
+        self.environment.push((constraint, None));
+        Placeholder(ix)
+    }
+
+    pub fn assume(&mut self, constraint: Constraint) -> EVar {
+        let ev = self.evars;
+        self.evars += 1;
+        let ev = EVar(ev);
+        self.environment.push((constraint, Some(Expr::EVar(ev))));
+        ev
     }
 }

@@ -1,3 +1,4 @@
+use crate::core::EVar;
 #[cfg(test)]
 use crate::{
     core::Expr,
@@ -46,7 +47,7 @@ fn solve_constraint_2() {
 fn solve_constraint_3() {
     let mut tc = Typechecker::new();
     let var = tc.fresh_typevar(Kind::Row);
-    tc.evidence.fresh_evar(Constraint::HasField {
+    tc.evidence.assume(Constraint::HasField {
         field: String::from("z"),
         rest: var.clone(),
     });
@@ -70,13 +71,16 @@ fn solve_constraint_3() {
     ));
     assert_eq!(expected_result, actual_result);
 
-    let expected_evidence = Evidence(vec![(
-        Constraint::HasField {
-            field: String::from("z"),
-            rest: var,
-        },
-        None,
-    )]);
+    let expected_evidence = Evidence {
+        evars: 1,
+        environment: vec![(
+            Constraint::HasField {
+                field: String::from("z"),
+                rest: var,
+            },
+            Some(Expr::EVar(EVar(0))),
+        )],
+    };
     let actual_evidence = tc.evidence;
     assert_eq!(expected_evidence, actual_evidence)
 }

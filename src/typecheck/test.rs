@@ -1,10 +1,11 @@
 #[cfg(test)]
 use std::collections::HashSet;
 
+use crate::core::Placeholder;
 #[cfg(test)]
 use crate::{
     core,
-    evidence::{solver::solve_evar, Constraint, EVar},
+    evidence::{solver::solve_placeholder, Constraint},
     syntax::{self, Binop, Kind, Type},
     typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
     void::Void,
@@ -253,9 +254,9 @@ fn infer_pattern_test_2() {
         (
             core::Pattern::Record {
                 names: vec![
-                    core::Expr::mk_evar(2),
-                    core::Expr::mk_evar(1),
-                    core::Expr::mk_evar(0)
+                    core::Expr::mk_placeholder(2),
+                    core::Expr::mk_placeholder(1),
+                    core::Expr::mk_placeholder(0)
                 ],
                 rest: false
             },
@@ -304,9 +305,9 @@ fn infer_pattern_test_3() {
         (
             core::Pattern::Record {
                 names: vec![
-                    core::Expr::mk_evar(2),
-                    core::Expr::mk_evar(1),
-                    core::Expr::mk_evar(0)
+                    core::Expr::mk_placeholder(2),
+                    core::Expr::mk_placeholder(1),
+                    core::Expr::mk_placeholder(0)
                 ],
                 rest: true
             },
@@ -344,7 +345,7 @@ fn infer_pattern_test_4() {
     assert_eq!(
         tc.infer_pattern(&pat),
         (
-            core::Pattern::mk_variant(core::Expr::mk_evar(0)),
+            core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
             syntax::Type::mk_variant(
                 vec![(String::from("just"), syntax::Type::Meta(0))],
                 Some(syntax::Type::Meta(1))
@@ -415,7 +416,10 @@ fn infer_lam_test_2() {
                     core::Expr::Var(0),
                     vec![core::Branch {
                         pattern: core::Pattern::Record {
-                            names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
+                            names: vec![
+                                core::Expr::mk_placeholder(1),
+                                core::Expr::mk_placeholder(0)
+                            ],
                             rest: false
                         },
                         body: core::Expr::Var(1)
@@ -471,7 +475,10 @@ fn infer_lam_test_3() {
                     core::Expr::Var(0),
                     vec![core::Branch {
                         pattern: core::Pattern::Record {
-                            names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
+                            names: vec![
+                                core::Expr::mk_placeholder(1),
+                                core::Expr::mk_placeholder(0)
+                            ],
                             rest: false
                         },
                         body: core::Expr::Var(0)
@@ -528,7 +535,7 @@ fn infer_lam_test_4() {
                 core::Expr::Var(0),
                 vec![core::Branch {
                     pattern: core::Pattern::Record {
-                        names: vec![core::Expr::mk_evar(1), core::Expr::mk_evar(0)],
+                        names: vec![core::Expr::mk_placeholder(1), core::Expr::mk_placeholder(0)],
                         rest: true,
                     },
                     body: core::Expr::Var(0),
@@ -837,8 +844,8 @@ fn infer_record_test_2() {
         Ok((
             core::Expr::mk_record(
                 vec![
-                    (core::Expr::mk_evar(1), core::Expr::Int(1)),
-                    (core::Expr::mk_evar(0), core::Expr::True)
+                    (core::Expr::mk_placeholder(1), core::Expr::Int(1)),
+                    (core::Expr::mk_placeholder(0), core::Expr::True)
                 ],
                 None
             ),
@@ -894,11 +901,11 @@ fn infer_record_test_3() {
         Ok((
             core::Expr::mk_record(
                 vec![
-                    (core::Expr::mk_evar(1), core::Expr::Int(1)),
-                    (core::Expr::mk_evar(0), core::Expr::True)
+                    (core::Expr::mk_placeholder(1), core::Expr::Int(1)),
+                    (core::Expr::mk_placeholder(0), core::Expr::True)
                 ],
                 Some(core::Expr::mk_record(
-                    vec![(core::Expr::mk_evar(2), core::Expr::Char('c'))],
+                    vec![(core::Expr::mk_placeholder(2), core::Expr::Char('c'))],
                     None
                 ))
             ),
@@ -1005,7 +1012,7 @@ fn infer_case_1() {
                 core::Expr::mk_case(
                     core::Expr::Var(0),
                     vec![core::Branch {
-                        pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
                         body: core::Expr::Var(0)
                     }]
                 )
@@ -1088,11 +1095,11 @@ fn infer_case_2() {
                     core::Expr::Var(0),
                     vec![
                         core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(1)),
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
                             body: core::Expr::Var(0)
                         },
                     ]
@@ -1193,11 +1200,11 @@ fn infer_case_3() {
                     core::Expr::Var(0),
                     vec![
                         core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(0)),
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_evar(1)),
+                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
                             body: core::Expr::Var(0)
                         },
                         core::Branch {
@@ -1304,9 +1311,12 @@ fn infer_record_1() {
     let mut tc = Typechecker::new();
     let expected_expr = core::Expr::mk_record(
         vec![
-            (core::Expr::EVar(EVar(2)), core::Expr::False),
-            (core::Expr::EVar(EVar(1)), core::Expr::String(Vec::new())),
-            (core::Expr::EVar(EVar(0)), core::Expr::Int(0)),
+            (core::Expr::Placeholder(Placeholder(2)), core::Expr::False),
+            (
+                core::Expr::Placeholder(Placeholder(1)),
+                core::Expr::String(Vec::new()),
+            ),
+            (core::Expr::Placeholder(Placeholder(0)), core::Expr::Int(0)),
         ],
         None,
     );
@@ -1319,6 +1329,7 @@ fn infer_record_1() {
         None,
     );
     let expected_result = Ok((expected_expr, expected_ty));
+    // { z = False, y = "", x = 0 }
     let expr = syntax::Spanned {
         pos: 0,
         item: syntax::Expr::mk_record(
@@ -1355,17 +1366,17 @@ fn infer_record_1() {
 
     let (actual_expr, _actual_ty) = actual_result.unwrap();
 
-    let mut evars: HashSet<EVar> = HashSet::new();
-    let _: Result<core::Expr, Void> = actual_expr.subst_evar(&mut |ev| {
-        evars.insert(*ev);
-        Ok(core::Expr::EVar(*ev))
+    let mut placeholders: HashSet<Placeholder> = HashSet::new();
+    let _: Result<core::Expr, Void> = actual_expr.subst_placeholder(&mut |p| {
+        placeholders.insert(*p);
+        Ok(core::Expr::Placeholder(*p))
     });
 
-    assert_eq!(3, evars.len(), "checking number of EVars");
+    assert_eq!(3, placeholders.len(), "checking number of Placeholders");
 
-    let ev0 = evars.get(&EVar(0)).unwrap();
-    let ev1 = evars.get(&EVar(1)).unwrap();
-    let ev2 = evars.get(&EVar(2)).unwrap();
+    let p0 = placeholders.get(&Placeholder(0)).unwrap();
+    let p1 = placeholders.get(&Placeholder(1)).unwrap();
+    let p2 = placeholders.get(&Placeholder(2)).unwrap();
 
     assert_eq!(
         Ok((
@@ -1375,7 +1386,8 @@ fn infer_record_1() {
                 rest: Type::RowNil
             }
         )),
-        solve_evar(&mut tc, *ev0).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+        solve_placeholder(&mut tc, *p0)
+            .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 
     assert_eq!(
@@ -1386,7 +1398,8 @@ fn infer_record_1() {
                 rest: Type::mk_rows(vec![(String::from("x"), Type::Int)], None)
             }
         )),
-        solve_evar(&mut tc, *ev1).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+        solve_placeholder(&mut tc, *p1)
+            .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 
     assert_eq!(
@@ -1407,7 +1420,8 @@ fn infer_record_1() {
                 )
             }
         )),
-        solve_evar(&mut tc, *ev2).map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+        solve_placeholder(&mut tc, *p2)
+            .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 }
 

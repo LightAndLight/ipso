@@ -290,7 +290,6 @@ pub struct Interpreter<'stdout, 'heap> {
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Expr>,
-    evidence: Vec<ValueRef<'heap>>,
 }
 
 impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
@@ -299,12 +298,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         context: HashMap<String, Expr>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
-        let evidence = Vec::new();
         Interpreter {
             stdout,
             context,
             heap,
-            evidence,
         }
     }
 
@@ -613,7 +610,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn eval(&mut self, env: &'heap Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
         match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
-            Expr::EVar(n) => self.evidence[n.0],
+            Expr::EVar(n) => panic!("found EVar({:?})", n),
+            Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
             Expr::Name(name) => self.eval(env, self.context.get(&name).unwrap().clone()),
             Expr::Builtin(name) => self.eval_builtin(&name),
 

@@ -1,4 +1,4 @@
-use crate::{evidence::EVar, syntax};
+use crate::syntax;
 
 #[cfg(test)]
 mod test;
@@ -16,14 +16,17 @@ impl Pattern {
         Pattern::Variant { tag: Box::new(tag) }
     }
 
-    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+    pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
+        &self,
+        f: &mut F,
+    ) -> Result<Self, E> {
         match self {
             Pattern::Name => Ok(Pattern::Name),
             Pattern::Record { names, rest } => {
                 let names = {
                     let mut new_names = Vec::new();
                     for name in names {
-                        match name.subst_evar(f) {
+                        match name.subst_placeholder(f) {
                             Err(err) => return Err(err),
                             Ok(new_name) => {
                                 new_names.push(new_name);
@@ -34,7 +37,9 @@ impl Pattern {
                 };
                 Ok(Pattern::Record { names, rest: *rest })
             }
-            Pattern::Variant { tag } => tag.subst_evar(f).map(|tag| Pattern::mk_variant(tag)),
+            Pattern::Variant { tag } => {
+                tag.subst_placeholder(f).map(|tag| Pattern::mk_variant(tag))
+            }
             Pattern::Wildcard => Ok(Pattern::Wildcard),
         }
     }
@@ -77,10 +82,13 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
-        self.body.subst_evar(f).and_then(|body| {
+    pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
+        &self,
+        f: &mut F,
+    ) -> Result<Self, E> {
+        self.body.subst_placeholder(f).and_then(|body| {
             self.pattern
-                .subst_evar(f)
+                .subst_placeholder(f)
                 .map(|pattern| Branch { pattern, body })
         })
     }
@@ -125,10 +133,13 @@ pub enum StringPart {
 }
 
 impl StringPart {
-    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Self, E> {
+    pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
+        &self,
+        f: &mut F,
+    ) -> Result<Self, E> {
         match self {
             StringPart::String(s) => Ok(StringPart::String(s.clone())),
-            StringPart::Expr(e) => e.subst_evar(f).map(|e| StringPart::Expr(e)),
+            StringPart::Expr(e) => e.subst_placeholder(f).map(|e| StringPart::Expr(e)),
         }
     }
 
@@ -160,10 +171,17 @@ pub enum Builtin {
     ReadLineStdin,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct EVar(pub usize);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct Placeholder(pub usize);
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
     EVar(EVar),
+    Placeholder(Placeholder),
     Name(String),
     Builtin(Builtin),
 
@@ -267,6 +285,10 @@ impl Expr {
         Expr::EVar(EVar(ev))
     }
 
+    pub fn mk_placeholder(p: usize) -> Expr {
+        Expr::Placeholder(Placeholder(p))
+    }
+
     pub fn instantiate(&self, val: &Expr) -> Expr {
         self.__instantiate(0, val)
     }
@@ -281,6 +303,7 @@ impl Expr {
                 }
             }
             Expr::EVar(v) => Expr::EVar(*v),
+            Expr::Placeholder(v) => Expr::Placeholder(*v),
             Expr::Name(n) => Expr::Name(n.clone()),
             Expr::Builtin(b) => Expr::Builtin(*b),
             Expr::App(a, b) => {
@@ -341,31 +364,37 @@ impl Expr {
         }
     }
 
-    pub fn subst_evar<E, F: FnMut(&EVar) -> Result<Expr, E>>(&self, f: &mut F) -> Result<Expr, E> {
+    pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
+        &self,
+        f: &mut F,
+    ) -> Result<Expr, E> {
         match self {
             Expr::Var(n) => Ok(Expr::Var(*n)),
-            Expr::EVar(v) => f(v),
+            Expr::EVar(n) => Ok(Expr::EVar(*n)),
+            Expr::Placeholder(v) => f(v),
             Expr::Name(n) => Ok(Expr::Name(n.clone())),
             Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
             Expr::App(a, b) => a
-                .subst_evar(f)
-                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_app(a, b))),
-            Expr::Lam { arg, body } => body.subst_evar(f).map(|body| Expr::mk_lam(*arg, body)),
+                .subst_placeholder(f)
+                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_app(a, b))),
+            Expr::Lam { arg, body } => body
+                .subst_placeholder(f)
+                .map(|body| Expr::mk_lam(*arg, body)),
             Expr::True => Ok(Expr::True),
             Expr::False => Ok(Expr::False),
-            Expr::IfThenElse(a, b, c) => a.subst_evar(f).and_then(|a| {
-                b.subst_evar(f)
-                    .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
+            Expr::IfThenElse(a, b, c) => a.subst_placeholder(f).and_then(|a| {
+                b.subst_placeholder(f)
+                    .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
             }),
             Expr::Int(n) => Ok(Expr::Int(*n)),
             Expr::Binop(a, b, c) => b
-                .subst_evar(f)
-                .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_binop(*a, b, c))),
+                .subst_placeholder(f)
+                .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_binop(*a, b, c))),
             Expr::Char(c) => Ok(Expr::Char(*c)),
             Expr::String(parts) => {
                 let mut new_parts = Vec::new();
                 for part in parts {
-                    match part.subst_evar(f) {
+                    match part.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
@@ -379,7 +408,7 @@ impl Expr {
             Expr::Array(items) => {
                 let mut new_items = Vec::new();
                 for item in items {
-                    match item.subst_evar(f) {
+                    match item.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
@@ -390,16 +419,16 @@ impl Expr {
                 }
                 Ok(Expr::Array(new_items))
             }
-            Expr::Extend(a, b, c) => a.subst_evar(f).and_then(|a| {
-                b.subst_evar(f)
-                    .and_then(|b| c.subst_evar(f).map(|c| Expr::mk_extend(a, b, c)))
+            Expr::Extend(a, b, c) => a.subst_placeholder(f).and_then(|a| {
+                b.subst_placeholder(f)
+                    .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_extend(a, b, c)))
             }),
             Expr::Record(items) => {
                 let mut new_items = Vec::new();
                 for (a, b) in items {
                     match a
-                        .subst_evar(f)
-                        .and_then(|a| b.subst_evar(f).map(|b| (a, b)))
+                        .subst_placeholder(f)
+                        .and_then(|a| b.subst_placeholder(f).map(|b| (a, b)))
                     {
                         Err(err) => {
                             return Err(err);
@@ -412,16 +441,16 @@ impl Expr {
                 Ok(Expr::Record(new_items))
             }
             Expr::Project(a, b) => a
-                .subst_evar(f)
-                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_project(a, b))),
-            Expr::Variant(a) => a.subst_evar(f).map(|a| Expr::mk_variant(a)),
+                .subst_placeholder(f)
+                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_project(a, b))),
+            Expr::Variant(a) => a.subst_placeholder(f).map(|a| Expr::mk_variant(a)),
             Expr::Embed(a, b) => a
-                .subst_evar(f)
-                .and_then(|a| b.subst_evar(f).map(|b| Expr::mk_embed(a, b))),
-            Expr::Case(a, bs) => a.subst_evar(f).and_then(|a| {
+                .subst_placeholder(f)
+                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_embed(a, b))),
+            Expr::Case(a, bs) => a.subst_placeholder(f).and_then(|a| {
                 let mut new_bs = Vec::new();
                 for b in bs {
-                    match b.subst_evar(f) {
+                    match b.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
@@ -448,6 +477,7 @@ impl Expr {
                 }
             }
             Expr::Name(n) => Expr::Name(n.clone()),
+            Expr::Placeholder(n) => Expr::Placeholder(*n),
             Expr::Builtin(b) => Expr::Builtin(*b),
             Expr::App(a, b) => {
                 Expr::mk_app(a.__abstract_evar(depth, ev), b.__abstract_evar(depth, ev))

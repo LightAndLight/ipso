@@ -1,5 +1,5 @@
 use crate::{
-    core,
+    core::{self, Placeholder},
     syntax::{self, Binop, Kind},
     typecheck::{TypeError, Typechecker},
 };
@@ -9,11 +9,8 @@ use super::{Constraint, EVar};
 mod test;
 
 pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
-    tc.evidence
-        .0
-        .iter()
-        .enumerate()
-        .find_map(|(ix, (other_constraint, other_evidence))| {
+    tc.evidence.environment.iter().enumerate().find_map(
+        |(ix, (other_constraint, other_evidence))| {
             if tc.eq_zonked_constraint(constraint, other_constraint) {
                 match other_evidence {
                     None => Some(core::Expr::mk_evar(ix)),
@@ -22,7 +19,8 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
             } else {
                 None
             }
-        })
+        },
+    )
 }
 
 pub fn solve_constraint<'a>(
@@ -66,7 +64,7 @@ pub fn solve_constraint<'a>(
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
-                            let ev = tc.evidence.fresh_evar(constraint.clone());
+                            let ev = tc.evidence.assume(constraint.clone());
                             Ok(core::Expr::EVar(ev))
                         }
                         Some(evidence) => Ok(evidence),
@@ -88,7 +86,6 @@ pub fn solve_constraint<'a>(
                     let (_, sol) = &tc.type_solutions[*n];
                     match sol {
                         None => {
-                            println!("tys: {:?}", tc.type_solutions);
                             let evidence = lookup_evidence(tc, constraint);
                             match evidence {
                                 None => {
@@ -130,12 +127,15 @@ pub fn solve_constraint<'a>(
     }
 }
 
-pub fn solve_evar(tc: &mut Typechecker, ev: EVar) -> Result<(core::Expr, Constraint), TypeError> {
-    let (constraint, evidence) = tc.evidence.0[ev.0].clone();
+pub fn solve_placeholder(
+    tc: &mut Typechecker,
+    p: Placeholder,
+) -> Result<(core::Expr, Constraint), TypeError> {
+    let (constraint, evidence) = tc.evidence.environment[p.0].clone();
     match evidence.clone() {
         None => {
             let expr = solve_constraint(tc, &constraint)?;
-            tc.evidence.0[ev.0].1 = Some(expr.clone());
+            tc.evidence.environment[p.0].1 = Some(expr.clone());
             Ok((expr, constraint.clone()))
         }
         Some(evidence) => Ok((evidence, constraint.clone())),

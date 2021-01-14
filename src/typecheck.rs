@@ -1,4 +1,4 @@
-use evidence::{solver::solve_evar, Constraint};
+use evidence::{solver::solve_placeholder, Constraint};
 
 use crate::diagnostic;
 use crate::rope::Rope;
@@ -114,7 +114,7 @@ pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
     pub type_solutions: Vec<(syntax::Kind, Option<Type<usize>>)>,
     implications: Vec<Implication>,
-    pub evidence: Evidence<core::Expr>,
+    pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
     bound_vars: BoundVars<Type<usize>>,
@@ -619,12 +619,12 @@ impl Typechecker {
         expr: core::Expr,
         ty: Type<usize>,
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
-        let mut unsolved_constraints: Vec<(evidence::EVar, evidence::Constraint)> = Vec::new();
-        let expr = expr.subst_evar(&mut |ev| {
-            let (expr, solved_constraint) = solve_evar(self, *ev)?;
+        let mut unsolved_constraints: Vec<(core::EVar, evidence::Constraint)> = Vec::new();
+        let expr = expr.subst_placeholder(&mut |p| {
+            let (expr, solved_constraint) = solve_placeholder(self, *p)?;
             match expr {
-                core::Expr::EVar(new_ev) if *ev == new_ev => {
-                    unsolved_constraints.push((*ev, solved_constraint));
+                core::Expr::EVar(ev) => {
+                    unsolved_constraints.push((ev, solved_constraint));
                 }
                 _ => {}
             }
@@ -711,12 +711,10 @@ impl Typechecker {
 
         self.bound_tyvars.insert(&ty_var_kinds);
 
-        let ty = self.check_kind(None, &ty, syntax::Kind::Type)?;
-
         let (constraints, ty) = ty.unwrap_constraints();
         for constraint in constraints {
             self.evidence
-                .fresh_evar(evidence::Constraint::from_type(constraint));
+                .assume(evidence::Constraint::from_type(constraint));
         }
         let body = self.check_expr(
             syntax::Spanned {
@@ -1339,12 +1337,12 @@ impl Typechecker {
         let rest_row = self.fresh_typevar(syntax::Kind::Row);
         let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
 
-        let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
+        let tag = self.evidence.placeholder(evidence::Constraint::HasField {
             field: name.clone(),
             rest: rest_row,
         });
         (
-            core::Pattern::mk_variant(core::Expr::EVar(tag)),
+            core::Pattern::mk_variant(core::Expr::Placeholder(tag)),
             ty,
             vec![(arg.item.clone(), arg_ty)],
         )
@@ -1397,16 +1395,16 @@ impl Typechecker {
             Some((_, row)) => row.clone(),
             None => Type::RowNil,
         };
-        let mut names_evidence = Vec::new();
+        let mut names_placeholders = Vec::new();
         for (name, ty) in names_tys.iter().rev() {
-            let ev = self.evidence.fresh_evar(Constraint::HasField {
+            let p = self.evidence.placeholder(Constraint::HasField {
                 field: name.clone(),
                 rest: extending_row.clone(),
             });
-            names_evidence.push(core::Expr::EVar(ev));
+            names_placeholders.push(core::Expr::Placeholder(p));
             extending_row = Type::mk_rowcons(name.clone(), ty.clone(), extending_row);
         }
-        names_evidence.reverse();
+        names_placeholders.reverse();
 
         rest_row.iter().for_each(|(rest_name, rest_row)| {
             names_tys.push((
@@ -1417,7 +1415,7 @@ impl Typechecker {
 
         (
             core::Pattern::Record {
-                names: names_evidence,
+                names: names_placeholders,
                 rest: match rest {
                     None => false,
                     Some(_) => true,
@@ -1473,14 +1471,14 @@ impl Typechecker {
             .into_iter()
             .map(|kind| self.fresh_typevar(kind))
             .collect();
-        let ty = sig.body.subst(&|&ix| metas[ix].clone());
+        let ty = sig.body.subst(&|&ix| metas[metas.len() - 1 - ix].clone());
         let (constraints, ty) = ty.unwrap_constraints();
         let mut expr = core::Expr::Name(name);
         for constraint in constraints {
-            let ev = self
+            let p = self
                 .evidence
-                .fresh_evar(evidence::Constraint::from_type(constraint));
-            expr = core::Expr::mk_app(expr, core::Expr::EVar(ev));
+                .placeholder(evidence::Constraint::from_type(constraint));
+            expr = core::Expr::mk_app(expr, core::Expr::Placeholder(p));
         }
         (expr, ty.clone())
     }
@@ -1633,11 +1631,11 @@ impl Typechecker {
                     let mut extending_row = rest_row_var.clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
-                        let index = self.evidence.fresh_evar(evidence::Constraint::HasField {
+                        let index = self.evidence.placeholder(evidence::Constraint::HasField {
                             field: field.clone(),
                             rest: extending_row.clone(),
                         });
-                        fields_core.push((core::Expr::EVar(index), expr_core));
+                        fields_core.push((core::Expr::Placeholder(index), expr_core));
                         extending_row = Type::mk_rowcons(field, expr_ty, extending_row);
                     }
                     // we did a right fold to build extending_row, but we want fields_core too look like we did a left fold
@@ -1677,21 +1675,21 @@ impl Typechecker {
                         self.check_expr(*expr, Type::mk_app(Type::Record, rows.clone()))?;
                     let offset = self
                         .evidence
-                        .fresh_evar(evidence::Constraint::HasField { field, rest: rows });
+                        .placeholder(evidence::Constraint::HasField { field, rest: rows });
                     Ok((
-                        core::Expr::mk_project(expr_core, core::Expr::EVar(offset)),
+                        core::Expr::mk_project(expr_core, core::Expr::Placeholder(offset)),
                         out_ty,
                     ))
                 }
                 syntax::Expr::Variant(ctor) => {
                     let arg_ty = self.fresh_typevar(syntax::Kind::Type);
                     let rest = self.fresh_typevar(syntax::Kind::Row);
-                    let tag = self.evidence.fresh_evar(evidence::Constraint::HasField {
+                    let tag = self.evidence.placeholder(evidence::Constraint::HasField {
                         field: ctor.clone(),
                         rest: Type::mk_rows(vec![], Some(rest.clone())),
                     });
                     Ok((
-                        core::Expr::mk_variant(core::Expr::EVar(tag)),
+                        core::Expr::mk_variant(core::Expr::Placeholder(tag)),
                         Type::mk_arrow(
                             arg_ty.clone(),
                             Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
@@ -1703,7 +1701,7 @@ impl Typechecker {
                     let rest_rows = self.fresh_typevar(syntax::Kind::Row);
                     let rest_core =
                         self.check_expr(*rest, Type::mk_app(Type::Variant, rest_rows.clone()))?;
-                    let tag = core::Expr::EVar(self.evidence.fresh_evar(
+                    let tag = core::Expr::Placeholder(self.evidence.placeholder(
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
                             rest: rest_rows.clone(),
@@ -1829,12 +1827,13 @@ impl Typechecker {
                                                 Some(rows) => rows.clone(),
                                             };
 
-                                            let tag = core::Expr::EVar(self.evidence.fresh_evar(
-                                                evidence::Constraint::HasField {
-                                                    field: name.clone(),
-                                                    rest: expr_rows,
-                                                },
-                                            ));
+                                            let tag =
+                                                core::Expr::Placeholder(self.evidence.placeholder(
+                                                    evidence::Constraint::HasField {
+                                                        field: name.clone(),
+                                                        rest: expr_rows,
+                                                    },
+                                                ));
 
                                             let pattern_ty =
                                                 Type::mk_app(Type::Variant, pattern_rows);
