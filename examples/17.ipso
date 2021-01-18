@@ -1,0 +1,14 @@
+atob : < A : x | r > -> < B : x | r >
+atob val =
+  case val of
+    A x -> B x
+    r -> < B | r >
+
+sayb : < B : x | r > -> IO ()
+sayb val = 
+  case val of
+    B x -> writeStdout stdout (toUtf8 "B")
+    _ -> writeStdout stdout (toUtf8 "not B")
+
+main : IO ()
+main = sayb (atob (C "hello"))
