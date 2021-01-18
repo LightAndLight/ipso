@@ -114,6 +114,13 @@ impl<'heap> Value<'heap> {
         }
     }
 
+    pub fn unpack_variant(&'heap self) -> (usize, ValueRef<'heap>) {
+        match self {
+            Value::Variant(tag, rest) => (*tag, *rest),
+            val => panic!("expected variant, got {:?}", val),
+        }
+    }
+
     pub fn apply<'stdout>(
         &self,
         interpreter: &mut Interpreter<'stdout, 'heap>,
@@ -608,7 +615,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     }
 
     pub fn eval(&mut self, env: &'heap Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
-        match expr {
+        let out = match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
@@ -743,17 +750,11 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Embed(tag, rest) => {
                 let tag = self.eval(env, *tag).unpack_int() as usize;
                 let rest = self.eval(env, *rest);
-                match rest {
-                    Value::Variant(old_tag, arg) => self.alloc_value(Value::Variant(
-                        if tag <= *old_tag {
-                            old_tag + 1
-                        } else {
-                            *old_tag
-                        },
-                        arg,
-                    )),
-                    rest => panic!("expected variant, got {:?}", rest),
-                }
+                let (old_tag, arg) = rest.unpack_variant();
+                self.alloc_value(Value::Variant(
+                    if tag <= old_tag { old_tag + 1 } else { old_tag },
+                    arg,
+                ))
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, *expr);
@@ -792,7 +793,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                     Value::Variant(tag, value) => {
                         // expect variant patterns
-                        let mut target: Option<Expr> = None;
+                        let mut target: Option<(ValueRef, Expr)> = None;
                         for branch in branches {
                             match branch.pattern {
                                 Pattern::Record { .. } => {
@@ -802,19 +803,19 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                     let branch_tag =
                                         self.eval(env, *branch_tag).unpack_int() as usize;
                                     if *tag == branch_tag {
-                                        target = Some(branch.body);
+                                        target = Some((value, branch.body));
                                         break;
                                     }
                                 }
                                 Pattern::Name | Pattern::Wildcard => {
-                                    target = Some(branch.body);
+                                    target = Some((expr, branch.body));
                                     break;
                                 }
                             }
                         }
                         match target {
                             None => panic!("pattern match failure"),
-                            Some(body) => {
+                            Some((value, body)) => {
                                 let env = self.alloc_env({
                                     let mut env = env.clone();
                                     env.push(value);
@@ -832,6 +833,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 }
             }
             Expr::Unit => self.alloc_value(Value::Unit),
-        }
+        };
+        out
     }
 }
