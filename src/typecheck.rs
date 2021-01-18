@@ -812,7 +812,7 @@ impl Typechecker {
         }
     }
 
-    fn zonk_kind(&self, kind: syntax::Kind) -> syntax::Kind {
+    pub fn zonk_kind(&self, kind: syntax::Kind) -> syntax::Kind {
         match kind {
             syntax::Kind::Type => syntax::Kind::Type,
             syntax::Kind::Row => syntax::Kind::Row,
@@ -1003,7 +1003,7 @@ impl Typechecker {
         }
     }
 
-    fn solve_typevar_left(
+    pub fn solve_typevar_left(
         &mut self,
         context: &UnifyTypeContext<usize>,
         meta: usize,

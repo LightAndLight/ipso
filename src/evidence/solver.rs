@@ -1,7 +1,7 @@
 use crate::{
     core::{self, Placeholder},
-    syntax::{self, Binop, Kind},
-    typecheck::{TypeError, Typechecker},
+    syntax::{self, Binop, Kind, Type},
+    typecheck::{TypeError, Typechecker, UnifyTypeContext},
 };
 
 use super::{Constraint, EVar};
@@ -83,18 +83,34 @@ pub fn solve_constraint<'a>(
                     }
                 }
                 syntax::Type::Meta(n) => {
-                    let (_, sol) = &tc.type_solutions[*n];
+                    let (kind, sol) = &tc.type_solutions[*n];
+                    // we assume solving is done after unification, so any unsolved variables
+                    // will never recieve solutions
                     match sol {
                         None => {
-                            let evidence = lookup_evidence(tc, constraint);
-                            match evidence {
-                                None => {
-                                    panic!(
+                            match tc.zonk_kind(kind.clone()) {
+                                // row metavariables can be safely defaulted to the empty row in the
+                                // presence of ambiguity
+                                Kind::Row => {
+                                    let context = UnifyTypeContext {
+                                        expected: Type::Meta(*n),
+                                        actual: Type::RowNil,
+                                    };
+                                    tc.solve_typevar_left(&context, *n, Type::RowNil)?;
+                                    solve_constraint(tc, constraint)
+                                }
+                                _ => {
+                                    let evidence = lookup_evidence(tc, constraint);
+                                    match evidence {
+                                        None => {
+                                            panic!(
                                         "impossible: cannot deduce HasField({:?}, {:?}) given {:?}",
                                         field, rest, tc.evidence
                                     )
+                                        }
+                                        Some(evidence) => Ok(evidence),
+                                    }
                                 }
-                                Some(evidence) => Ok(evidence),
                             }
                         }
                         Some(sol) => solve_constraint(

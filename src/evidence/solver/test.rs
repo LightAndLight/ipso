@@ -63,12 +63,8 @@ fn solve_constraint_3() {
         ),
     };
 
-    let expected_result = solve_constraint(&mut tc, &constraint);
-    let actual_result = Ok(Expr::mk_binop(
-        Binop::Add,
-        Expr::Int(1),
-        Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::mk_evar(0)),
-    ));
+    let expected_result = Ok(Expr::Int(2));
+    let actual_result = solve_constraint(&mut tc, &constraint);
     assert_eq!(expected_result, actual_result);
 
     let expected_evidence = Evidence {
