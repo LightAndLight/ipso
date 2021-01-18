@@ -928,6 +928,8 @@ impl Parser {
                 choices!(
                     self,
                     self.int().map(|n| Expr::Int(n)),
+                    self.keyword(Keyword::False).map(|_| Expr::False),
+                    self.keyword(Keyword::True).map(|_| Expr::True),
                     self.ident().map(|n| Expr::Var(n)),
                     self.ctor().map(|n| Expr::Variant(n)),
                     self.expr_record(),
@@ -1116,14 +1118,52 @@ impl Parser {
         })
     }
 
+    fn instance_member(&mut self) -> ParseResult<(String, Vec<Pattern>, Spanned<Expr>)> {
+        keep_left!(self.ident(), self.spaces()).and_then(|name| {
+            many!(self, keep_left!(self.pattern(), self.spaces())).and_then(|args| {
+                keep_left!(self.token(&TokenType::Equals), self.spaces())
+                    .and_then(|_| self.expr().map(|body| (name, args, body)))
+            })
+        })
+    }
+
+    fn instance(&mut self) -> ParseResult<Declaration> {
+        keep_left!(self.keyword(Keyword::Instance), self.spaces()).and_then(|_| {
+            keep_left!(self.ctor(), self.spaces()).and_then(|name| {
+                many!(self, keep_left!(self.type_(), self.spaces())).and_then(|args| {
+                    keep_left!(
+                        self.keyword(Keyword::Where),
+                        many_!(self, self.token(&TokenType::Space))
+                    )
+                    .and_then(|_| {
+                        keep_right!(
+                            self.indent(),
+                            sep_by!(self, self.instance_member(), self.newline()).and_then(
+                                |members| keep_right!(
+                                    self.dedent(),
+                                    ParseResult::pure(Declaration::Instance {
+                                        name,
+                                        args,
+                                        members,
+                                    })
+                                )
+                            )
+                        )
+                    })
+                })
+            })
+        })
+    }
+
     fn declaration(&mut self) -> ParseResult<Declaration> {
         choices!(
             self,
-            self.class(),
             self.definition(),
             self.type_alias(),
             self.import(),
-            self.from_import()
+            self.from_import(),
+            self.class(),
+            self.instance()
         )
     }
 

@@ -146,6 +146,8 @@ fn parse_definition_3() {
                 },
                 TokenType::Ident(String::from("")),
                 TokenType::Ident(String::from("case")),
+                TokenType::Ident(String::from("true")),
+                TokenType::Ident(String::from("false")),
                 TokenType::Ctor,
                 TokenType::Space,
                 TokenType::LAngle,
@@ -535,6 +537,8 @@ fn parse_case_4() {
                 TokenType::LParen,
                 TokenType::LBrace,
                 TokenType::Ctor,
+                TokenType::Ident(String::from("true")),
+                TokenType::Ident(String::from("false")),
                 TokenType::Ident(String::from("")),
                 TokenType::DoubleQuote,
                 TokenType::Int {

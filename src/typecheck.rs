@@ -757,6 +757,13 @@ impl Typechecker {
             } => {
                 todo!("check class declaration {:?}", (name, args, members))
             }
+            syntax::Declaration::Instance {
+                name,
+                args,
+                members,
+            } => {
+                todo!("check instance declaration {:?}", (name, args, members))
+            }
         }
     }
 
