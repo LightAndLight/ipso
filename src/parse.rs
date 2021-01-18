@@ -452,22 +452,19 @@ impl Parser {
     fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
         self.expecting
             .insert(TokenType::Ident(String::from(expected.to_string())));
-        keep_left!(
-            match self.current {
-                None => self.unexpected(false),
-                Some(ref actual) => match actual.token_type {
-                    TokenType::Ident(ref id) => {
-                        if expected.matches(id) {
-                            map0!((), self.consume())
-                        } else {
-                            self.unexpected(false)
-                        }
+        match self.current {
+            None => self.unexpected(false),
+            Some(ref actual) => match actual.token_type {
+                TokenType::Ident(ref id) => {
+                    if expected.matches(id) {
+                        map0!((), self.consume())
+                    } else {
+                        self.unexpected(false)
                     }
-                    _ => self.unexpected(false),
-                },
+                }
+                _ => self.unexpected(false),
             },
-            self.spaces()
-        )
+        }
     }
 
     fn token(&mut self, expected: &TokenType) -> ParseResult<()> {
@@ -965,14 +962,10 @@ impl Parser {
     fn expr_case(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(
-                self.token(&TokenType::Ident(String::from("case"))),
-                self.spaces()
-            )
-            .and_then(|_| {
+            keep_left!(self.keyword(Keyword::Case), self.spaces()).and_then(|_| {
                 self.expr().and_then(|cond| {
                     keep_left!(
-                        self.token(&TokenType::Ident(String::from("of"))),
+                        self.keyword(Keyword::Of),
                         many_!(self, self.token(&TokenType::Space))
                     )
                     .and_then(|_| {
@@ -1086,9 +1079,47 @@ impl Parser {
         )
     }
 
+    fn class_member(&mut self) -> ParseResult<(String, Type<String>)> {
+        keep_left!(self.ident(), self.spaces()).and_then(|name| {
+            keep_left!(self.token(&TokenType::Colon), self.spaces()).and_then(|_| {
+                keep_left!(self.type_(), many_!(self, self.token(&TokenType::Space)))
+                    .map(|type_| (name, type_))
+            })
+        })
+    }
+
+    fn class(&mut self) -> ParseResult<Declaration> {
+        keep_left!(self.keyword(Keyword::Class), self.spaces()).and_then(|_| {
+            keep_left!(self.ctor(), self.spaces()).and_then(|name| {
+                many!(self, keep_left!(self.ident(), self.spaces())).and_then(|args| {
+                    keep_left!(
+                        self.keyword(Keyword::Where),
+                        many_!(self, self.token(&TokenType::Space))
+                    )
+                    .and_then(|_| {
+                        keep_right!(
+                            self.indent(),
+                            sep_by!(self, self.class_member(), self.newline()).and_then(
+                                |members| keep_right!(
+                                    self.dedent(),
+                                    ParseResult::pure(Declaration::Class {
+                                        name,
+                                        args,
+                                        members,
+                                    })
+                                )
+                            )
+                        )
+                    })
+                })
+            })
+        })
+    }
+
     fn declaration(&mut self) -> ParseResult<Declaration> {
         choices!(
             self,
+            self.class(),
             self.definition(),
             self.type_alias(),
             self.import(),

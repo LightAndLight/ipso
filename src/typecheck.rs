@@ -750,6 +750,13 @@ impl Typechecker {
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))
             }
+            syntax::Declaration::Class {
+                name,
+                args,
+                members,
+            } => {
+                todo!("check class declaration {:?}", (name, args, members))
+            }
         }
     }
 

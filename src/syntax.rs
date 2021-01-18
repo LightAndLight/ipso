@@ -24,6 +24,9 @@ pub enum Keyword {
     As,
     From,
     Type,
+    Class,
+    Instance,
+    Where,
 }
 
 impl Keyword {
@@ -44,13 +47,18 @@ impl Keyword {
             Keyword::As => "as",
             Keyword::From => "from",
             Keyword::Type => "type",
+            Keyword::Class => "class",
+            Keyword::Instance => "instance",
+            Keyword::Where => "where",
         }
     }
 }
 
 lazy_static! {
-    static ref KEYWORDS: Vec<&'static str> =
-        vec!["case", "of", "if", "then", "else", "true", "false", "import", "as", "from"];
+    static ref KEYWORDS: Vec<&'static str> = vec![
+        "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where",
+        "class", "instance"
+    ];
 }
 
 pub fn is_keyword(val: &String) -> bool {
@@ -730,6 +738,11 @@ pub enum Declaration {
         ty: Type<String>,
         args: Vec<Pattern>,
         body: Spanned<Expr>,
+    },
+    Class {
+        name: String,
+        args: Vec<String>,
+        members: Vec<(String, Type<String>)>,
     },
     TypeAlias {
         name: String,
