@@ -1093,7 +1093,11 @@ impl Parser {
     fn class(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.keyword(Keyword::Class), self.spaces()).and_then(|_| {
             keep_left!(self.ctor(), self.spaces()).and_then(|name| {
-                many!(self, keep_left!(self.ident(), self.spaces())).and_then(|args| {
+                many!(
+                    self,
+                    keep_left!(spanned!(self, self.ident()), self.spaces())
+                )
+                .and_then(|args| {
                     keep_left!(
                         self.keyword(Keyword::Where),
                         many_!(self, self.token(&TokenType::Space))

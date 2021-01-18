@@ -271,16 +271,16 @@ pub struct IterVars<'a, A> {
 }
 
 impl<'a, A: Clone> Iterator for IterVars<'a, A> {
-    type Item = A;
+    type Item = &'a A;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, A>
+        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, &'a A>
         where
             A: Clone,
         {
             match ty {
                 Type::Name(_) => Step::Skip,
-                Type::Var(n) => Step::Yield(n.clone()),
+                Type::Var(n) => Step::Yield(n),
                 Type::Bool => Step::Skip,
                 Type::Int => Step::Skip,
                 Type::Char => Step::Skip,
@@ -741,7 +741,7 @@ pub enum Declaration {
     },
     Class {
         name: String,
-        args: Vec<String>,
+        args: Vec<Spanned<String>>,
         members: Vec<(String, Type<String>)>,
     },
     Instance {

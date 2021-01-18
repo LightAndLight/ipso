@@ -551,8 +551,8 @@ pub struct TypeSig {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ClassMember {
-    name: String,
-    sig: TypeSig,
+    pub name: String,
+    pub sig: TypeSig,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -580,10 +580,9 @@ pub enum Declaration {
         names: syntax::Names,
     },
     Class {
-        ty_vars: Vec<syntax::Kind>,
         supers: Vec<syntax::Type<usize>>,
         name: String,
-        args: Vec<usize>,
+        arg_kinds: Vec<syntax::Kind>,
         members: Vec<ClassMember>,
     },
     Instance {

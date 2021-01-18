@@ -6,8 +6,8 @@ fn iter_vars_test_1() {
     assert_eq!(
         Type::mk_app(Type::Var(0), Type::Var(1))
             .iter_vars()
-            .collect::<Vec<usize>>(),
-        vec![0, 1]
+            .collect::<Vec<&usize>>(),
+        vec![&0, &1]
     )
 }
 
@@ -19,8 +19,8 @@ fn iter_vars_test_2() {
             Type::mk_app(Type::Var(2), Type::Var(3))
         )
         .iter_vars()
-        .collect::<Vec<usize>>(),
-        vec![0, 1, 2, 3]
+        .collect::<Vec<&usize>>(),
+        vec![&0, &1, &2, &3]
     )
 }
 
@@ -32,8 +32,8 @@ fn iter_vars_test_3() {
             Type::mk_app(Type::Name(String::from("hi")), Type::Var(3))
         )
         .iter_vars()
-        .collect::<Vec<usize>>(),
-        vec![0, 1, 3]
+        .collect::<Vec<&usize>>(),
+        vec![&0, &1, &3]
     )
 }
 

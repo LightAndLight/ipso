@@ -1,0 +1,11 @@
+class TypeOf a where
+  typeOf : a -> String
+
+instance TypeOf Int where
+  typeOf _ = "Int"
+
+instance TypeOf Bool where
+  typeOf _ = "Bool"
+
+main : IO ()
+main = writeStdout stdout (toUtf8 "${typeOf 1} ${typeOf false}")

@@ -9,6 +9,7 @@ use crate::{core, evidence};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    todo,
 };
 
 #[cfg(test)]
@@ -151,6 +152,9 @@ pub enum TypeError {
         pos: usize,
         name: String,
     },
+    DuplicateClassArgument {
+        pos: usize,
+    },
     NotInScope {
         pos: usize,
         name: String,
@@ -226,6 +230,7 @@ impl TypeError {
             } => *pos,
             TypeError::NotInScope { pos, name: _ } => *pos,
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
+            TypeError::DuplicateClassArgument { pos } => *pos,
             TypeError::RedundantPattern { pos } => *pos,
             TypeError::KindOccurs { pos, .. } => *pos,
             TypeError::TypeOccurs { pos, .. } => *pos,
@@ -268,6 +273,9 @@ impl TypeError {
             }
             TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
             TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
+            TypeError::DuplicateClassArgument { .. } => {
+                String::from("duplicate type class argument")
+            }
             TypeError::RedundantPattern { pos: _ } => String::from("redundant pattern"),
             TypeError::KindOccurs { meta, kind, .. } => {
                 format!(
@@ -323,6 +331,7 @@ impl TypeError {
                 }
             },
             TypeError::DuplicateArgument { pos: _, name: _ } => None,
+            TypeError::DuplicateClassArgument { .. } => None,
             TypeError::TypeMismatch {
                 pos: _,
                 context: _,
@@ -511,14 +520,13 @@ impl Typechecker {
                 todo!("register FromImport {:?}", (module, names))
             }
             core::Declaration::Class {
-                ty_vars,
                 supers,
                 name,
-                args,
+                arg_kinds,
                 members,
             } => todo!(
                 "register type class {:?}",
-                (ty_vars, supers, name, args, members)
+                (supers, name, arg_kinds, members)
             ),
             core::Declaration::Instance {
                 ty_vars,
@@ -575,15 +583,11 @@ impl Typechecker {
                     names: _,
                 } => {}
                 core::Declaration::Class {
-                    ty_vars,
                     supers,
                     name,
-                    args,
+                    arg_kinds,
                     members,
-                } => todo!(
-                    "import type class {:?}",
-                    (ty_vars, supers, name, args, members)
-                ),
+                } => todo!("import type class {:?}", (supers, name, arg_kinds, members)),
                 core::Declaration::Instance {
                     ty_vars,
                     assumes,
@@ -683,9 +687,9 @@ impl Typechecker {
         let ty_var_positions: HashMap<String, usize> = {
             let mut vars = HashMap::new();
             for var in ty.iter_vars() {
-                match vars.get(&var) {
+                match vars.get(var) {
                     None => {
-                        vars.insert(var, vars.len());
+                        vars.insert(var.clone(), vars.len());
                     }
                     Some(_) => {}
                 }
@@ -730,6 +734,92 @@ impl Typechecker {
         Ok(core::Declaration::Definition { name, sig, body })
     }
 
+    fn check_class_member(
+        &mut self,
+        class_args: &HashSet<String>,
+        name: String,
+        type_: Type<String>,
+    ) -> Result<core::ClassMember, TypeError> {
+        let mut local_tyvars = Vec::new();
+        let local_tyvars_len = local_tyvars.len();
+        let mut seen: HashSet<&String> = HashSet::new();
+        for var in type_.iter_vars() {
+            if !class_args.contains(var) && !seen.contains(var) {
+                seen.insert(&var);
+                local_tyvars.push((var.clone(), self.fresh_kindvar()));
+            }
+        }
+
+        let type_ = type_.map(&mut |var| match self.bound_tyvars.lookup_name(var) {
+            None => {
+                local_tyvars_len
+                    - local_tyvars
+                        .iter()
+                        .position(|(name, _)| name == var)
+                        .unwrap()
+            }
+            Some((ix, _)) => ix,
+        });
+
+        self.bound_tyvars.insert(&local_tyvars);
+        let checked_type = self.check_kind(None, &type_, syntax::Kind::Type)?;
+        self.bound_tyvars.delete(local_tyvars.len());
+
+        let sig = core::TypeSig {
+            ty_vars: local_tyvars
+                .into_iter()
+                .map(|(_, kind)| self.zonk_kind(kind))
+                .collect(),
+            body: checked_type,
+        };
+        Ok(core::ClassMember { name, sig })
+    }
+
+    fn check_class(
+        &mut self,
+        name: String,
+        args: Vec<Spanned<String>>,
+        members: Vec<(String, Type<String>)>,
+    ) -> Result<core::Declaration, TypeError> {
+        let args_len = args.len();
+        let class_args = args.iter().map(|arg| arg.item.clone()).collect();
+        let args_kinds = {
+            let mut seen: HashSet<String> = HashSet::new();
+            let mut args_kinds = Vec::with_capacity(args_len);
+            for arg in args.into_iter() {
+                if seen.contains(&arg.item) {
+                    return Err(TypeError::DuplicateClassArgument { pos: arg.pos });
+                } else {
+                    seen.insert(arg.item.clone());
+                }
+                args_kinds.push((arg.item, self.fresh_kindvar()))
+            }
+            args_kinds
+        };
+
+        self.bound_tyvars.insert(&args_kinds);
+        let mut checked_members = Vec::with_capacity(members.len());
+        for (member_name, member_type) in members {
+            match self.check_class_member(&class_args, member_name, member_type) {
+                Err(err) => return Err(err),
+                Ok(checked_member) => {
+                    checked_members.push(checked_member);
+                }
+            }
+        }
+        self.bound_tyvars.delete(args_len);
+
+        Ok(core::Declaration::Class {
+            supers: Vec::new(),
+            name,
+            arg_kinds: args_kinds
+                .into_iter()
+                .map(|(_, kind)| self.zonk_kind(kind))
+                .collect(),
+            members: checked_members,
+        })
+    }
+
     fn check_declaration(
         &mut self,
         decl: syntax::Spanned<syntax::Declaration>,
@@ -754,9 +844,7 @@ impl Typechecker {
                 name,
                 args,
                 members,
-            } => {
-                todo!("check class declaration {:?}", (name, args, members))
-            }
+            } => self.check_class(name, args, members),
             syntax::Declaration::Instance {
                 name,
                 args,
