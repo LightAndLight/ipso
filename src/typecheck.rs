@@ -501,6 +501,37 @@ impl Typechecker {
         }
     }
 
+    pub fn register_class(
+        &mut self,
+        supers: &Vec<Type<usize>>,
+        name: &String,
+        arg_kinds: &Vec<syntax::Kind>,
+        members: &Vec<core::ClassMember>,
+    ) {
+        // generate constraint's kind
+        let mut constraint_kind = syntax::Kind::Constraint;
+        for kind in arg_kinds.iter().rev() {
+            constraint_kind = syntax::Kind::mk_arrow(kind.clone(), constraint_kind);
+        }
+        self.type_context.insert(name.clone(), constraint_kind);
+
+        // generate superclass accessors
+        self.implications.extend(
+            supers
+                .iter()
+                .enumerate()
+                .map(|(pos, superclass)| Implication {
+                    ty_vars: arg_kinds.clone(),
+                    antecedents: (),
+                    consequent: superclass.clone(),
+                    evidence: (),
+                }),
+        );
+
+        // generate class members
+        todo!()
+    }
+
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
@@ -524,10 +555,7 @@ impl Typechecker {
                 name,
                 arg_kinds,
                 members,
-            } => todo!(
-                "register type class {:?}",
-                (supers, name, arg_kinds, members)
-            ),
+            } => self.register_class(supers, name, arg_kinds, members),
             core::Declaration::Instance {
                 ty_vars,
                 assumes,
