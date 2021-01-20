@@ -515,6 +515,12 @@ impl Typechecker {
         }
         self.type_context.insert(name.clone(), constraint_kind);
 
+        let applied_type = (0..arg_kinds.len())
+            .into_iter()
+            .fold(Type::Name(name.clone()), |acc, el| {
+                Type::mk_app(acc, Type::Var(el))
+            });
+
         // generate superclass accessors
         self.implications.extend(
             supers
@@ -522,14 +528,41 @@ impl Typechecker {
                 .enumerate()
                 .map(|(pos, superclass)| Implication {
                     ty_vars: arg_kinds.clone(),
-                    antecedents: (),
+                    antecedents: vec![applied_type.clone()],
                     consequent: superclass.clone(),
-                    evidence: (),
+                    evidence: core::Expr::mk_lam(
+                        true,
+                        core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
+                    ),
                 }),
         );
 
+        let supers_len = supers.len();
+
         // generate class members
-        todo!()
+        self.context
+            .extend(members.iter().enumerate().map(|(ix, member)| {
+                let sig = {
+                    // the variables bound by the class declaration are the
+                    // bound variables in the signature
+                    let mut ty_vars = arg_kinds.clone();
+                    ty_vars.extend(member.sig.ty_vars.clone().into_iter());
+
+                    let mut body = member.sig.body.clone();
+                    body = syntax::Type::mk_fatarrow(applied_type.clone(), body);
+
+                    core::TypeSig { ty_vars, body }
+                };
+                let body = core::Expr::mk_lam(
+                    true,
+                    core::Expr::mk_project(
+                        core::Expr::Var(0),
+                        core::Expr::Int(supers_len as u32 + ix as u32),
+                    ),
+                );
+
+                (member.name.clone(), (sig, body))
+            }))
     }
 
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
