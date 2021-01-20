@@ -118,6 +118,7 @@ pub struct Typechecker {
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
+    class_context: HashMap<String, HashMap<String, core::TypeSig>>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
@@ -184,6 +185,13 @@ pub enum TypeError {
         meta: usize,
         ty: Type<String>,
     },
+    NoSuchClass {
+        pos: usize,
+    },
+    NotAMember {
+        pos: usize,
+        cls: String,
+    },
 }
 
 impl syntax::Pattern {
@@ -234,6 +242,8 @@ impl TypeError {
             TypeError::RedundantPattern { pos } => *pos,
             TypeError::KindOccurs { pos, .. } => *pos,
             TypeError::TypeOccurs { pos, .. } => *pos,
+            TypeError::NoSuchClass { pos, .. } => *pos,
+            TypeError::NotAMember { pos, .. } => *pos,
         }
     }
 
@@ -291,6 +301,10 @@ impl TypeError {
                     ty.render()
                 )
             }
+            TypeError::NoSuchClass { .. } => String::from("type class not in scope"),
+            TypeError::NotAMember { cls, .. } => {
+                format!("not a member of the {:?} type class", cls)
+            }
         }
     }
 
@@ -342,6 +356,8 @@ impl TypeError {
             TypeError::NotInScope { pos: _, name: _ } => None,
             TypeError::KindOccurs { .. } => None,
             TypeError::TypeOccurs { .. } => None,
+            TypeError::NoSuchClass { .. } => None,
+            TypeError::NotAMember { .. } => None,
         }
     }
 
@@ -363,6 +379,7 @@ impl Typechecker {
             evidence: Evidence::new(),
             type_context: HashMap::new(),
             context: HashMap::new(),
+            class_context: HashMap::new(),
             bound_vars: BoundVars::new(),
             bound_tyvars: BoundVars::new(),
             position: None,
@@ -562,7 +579,16 @@ impl Typechecker {
                 );
 
                 (member.name.clone(), (sig, body))
-            }))
+            }));
+
+        // update class context
+        self.class_context.insert(
+            name.clone(),
+            members
+                .iter()
+                .map(|member| (member.name.clone(), member.sig.clone()))
+                .collect(),
+        );
     }
 
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
@@ -881,6 +907,71 @@ impl Typechecker {
         })
     }
 
+    fn check_instance(
+        &mut self,
+        name: Spanned<String>,
+        args: Vec<Type<String>>,
+        members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
+    ) -> Result<core::Declaration, TypeError> {
+        let member_types: &HashMap<String, core::TypeSig> = match self.class_context.get(&name.item)
+        {
+            None => Err(TypeError::NoSuchClass { pos: name.pos }),
+            Some(member_types) => Ok(member_types),
+        }?;
+
+        // abstract over type variables
+        let ty_vars: HashMap<String, usize> = {
+            let mut ty_var_set = HashMap::new();
+            for arg in &args {
+                for var in arg.iter_vars() {
+                    match ty_var_set.get(var) {
+                        None => {
+                            ty_var_set.insert(var.clone(), ty_var_set.len());
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
+            ty_var_set
+        };
+
+        let num_ty_vars = ty_vars.len();
+
+        let args: Vec<Type<usize>> = args
+            .iter()
+            .map(|arg| arg.map(&mut |var| num_ty_vars - ty_vars.get(var).unwrap()))
+            .collect();
+
+        // type check members
+        for (member_name, member_args, member_body) in members {
+            // bind type variables
+            todo!();
+
+            match member_types.get(&member_name.item) {
+                None => {
+                    return Err(TypeError::NotAMember {
+                        pos: member_name.pos,
+                        cls: name.item.clone(),
+                    })
+                }
+                Some(member_type) => match self.check_expr(
+                    Spanned {
+                        pos: member_name.pos,
+                        item: syntax::Expr::mk_lam(member_args, member_body),
+                    },
+                    member_type.body.clone(),
+                ) {
+                    Err(err) => return Err(err),
+                    Ok(member_body) => {
+                        todo!()
+                    }
+                },
+            }
+        }
+
+        todo!()
+    }
+
     fn check_declaration(
         &mut self,
         decl: syntax::Spanned<syntax::Declaration>,
@@ -910,9 +1001,7 @@ impl Typechecker {
                 name,
                 args,
                 members,
-            } => {
-                todo!("check instance declaration {:?}", (name, args, members))
-            }
+            } => self.check_instance(name, args, members),
         }
     }
 

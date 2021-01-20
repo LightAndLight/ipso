@@ -745,9 +745,9 @@ pub enum Declaration {
         members: Vec<(String, Type<String>)>,
     },
     Instance {
-        name: String,
+        name: Spanned<String>,
         args: Vec<Type<String>>,
-        members: Vec<(String, Vec<Pattern>, Spanned<Expr>)>,
+        members: Vec<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)>,
     },
     TypeAlias {
         name: String,

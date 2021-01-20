@@ -1122,8 +1122,8 @@ impl Parser {
         })
     }
 
-    fn instance_member(&mut self) -> ParseResult<(String, Vec<Pattern>, Spanned<Expr>)> {
-        keep_left!(self.ident(), self.spaces()).and_then(|name| {
+    fn instance_member(&mut self) -> ParseResult<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)> {
+        keep_left!(spanned!(self, self.ident()), self.spaces()).and_then(|name| {
             many!(self, keep_left!(self.pattern(), self.spaces())).and_then(|args| {
                 keep_left!(self.token(&TokenType::Equals), self.spaces())
                     .and_then(|_| self.expr().map(|body| (name, args, body)))
@@ -1133,7 +1133,7 @@ impl Parser {
 
     fn instance(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.keyword(Keyword::Instance), self.spaces()).and_then(|_| {
-            keep_left!(self.ctor(), self.spaces()).and_then(|name| {
+            keep_left!(spanned!(self, self.ctor()), self.spaces()).and_then(|name| {
                 many!(self, keep_left!(self.type_(), self.spaces())).and_then(|args| {
                     keep_left!(
                         self.keyword(Keyword::Where),
