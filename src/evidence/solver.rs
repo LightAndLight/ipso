@@ -4,7 +4,7 @@ use crate::{
     typecheck::{TypeError, Typechecker, UnifyTypeContext},
 };
 
-use super::{Constraint, EVar};
+use super::Constraint;
 
 mod test;
 

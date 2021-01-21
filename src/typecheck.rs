@@ -15,6 +15,14 @@ use std::{
 #[cfg(test)]
 mod test;
 
+macro_rules! fresh_kindvar {
+    ($val:expr) => {{
+        let n = $val.len();
+        $val.push(None);
+        syntax::Kind::Meta(n)
+    }};
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct BoundVars<A> {
     indices: HashMap<String, Vec<usize>>,
@@ -522,12 +530,12 @@ impl Typechecker {
         &mut self,
         supers: &Vec<Type<usize>>,
         name: &String,
-        arg_kinds: &Vec<syntax::Kind>,
+        arg_kinds: &Vec<(String, syntax::Kind)>,
         members: &Vec<core::ClassMember>,
     ) {
         // generate constraint's kind
         let mut constraint_kind = syntax::Kind::Constraint;
-        for kind in arg_kinds.iter().rev() {
+        for (_, kind) in arg_kinds.iter().rev() {
             constraint_kind = syntax::Kind::mk_arrow(kind.clone(), constraint_kind);
         }
         self.type_context.insert(name.clone(), constraint_kind);
@@ -544,7 +552,7 @@ impl Typechecker {
                 .iter()
                 .enumerate()
                 .map(|(pos, superclass)| Implication {
-                    ty_vars: arg_kinds.clone(),
+                    ty_vars: arg_kinds.iter().map(|(_, kind)| kind.clone()).collect(),
                     antecedents: vec![applied_type.clone()],
                     consequent: superclass.clone(),
                     evidence: core::Expr::mk_lam(
@@ -612,17 +620,17 @@ impl Typechecker {
             core::Declaration::Class {
                 supers,
                 name,
-                arg_kinds,
+                args,
                 members,
-            } => self.register_class(supers, name, arg_kinds, members),
+            } => self.register_class(supers, name, args, members),
             core::Declaration::Instance {
                 ty_vars,
                 assumes,
                 head,
-                dict,
+                members,
             } => todo!(
                 "register type class instance {:?}",
-                (ty_vars, assumes, head, dict)
+                (ty_vars, assumes, head, members)
             ),
         }
     }
@@ -672,17 +680,17 @@ impl Typechecker {
                 core::Declaration::Class {
                     supers,
                     name,
-                    arg_kinds,
+                    args,
                     members,
-                } => todo!("import type class {:?}", (supers, name, arg_kinds, members)),
+                } => todo!("import type class {:?}", (supers, name, args, members)),
                 core::Declaration::Instance {
                     ty_vars,
                     assumes,
                     head,
-                    dict,
+                    members,
                 } => todo!(
                     "import type class instance {:?}",
-                    (ty_vars, assumes, head, dict)
+                    (ty_vars, assumes, head, members)
                 ),
             }
         }
@@ -754,7 +762,7 @@ impl Typechecker {
             .bound_tyvars
             .info
             .iter()
-            .map(|x| self.zonk_kind(x.1.clone()))
+            .map(|(name, kind)| (name.clone(), self.zonk_kind(kind.clone())))
             .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
@@ -855,7 +863,7 @@ impl Typechecker {
         let sig = core::TypeSig {
             ty_vars: local_tyvars
                 .into_iter()
-                .map(|(_, kind)| self.zonk_kind(kind))
+                .map(|(name, kind)| (name, self.zonk_kind(kind)))
                 .collect(),
             body: checked_type,
         };
@@ -899,9 +907,9 @@ impl Typechecker {
         Ok(core::Declaration::Class {
             supers: Vec::new(),
             name,
-            arg_kinds: args_kinds
+            args: args_kinds
                 .into_iter()
-                .map(|(_, kind)| self.zonk_kind(kind))
+                .map(|(name, kind)| (name, self.zonk_kind(kind)))
                 .collect(),
             members: checked_members,
         })
@@ -913,40 +921,54 @@ impl Typechecker {
         args: Vec<Type<String>>,
         members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
     ) -> Result<core::Declaration, TypeError> {
-        let member_types: &HashMap<String, core::TypeSig> = match self.class_context.get(&name.item)
-        {
-            None => Err(TypeError::NoSuchClass { pos: name.pos }),
-            Some(member_types) => Ok(member_types),
-        }?;
-
         // abstract over type variables
-        let ty_vars: HashMap<String, usize> = {
-            let mut ty_var_set = HashMap::new();
+        let mut ty_var_kinds = Vec::new();
+        let ty_vars_map: HashMap<String, usize> = {
+            let mut ty_vars_map = HashMap::new();
             for arg in &args {
                 for var in arg.iter_vars() {
-                    match ty_var_set.get(var) {
+                    match ty_vars_map.get(var) {
                         None => {
-                            ty_var_set.insert(var.clone(), ty_var_set.len());
+                            ty_var_kinds.push((var.clone(), self.fresh_kindvar()));
+                            ty_vars_map.insert(var.clone(), ty_vars_map.len());
                         }
                         Some(_) => {}
                     }
                 }
             }
-            ty_var_set
+            ty_vars_map
         };
 
-        let num_ty_vars = ty_vars.len();
+        let num_ty_vars = ty_var_kinds.len();
 
         let args: Vec<Type<usize>> = args
             .iter()
-            .map(|arg| arg.map(&mut |var| num_ty_vars - ty_vars.get(var).unwrap()))
+            .map(|arg| arg.map(&mut |var| num_ty_vars - ty_vars_map.get(var).unwrap()))
             .collect();
 
-        // type check members
-        for (member_name, member_args, member_body) in members {
-            // bind type variables
-            todo!();
+        let head = args
+            .into_iter()
+            .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
+                syntax::Type::mk_app(acc, el)
+            });
 
+        self.bound_tyvars.insert(&ty_var_kinds);
+        self.check_kind(None, &head, syntax::Kind::Constraint)?;
+        self.bound_tyvars.delete(ty_var_kinds.len());
+
+        let member_types: HashMap<String, core::TypeSig> = match self.class_context.get(&name.item)
+        {
+            None => {
+                // this should be impossible, because if the class doesn't exist then the kind check should
+                // have failed
+                panic!("no such class")
+            }
+            Some(member_types) => Ok(member_types.clone()),
+        }?;
+
+        // type check members
+        let mut new_members = Vec::with_capacity(members.len());
+        for (member_name, member_args, member_body) in members {
             match member_types.get(&member_name.item) {
                 None => {
                     return Err(TypeError::NotAMember {
@@ -954,22 +976,35 @@ impl Typechecker {
                         cls: name.item.clone(),
                     })
                 }
-                Some(member_type) => match self.check_expr(
-                    Spanned {
-                        pos: member_name.pos,
-                        item: syntax::Expr::mk_lam(member_args, member_body),
-                    },
-                    member_type.body.clone(),
-                ) {
-                    Err(err) => return Err(err),
-                    Ok(member_body) => {
-                        todo!()
-                    }
-                },
+                Some(member_type) => {
+                    self.bound_tyvars.insert(&member_type.ty_vars);
+
+                    match self.check_expr(
+                        Spanned {
+                            pos: member_name.pos,
+                            item: syntax::Expr::mk_lam(member_args, member_body),
+                        },
+                        member_type.body.clone(),
+                    ) {
+                        Err(err) => return Err(err),
+                        Ok(member_body) => {
+                            self.bound_tyvars.delete(member_type.ty_vars.len());
+                            new_members.push(core::InstanceMember {
+                                name: member_name.item.clone(),
+                                body: member_body,
+                            });
+                        }
+                    };
+                }
             }
         }
 
-        todo!()
+        Ok(core::Declaration::Instance {
+            ty_vars: ty_var_kinds,
+            assumes: Vec::new(),
+            head,
+            members: new_members,
+        })
     }
 
     fn check_declaration(
@@ -1073,7 +1108,8 @@ impl Typechecker {
                 syntax::Kind::mk_arrow(self.zonk_kind(*a), self.zonk_kind(*b))
             }
             syntax::Kind::Meta(m) => match self.kind_solutions[m].clone() {
-                None => syntax::Kind::Meta(m),
+                // unsolved kind metas are zonked to 'type', because we're not kind-polymorphic
+                None => syntax::Kind::Type,
                 Some(kind) => self.zonk_kind(kind),
             },
         }
@@ -1721,7 +1757,7 @@ impl Typechecker {
         let metas: Vec<Type<usize>> = sig
             .ty_vars
             .into_iter()
-            .map(|kind| self.fresh_typevar(kind))
+            .map(|(_, kind)| self.fresh_typevar(kind))
             .collect();
         let ty = sig.body.subst(&|&ix| metas[metas.len() - 1 - ix].clone());
         let (constraints, ty) = ty.unwrap_constraints();

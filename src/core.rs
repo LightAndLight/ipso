@@ -545,7 +545,7 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
-    pub ty_vars: Vec<syntax::Kind>,
+    pub ty_vars: Vec<(String, syntax::Kind)>,
     pub body: syntax::Type<usize>,
 }
 
@@ -553,6 +553,12 @@ pub struct TypeSig {
 pub struct ClassMember {
     pub name: String,
     pub sig: TypeSig,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct InstanceMember {
+    pub name: String,
+    pub body: Expr,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -582,14 +588,14 @@ pub enum Declaration {
     Class {
         supers: Vec<syntax::Type<usize>>,
         name: String,
-        arg_kinds: Vec<syntax::Kind>,
+        args: Vec<(String, syntax::Kind)>,
         members: Vec<ClassMember>,
     },
     Instance {
-        ty_vars: Vec<syntax::Kind>,
+        ty_vars: Vec<(String, syntax::Kind)>,
         assumes: Vec<syntax::Type<usize>>,
         head: syntax::Type<usize>,
-        dict: Expr,
+        members: Vec<InstanceMember>,
     },
 }
 

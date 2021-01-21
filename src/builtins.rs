@@ -11,9 +11,9 @@ lazy_static! {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        Kind::Type,
+                        (String::from("a"), Kind::Type),
                         // b : Type
-                        Kind::Type
+                        (String::from("b"), Kind::Type)
                     ],
                     body: Type::mk_arrow(
                         Type::mk_arrow(
@@ -35,7 +35,7 @@ lazy_static! {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        Kind::Type,
+                        (String::from("a"), Kind::Type),
                     ],
                     body: Type::mk_arrow(
                             Type::Var(0),
@@ -51,9 +51,9 @@ lazy_static! {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        Kind::Type,
+                        (String::from("a"), Kind::Type),
                         // b : Type
-                        Kind::Type,
+                        (String::from("b"), Kind::Type),
                     ],
                     body: Type::mk_arrow(
                             Type::mk_app(Type::IO, Type::Var(1)),
@@ -72,9 +72,9 @@ lazy_static! {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        Kind::Type,
+                        (String::from("a"), Kind::Type),
                         // b : Type
-                        Kind::Type,
+                        (String::from("b"), Kind::Type),
                     ],
                     body: Type::mk_arrow(
                             Type::Var(1),

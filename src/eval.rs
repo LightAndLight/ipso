@@ -1,6 +1,6 @@
 use crate::{
     builtins,
-    core::{Branch, Builtin, Declaration, Expr, Pattern, StringPart},
+    core::{Builtin, Declaration, Expr, Pattern, StringPart},
     rope::Rope,
     syntax::Binop,
 };

@@ -1,10 +1,10 @@
 #[cfg(test)]
 use std::collections::HashSet;
 
-use crate::core::Placeholder;
+use crate::{core::Placeholder, syntax::Spanned};
 #[cfg(test)]
 use crate::{
-    core,
+    core::{self, ClassMember, Declaration, InstanceMember, TypeSig},
     evidence::{solver::solve_placeholder, Constraint},
     syntax::{self, Binop, Kind, Type},
     typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
@@ -1455,7 +1455,7 @@ fn check_definition_1() {
         Ok(core::Declaration::Definition {
             name: String::from("id"),
             sig: core::TypeSig {
-                ty_vars: vec![syntax::Kind::Type],
+                ty_vars: vec![(String::from("a"), syntax::Kind::Type)],
                 body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
             },
             body: core::Expr::mk_lam(true, core::Expr::Var(0))
@@ -1506,7 +1506,7 @@ fn check_definition_2() {
     let expected = Ok(core::Declaration::Definition {
         name: String::from("thing"),
         sig: core::TypeSig {
-            ty_vars: vec![syntax::Kind::Row],
+            ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
             body: syntax::Type::mk_fatarrow(
                 syntax::Type::mk_hasfield(String::from("x"), Type::Var(0)),
                 syntax::Type::mk_arrow(
@@ -1646,7 +1646,7 @@ fn check_definition_4() {
         Ok(core::Declaration::Definition {
             name: String::from("getx"),
             sig: core::TypeSig {
-                ty_vars: vec![syntax::Kind::Row],
+                ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
                 body: syntax::Type::mk_fatarrow(
                     syntax::Type::mk_hasfield(String::from("x"), syntax::Type::Var(0)),
                     syntax::Type::mk_arrow(
@@ -1721,4 +1721,143 @@ fn type_occurs_1() {
             ty: Type::mk_arrow(tc.fill_ty_names(v1), tc.fill_ty_names(v2))
         })
     )
+}
+
+#[test]
+fn check_class_1() {
+    let expected = Ok(core::Declaration::Class {
+        supers: Vec::new(),
+        name: String::from("Eq"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![ClassMember {
+            name: String::from("eq"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+    let mut tc = Typechecker::new();
+    /*
+    class Eq a where
+      eq : a -> a -> Bool
+    */
+    let actual = tc.check_declaration(Spanned {
+        pos: 0,
+        item: syntax::Declaration::Class {
+            name: String::from("Eq"),
+            args: vec![Spanned {
+                pos: 9,
+                item: String::from("a"),
+            }],
+            members: vec![(
+                String::from("eq"),
+                Type::mk_arrow(
+                    Type::Var(String::from("a")),
+                    Type::mk_arrow(Type::Var(String::from("a")), Type::Bool),
+                ),
+            )],
+        },
+    });
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn check_class_2() {
+    let expected = Ok(core::Declaration::Class {
+        supers: Vec::new(),
+        name: String::from("Wut"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![ClassMember {
+            name: String::from("wut"),
+            sig: TypeSig {
+                ty_vars: vec![(String::from("b"), Kind::Type)],
+                body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+    let mut tc = Typechecker::new();
+    /*
+    class Wut a where
+      wut : a -> b -> Bool
+    */
+    let actual = tc.check_declaration(Spanned {
+        pos: 0,
+        item: syntax::Declaration::Class {
+            name: String::from("Wut"),
+            args: vec![Spanned {
+                pos: 9,
+                item: String::from("a"),
+            }],
+            members: vec![(
+                String::from("wut"),
+                Type::mk_arrow(
+                    Type::Var(String::from("a")),
+                    Type::mk_arrow(Type::Var(String::from("b")), Type::Bool),
+                ),
+            )],
+        },
+    });
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn check_instance_1() {
+    let expected = Ok(core::Declaration::Instance {
+        ty_vars: Vec::new(),
+        assumes: Vec::new(),
+        head: Type::mk_app(Type::Name(String::from("Eq")), Type::Unit),
+        members: vec![InstanceMember {
+            name: String::from("eq"),
+            body: core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
+        }],
+    });
+    let mut tc = Typechecker::new();
+    tc.register_declaration(&core::Declaration::Class {
+        supers: Vec::new(),
+        name: String::from("Eq"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![ClassMember {
+            name: String::from("eq"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+    /*
+    instance Eq () where
+      eq x y = True
+    */
+    let actual = tc.check_declaration(Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            name: Spanned {
+                pos: 9,
+                item: String::from("Eq"),
+            },
+            args: vec![Type::Unit],
+            members: vec![(
+                Spanned {
+                    pos: 22,
+                    item: String::from("eq"),
+                },
+                vec![
+                    syntax::Pattern::Name(Spanned {
+                        pos: 25,
+                        item: String::from("x"),
+                    }),
+                    syntax::Pattern::Name(Spanned {
+                        pos: 27,
+                        item: String::from("y"),
+                    }),
+                ],
+                Spanned {
+                    pos: 31,
+                    item: syntax::Expr::True,
+                },
+            )],
+        },
+    });
+    assert_eq!(expected, actual)
 }

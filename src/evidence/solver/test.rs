@@ -1,7 +1,6 @@
-use crate::core::EVar;
 #[cfg(test)]
 use crate::{
-    core::Expr,
+    core::{EVar, Expr},
     evidence::{solver::solve_constraint, Constraint, Evidence},
     syntax::{Binop, Kind, Type},
     typecheck::Typechecker,
