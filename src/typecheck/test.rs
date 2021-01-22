@@ -57,7 +57,7 @@ fn infer_kind_test_4() {
             Type::Record,
             Type::mk_rowcons(String::from("x"), Type::Bool, Type::RowNil),
         ))
-        .map(|(_, kind)| tc.zonk_kind(kind));
+        .map(|(_, kind)| tc.zonk_kind(false, kind));
     assert_eq!(expected, actual)
 }
 

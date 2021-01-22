@@ -762,7 +762,7 @@ impl Typechecker {
             .bound_tyvars
             .info
             .iter()
-            .map(|(name, kind)| (name.clone(), self.zonk_kind(kind.clone())))
+            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
             .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
@@ -863,7 +863,7 @@ impl Typechecker {
         let sig = core::TypeSig {
             ty_vars: local_tyvars
                 .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(kind)))
+                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
                 .collect(),
             body: checked_type,
         };
@@ -909,7 +909,7 @@ impl Typechecker {
             name,
             args: args_kinds
                 .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(kind)))
+                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
                 .collect(),
             members: checked_members,
         })
@@ -1099,18 +1099,24 @@ impl Typechecker {
         }
     }
 
-    pub fn zonk_kind(&self, kind: syntax::Kind) -> syntax::Kind {
+    pub fn zonk_kind(&self, close_unsolved: bool, kind: syntax::Kind) -> syntax::Kind {
         match kind {
             syntax::Kind::Type => syntax::Kind::Type,
             syntax::Kind::Row => syntax::Kind::Row,
             syntax::Kind::Constraint => syntax::Kind::Constraint,
-            syntax::Kind::Arrow(a, b) => {
-                syntax::Kind::mk_arrow(self.zonk_kind(*a), self.zonk_kind(*b))
-            }
+            syntax::Kind::Arrow(a, b) => syntax::Kind::mk_arrow(
+                self.zonk_kind(close_unsolved, *a),
+                self.zonk_kind(close_unsolved, *b),
+            ),
             syntax::Kind::Meta(m) => match self.kind_solutions[m].clone() {
-                // unsolved kind metas are zonked to 'type', because we're not kind-polymorphic
-                None => syntax::Kind::Type,
-                Some(kind) => self.zonk_kind(kind),
+                None => {
+                    if close_unsolved {
+                        syntax::Kind::Type
+                    } else {
+                        syntax::Kind::Meta(m)
+                    }
+                }
+                Some(kind) => self.zonk_kind(close_unsolved, kind),
             },
         }
     }
@@ -1133,7 +1139,7 @@ impl Typechecker {
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
             ty: self.fill_ty_names(self.zonk_type(context.ty.clone())),
-            has_kind: self.zonk_kind(context.has_kind.clone()),
+            has_kind: self.zonk_kind(false, context.has_kind.clone()),
             unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_type(x.expected.clone())),
                 actual: self.fill_ty_names(self.zonk_type(x.actual.clone())),
@@ -1196,7 +1202,7 @@ impl Typechecker {
             Some(_) => Err(TypeError::KindOccurs {
                 pos: self.current_position(),
                 meta,
-                kind: self.zonk_kind(kind.clone()),
+                kind: self.zonk_kind(false, kind.clone()),
             }),
         }
     }
