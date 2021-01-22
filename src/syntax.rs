@@ -325,7 +325,70 @@ impl<'a, A> Iterator for IterVars<'a, A> {
     }
 }
 
+impl Type<usize> {
+    pub fn instantiate_many(&self, tys: &Vec<Type<usize>>) -> Self {
+        match self {
+            Type::Name(n) => Type::Name(n.clone()),
+            Type::Var(n) => {
+                let tys_len = tys.len();
+                if *n < tys_len {
+                    tys[tys_len - 1 - n].clone()
+                } else {
+                    Type::Var(*n - tys_len)
+                }
+            }
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Bytes => Type::Bytes,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => {
+                Type::Constraints(cs.iter().map(|c| c.instantiate_many(tys)).collect())
+            }
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::Variant,
+            Type::App(a, b) => Type::mk_app(a.instantiate_many(tys), b.instantiate_many(tys)),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(a, b, c) => {
+                Type::mk_rowcons(a.clone(), b.instantiate_many(tys), c.instantiate_many(tys))
+            }
+            Type::HasField(a, b) => Type::mk_hasfield(a.clone(), b.instantiate_many(tys)),
+            Type::Unit => Type::Unit,
+            Type::Meta(n) => Type::Meta(*n),
+        }
+    }
+}
+
 impl<A> Type<A> {
+    /// ```
+    /// use ipso::syntax::Type;
+    /// assert_eq!(
+    ///     Type::mk_app(Type::mk_app(Type::mk_app(Type::Var(0), Type::Var(1)), Type::Var(2)), Type::Var(3))
+    ///     (Type::Var(0), vec![Type::Var(1), Type::Var(2), Type::Var(3)])
+    /// )
+    /// ```
+    pub fn unwrap_app<'a>(&'a self) -> (&'a Type<A>, Vec<&'a Type<A>>) {
+        let mut target = self;
+        let mut args: Vec<&'a Type<A>> = Vec::new();
+        loop {
+            match target {
+                Type::App(a, b) => {
+                    args.push(b);
+                    target = a;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        args.reverse();
+        (target, args)
+    }
+
     /// Abstract over the variables in the type. The last distinct variable encountered
     /// is recieves the index '0', and the first variable encountered recieves the index
     /// `positions.len() + <number of distinct variables in type>`.

@@ -126,7 +126,7 @@ pub struct Typechecker {
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
-    class_context: HashMap<String, HashMap<String, core::TypeSig>>,
+    class_context: HashMap<String, core::ClassDeclaration>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
@@ -526,51 +526,46 @@ impl Typechecker {
         }
     }
 
-    pub fn register_class(
-        &mut self,
-        supers: &Vec<Type<usize>>,
-        name: &String,
-        arg_kinds: &Vec<(String, syntax::Kind)>,
-        members: &Vec<core::ClassMember>,
-    ) {
+    pub fn register_class(&mut self, decl: &core::ClassDeclaration) {
         // generate constraint's kind
         let mut constraint_kind = syntax::Kind::Constraint;
-        for (_, kind) in arg_kinds.iter().rev() {
+        for (_, kind) in decl.args.iter().rev() {
             constraint_kind = syntax::Kind::mk_arrow(kind.clone(), constraint_kind);
         }
-        self.type_context.insert(name.clone(), constraint_kind);
+        self.type_context.insert(decl.name.clone(), constraint_kind);
 
-        let applied_type = (0..arg_kinds.len())
+        let applied_type = (0..decl.args.len())
             .into_iter()
-            .fold(Type::Name(name.clone()), |acc, el| {
+            .fold(Type::Name(decl.name.clone()), |acc, el| {
                 Type::mk_app(acc, Type::Var(el))
             });
 
         // generate superclass accessors
-        self.implications.extend(
-            supers
-                .iter()
-                .enumerate()
-                .map(|(pos, superclass)| Implication {
-                    ty_vars: arg_kinds.iter().map(|(_, kind)| kind.clone()).collect(),
-                    antecedents: vec![applied_type.clone()],
-                    consequent: superclass.clone(),
-                    evidence: core::Expr::mk_lam(
-                        true,
-                        core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
-                    ),
-                }),
-        );
+        self.implications
+            .extend(
+                decl.supers
+                    .iter()
+                    .enumerate()
+                    .map(|(pos, superclass)| Implication {
+                        ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
+                        antecedents: vec![applied_type.clone()],
+                        consequent: superclass.clone(),
+                        evidence: core::Expr::mk_lam(
+                            true,
+                            core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
+                        ),
+                    }),
+            );
 
-        let supers_len = supers.len();
+        let supers_len = decl.supers.len();
 
         // generate class members
         self.context
-            .extend(members.iter().enumerate().map(|(ix, member)| {
+            .extend(decl.members.iter().enumerate().map(|(ix, member)| {
                 let sig = {
                     // the variables bound by the class declaration are the
                     // bound variables in the signature
-                    let mut ty_vars = arg_kinds.clone();
+                    let mut ty_vars = decl.args.clone();
                     ty_vars.extend(member.sig.ty_vars.clone().into_iter());
 
                     let mut body = member.sig.body.clone();
@@ -590,13 +585,7 @@ impl Typechecker {
             }));
 
         // update class context
-        self.class_context.insert(
-            name.clone(),
-            members
-                .iter()
-                .map(|member| (member.name.clone(), member.sig.clone()))
-                .collect(),
-        );
+        self.class_context.insert(decl.name.clone(), decl.clone());
     }
 
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
@@ -617,12 +606,7 @@ impl Typechecker {
             core::Declaration::FromImport { module, names } => {
                 todo!("register FromImport {:?}", (module, names))
             }
-            core::Declaration::Class {
-                supers,
-                name,
-                args,
-                members,
-            } => self.register_class(supers, name, args, members),
+            core::Declaration::Class(decl) => self.register_class(decl),
             core::Declaration::Instance {
                 ty_vars,
                 assumes,
@@ -677,12 +661,12 @@ impl Typechecker {
                     module: _,
                     names: _,
                 } => {}
-                core::Declaration::Class {
+                core::Declaration::Class(core::ClassDeclaration {
                     supers,
                     name,
                     args,
                     members,
-                } => todo!("import type class {:?}", (supers, name, args, members)),
+                }) => todo!("import type class {:?}", (supers, name, args, members)),
                 core::Declaration::Instance {
                     ty_vars,
                     assumes,
@@ -902,7 +886,7 @@ impl Typechecker {
             }
         }
 
-        Ok(core::Declaration::Class {
+        Ok(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name,
             args: args_kinds
@@ -910,7 +894,7 @@ impl Typechecker {
                 .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
                 .collect(),
             members: checked_members,
-        })
+        }))
     }
 
     fn check_instance(
@@ -919,55 +903,47 @@ impl Typechecker {
         args: Vec<Type<String>>,
         members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
     ) -> Result<core::Declaration, TypeError> {
-        // abstract over type variables
-        let mut ty_var_kinds = Vec::new();
-        let ty_vars_map: HashMap<String, usize> = {
-            let mut ty_vars_map = HashMap::new();
-            for arg in &args {
-                for var in arg.iter_vars() {
-                    match ty_vars_map.get(var) {
-                        None => {
-                            ty_var_kinds.push((var.clone(), self.fresh_kindvar()));
-                            ty_vars_map.insert(var.clone(), ty_vars_map.len());
-                        }
-                        Some(_) => {}
-                    }
-                }
-            }
-            ty_vars_map
-        };
+        let class_context = &self.class_context;
+        let class_decl = match class_context.get(&name.item) {
+            None => Err(TypeError::NoSuchClass { pos: name.pos }),
+            Some(class_decl) => Ok(class_decl),
+        }?;
 
-        let num_ty_vars = ty_var_kinds.len();
-
-        let args: Vec<Type<usize>> = args
-            .iter()
-            .map(|arg| arg.map(&mut |var| num_ty_vars - ty_vars_map.get(var).unwrap()))
-            .collect();
-
-        let head = args
+        let (head, ty_vars) = args
             .into_iter()
             .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
                 syntax::Type::mk_app(acc, el)
-            });
+            })
+            .abstract_vars(&Vec::new());
+        let kind_solutions = &mut self.kind_solutions;
+        let ty_var_kinds = ty_vars
+            .into_iter()
+            .map(|var| (var, fresh_kindvar!(kind_solutions)))
+            .collect();
+
+        let (_, args) = head.unwrap_app();
+        let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
+
+        let instantiated_class_members: Vec<core::ClassMember> = class_decl
+            .members
+            .iter()
+            .map(|class_member| core::ClassMember {
+                name: class_member.name.clone(),
+                sig: class_member.sig.clone().instantiate_many(&args),
+            })
+            .collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
         self.check_kind(None, &head, syntax::Kind::Constraint)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
-        let member_types: HashMap<String, core::TypeSig> = match self.class_context.get(&name.item)
-        {
-            None => {
-                // this should be impossible, because if the class doesn't exist then the kind check should
-                // have failed
-                panic!("no such class")
-            }
-            Some(member_types) => Ok(member_types.clone()),
-        }?;
-
         // type check members
         let mut new_members = Vec::with_capacity(members.len());
         for (member_name, member_args, member_body) in members {
-            match member_types.get(&member_name.item) {
+            match instantiated_class_members
+                .iter()
+                .find(|class_member| class_member.name == member_name.item)
+            {
                 None => {
                     return Err(TypeError::NotAMember {
                         pos: member_name.pos,
@@ -975,18 +951,18 @@ impl Typechecker {
                     })
                 }
                 Some(member_type) => {
-                    self.bound_tyvars.insert(&member_type.ty_vars);
+                    self.bound_tyvars.insert(&member_type.sig.ty_vars);
 
                     match self.check_expr(
                         Spanned {
                             pos: member_name.pos,
                             item: syntax::Expr::mk_lam(member_args, member_body),
                         },
-                        member_type.body.clone(),
+                        member_type.sig.body.clone(),
                     ) {
                         Err(err) => return Err(err),
                         Ok(member_body) => {
-                            self.bound_tyvars.delete(member_type.ty_vars.len());
+                            self.bound_tyvars.delete(member_type.sig.ty_vars.len());
                             new_members.push(core::InstanceMember {
                                 name: member_name.item.clone(),
                                 body: member_body,
@@ -1120,9 +1096,7 @@ impl Typechecker {
     }
 
     fn fresh_kindvar(&mut self) -> syntax::Kind {
-        let n = self.kind_solutions.len();
-        self.kind_solutions.push(None);
-        syntax::Kind::Meta(n)
+        fresh_kindvar!(self.kind_solutions)
     }
 
     pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<String> {

@@ -549,7 +549,25 @@ pub struct TypeSig {
     pub body: syntax::Type<usize>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+impl TypeSig {
+    pub fn instantiate_many(&self, tys: &Vec<syntax::Type<usize>>) -> TypeSig {
+        let mut ty_vars = self.ty_vars.clone();
+        for ty in tys.iter().rev() {
+            match ty_vars.pop() {
+                None => panic!("instantiating too many variables"),
+                Some((ty_var_name, ty_var_kind)) => {
+                    todo!()
+                }
+            }
+        }
+        TypeSig {
+            ty_vars,
+            body: self.body.instantiate_many(tys),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassMember {
     pub name: String,
     pub sig: TypeSig,
@@ -585,18 +603,21 @@ pub enum Declaration {
         module: String,
         names: syntax::Names,
     },
-    Class {
-        supers: Vec<syntax::Type<usize>>,
-        name: String,
-        args: Vec<(String, syntax::Kind)>,
-        members: Vec<ClassMember>,
-    },
+    Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(String, syntax::Kind)>,
         assumes: Vec<syntax::Type<usize>>,
         head: syntax::Type<usize>,
         members: Vec<InstanceMember>,
     },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ClassDeclaration {
+    pub supers: Vec<syntax::Type<usize>>,
+    pub name: String,
+    pub args: Vec<(String, syntax::Kind)>,
+    pub members: Vec<ClassMember>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
