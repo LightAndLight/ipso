@@ -340,7 +340,10 @@ impl<A> Type<A> {
     /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
     /// assert_eq!(
     ///     input.abstract_vars(&Vec::new()),
-    ///     Type::mk_arrow(Type::Var(1), Type::mk_app(Type::Var(0), Type::Var(1)))
+    ///     (
+    ///         Type::mk_arrow(Type::Var(1), Type::mk_app(Type::Var(0), Type::Var(1))),
+    ///         vec![String::from("a"), String::from("f")]
+    ///     )
     /// )
     /// ```
     ///
@@ -351,12 +354,15 @@ impl<A> Type<A> {
     /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
     /// assert_eq!(
     ///     input.abstract_vars(&vec![String::from("f"), String::from("a")]),
-    ///     Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Var(1), Type::Var(0)))
+    ///     (
+    ///         Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Var(1), Type::Var(0))),
+    ///         vec![String::from("f"), String::from("a")]
+    ///     )
     /// )
     /// ```
-    pub fn abstract_vars(&self, seen: &Vec<A>) -> Type<usize>
+    pub fn abstract_vars(&self, seen: &Vec<A>) -> (Type<usize>, Vec<A>)
     where
-        A: Eq + Hash,
+        A: Eq + Hash + Clone,
     {
         let mut seen: HashMap<&A, usize> = seen.iter().enumerate().map(|(a, b)| (b, a)).collect();
         for var in self.iter_vars() {
@@ -369,7 +375,16 @@ impl<A> Type<A> {
         }
 
         let seen_len = seen.len();
-        self.map(&mut |var| seen_len - 1 - seen.get(var).unwrap())
+        let all_vars: Vec<A> = {
+            let mut all_vars: Vec<(A, usize)> =
+                seen.iter().map(|(a, b)| ((*a).clone(), *b)).collect();
+            all_vars.sort_by_key(|(_, a)| *a);
+            all_vars.into_iter().map(|(a, _)| a).collect()
+        };
+        (
+            self.map(&mut |var| seen_len - 1 - seen.get(var).unwrap()),
+            all_vars,
+        )
     }
 
     pub fn map<B, F: FnMut(&A) -> B>(&self, f: &mut F) -> Type<B> {
