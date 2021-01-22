@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::iter::Step;
 use lazy_static::lazy_static;
@@ -270,14 +270,11 @@ pub struct IterVars<'a, A> {
     items: Vec<&'a Type<A>>,
 }
 
-impl<'a, A: Clone> Iterator for IterVars<'a, A> {
+impl<'a, A> Iterator for IterVars<'a, A> {
     type Item = &'a A;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, &'a A>
-        where
-            A: Clone,
-        {
+        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, &'a A> {
             match ty {
                 Type::Name(_) => Step::Skip,
                 Type::Var(n) => Step::Yield(n),
@@ -329,6 +326,52 @@ impl<'a, A: Clone> Iterator for IterVars<'a, A> {
 }
 
 impl<A> Type<A> {
+    /// Abstract over the variables in the type. The last distinct variable encountered
+    /// is recieves the index '0', and the first variable encountered recieves the index
+    /// `positions.len() + <number of distinct variables in type>`.
+    ///
+    /// This gives the type De Bruijn indices such that it can be wrapped in `forall`s
+    /// with the earlier variables bound first.
+    ///
+    /// i.e. `a -> f a` to `forall a f. a -> f a`
+    ///
+    /// ```
+    /// use ipso::syntax::Type;
+    /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
+    /// assert_eq!(
+    ///     input.abstract_vars(&Vec::new()),
+    ///     Type::mk_arrow(Type::Var(1), Type::mk_app(Type::Var(0), Type::Var(1)))
+    /// )
+    /// ```
+    ///
+    /// The `seen` vector can be used to influence the binding order.
+    ///
+    /// ```
+    /// use ipso::syntax::Type;
+    /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
+    /// assert_eq!(
+    ///     input.abstract_vars(&vec![String::from("f"), String::from("a")]),
+    ///     Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Var(1), Type::Var(0)))
+    /// )
+    /// ```
+    pub fn abstract_vars(&self, seen: &Vec<A>) -> Type<usize>
+    where
+        A: Eq + Hash,
+    {
+        let mut seen: HashMap<&A, usize> = seen.iter().enumerate().map(|(a, b)| (b, a)).collect();
+        for var in self.iter_vars() {
+            match seen.get(var) {
+                None => {
+                    seen.insert(var, seen.len());
+                }
+                Some(_) => {}
+            }
+        }
+
+        let seen_len = seen.len();
+        self.map(&mut |var| seen_len - 1 - seen.get(var).unwrap())
+    }
+
     pub fn map<B, F: FnMut(&A) -> B>(&self, f: &mut F) -> Type<B> {
         match self {
             Type::Name(n) => Type::Name(n.clone()),

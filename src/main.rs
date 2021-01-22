@@ -1,23 +1,13 @@
-use eval::Interpreter;
-use typed_arena::Arena;
-
-use crate::diagnostic::{Diagnostic, Item};
-use crate::typecheck::Typechecker;
+use ipso::{
+    core,
+    diagnostic::{self, Diagnostic, Item},
+    eval::Interpreter,
+    parse, syntax,
+    typecheck::{self, Typechecker},
+};
 use std::path::Path;
 use std::{env, io};
-
-mod builtins;
-mod core;
-mod diagnostic;
-mod eval;
-mod evidence;
-mod iter;
-mod lex;
-mod parse;
-mod rope;
-mod syntax;
-mod typecheck;
-mod void;
+use typed_arena::Arena;
 
 #[derive(Debug)]
 struct Config {

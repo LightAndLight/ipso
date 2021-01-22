@@ -1,8 +1,7 @@
 mod test;
 
+use crate::diagnostic::{Diagnostic, Item};
 use crate::syntax::Spanned;
-use crate::Diagnostic;
-use crate::Item;
 use std::collections::BTreeSet;
 use std::{fs::File, io::Read, vec::IntoIter};
 

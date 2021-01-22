@@ -9,3 +9,7 @@ edition = "2018"
 [dependencies]
 lazy_static = "1.4.0"
 typed-arena = "2.0.1"
+
+[lib]
+name = "ipso"
+path = "./src/ipso.rs"
