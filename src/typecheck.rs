@@ -831,40 +831,41 @@ impl Typechecker {
 
     fn check_class_member(
         &mut self,
-        class_args: &HashSet<String>,
+        class_args_kinds: &Vec<(String, syntax::Kind)>,
         name: String,
         type_: Type<String>,
     ) -> Result<core::ClassMember, TypeError> {
-        let mut local_tyvars = Vec::new();
-        let local_tyvars_len = local_tyvars.len();
-        let mut seen: HashSet<&String> = HashSet::new();
-        for var in type_.iter_vars() {
-            if !class_args.contains(var) && !seen.contains(var) {
-                seen.insert(&var);
-                local_tyvars.push((var.clone(), self.fresh_kindvar()));
-            }
-        }
+        let class_args = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
+        let (type_, ty_vars) = type_.abstract_vars(&class_args);
 
-        let type_ = type_.map(&mut |var| match self.bound_tyvars.lookup_name(var) {
-            None => {
-                local_tyvars_len
-                    - local_tyvars
-                        .iter()
-                        .position(|(name, _)| name == var)
-                        .unwrap()
-            }
-            Some((ix, _)) => ix,
-        });
+        let class_args_kinds_map: HashMap<String, syntax::Kind> = class_args_kinds
+            .iter()
+            .map(|(a, b)| (a.clone(), b.clone()))
+            .collect();
+        let ty_var_kinds: Vec<(String, syntax::Kind)> = ty_vars
+            .iter()
+            .map(|var| {
+                (
+                    var.clone(),
+                    match class_args_kinds_map.get(var) {
+                        None => self.fresh_kindvar(),
+                        Some(kind) => kind.clone(),
+                    },
+                )
+            })
+            .collect();
 
-        self.bound_tyvars.insert(&local_tyvars);
+        self.bound_tyvars.insert(&ty_var_kinds);
         let checked_type = self.check_kind(None, &type_, syntax::Kind::Type)?;
-        self.bound_tyvars.delete(local_tyvars.len());
+        self.bound_tyvars.delete(ty_var_kinds.len());
+
+        let local_tyvars = ty_var_kinds[class_args_kinds.len()..]
+            .into_iter()
+            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
+            .collect();
 
         let sig = core::TypeSig {
-            ty_vars: local_tyvars
-                .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
-                .collect(),
+            ty_vars: local_tyvars,
             body: checked_type,
         };
         Ok(core::ClassMember { name, sig })
@@ -877,7 +878,6 @@ impl Typechecker {
         members: Vec<(String, Type<String>)>,
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
-        let class_args = args.iter().map(|arg| arg.item.clone()).collect();
         let args_kinds = {
             let mut seen: HashSet<String> = HashSet::new();
             let mut args_kinds = Vec::with_capacity(args_len);
@@ -892,17 +892,15 @@ impl Typechecker {
             args_kinds
         };
 
-        self.bound_tyvars.insert(&args_kinds);
         let mut checked_members = Vec::with_capacity(members.len());
         for (member_name, member_type) in members {
-            match self.check_class_member(&class_args, member_name, member_type) {
+            match self.check_class_member(&args_kinds, member_name, member_type) {
                 Err(err) => return Err(err),
                 Ok(checked_member) => {
                     checked_members.push(checked_member);
                 }
             }
         }
-        self.bound_tyvars.delete(args_len);
 
         Ok(core::Declaration::Class {
             supers: Vec::new(),
