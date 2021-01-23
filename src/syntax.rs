@@ -410,16 +410,37 @@ impl<A> Type<A> {
     /// )
     /// ```
     ///
-    /// The `seen` vector can be used to influence the binding order.
+    /// The `seen` vector can be used to influence the order of the binders.
     ///
     /// ```
     /// use ipso::syntax::Type;
-    /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
+    /// let input = Type::mk_arrow(
+    ///     Type::Var(String::from("a")),
+    ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a")))
+    /// );
     /// assert_eq!(
     ///     input.abstract_vars(&vec![String::from("f"), String::from("a")]),
     ///     (
     ///         Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Var(1), Type::Var(0))),
     ///         vec![String::from("f"), String::from("a")]
+    ///     )
+    /// )
+    /// ```
+    ///
+    /// ```
+    /// use ipso::syntax::Type;
+    /// let input = Type::mk_arrow(
+    ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))),
+    ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("b")))
+    /// );
+    /// assert_eq!(
+    ///     input.abstract_vars(&vec![String::from("a"), String::from("b")]),
+    ///     (
+    ///         Type::mk_arrow(
+    ///             Type::mk_app(Type::Var(0), Type::Var(2)),
+    ///             Type::mk_app(Type::Var(0), Type::Var(1))
+    ///     ),
+    ///         vec![String::from("a"), String::from("b"), String::from("f")]
     ///     )
     /// )
     /// ```

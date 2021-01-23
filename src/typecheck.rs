@@ -534,13 +534,12 @@ impl Typechecker {
         }
         self.type_context.insert(decl.name.clone(), constraint_kind);
 
+        // generate superclass accessors
         let applied_type = (0..decl.args.len())
             .into_iter()
             .fold(Type::Name(decl.name.clone()), |acc, el| {
                 Type::mk_app(acc, Type::Var(el))
             });
-
-        // generate superclass accessors
         self.implications
             .extend(
                 decl.supers
@@ -562,16 +561,30 @@ impl Typechecker {
         // generate class members
         self.context
             .extend(decl.members.iter().enumerate().map(|(ix, member)| {
+                // we need each argument in the applied type to account for the extra variables
+                // bound by the member's signature
+                //
+                // e.g.
+                //
+                // class X a where
+                //   x : a -> b -> ()
+                //
+                // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
+                // bound variable
+                let adjustment = member.sig.ty_vars.len() - decl.args.len();
+                let applied_type = (adjustment..adjustment + decl.args.len())
+                    .into_iter()
+                    .fold(Type::Name(decl.name.clone()), |acc, el| {
+                        Type::mk_app(acc, Type::Var(el))
+                    });
                 let sig = {
-                    // the variables bound by the class declaration are the
-                    // bound variables in the signature
-                    let mut ty_vars = decl.args.clone();
-                    ty_vars.extend(member.sig.ty_vars.clone().into_iter());
-
                     let mut body = member.sig.body.clone();
-                    body = syntax::Type::mk_fatarrow(applied_type.clone(), body);
+                    body = syntax::Type::mk_fatarrow(applied_type, body);
 
-                    core::TypeSig { ty_vars, body }
+                    core::TypeSig {
+                        ty_vars: member.sig.ty_vars.clone(),
+                        body,
+                    }
                 };
                 let body = core::Expr::mk_lam(
                     true,
@@ -843,13 +856,12 @@ impl Typechecker {
         let checked_type = self.check_kind(None, &type_, syntax::Kind::Type)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
-        let local_tyvars = ty_var_kinds[class_args_kinds.len()..]
-            .into_iter()
-            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
+        let ty_vars = ty_var_kinds
+            .iter()
+            .map(|(a, b)| (a.clone(), self.zonk_kind(true, b.clone())))
             .collect();
-
         let sig = core::TypeSig {
-            ty_vars: local_tyvars,
+            ty_vars,
             body: checked_type,
         };
         Ok(core::ClassMember { name, sig })

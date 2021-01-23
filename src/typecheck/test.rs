@@ -1,12 +1,11 @@
 #[cfg(test)]
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use crate::{core::Placeholder, syntax::Spanned};
 #[cfg(test)]
 use crate::{
-    core::{self, ClassMember, Declaration, InstanceMember, TypeSig},
+    core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
     evidence::{solver::solve_placeholder, Constraint},
-    syntax::{self, Binop, Kind, Type},
+    syntax::{self, Binop, Kind, Spanned, Type},
     typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
     void::Void,
 };
@@ -554,7 +553,7 @@ fn infer_lam_test_4() {
         ),
     ));
     let actual = tc.infer_expr(term);
-    assert_eq!(expected, actual,)
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -1725,18 +1724,18 @@ fn type_occurs_1() {
 
 #[test]
 fn check_class_1() {
-    let expected = Ok(core::Declaration::Class {
+    let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
         supers: Vec::new(),
         name: String::from("Eq"),
         args: vec![(String::from("a"), Kind::Type)],
         members: vec![ClassMember {
             name: String::from("eq"),
             sig: TypeSig {
-                ty_vars: Vec::new(),
+                ty_vars: vec![(String::from("a"), Kind::Type)],
                 body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
             },
         }],
-    });
+    }));
     let mut tc = Typechecker::new();
     /*
     class Eq a where
@@ -1759,23 +1758,64 @@ fn check_class_1() {
             )],
         },
     });
-    assert_eq!(expected, actual)
+    assert_eq!(expected, actual);
+
+    let decl = actual.unwrap();
+    tc.register_declaration(&decl);
+
+    let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
+        String::from("Eq"),
+        core::ClassDeclaration {
+            supers: Vec::new(),
+            args: vec![(String::from("a"), Kind::Type)],
+            name: String::from("Eq"),
+            members: vec![core::ClassMember {
+                name: String::from("eq"),
+                sig: core::TypeSig {
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+                },
+            }],
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    assert_eq!(expected_context, tc.class_context);
+
+    let expected_member = (
+        core::TypeSig {
+            ty_vars: vec![(String::from("a"), Kind::Type)],
+            body: Type::mk_fatarrow(
+                Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0)),
+                Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            ),
+        },
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
+        ),
+    );
+    assert_eq!(Some(&expected_member), tc.context.get(&String::from("eq")));
 }
 
 #[test]
 fn check_class_2() {
-    let expected = Ok(core::Declaration::Class {
+    let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
         supers: Vec::new(),
         name: String::from("Wut"),
         args: vec![(String::from("a"), Kind::Type)],
         members: vec![ClassMember {
             name: String::from("wut"),
             sig: TypeSig {
-                ty_vars: vec![(String::from("b"), Kind::Type)],
+                ty_vars: vec![
+                    (String::from("a"), Kind::Type),
+                    (String::from("b"), Kind::Type),
+                ],
                 body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
             },
         }],
-    });
+    }));
     let mut tc = Typechecker::new();
     /*
     class Wut a where
@@ -1798,7 +1838,55 @@ fn check_class_2() {
             )],
         },
     });
-    assert_eq!(expected, actual)
+    assert_eq!(expected, actual);
+
+    let decl = actual.unwrap();
+    tc.register_declaration(&decl);
+
+    let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
+        String::from("Wut"),
+        core::ClassDeclaration {
+            supers: Vec::new(),
+            args: vec![(String::from("a"), Kind::Type)],
+            name: String::from("Wut"),
+            members: vec![core::ClassMember {
+                name: String::from("wut"),
+                sig: core::TypeSig {
+                    ty_vars: vec![
+                        (String::from("a"), Kind::Type),
+                        (String::from("b"), Kind::Type),
+                    ],
+                    body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
+                },
+            }],
+        },
+    )]
+    .into_iter()
+    .collect();
+
+    assert_eq!(expected_context, tc.class_context);
+
+    let expected_member = (
+        core::TypeSig {
+            ty_vars: vec![
+                (String::from("a"), Kind::Type),
+                (String::from("b"), Kind::Type),
+            ],
+            body: Type::mk_fatarrow(
+                Type::mk_app(Type::Name(String::from("Wut")), Type::Var(1)),
+                Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            ),
+        },
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
+        ),
+    );
+    assert_eq!(
+        Some(&expected_member),
+        tc.context.get(&String::from("wut")),
+        "expected member"
+    );
 }
 
 #[test]
@@ -1813,18 +1901,18 @@ fn check_instance_1() {
         }],
     });
     let mut tc = Typechecker::new();
-    tc.register_declaration(&core::Declaration::Class {
+    tc.register_declaration(&core::Declaration::Class(core::ClassDeclaration {
         supers: Vec::new(),
         name: String::from("Eq"),
         args: vec![(String::from("a"), Kind::Type)],
         members: vec![ClassMember {
             name: String::from("eq"),
             sig: TypeSig {
-                ty_vars: Vec::new(),
+                ty_vars: vec![(String::from("a"), Kind::Type)],
                 body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
             },
         }],
-    });
+    }));
     /*
     instance Eq () where
       eq x y = True

@@ -552,12 +552,10 @@ pub struct TypeSig {
 impl TypeSig {
     pub fn instantiate_many(&self, tys: &Vec<syntax::Type<usize>>) -> TypeSig {
         let mut ty_vars = self.ty_vars.clone();
-        for ty in tys.iter().rev() {
+        for _ty in tys.iter().rev() {
             match ty_vars.pop() {
                 None => panic!("instantiating too many variables"),
-                Some((ty_var_name, ty_var_kind)) => {
-                    todo!()
-                }
+                Some((_ty_var_name, _ty_var_kind)) => {}
             }
         }
         TypeSig {
