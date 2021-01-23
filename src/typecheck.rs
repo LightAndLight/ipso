@@ -601,6 +601,28 @@ impl Typechecker {
         self.class_context.insert(decl.name.clone(), decl.clone());
     }
 
+    pub fn register_instance(
+        &mut self,
+        ty_vars: &Vec<(String, syntax::Kind)>,
+        assumes: &Vec<Type<usize>>,
+        head: &Type<usize>,
+        members: &Vec<core::InstanceMember>,
+    ) {
+        self.implications.push(Implication {
+            ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
+            antecedents: assumes.clone(),
+            consequent: head.clone(),
+            evidence: core::Expr::mk_record(
+                members
+                    .iter()
+                    .enumerate()
+                    .map(|(ix, member)| (core::Expr::Int(ix as u32), member.body.clone()))
+                    .collect(),
+                None,
+            ),
+        });
+    }
+
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
@@ -625,10 +647,7 @@ impl Typechecker {
                 assumes,
                 head,
                 members,
-            } => todo!(
-                "register type class instance {:?}",
-                (ty_vars, assumes, head, members)
-            ),
+            } => self.register_instance(ty_vars, assumes, head, members),
         }
     }
 
