@@ -367,8 +367,8 @@ impl<A> Type<A> {
     /// ```
     /// use ipso::syntax::Type;
     /// assert_eq!(
-    ///     Type::mk_app(Type::mk_app(Type::mk_app(Type::Var(0), Type::Var(1)), Type::Var(2)), Type::Var(3))
-    ///     (Type::Var(0), vec![Type::Var(1), Type::Var(2), Type::Var(3)])
+    ///     Type::mk_app(Type::mk_app(Type::mk_app(Type::Var(0), Type::Var(1)), Type::Var(2)), Type::Var(3)).unwrap_app(),
+    ///     (&Type::Var(0), vec![&Type::Var(1), &Type::Var(2), &Type::Var(3)])
     /// )
     /// ```
     pub fn unwrap_app<'a>(&'a self) -> (&'a Type<A>, Vec<&'a Type<A>>) {
