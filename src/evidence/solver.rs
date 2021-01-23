@@ -23,7 +23,7 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
     )
 }
 
-pub fn solve_constraint<'a>(
+pub fn solve_constraint(
     tc: &mut Typechecker,
     constraint: &Constraint,
 ) -> Result<core::Expr, TypeError> {

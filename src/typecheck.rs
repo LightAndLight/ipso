@@ -1,4 +1,7 @@
-use evidence::{solver::solve_placeholder, Constraint};
+use evidence::{
+    solver::{solve_constraint, solve_placeholder},
+    Constraint,
+};
 
 use crate::diagnostic;
 use crate::rope::Rope;
@@ -604,22 +607,28 @@ impl Typechecker {
     pub fn register_instance(
         &mut self,
         ty_vars: &Vec<(String, syntax::Kind)>,
+        superclass_constructors: &Vec<core::Expr>,
         assumes: &Vec<Type<usize>>,
         head: &Type<usize>,
         members: &Vec<core::InstanceMember>,
     ) {
+        let mut evidence = core::Expr::mk_record(
+            members
+                .iter()
+                .enumerate()
+                .map(|(ix, member)| (core::Expr::Int(ix as u32), member.body.clone()))
+                .collect(),
+            None,
+        );
+        for _assume in assumes.iter().rev() {
+            evidence = core::Expr::mk_lam(true, evidence)
+        }
+
         self.implications.push(Implication {
             ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
             antecedents: assumes.clone(),
             consequent: head.clone(),
-            evidence: core::Expr::mk_record(
-                members
-                    .iter()
-                    .enumerate()
-                    .map(|(ix, member)| (core::Expr::Int(ix as u32), member.body.clone()))
-                    .collect(),
-                None,
-            ),
+            evidence,
         });
     }
 
@@ -644,10 +653,11 @@ impl Typechecker {
             core::Declaration::Class(decl) => self.register_class(decl),
             core::Declaration::Instance {
                 ty_vars,
+                superclass_constructors,
                 assumes,
                 head,
                 members,
-            } => self.register_instance(ty_vars, assumes, head, members),
+            } => self.register_instance(ty_vars, superclass_constructors, assumes, head, members),
         }
     }
 
@@ -701,12 +711,13 @@ impl Typechecker {
                 }) => todo!("import type class {:?}", (supers, name, args, members)),
                 core::Declaration::Instance {
                     ty_vars,
+                    superclass_constructors,
                     assumes,
                     head,
                     members,
                 } => todo!(
                     "import type class instance {:?}",
-                    (ty_vars, assumes, head, members)
+                    (ty_vars, superclass_constructors, assumes, head, members)
                 ),
             }
         }
@@ -935,9 +946,9 @@ impl Typechecker {
         members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
-        let class_decl = match class_context.get(&name.item) {
+        let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass { pos: name.pos }),
-            Some(class_decl) => Ok(class_decl),
+            Some(class_decl) => Ok(class_decl.clone()),
         }?;
 
         let (head, ty_vars) = args
@@ -954,6 +965,27 @@ impl Typechecker {
 
         let (_, args) = head.unwrap_app();
         let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
+
+        // locate evidence for superclasses
+        let superclass_constructors: Vec<core::Expr> = {
+            let mut superclass_constructors = Vec::new();
+            for superclass in &class_decl.supers {
+                let superclass = superclass.instantiate_many(&args);
+
+                // when I implement assumptions for instances, these assumptions need to be
+                // assumed as evidence
+                assert!(self.evidence == Evidence::new());
+
+                match evidence::solver::solve_constraint(
+                    self,
+                    &evidence::Constraint::from_type(&superclass),
+                ) {
+                    Err(err) => return Err(err),
+                    Ok(evidence) => superclass_constructors.push(evidence),
+                }
+            }
+            superclass_constructors
+        };
 
         let instantiated_class_members: Vec<core::ClassMember> = class_decl
             .members
@@ -1006,6 +1038,7 @@ impl Typechecker {
 
         Ok(core::Declaration::Instance {
             ty_vars: ty_var_kinds,
+            superclass_constructors,
             assumes: Vec::new(),
             head,
             members: new_members,

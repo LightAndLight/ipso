@@ -604,6 +604,7 @@ pub enum Declaration {
     Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(String, syntax::Kind)>,
+        superclass_constructors: Vec<Expr>,
         assumes: Vec<syntax::Type<usize>>,
         head: syntax::Type<usize>,
         members: Vec<InstanceMember>,

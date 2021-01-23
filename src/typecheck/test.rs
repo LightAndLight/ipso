@@ -1893,6 +1893,7 @@ fn check_class_2() {
 fn check_instance_1() {
     let expected = Ok(core::Declaration::Instance {
         ty_vars: Vec::new(),
+        superclass_constructors: Vec::new(),
         assumes: Vec::new(),
         head: Type::mk_app(Type::Name(String::from("Eq")), Type::Unit),
         members: vec![InstanceMember {
@@ -1948,4 +1949,85 @@ fn check_instance_1() {
         },
     });
     assert_eq!(expected, actual)
+}
+
+#[test]
+fn class_and_instance_1() {
+    /*
+    class Eq a where
+      eq : a -> a -> Bool
+
+    class Eq a => Ord a where
+      lt : a -> a -> Bool
+
+    instance Eq Int where
+      eq = eqInt
+
+    instance Ord Int where
+      lt = ltInt
+
+    eqDictInt = {
+        eq = eqInt
+    }
+
+    ordDictInt = {
+        eqDict = eqDictInt
+        lt = ltInt
+    }
+     */
+
+    let mut tc = Typechecker::new();
+
+    tc.register_class(&core::ClassDeclaration {
+        supers: Vec::new(),
+        name: String::from("Eq"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![core::ClassMember {
+            name: String::from("eq"),
+            sig: core::TypeSig {
+                ty_vars: vec![(String::from("a"), Kind::Type)],
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+
+    tc.register_class(&core::ClassDeclaration {
+        supers: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+        name: String::from("Ord"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![core::ClassMember {
+            name: String::from("lt"),
+            sig: core::TypeSig {
+                ty_vars: vec![(String::from("a"), Kind::Type)],
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+
+    let instance_eq_int_result = tc.check_declaration(Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            name: Spanned {
+                pos: 0,
+                item: String::from("Eq"),
+            },
+            args: vec![Type::Int],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("eq"),
+                },
+                Vec::new(),
+                Spanned {
+                    pos: 0,
+                    item: syntax::Expr::Var(String::from("eqInt")),
+                },
+            )],
+        },
+    });
+
+    let instance_eq_int = match instance_eq_int_result {
+        Err(err) => panic!("{:?}", err),
+        Ok(a) => a,
+    };
 }
