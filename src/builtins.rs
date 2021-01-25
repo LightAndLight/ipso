@@ -167,6 +167,17 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::ReadLineStdin)
             },
+        // eqInt : Int -> Int -> Bool
+        Declaration::Definition{
+            name: String::from("eqInt"),
+            sig: TypeSig{
+                ty_vars: Vec::new(),
+                body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Bool))
+            },
+            body: Expr::Builtin(Builtin::EqInt)
+        }
         ]
+
+
     };
 }

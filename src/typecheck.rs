@@ -203,6 +203,9 @@ pub enum TypeError {
         pos: usize,
         cls: String,
     },
+    CannotDeduce {
+        pos: usize,
+    },
 }
 
 impl syntax::Pattern {
@@ -255,6 +258,7 @@ impl TypeError {
             TypeError::TypeOccurs { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
+            TypeError::CannotDeduce { pos, .. } => *pos,
         }
     }
 
@@ -316,6 +320,7 @@ impl TypeError {
             TypeError::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
+            TypeError::CannotDeduce { .. } => String::from("cannot deduce"),
         }
     }
 
@@ -369,6 +374,7 @@ impl TypeError {
             TypeError::TypeOccurs { .. } => None,
             TypeError::NoSuchClass { .. } => None,
             TypeError::NotAMember { .. } => None,
+            TypeError::CannotDeduce { .. } => None,
         }
     }
 

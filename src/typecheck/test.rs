@@ -1976,7 +1976,7 @@ fn class_and_instance_1() {
     }
      */
 
-    let mut tc = Typechecker::new();
+    let mut tc = Typechecker::new_with_builtins();
 
     tc.register_class(&core::ClassDeclaration {
         supers: Vec::new(),
@@ -2004,7 +2004,7 @@ fn class_and_instance_1() {
         }],
     });
 
-    let instance_eq_int_result = tc.check_declaration(Spanned {
+    let instance_eq_int_decl = Spanned {
         pos: 0,
         item: syntax::Declaration::Instance {
             name: Spanned {
@@ -2024,10 +2024,40 @@ fn class_and_instance_1() {
                 },
             )],
         },
-    });
+    };
+
+    let instance_ord_int_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            name: Spanned {
+                pos: 0,
+                item: String::from("Ord"),
+            },
+            args: vec![Type::Int],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("lt"),
+                },
+                Vec::new(),
+                Spanned {
+                    pos: 0,
+                    item: syntax::Expr::Var(String::from("ltInt")),
+                },
+            )],
+        },
+    };
+
+    let instance_ord_int_result = tc.check_declaration(instance_ord_int_decl);
+
+    panic!("ord check needs to fail with \"cannot deduce Eq Int\"");
+
+    let instance_eq_int_result = tc.check_declaration(instance_eq_int_decl);
 
     let instance_eq_int = match instance_eq_int_result {
         Err(err) => panic!("{:?}", err),
         Ok(a) => a,
     };
+
+    todo!()
 }

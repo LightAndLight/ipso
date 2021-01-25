@@ -169,6 +169,7 @@ pub enum Builtin {
     Stdin,
     WriteStdout,
     ReadLineStdin,
+    EqInt,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

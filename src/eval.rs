@@ -611,6 +611,40 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 });
                 closure
             }
+            Builtin::EqInt => {
+                fn eq_int_0<'heap>(
+                    tc: &mut Interpreter<'_, 'heap>,
+                    _env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    fn eq_int_1<'heap>(
+                        tc: &mut Interpreter<'_, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>,
+                    ) -> ValueRef<'heap> {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        if a == b {
+                            tc.alloc_value(Value::True)
+                        } else {
+                            tc.alloc_value(Value::False)
+                        }
+                    }
+                    let env = tc.alloc_env(vec![arg]);
+                    let closure = tc.alloc_value(Value::StaticClosure {
+                        env,
+                        body: StaticClosureBody(eq_int_1),
+                    });
+                    closure
+                };
+
+                let env = self.alloc_env(Vec::new());
+                let closure = self.alloc_value(Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(eq_int_0),
+                });
+                closure
+            }
         }
     }
 
