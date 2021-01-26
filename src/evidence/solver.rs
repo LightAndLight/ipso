@@ -1,7 +1,9 @@
 use crate::{
     core::{self, Expr, Placeholder},
     syntax::{self, Binop, Kind, Type},
-    typecheck::{Implication, TypeError, Typechecker, UnifyTypeContext},
+    typecheck::{
+        substitution::Substitution, Implication, TypeError, Typechecker, UnifyTypeContext,
+    },
 };
 
 use super::Constraint;
@@ -24,22 +26,42 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
 }
 
 pub fn lookup_implication(tc: &mut Typechecker, constraint: &Type<usize>) -> Option<Implication> {
-    let (head, args) = constraint.unwrap_app();
-    let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
-    tc.implications.iter().find_map(|implication| {
-        let (i_head, i_args) = implication.consequent.unwrap_app();
-        if head == i_head {
-            debug_assert!(args.len() == i_args.len());
-            for (arg_ty, i_arg_ty) in args.iter().zip(i_args.iter()) {
-                let (arg_ty_head, arg_ty_args) = arg_ty.unwrap_app();
-                let (i_arg_ty_head, i_arg_ty_args) = i_arg_ty.unwrap_app();
-                if arg_ty_head != i_arg_ty_head {
-                    return None;
-                }
+    let implications = tc.implications.clone();
+    implications.into_iter().find_map(|implication| {
+        let metas: Vec<Type<usize>> = implication
+            .ty_vars
+            .iter()
+            .map(|kind| tc.fresh_typevar(kind.clone()))
+            .collect();
+
+        let implication = implication.instantiate_many(&metas);
+
+        let mut subst = Substitution::new();
+        let context = UnifyTypeContext {
+            expected: constraint.clone(),
+            actual: implication.consequent.clone(),
+        };
+
+        match tc.unify_type_subst(
+            &mut subst,
+            &context,
+            constraint.clone(),
+            implication.consequent.clone(),
+        ) {
+            Err(_) => None,
+            Ok(()) => {
+                tc.commit_substitutions(subst);
+                Some(Implication {
+                    ty_vars: implication.ty_vars,
+                    antecedents: implication
+                        .antecedents
+                        .into_iter()
+                        .map(|x| tc.zonk_type(x))
+                        .collect(),
+                    consequent: tc.zonk_type(implication.consequent),
+                    evidence: implication.evidence,
+                })
             }
-            Some(implication.instantiate_many(&args))
-        } else {
-            None
         }
     })
 }

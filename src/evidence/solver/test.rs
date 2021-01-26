@@ -122,20 +122,18 @@ fn solve_constraint_4() {
         }],
     );
 
-    println!("impls: {:?}", tc.implications);
+    let expected = Ok(Expr::mk_app(
+        Expr::Builtin(Builtin::EqArray),
+        Expr::Builtin(Builtin::EqInt),
+    ));
+    let actual = solve_constraint(
+        &None,
+        &mut tc,
+        &Constraint::from_type(&Type::mk_app(
+            Type::Name(String::from("Eq")),
+            Type::mk_app(Type::Array, Type::Int),
+        )),
+    );
 
-    assert_eq!(
-        solve_constraint(
-            &None,
-            &mut tc,
-            &Constraint::from_type(&Type::mk_app(
-                Type::Name(String::from("Eq")),
-                Type::mk_app(Type::Array, Type::Int)
-            ))
-        ),
-        Ok(Expr::mk_app(
-            Expr::Builtin(Builtin::EqArray),
-            Expr::Builtin(Builtin::EqInt)
-        ))
-    )
+    assert_eq!(expected, actual)
 }

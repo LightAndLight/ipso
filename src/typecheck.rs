@@ -14,7 +14,7 @@ use std::{
 
 use self::substitution::Substitution;
 
-mod substitution;
+pub mod substitution;
 
 #[cfg(test)]
 mod test;
@@ -116,7 +116,7 @@ impl<A> BoundVars<A> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Implication {
     pub ty_vars: Vec<syntax::Kind>,
     pub antecedents: Vec<syntax::Type<usize>>,
@@ -1141,7 +1141,7 @@ impl Typechecker {
         }
     }
 
-    fn zonk_type(&self, ty: Type<usize>) -> Type<usize> {
+    pub fn zonk_type(&self, ty: Type<usize>) -> Type<usize> {
         match ty {
             Type::Name(n) => Type::Name(n),
             Type::Var(n) => Type::Var(n),
@@ -1683,6 +1683,13 @@ impl Typechecker {
         }
     }
 
+    pub fn commit_substitutions(&mut self, subst: Substitution) {
+        for (var, ty) in subst.into_hashmap().into_iter() {
+            debug_assert!(self.type_solutions[var].1 == None);
+            self.type_solutions[var].1 = Some(ty);
+        }
+    }
+
     pub fn unify_type(
         &mut self,
         context: &UnifyTypeContext<usize>,
@@ -1691,10 +1698,7 @@ impl Typechecker {
     ) -> Result<(), TypeError> {
         let mut subst = Substitution::new();
         self.unify_type_subst(&mut subst, context, expected, actual)?;
-        for (var, ty) in subst.into_hashmap().into_iter() {
-            debug_assert!(self.type_solutions[var].1 == None);
-            self.type_solutions[var].1 = Some(ty);
-        }
+        self.commit_substitutions(subst);
         Ok(())
     }
 
