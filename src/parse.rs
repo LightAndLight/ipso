@@ -1145,6 +1145,7 @@ impl Parser {
                                 |members| keep_right!(
                                     self.dedent(),
                                     ParseResult::pure(Declaration::Instance {
+                                        assumes: Vec::new(),
                                         name,
                                         args,
                                         members,

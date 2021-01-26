@@ -181,6 +181,12 @@ pub struct UnifyTypeContext<A> {
     pub actual: Type<A>,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct SolveConstraintContext {
+    pub pos: usize,
+    pub constraint: Type<String>,
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
@@ -227,7 +233,7 @@ pub enum TypeError {
         cls: String,
     },
     CannotDeduce {
-        pos: usize,
+        context: Option<SolveConstraintContext>,
     },
 }
 
@@ -281,7 +287,10 @@ impl TypeError {
             TypeError::TypeOccurs { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
-            TypeError::CannotDeduce { pos, .. } => *pos,
+            TypeError::CannotDeduce { context, .. } => match context {
+                None => 0,
+                Some(context) => context.pos,
+            },
         }
     }
 
@@ -985,6 +994,7 @@ impl Typechecker {
 
     fn check_instance(
         &mut self,
+        assumes: Vec<Type<String>>,
         name: Spanned<String>,
         args: Vec<Type<String>>,
         members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
@@ -1001,6 +1011,12 @@ impl Typechecker {
                 syntax::Type::mk_app(acc, el)
             })
             .abstract_vars(&Vec::new());
+
+        let assumes: Vec<Type<usize>> = assumes
+            .into_iter()
+            .map(|assume| assume.abstract_vars(&ty_vars).0)
+            .collect();
+
         let kind_solutions = &mut self.kind_solutions;
         let ty_var_kinds = ty_vars
             .into_iter()
@@ -1010,22 +1026,31 @@ impl Typechecker {
         let (_, args) = head.unwrap_app();
         let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
 
+        // generate evidence for assumptions
+        assumes.iter().for_each(|constraint| {
+            let _ = self
+                .evidence
+                .assume(evidence::Constraint::from_type(constraint));
+        });
+
         // locate evidence for superclasses
         let superclass_constructors: Vec<core::Expr> = {
             let mut superclass_constructors = Vec::new();
+
             for superclass in &class_decl.supers {
                 let superclass = superclass.instantiate_many(&args);
 
-                // when I implement assumptions for instances, these assumptions need to be
-                // assumed as evidence
-                assert!(self.evidence == Evidence::new());
-
                 match evidence::solver::solve_constraint(
-                    &None,
+                    &Some(SolveConstraintContext {
+                        pos: name.pos,
+                        constraint: self.fill_ty_names(superclass.clone()),
+                    }),
                     self,
                     &evidence::Constraint::from_type(&superclass),
                 ) {
-                    Err(err) => return Err(err),
+                    Err(err) => {
+                        return Err(err);
+                    }
                     Ok(evidence) => superclass_constructors.push(evidence),
                 }
             }
@@ -1081,6 +1106,8 @@ impl Typechecker {
             }
         }
 
+        self.evidence = Evidence::new();
+
         Ok(core::Declaration::Instance {
             ty_vars: ty_var_kinds,
             superclass_constructors,
@@ -1116,10 +1143,11 @@ impl Typechecker {
                 members,
             } => self.check_class(name, args, members),
             syntax::Declaration::Instance {
+                assumes,
                 name,
                 args,
                 members,
-            } => self.check_instance(name, args, members),
+            } => self.check_instance(assumes, name, args, members),
         }
     }
 

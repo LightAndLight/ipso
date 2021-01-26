@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 #[cfg(test)]
 mod test;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Spanned<A> {
     pub pos: usize,
     pub item: A,
@@ -85,13 +85,13 @@ pub enum Binop {
     Lte,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StringPart {
     String(String),
     Expr(Spanned<Expr>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
     Name(Spanned<String>),
     Record {
@@ -105,13 +105,13 @@ pub enum Pattern {
     Wildcard,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
 
@@ -867,13 +867,13 @@ impl<A> Type<A> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Names {
     All,
     Names(Vec<String>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     Definition {
         name: String,
@@ -887,6 +887,7 @@ pub enum Declaration {
         members: Vec<(String, Type<String>)>,
     },
     Instance {
+        assumes: Vec<Type<String>>,
         name: Spanned<String>,
         args: Vec<Type<String>>,
         members: Vec<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)>,

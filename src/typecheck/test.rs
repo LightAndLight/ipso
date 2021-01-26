@@ -10,6 +10,8 @@ use crate::{
     void::Void,
 };
 
+use super::SolveConstraintContext;
+
 #[test]
 fn infer_kind_test_1() {
     let mut tc = Typechecker::new();
@@ -1921,6 +1923,7 @@ fn check_instance_1() {
     let actual = tc.check_declaration(Spanned {
         pos: 0,
         item: syntax::Declaration::Instance {
+            assumes: Vec::new(),
             name: Spanned {
                 pos: 9,
                 item: String::from("Eq"),
@@ -2007,6 +2010,7 @@ fn class_and_instance_1() {
     let instance_eq_int_decl = Spanned {
         pos: 0,
         item: syntax::Declaration::Instance {
+            assumes: Vec::new(),
             name: Spanned {
                 pos: 0,
                 item: String::from("Eq"),
@@ -2029,6 +2033,7 @@ fn class_and_instance_1() {
     let instance_ord_int_decl = Spanned {
         pos: 0,
         item: syntax::Declaration::Instance {
+            assumes: Vec::new(),
             name: Spanned {
                 pos: 0,
                 item: String::from("Ord"),
@@ -2048,16 +2053,59 @@ fn class_and_instance_1() {
         },
     };
 
-    let instance_ord_int_result = tc.check_declaration(instance_ord_int_decl);
+    let expected_instance_ord_int_result = Err(TypeError::CannotDeduce {
+        context: Some(SolveConstraintContext {
+            pos: 0,
+            constraint: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+        }),
+    });
+    let actual_instance_ord_int_result = tc.check_declaration(instance_ord_int_decl.clone());
 
-    panic!("ord check needs to fail with \"cannot deduce Eq Int\"");
+    assert_eq!(
+        expected_instance_ord_int_result,
+        actual_instance_ord_int_result
+    );
 
-    let instance_eq_int_result = tc.check_declaration(instance_eq_int_decl);
+    let expected_instance_eq_int_result = Ok(core::Declaration::Instance {
+        ty_vars: Vec::new(),
+        superclass_constructors: Vec::new(),
+        assumes: Vec::new(),
+        head: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+        members: vec![core::InstanceMember {
+            name: String::from("eq"),
+            body: core::Expr::Name(String::from("eqInt")),
+        }],
+    });
+    let actual_instance_eq_int_result = tc.check_declaration(instance_eq_int_decl);
 
-    let instance_eq_int = match instance_eq_int_result {
-        Err(err) => panic!("{:?}", err),
-        Ok(a) => a,
-    };
+    assert_eq!(
+        expected_instance_eq_int_result,
+        actual_instance_eq_int_result,
+    );
+
+    tc.register_declaration(&actual_instance_eq_int_result.unwrap());
+
+    let expected_instance_ord_int_result = Ok(core::Declaration::Instance {
+        ty_vars: Vec::new(),
+        superclass_constructors: vec![core::Expr::mk_record(
+            vec![(core::Expr::Int(0), core::Expr::Name(String::from("eqInt")))],
+            None,
+        )],
+        assumes: Vec::new(),
+        head: Type::mk_app(Type::Name(String::from("Ord")), Type::Int),
+        members: vec![core::InstanceMember {
+            name: String::from("lt"),
+            body: core::Expr::Name(String::from("ltInt")),
+        }],
+    });
+    let actual_instance_ord_int_result = tc.check_declaration(instance_ord_int_decl);
+
+    println!("impls: {:?}", tc.implications);
+
+    assert_eq!(
+        expected_instance_ord_int_result,
+        actual_instance_ord_int_result
+    );
 
     todo!()
 }

@@ -2,7 +2,8 @@ use crate::{
     core::{self, Expr, Placeholder},
     syntax::{self, Binop, Kind, Type},
     typecheck::{
-        substitution::Substitution, Implication, TypeError, Typechecker, UnifyTypeContext,
+        substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
+        UnifyTypeContext,
     },
 };
 
@@ -66,25 +67,17 @@ pub fn lookup_implication(tc: &mut Typechecker, constraint: &Type<usize>) -> Opt
     })
 }
 
-pub struct SolveConstraintContext {
-    pub pos: usize,
-}
-
 pub fn solve_constraint(
     context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     constraint: &Constraint,
 ) -> Result<core::Expr, TypeError> {
-    println!("constraint {:?}", constraint);
     match constraint {
         Constraint::Type(constraint) => {
             let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
             match lookup_implication(tc, constraint) {
                 None => Err(TypeError::CannotDeduce {
-                    pos: match context {
-                        None => 0,
-                        Some(context) => context.pos,
-                    },
+                    context: context.clone(),
                 }),
                 Some(implication) => {
                     let mut evidence = implication.evidence;
