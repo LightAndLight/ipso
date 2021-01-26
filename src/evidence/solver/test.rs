@@ -122,9 +122,15 @@ fn solve_constraint_4() {
         }],
     );
 
-    let expected = Ok(Expr::mk_app(
-        Expr::Builtin(Builtin::EqArray),
-        Expr::Builtin(Builtin::EqInt),
+    let expected = Ok(Expr::mk_record(
+        vec![(
+            Expr::Int(0),
+            Expr::mk_app(
+                Expr::Builtin(Builtin::EqArray),
+                Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
+            ),
+        )],
+        None,
     ));
     let actual = solve_constraint(
         &None,

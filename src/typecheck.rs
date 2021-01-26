@@ -647,16 +647,25 @@ impl Typechecker {
         head: &Type<usize>,
         members: &Vec<core::InstanceMember>,
     ) {
+        let mut dictionary: Vec<core::Expr> =
+            members.iter().map(|member| member.body.clone()).collect();
+
+        for (ix, _assume) in assumes.iter().enumerate().rev() {
+            for item in &mut dictionary {
+                *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
+            }
+        }
+
         let mut evidence = core::Expr::mk_record(
-            members
-                .iter()
+            dictionary
+                .into_iter()
                 .enumerate()
-                .map(|(ix, member)| (core::Expr::Int(ix as u32), member.body.clone()))
+                .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
                 .collect(),
             None,
         );
-        for _assume in assumes.iter().rev() {
-            evidence = core::Expr::mk_lam(true, evidence)
+        for _assume in assumes.iter() {
+            evidence = core::Expr::mk_lam(true, evidence);
         }
 
         self.implications.push(Implication {
