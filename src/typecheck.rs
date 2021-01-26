@@ -952,6 +952,7 @@ impl Typechecker {
 
     fn check_class(
         &mut self,
+        supers: Vec<Type<String>>,
         name: String,
         args: Vec<Spanned<String>>,
         members: Vec<(String, Type<String>)>,
@@ -970,6 +971,18 @@ impl Typechecker {
             }
             args_kinds
         };
+
+        for s in &supers {
+            // abstract over variables
+            let s = ();
+            let context = ();
+            match self.check_kind(context, s, syntax::Kind::Constraint) {
+                Err(err) => {
+                    return Err(err);
+                }
+                Ok(s) => {}
+            }
+        }
 
         let mut checked_members = Vec::with_capacity(members.len());
         for (member_name, member_type) in members {
@@ -1138,10 +1151,11 @@ impl Typechecker {
                 todo!("check from-import {:?}", (module, names))
             }
             syntax::Declaration::Class {
+                supers,
                 name,
                 args,
                 members,
-            } => self.check_class(name, args, members),
+            } => self.check_class(supers, name, args, members),
             syntax::Declaration::Instance {
                 assumes,
                 name,
