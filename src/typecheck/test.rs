@@ -2063,7 +2063,8 @@ fn class_and_instance_1() {
 
     assert_eq!(
         expected_instance_ord_int_result,
-        actual_instance_ord_int_result
+        actual_instance_ord_int_result,
+        "When `instance Eq Int` is not in scope, `instance Ord Int` fails to type check because `Eq` is a superclass of `Ord`"
     );
 
     let expected_instance_eq_int_result = Ok(core::Declaration::Instance {
@@ -2079,8 +2080,8 @@ fn class_and_instance_1() {
     let actual_instance_eq_int_result = tc.check_declaration(instance_eq_int_decl);
 
     assert_eq!(
-        expected_instance_eq_int_result,
-        actual_instance_eq_int_result,
+        expected_instance_eq_int_result, actual_instance_eq_int_result,
+        "`instance Eq Int` is valid"
     );
 
     tc.register_declaration(&actual_instance_eq_int_result.unwrap());
@@ -2100,12 +2101,8 @@ fn class_and_instance_1() {
     });
     let actual_instance_ord_int_result = tc.check_declaration(instance_ord_int_decl);
 
-    println!("impls: {:?}", tc.implications);
-
     assert_eq!(
-        expected_instance_ord_int_result,
-        actual_instance_ord_int_result
+        expected_instance_ord_int_result, actual_instance_ord_int_result,
+        "After `instance Eq Int` is brought into scope, `instance Ord Int` is valid"
     );
-
-    todo!()
 }

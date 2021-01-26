@@ -10,6 +10,37 @@ use typed_arena::Arena;
 
 mod test;
 
+macro_rules! function2 {
+    ($self:expr, $body:expr) => {{
+        fn code_0<'heap>(
+            tc: &mut Interpreter<'_, 'heap>,
+            _env: &'heap Vec<ValueRef<'heap>>,
+            arg: ValueRef<'heap>,
+        ) -> ValueRef<'heap> {
+            fn code_1<'heap>(
+                tc: &mut Interpreter<'_, 'heap>,
+                env: &'heap Vec<ValueRef<'heap>>,
+                arg: ValueRef<'heap>,
+            ) -> ValueRef<'heap> {
+                $body(tc, env, arg)
+            }
+            let env = tc.alloc_env(vec![arg]);
+            let closure = tc.alloc_value(Value::StaticClosure {
+                env,
+                body: StaticClosureBody(code_1),
+            });
+            closure
+        };
+
+        let env = $self.alloc_env(Vec::new());
+        let closure = $self.alloc_value(Value::StaticClosure {
+            env,
+            body: StaticClosureBody(code_0),
+        });
+        closure
+    }};
+}
+
 type ValueRef<'heap> = &'heap Value<'heap>;
 
 #[derive(Clone)]
@@ -659,6 +690,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     body: StaticClosureBody(eq_int_0),
                 });
                 closure
+            }
+            Builtin::LtInt => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        if a < b {
+                            eval.alloc_value(Value::True)
+                        } else {
+                            eval.alloc_value(Value::False)
+                        }
+                    }
+                )
             }
             Builtin::EqArray => {
                 fn eq_int_0<'heap>(

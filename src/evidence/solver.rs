@@ -26,47 +26,6 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
     )
 }
 
-pub fn lookup_implication(tc: &mut Typechecker, constraint: &Type<usize>) -> Option<Implication> {
-    let implications = tc.implications.clone();
-    implications.into_iter().find_map(|implication| {
-        let metas: Vec<Type<usize>> = implication
-            .ty_vars
-            .iter()
-            .map(|kind| tc.fresh_typevar(kind.clone()))
-            .collect();
-
-        let implication = implication.instantiate_many(&metas);
-
-        let mut subst = Substitution::new();
-        let context = UnifyTypeContext {
-            expected: constraint.clone(),
-            actual: implication.consequent.clone(),
-        };
-
-        match tc.unify_type_subst(
-            &mut subst,
-            &context,
-            constraint.clone(),
-            implication.consequent.clone(),
-        ) {
-            Err(_) => None,
-            Ok(()) => {
-                tc.commit_substitutions(subst);
-                Some(Implication {
-                    ty_vars: implication.ty_vars,
-                    antecedents: implication
-                        .antecedents
-                        .into_iter()
-                        .map(|x| tc.zonk_type(x))
-                        .collect(),
-                    consequent: tc.zonk_type(implication.consequent),
-                    evidence: implication.evidence,
-                })
-            }
-        }
-    })
-}
-
 pub fn solve_constraint(
     context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
@@ -75,22 +34,76 @@ pub fn solve_constraint(
     match constraint {
         Constraint::Type(constraint) => {
             let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
-            match lookup_implication(tc, constraint) {
-                None => Err(TypeError::CannotDeduce {
-                    context: context.clone(),
-                }),
-                Some(implication) => {
-                    let mut evidence = implication.evidence;
-                    for antecedent in &implication.antecedents {
-                        match solve_constraint(context, tc, &Constraint::from_type(antecedent)) {
-                            Err(err) => return Err(err),
-                            Ok(arg) => {
-                                evidence = Expr::mk_app(evidence, arg);
+            let implications = tc.implications.clone();
+
+            let mut result = None;
+            for implication in implications.into_iter() {
+                let metas: Vec<Type<usize>> = implication
+                    .ty_vars
+                    .iter()
+                    .map(|kind| tc.fresh_typevar(kind.clone()))
+                    .collect();
+
+                let implication = implication.instantiate_many(&metas);
+
+                let mut subst = Substitution::new();
+                let unify_context = UnifyTypeContext {
+                    expected: constraint.clone(),
+                    actual: implication.consequent.clone(),
+                };
+
+                match tc.unify_type_subst(
+                    &mut subst,
+                    &unify_context,
+                    constraint.clone(),
+                    implication.consequent.clone(),
+                ) {
+                    Err(_) => {
+                        continue;
+                    }
+                    Ok(()) => {
+                        tc.commit_substitutions(subst);
+                        let implication = Implication {
+                            ty_vars: implication.ty_vars,
+                            antecedents: implication
+                                .antecedents
+                                .into_iter()
+                                .map(|x| tc.zonk_type(x))
+                                .collect(),
+                            consequent: tc.zonk_type(implication.consequent),
+                            evidence: implication.evidence,
+                        };
+                        let mut evidence = Ok(implication.evidence);
+                        for antecedent in &implication.antecedents {
+                            match solve_constraint(context, tc, &Constraint::from_type(antecedent))
+                            {
+                                Err(err) => {
+                                    evidence = Err(err);
+                                    break;
+                                }
+                                Ok(arg) => {
+                                    evidence = evidence.map(|evidence| Expr::mk_app(evidence, arg));
+                                }
+                            }
+                        }
+                        match evidence {
+                            Err(_err) => {
+                                continue;
+                            }
+                            Ok(evidence) => {
+                                result = Some(evidence);
+                                break;
                             }
                         }
                     }
-                    Ok(evidence)
                 }
+            }
+
+            match result {
+                None => Err(TypeError::CannotDeduce {
+                    context: context.clone(),
+                }),
+                Some(evidence) => Ok(evidence),
             }
         }
         Constraint::HasField { field, rest } => {

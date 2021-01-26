@@ -170,6 +170,7 @@ pub enum Builtin {
     WriteStdout,
     ReadLineStdin,
     EqInt,
+    LtInt,
     EqArray,
 }
 

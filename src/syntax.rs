@@ -364,6 +364,13 @@ impl Type<usize> {
 }
 
 impl<A> Type<A> {
+    pub fn unwrap_name<'a>(&'a self) -> Option<&'a String> {
+        match self {
+            Type::Name(n) => Some(n),
+            _ => None,
+        }
+    }
+
     /// ```
     /// use ipso::syntax::Type;
     /// assert_eq!(
