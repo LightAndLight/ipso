@@ -79,6 +79,21 @@ impl<'heap> Value<'heap> {
         }
     }
 
+    pub fn unpack_array<'stdout>(&'heap self) -> Vec<ValueRef<'heap>> {
+        match self {
+            Value::Array(vals) => vals.clone(),
+            val => panic!("expected array, got {:?}", val),
+        }
+    }
+
+    pub fn unpack_bool<'stdout>(&'heap self) -> bool {
+        match self {
+            Value::False => false,
+            Value::True => true,
+            val => panic!("expected bool, got {:?}", val),
+        }
+    }
+
     pub fn unpack_int<'stdout>(&'heap self) -> u32 {
         match self {
             Value::Int(n) => *n,
@@ -629,6 +644,62 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         } else {
                             tc.alloc_value(Value::False)
                         }
+                    }
+                    let env = tc.alloc_env(vec![arg]);
+                    let closure = tc.alloc_value(Value::StaticClosure {
+                        env,
+                        body: StaticClosureBody(eq_int_1),
+                    });
+                    closure
+                };
+
+                let env = self.alloc_env(Vec::new());
+                let closure = self.alloc_value(Value::StaticClosure {
+                    env,
+                    body: StaticClosureBody(eq_int_0),
+                });
+                closure
+            }
+            Builtin::EqArray => {
+                fn eq_int_0<'heap>(
+                    tc: &mut Interpreter<'_, 'heap>,
+                    _env: &'heap Vec<ValueRef<'heap>>,
+                    arg: ValueRef<'heap>,
+                ) -> ValueRef<'heap> {
+                    fn eq_int_1<'heap>(
+                        tc: &mut Interpreter<'_, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>,
+                    ) -> ValueRef<'heap> {
+                        fn eq_int_2<'heap>(
+                            tc: &mut Interpreter<'_, 'heap>,
+                            env: &'heap Vec<ValueRef<'heap>>,
+                            arg: ValueRef<'heap>,
+                        ) -> ValueRef<'heap> {
+                            let f = env[0];
+                            let a = env[1].unpack_array();
+                            let b = arg.unpack_array();
+
+                            let mut acc = Value::True;
+                            if a.len() == b.len() {
+                                for (a, b) in a.iter().zip(b.iter()) {
+                                    let res = f.apply(tc, a).apply(tc, b).unpack_bool();
+                                    if !res {
+                                        acc = Value::False;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                acc = Value::False;
+                            }
+                            return tc.alloc_value(acc);
+                        }
+                        let env = tc.alloc_env(vec![env[0], arg]);
+                        let closure = tc.alloc_value(Value::StaticClosure {
+                            env,
+                            body: StaticClosureBody(eq_int_2),
+                        });
+                        closure
                     }
                     let env = tc.alloc_env(vec![arg]);
                     let closure = tc.alloc_value(Value::StaticClosure {

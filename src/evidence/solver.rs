@@ -1,7 +1,7 @@
 use crate::{
-    core::{self, Placeholder},
+    core::{self, Expr, Placeholder},
     syntax::{self, Binop, Kind, Type},
-    typecheck::{TypeError, Typechecker, UnifyTypeContext},
+    typecheck::{Implication, TypeError, Typechecker, UnifyTypeContext},
 };
 
 use super::Constraint;
@@ -23,13 +23,60 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
     )
 }
 
+pub fn lookup_implication(tc: &mut Typechecker, constraint: &Type<usize>) -> Option<Implication> {
+    let (head, args) = constraint.unwrap_app();
+    let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
+    tc.implications.iter().find_map(|implication| {
+        let (i_head, i_args) = implication.consequent.unwrap_app();
+        if head == i_head {
+            debug_assert!(args.len() == i_args.len());
+            for (arg_ty, i_arg_ty) in args.iter().zip(i_args.iter()) {
+                let (arg_ty_head, arg_ty_args) = arg_ty.unwrap_app();
+                let (i_arg_ty_head, i_arg_ty_args) = i_arg_ty.unwrap_app();
+                if arg_ty_head != i_arg_ty_head {
+                    return None;
+                }
+            }
+            Some(implication.instantiate_many(&args))
+        } else {
+            None
+        }
+    })
+}
+
+pub struct SolveConstraintContext {
+    pub pos: usize,
+}
+
 pub fn solve_constraint(
+    context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     constraint: &Constraint,
 ) -> Result<core::Expr, TypeError> {
+    println!("constraint {:?}", constraint);
     match constraint {
         Constraint::Type(constraint) => {
-            todo!("solve constraint {:?}", constraint)
+            let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
+            match lookup_implication(tc, constraint) {
+                None => Err(TypeError::CannotDeduce {
+                    pos: match context {
+                        None => 0,
+                        Some(context) => context.pos,
+                    },
+                }),
+                Some(implication) => {
+                    let mut evidence = implication.evidence;
+                    for antecedent in &implication.antecedents {
+                        match solve_constraint(context, tc, &Constraint::from_type(antecedent)) {
+                            Err(err) => return Err(err),
+                            Ok(arg) => {
+                                evidence = Expr::mk_app(evidence, arg);
+                            }
+                        }
+                    }
+                    Ok(evidence)
+                }
+            }
         }
         Constraint::HasField { field, rest } => {
             let _ = tc.check_kind(None, rest, Kind::Row)?;
@@ -38,6 +85,7 @@ pub fn solve_constraint(
                 syntax::Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
+                            context,
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
@@ -46,6 +94,7 @@ pub fn solve_constraint(
                         )
                     } else {
                         let ev = solve_constraint(
+                            context,
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
@@ -92,12 +141,12 @@ pub fn solve_constraint(
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
-                                    let context = UnifyTypeContext {
+                                    let unify_type_context = UnifyTypeContext {
                                         expected: Type::Meta(*n),
                                         actual: Type::RowNil,
                                     };
-                                    tc.solve_typevar_left(&context, *n, Type::RowNil)?;
-                                    solve_constraint(tc, constraint)
+                                    tc.solve_typevar_left(&unify_type_context, *n, Type::RowNil)?;
+                                    solve_constraint(context, tc, constraint)
                                 }
                                 _ => {
                                     let evidence = lookup_evidence(tc, constraint);
@@ -114,6 +163,7 @@ pub fn solve_constraint(
                             }
                         }
                         Some(sol) => solve_constraint(
+                            context,
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
@@ -144,13 +194,14 @@ pub fn solve_constraint(
 }
 
 pub fn solve_placeholder(
+    context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     p: Placeholder,
 ) -> Result<(core::Expr, Constraint), TypeError> {
     let (constraint, evidence) = tc.evidence.environment[p.0].clone();
     match evidence.clone() {
         None => {
-            let expr = solve_constraint(tc, &constraint)?;
+            let expr = solve_constraint(context, tc, &constraint)?;
             tc.evidence.environment[p.0].1 = Some(expr.clone());
             Ok((expr, constraint.clone()))
         }

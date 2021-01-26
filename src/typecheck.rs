@@ -1,7 +1,4 @@
-use evidence::{
-    solver::{solve_constraint, solve_placeholder},
-    Constraint,
-};
+use evidence::{solver::solve_placeholder, Constraint};
 
 use crate::diagnostic;
 use crate::rope::Rope;
@@ -14,6 +11,10 @@ use std::{
     fmt::Debug,
     todo,
 };
+
+use self::substitution::Substitution;
+
+mod substitution;
 
 #[cfg(test)]
 mod test;
@@ -115,6 +116,7 @@ impl<A> BoundVars<A> {
     }
 }
 
+#[derive(Debug)]
 pub struct Implication {
     pub ty_vars: Vec<syntax::Kind>,
     pub antecedents: Vec<syntax::Type<usize>>,
@@ -122,10 +124,31 @@ pub struct Implication {
     pub evidence: core::Expr,
 }
 
+impl Implication {
+    pub fn instantiate_many(&self, tys: &Vec<Type<usize>>) -> Self {
+        let mut ty_vars = self.ty_vars.clone();
+        for _ in tys.iter().rev() {
+            let _ = ty_vars.pop();
+        }
+        let antecedents = self
+            .antecedents
+            .iter()
+            .map(|ty| ty.instantiate_many(tys))
+            .collect();
+        let consequent = self.consequent.instantiate_many(tys);
+        Implication {
+            ty_vars,
+            antecedents,
+            consequent,
+            evidence: self.evidence.clone(),
+        }
+    }
+}
+
 pub struct Typechecker {
     kind_solutions: Vec<Option<syntax::Kind>>,
     pub type_solutions: Vec<(syntax::Kind, Option<Type<usize>>)>,
-    implications: Vec<Implication>,
+    pub implications: Vec<Implication>,
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
@@ -580,7 +603,13 @@ impl Typechecker {
                 //
                 // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
                 // bound variable
-                let adjustment = member.sig.ty_vars.len() - decl.args.len();
+                //
+                // this will panic if we allow ambiguous class members
+                let adjustment = if member.sig.ty_vars.len() > 0 {
+                    member.sig.ty_vars.len() - decl.args.len()
+                } else {
+                    0
+                };
                 let applied_type = (adjustment..adjustment + decl.args.len())
                     .into_iter()
                     .fold(Type::Name(decl.name.clone()), |acc, el| {
@@ -753,7 +782,7 @@ impl Typechecker {
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let mut unsolved_constraints: Vec<(core::EVar, evidence::Constraint)> = Vec::new();
         let expr = expr.subst_placeholder(&mut |p| {
-            let (expr, solved_constraint) = solve_placeholder(self, *p)?;
+            let (expr, solved_constraint) = solve_placeholder(&None, self, *p)?;
             match expr {
                 core::Expr::EVar(ev) => {
                     unsolved_constraints.push((ev, solved_constraint));
@@ -983,6 +1012,7 @@ impl Typechecker {
                 assert!(self.evidence == Evidence::new());
 
                 match evidence::solver::solve_constraint(
+                    &None,
                     self,
                     &evidence::Constraint::from_type(&superclass),
                 ) {
@@ -1323,7 +1353,7 @@ impl Typechecker {
         }
     }
 
-    fn solve_typevar_right(
+    pub fn solve_typevar_right(
         &mut self,
         context: &UnifyTypeContext<usize>,
         expected: Type<usize>,
@@ -1457,8 +1487,9 @@ impl Typechecker {
         Type::Meta(n)
     }
 
-    pub fn unify_type(
+    pub fn unify_type_subst(
         &mut self,
+        subst: &mut Substitution,
         context: &UnifyTypeContext<usize>,
         expected: Type<usize>,
         actual: Type<usize>,
@@ -1468,67 +1499,67 @@ impl Typechecker {
         match expected {
             Type::App(a1, b1) => match actual {
                 Type::App(a2, b2) => {
-                    self.unify_type(context, *a1, *a2)?;
-                    self.unify_type(context, *b1, *b2)?;
+                    self.unify_type_subst(subst, context, *a1, *a2)?;
+                    self.unify_type_subst(subst, context, *b1, *b2)?;
                     Ok(())
                 }
-                Type::Meta(n) => self.solve_typevar_right(context, Type::App(a1, b1), n),
+                Type::Meta(n) => subst.subst_right(self, context, Type::App(a1, b1), n),
                 actual => self.type_mismatch(context, Type::App(a1, b1), actual),
             },
             Type::Name(n) => match actual {
                 Type::Name(nn) if n == nn => Ok(()),
-                Type::Meta(nn) => self.solve_typevar_right(context, Type::Name(n), nn),
+                Type::Meta(nn) => subst.subst_right(self, context, Type::Name(n), nn),
                 actual => self.type_mismatch(context, Type::Name(n), actual),
             },
             Type::Var(n) => match actual {
                 Type::Var(nn) if n == nn => Ok(()),
-                Type::Meta(nn) => self.solve_typevar_right(context, Type::Var(n), nn),
+                Type::Meta(nn) => subst.subst_right(self, context, Type::Var(n), nn),
                 actual => self.type_mismatch(context, Type::Var(n), actual),
             },
             Type::Bool => match actual {
                 Type::Bool => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Int => match actual {
                 Type::Int => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Char => match actual {
                 Type::Char => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::String => match actual {
                 Type::String => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Bytes => match actual {
                 Type::Bytes => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Array => match actual {
                 Type::Array => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Arrow => match actual {
                 Type::Arrow => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::FatArrow => match actual {
                 Type::FatArrow => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Constraints(constraints1) => match actual {
                 Type::Constraints(constraints2) => {
                     for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
-                        match self.unify_type(context, c1, c2) {
+                        match self.unify_type_subst(subst, context, c1, c2) {
                             Err(err) => return Err(err),
                             Ok(_) => {}
                         }
@@ -1536,28 +1567,28 @@ impl Typechecker {
                     Ok(())
                 }
                 Type::Meta(n) => {
-                    self.solve_typevar_right(context, Type::Constraints(constraints1), n)
+                    subst.subst_right(self, context, Type::Constraints(constraints1), n)
                 }
                 actual => self.type_mismatch(context, Type::Constraints(constraints1), actual),
             },
             Type::Record => match actual {
                 Type::Record => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Variant => match actual {
                 Type::Variant => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::IO => match actual {
                 Type::IO => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::RowNil => match actual {
                 Type::RowNil => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::RowCons(field1, ty1, rest1) => match actual {
@@ -1599,14 +1630,16 @@ impl Typechecker {
                     //
                     // unify sames
                     for (_field, ty1, ty2) in sames {
-                        match self.unify_type(context, (*ty1).clone(), (*ty2).clone()) {
+                        match self.unify_type_subst(subst, context, (*ty1).clone(), (*ty2).clone())
+                        {
                             Err(err) => return Err(err),
                             Ok(()) => {}
                         }
                     }
 
                     let rest3 = Some(self.fresh_typevar(syntax::Kind::Row));
-                    self.unify_type(
+                    self.unify_type_subst(
+                        subst,
                         context,
                         match rest1 {
                             None => Type::RowNil,
@@ -1614,7 +1647,8 @@ impl Typechecker {
                         },
                         Type::mk_rows(not_in_rows1, rest3.clone()),
                     )?;
-                    self.unify_type(
+                    self.unify_type_subst(
+                        subst,
                         context,
                         Type::mk_rows(not_in_rows2, rest3),
                         match rest2 {
@@ -1626,27 +1660,42 @@ impl Typechecker {
                     Ok(())
                 }
                 Type::Meta(n) => {
-                    self.solve_typevar_right(context, Type::RowCons(field1, ty1, rest1), n)
+                    subst.subst_right(self, context, Type::RowCons(field1, ty1, rest1), n)
                 }
                 actual => self.type_mismatch(context, Type::RowCons(field1, ty1, rest1), actual),
             },
             Type::HasField(field, rest) => match actual {
                 Type::HasField(field2, rest2) if field == field2 => {
-                    self.unify_type(context, *rest, *rest2)
+                    self.unify_type_subst(subst, context, *rest, *rest2)
                 }
-                Type::Meta(n) => self.solve_typevar_right(context, Type::HasField(field, rest), n),
+                Type::Meta(n) => subst.subst_right(self, context, Type::HasField(field, rest), n),
                 _ => self.type_mismatch(context, Type::HasField(field, rest), actual),
             },
             Type::Unit => match actual {
                 Type::Unit => Ok(()),
-                Type::Meta(n) => self.solve_typevar_right(context, expected, n),
+                Type::Meta(n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
             Type::Meta(n) => match actual {
                 Type::Meta(nn) if n == nn => Ok(()),
-                _ => self.solve_typevar_left(context, n, actual),
+                _ => subst.subst_left(self, context, n, actual),
             },
         }
+    }
+
+    pub fn unify_type(
+        &mut self,
+        context: &UnifyTypeContext<usize>,
+        expected: Type<usize>,
+        actual: Type<usize>,
+    ) -> Result<(), TypeError> {
+        let mut subst = Substitution::new();
+        self.unify_type_subst(&mut subst, context, expected, actual)?;
+        for (var, ty) in subst.into_hashmap().into_iter() {
+            debug_assert!(self.type_solutions[var].1 == None);
+            self.type_solutions[var].1 = Some(ty);
+        }
+        Ok(())
     }
 
     fn check_duplicate_args(&self, args: &Vec<&Spanned<String>>) -> Result<(), TypeError> {

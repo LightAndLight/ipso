@@ -167,15 +167,35 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::ReadLineStdin)
             },
-        // eqInt : Int -> Int -> Bool
-        Declaration::Definition{
-            name: String::from("eqInt"),
-            sig: TypeSig{
-                ty_vars: Vec::new(),
-                body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Bool))
+
+            // eqInt : Int -> Int -> Bool
+            Declaration::Definition{
+                name: String::from("eqInt"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Bool))
+                },
+                body: Expr::Builtin(Builtin::EqInt)
             },
-            body: Expr::Builtin(Builtin::EqInt)
-        }
+
+            // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
+            Declaration::Definition{
+                name: String::from("eqArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+                        Type::mk_arrow(
+                            Type::mk_app(Type::Array, Type::Var(0)),
+                            Type::mk_arrow(
+                                Type::mk_app(Type::Array, Type::Var(0)),
+                                Type::Bool
+                            )
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::EqArray)
+            }
         ]
 
 
