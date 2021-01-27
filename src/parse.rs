@@ -920,6 +920,19 @@ impl Parser {
         )
     }
 
+    fn expr_array(&mut self) -> ParseResult<Expr> {
+        between!(
+            keep_left!(self.token(&TokenType::LBracket), self.spaces()),
+            keep_left!(self.token(&TokenType::RBracket), self.spaces()),
+            sep_by!(
+                self,
+                self.expr(),
+                keep_left!(self.token(&TokenType::Comma), self.spaces())
+            )
+        )
+        .map(|es| Expr::Array(es))
+    }
+
     fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
             spanned!(
@@ -933,6 +946,7 @@ impl Parser {
                     self.ctor().map(|n| Expr::Variant(n)),
                     self.expr_record(),
                     self.expr_embed(),
+                    self.expr_array(),
                     keep_right!(
                         keep_left!(self.token(&TokenType::LParen), self.spaces()),
                         keep_left!(

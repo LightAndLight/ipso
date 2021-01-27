@@ -171,6 +171,7 @@ pub enum Builtin {
     ReadLineStdin,
     EqInt,
     LtInt,
+    FoldlArray,
     EqArray,
 }
 

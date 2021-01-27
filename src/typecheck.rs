@@ -803,7 +803,7 @@ impl Typechecker {
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let mut unsolved_constraints: Vec<(core::EVar, evidence::Constraint)> = Vec::new();
         let expr = expr.subst_placeholder(&mut |p| {
-            let (expr, solved_constraint) = solve_placeholder(&None, self, *p)?;
+            let (expr, solved_constraint) = solve_placeholder(self, *p)?;
             match expr {
                 core::Expr::EVar(ev) => {
                     unsolved_constraints.push((ev, solved_constraint));
@@ -896,7 +896,7 @@ impl Typechecker {
         let (constraints, ty) = ty.unwrap_constraints();
         for constraint in constraints {
             self.evidence
-                .assume(evidence::Constraint::from_type(constraint));
+                .assume(None, evidence::Constraint::from_type(constraint));
         }
         let body = self.check_expr(
             syntax::Spanned {
@@ -1057,7 +1057,7 @@ impl Typechecker {
         assumes.iter().for_each(|constraint| {
             let _ = self
                 .evidence
-                .assume(evidence::Constraint::from_type(constraint));
+                .assume(None, evidence::Constraint::from_type(constraint));
         });
 
         // locate evidence for superclasses
@@ -1797,10 +1797,13 @@ impl Typechecker {
         let rest_row = self.fresh_typevar(syntax::Kind::Row);
         let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
 
-        let tag = self.evidence.placeholder(evidence::Constraint::HasField {
-            field: name.clone(),
-            rest: rest_row,
-        });
+        let tag = self.evidence.placeholder(
+            Some(self.current_position()),
+            evidence::Constraint::HasField {
+                field: name.clone(),
+                rest: rest_row,
+            },
+        );
         (
             core::Pattern::mk_variant(core::Expr::Placeholder(tag)),
             ty,
@@ -1835,18 +1838,18 @@ impl Typechecker {
         names: &Vec<Spanned<String>>,
         rest: &Option<Spanned<String>>,
     ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
-        let mut names_tys: Vec<(String, Type<usize>)> = names
+        let mut names_tys: Vec<(Spanned<String>, Type<usize>)> = names
             .iter()
-            .map(|name| (name.item.clone(), self.fresh_typevar(syntax::Kind::Type)))
+            .map(|name| (name.clone(), self.fresh_typevar(syntax::Kind::Type)))
             .collect();
-        let rest_row: Option<(String, Type<usize>)> = match rest {
+        let rest_row: Option<(Spanned<String>, Type<usize>)> = match rest {
             None => None,
-            Some(name) => Some((name.item.clone(), self.fresh_typevar(syntax::Kind::Row))),
+            Some(name) => Some((name.clone(), self.fresh_typevar(syntax::Kind::Row))),
         };
         let ty = Type::mk_record(
             names_tys
                 .iter()
-                .map(|(name, ty)| ((*name).clone(), ty.clone()))
+                .map(|(name, ty)| ((*name).item.clone(), ty.clone()))
                 .collect(),
             rest_row.clone().map(|x| x.1),
         );
@@ -1857,12 +1860,15 @@ impl Typechecker {
         };
         let mut names_placeholders = Vec::new();
         for (name, ty) in names_tys.iter().rev() {
-            let p = self.evidence.placeholder(Constraint::HasField {
-                field: name.clone(),
-                rest: extending_row.clone(),
-            });
+            let p = self.evidence.placeholder(
+                Some(name.pos),
+                Constraint::HasField {
+                    field: name.item.clone(),
+                    rest: extending_row.clone(),
+                },
+            );
             names_placeholders.push(core::Expr::Placeholder(p));
-            extending_row = Type::mk_rowcons(name.clone(), ty.clone(), extending_row);
+            extending_row = Type::mk_rowcons(name.item.clone(), ty.clone(), extending_row);
         }
         names_placeholders.reverse();
 
@@ -1882,7 +1888,7 @@ impl Typechecker {
                 },
             },
             ty,
-            names_tys,
+            names_tys.into_iter().map(|(a, b)| (a.item, b)).collect(),
         )
     }
 
@@ -1935,9 +1941,10 @@ impl Typechecker {
         let (constraints, ty) = ty.unwrap_constraints();
         let mut expr = core::Expr::Name(name);
         for constraint in constraints {
-            let p = self
-                .evidence
-                .placeholder(evidence::Constraint::from_type(constraint));
+            let p = self.evidence.placeholder(
+                Some(self.current_position()),
+                evidence::Constraint::from_type(constraint),
+            );
             expr = core::Expr::mk_app(expr, core::Expr::Placeholder(p));
         }
         (expr, ty.clone())
@@ -2091,10 +2098,13 @@ impl Typechecker {
                     let mut extending_row = rest_row_var.clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
-                        let index = self.evidence.placeholder(evidence::Constraint::HasField {
-                            field: field.clone(),
-                            rest: extending_row.clone(),
-                        });
+                        let index = self.evidence.placeholder(
+                            None,
+                            evidence::Constraint::HasField {
+                                field: field.clone(),
+                                rest: extending_row.clone(),
+                            },
+                        );
                         fields_core.push((core::Expr::Placeholder(index), expr_core));
                         extending_row = Type::mk_rowcons(field, expr_ty, extending_row);
                     }
@@ -2135,7 +2145,7 @@ impl Typechecker {
                         self.check_expr(*expr, Type::mk_app(Type::Record, rows.clone()))?;
                     let offset = self
                         .evidence
-                        .placeholder(evidence::Constraint::HasField { field, rest: rows });
+                        .placeholder(None, evidence::Constraint::HasField { field, rest: rows });
                     Ok((
                         core::Expr::mk_project(expr_core, core::Expr::Placeholder(offset)),
                         out_ty,
@@ -2144,10 +2154,13 @@ impl Typechecker {
                 syntax::Expr::Variant(ctor) => {
                     let arg_ty = self.fresh_typevar(syntax::Kind::Type);
                     let rest = self.fresh_typevar(syntax::Kind::Row);
-                    let tag = self.evidence.placeholder(evidence::Constraint::HasField {
-                        field: ctor.clone(),
-                        rest: Type::mk_rows(vec![], Some(rest.clone())),
-                    });
+                    let tag = self.evidence.placeholder(
+                        None,
+                        evidence::Constraint::HasField {
+                            field: ctor.clone(),
+                            rest: Type::mk_rows(vec![], Some(rest.clone())),
+                        },
+                    );
                     Ok((
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
                         Type::mk_arrow(
@@ -2162,6 +2175,7 @@ impl Typechecker {
                     let rest_core =
                         self.check_expr(*rest, Type::mk_app(Type::Variant, rest_rows.clone()))?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
+                        None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
                             rest: rest_rows.clone(),
@@ -2289,6 +2303,7 @@ impl Typechecker {
 
                                             let tag =
                                                 core::Expr::Placeholder(self.evidence.placeholder(
+                                                    None,
                                                     evidence::Constraint::HasField {
                                                         field: name.clone(),
                                                         rest: expr_rows,

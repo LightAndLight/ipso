@@ -1,13 +1,14 @@
 use crate::{
     core::{EVar, Expr, Placeholder},
     syntax::{self, Type},
+    typecheck::Typechecker,
 };
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evidence {
     evars: usize,
-    environment: Vec<(Constraint, Option<Expr>)>,
+    environment: Vec<(Constraint, Option<usize>, Option<Expr>)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -46,17 +47,28 @@ impl Evidence {
         }
     }
 
-    pub fn placeholder(&mut self, constraint: Constraint) -> Placeholder {
+    pub fn placeholder(&mut self, pos: Option<usize>, constraint: Constraint) -> Placeholder {
         let ix = self.environment.len();
-        self.environment.push((constraint, None));
+        self.environment.push((constraint, pos, None));
         Placeholder(ix)
     }
 
-    pub fn assume(&mut self, constraint: Constraint) -> EVar {
+    pub fn assume(&mut self, pos: Option<usize>, constraint: Constraint) -> EVar {
         let ev = self.evars;
         self.evars += 1;
         let ev = EVar(ev);
-        self.environment.push((constraint, Some(Expr::EVar(ev))));
+        self.environment
+            .push((constraint, pos, Some(Expr::EVar(ev))));
         ev
+    }
+
+    pub fn find(&self, tc: &Typechecker, constraint: &Constraint) -> Option<Expr> {
+        self.environment.iter().find_map(|c| {
+            if tc.eq_zonked_constraint(&c.0, constraint) {
+                c.2.clone()
+            } else {
+                None
+            }
+        })
     }
 }

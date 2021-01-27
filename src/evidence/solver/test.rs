@@ -46,10 +46,13 @@ fn solve_constraint_2() {
 fn solve_constraint_3() {
     let mut tc = Typechecker::new();
     let var = tc.fresh_typevar(Kind::Row);
-    tc.evidence.assume(Constraint::HasField {
-        field: String::from("z"),
-        rest: var.clone(),
-    });
+    tc.evidence.assume(
+        None,
+        Constraint::HasField {
+            field: String::from("z"),
+            rest: var.clone(),
+        },
+    );
     // HasField "z" (x : Int, y : Bool, ?0)
     let constraint = Constraint::HasField {
         field: String::from("z"),
@@ -73,6 +76,7 @@ fn solve_constraint_3() {
                 field: String::from("z"),
                 rest: var,
             },
+            None,
             Some(Expr::EVar(EVar(0))),
         )],
     };

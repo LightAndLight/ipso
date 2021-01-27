@@ -1,0 +1,17 @@
+class A x where
+  a : x -> String
+
+class (A x) => B x where
+  b : x -> String
+
+instance (B a) => A (Array a) where
+  a arr = foldlArray (\acc el -> "${acc} ${b el}") "A Array: " arr
+
+instance (B a) => B (Array a) where
+  b = foldlArray (\acc el -> "${acc} ${b el}") "B: Array"
+
+main : IO ()
+main =
+  bindIO (writeStdout stdout (toUtf8 (a [1, 2, 3]))) (\_ ->
+  writeStdout stdout (toUtf8 (b [4, 5]))
+  )

@@ -153,6 +153,7 @@ fn parse_definition_3() {
                 TokenType::LAngle,
                 TokenType::LParen,
                 TokenType::LBrace,
+                TokenType::LBracket,
                 TokenType::DoubleQuote,
                 TokenType::Backslash
             ]
@@ -536,6 +537,7 @@ fn parse_case_4() {
                 TokenType::LAngle,
                 TokenType::LParen,
                 TokenType::LBrace,
+                TokenType::LBracket,
                 TokenType::Ctor,
                 TokenType::Ident(String::from("true")),
                 TokenType::Ident(String::from("false")),

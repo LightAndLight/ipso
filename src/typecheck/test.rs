@@ -1387,7 +1387,7 @@ fn infer_record_1() {
                 rest: Type::RowNil
             }
         )),
-        solve_placeholder(&None, &mut tc, *p0)
+        solve_placeholder(&mut tc, *p0)
             .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 
@@ -1399,7 +1399,7 @@ fn infer_record_1() {
                 rest: Type::mk_rows(vec![(String::from("x"), Type::Int)], None)
             }
         )),
-        solve_placeholder(&None, &mut tc, *p1)
+        solve_placeholder(&mut tc, *p1)
             .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 
@@ -1421,7 +1421,7 @@ fn infer_record_1() {
                 )
             }
         )),
-        solve_placeholder(&None, &mut tc, *p2)
+        solve_placeholder(&mut tc, *p2)
             .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
     );
 }

@@ -13,7 +13,7 @@ mod test;
 
 pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
     tc.evidence.environment.iter().enumerate().find_map(
-        |(ix, (other_constraint, other_evidence))| {
+        |(ix, (other_constraint, _, other_evidence))| {
             if tc.eq_zonked_constraint(constraint, other_constraint) {
                 match other_evidence {
                     None => Some(core::Expr::mk_evar(ix)),
@@ -34,6 +34,14 @@ pub fn solve_constraint(
     match constraint {
         Constraint::Type(constraint) => {
             let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
+
+            match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
+                None => {}
+                Some(expr) => {
+                    return Ok(expr);
+                }
+            }
+
             let implications = tc.implications.clone();
 
             let mut result = None;
@@ -141,7 +149,7 @@ pub fn solve_constraint(
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
-                            let ev = tc.evidence.assume(constraint.clone());
+                            let ev = tc.evidence.assume(None, constraint.clone());
                             Ok(core::Expr::EVar(ev))
                         }
                         Some(evidence) => Ok(evidence),
@@ -222,15 +230,24 @@ pub fn solve_constraint(
 }
 
 pub fn solve_placeholder(
-    context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     p: Placeholder,
 ) -> Result<(core::Expr, Constraint), TypeError> {
-    let (constraint, evidence) = tc.evidence.environment[p.0].clone();
+    let (constraint, pos, evidence) = tc.evidence.environment[p.0].clone();
     match evidence.clone() {
         None => {
-            let expr = solve_constraint(context, tc, &constraint)?;
-            tc.evidence.environment[p.0].1 = Some(expr.clone());
+            let expr = solve_constraint(
+                &Some(SolveConstraintContext {
+                    pos: match pos {
+                        None => 0,
+                        Some(pos) => pos,
+                    },
+                    constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type())),
+                }),
+                tc,
+                &constraint,
+            )?;
+            tc.evidence.environment[p.0].2 = Some(expr.clone());
             Ok((expr, constraint.clone()))
         }
         Some(evidence) => Ok((evidence, constraint.clone())),
