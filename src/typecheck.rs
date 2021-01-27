@@ -352,7 +352,10 @@ impl TypeError {
             TypeError::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
-            TypeError::CannotDeduce { .. } => String::from("cannot deduce"),
+            TypeError::CannotDeduce { context } => match context {
+                None => String::from("cannot deduce"),
+                Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
+            },
         }
     }
 
@@ -973,6 +976,7 @@ impl Typechecker {
             args_kinds
         };
 
+        let mut new_supers = Vec::with_capacity(supers.len());
         for s in &supers {
             // abstract over variables
             let (s_item, _) = s.item.abstract_vars(&arg_names);
@@ -982,7 +986,8 @@ impl Typechecker {
                     Err(err) => {
                         return Err(err);
                     }
-                    Ok(s) => {
+                    Ok(s_item) => {
+                        new_supers.push(s_item);
                         self.bound_tyvars.delete(args_len);
                     }
                 }
@@ -1000,7 +1005,7 @@ impl Typechecker {
         }
 
         Ok(core::Declaration::Class(core::ClassDeclaration {
-            supers: Vec::new(),
+            supers: new_supers,
             name,
             args: args_kinds
                 .into_iter()
@@ -1046,6 +1051,8 @@ impl Typechecker {
         let (_, args) = head.unwrap_app();
         let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
 
+        self.bound_tyvars.insert(&ty_var_kinds);
+
         // generate evidence for assumptions
         assumes.iter().for_each(|constraint| {
             let _ = self
@@ -1086,7 +1093,6 @@ impl Typechecker {
             })
             .collect();
 
-        self.bound_tyvars.insert(&ty_var_kinds);
         with_position!(
             self,
             name.pos,
