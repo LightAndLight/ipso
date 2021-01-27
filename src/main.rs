@@ -87,7 +87,7 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
         InterpreterError::MissingEntrypoint(name) => diagnostic.item(diagnostic::Item {
             pos: 0,
-            message: format!("Missing entrypoint {:?}", name),
+            message: format!("missing entrypoint {:?}", name),
             addendum: None,
         }),
     }

@@ -1746,6 +1746,7 @@ fn check_class_1() {
     let actual = tc.check_declaration(Spanned {
         pos: 0,
         item: syntax::Declaration::Class {
+            supers: Vec::new(),
             name: String::from("Eq"),
             args: vec![Spanned {
                 pos: 9,
@@ -1826,6 +1827,7 @@ fn check_class_2() {
     let actual = tc.check_declaration(Spanned {
         pos: 0,
         item: syntax::Declaration::Class {
+            supers: Vec::new(),
             name: String::from("Wut"),
             args: vec![Spanned {
                 pos: 9,

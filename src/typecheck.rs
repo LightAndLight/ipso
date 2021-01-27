@@ -952,12 +952,13 @@ impl Typechecker {
 
     fn check_class(
         &mut self,
-        supers: Vec<Type<String>>,
+        supers: Vec<Spanned<Type<String>>>,
         name: String,
         args: Vec<Spanned<String>>,
         members: Vec<(String, Type<String>)>,
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
+        let arg_names = args.iter().map(|x| x.item.clone()).collect();
         let args_kinds = {
             let mut seen: HashSet<String> = HashSet::new();
             let mut args_kinds = Vec::with_capacity(args_len);
@@ -974,14 +975,18 @@ impl Typechecker {
 
         for s in &supers {
             // abstract over variables
-            let s = ();
-            let context = ();
-            match self.check_kind(context, s, syntax::Kind::Constraint) {
-                Err(err) => {
-                    return Err(err);
+            let (s_item, _) = s.item.abstract_vars(&arg_names);
+            with_position!(self, s.pos, {
+                self.bound_tyvars.insert(&args_kinds);
+                match self.check_kind(None, &s_item, syntax::Kind::Constraint) {
+                    Err(err) => {
+                        return Err(err);
+                    }
+                    Ok(s) => {
+                        self.bound_tyvars.delete(args_len);
+                    }
                 }
-                Ok(s) => {}
-            }
+            })
         }
 
         let mut checked_members = Vec::with_capacity(members.len());
@@ -1007,7 +1012,7 @@ impl Typechecker {
 
     fn check_instance(
         &mut self,
-        assumes: Vec<Type<String>>,
+        assumes: Vec<Spanned<Type<String>>>,
         name: Spanned<String>,
         args: Vec<Type<String>>,
         members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
@@ -1027,14 +1032,16 @@ impl Typechecker {
 
         let assumes: Vec<Type<usize>> = assumes
             .into_iter()
-            .map(|assume| assume.abstract_vars(&ty_vars).0)
+            .map(|assume| assume.item.abstract_vars(&ty_vars).0)
             .collect();
 
-        let kind_solutions = &mut self.kind_solutions;
-        let ty_var_kinds = ty_vars
-            .into_iter()
-            .map(|var| (var, fresh_kindvar!(kind_solutions)))
-            .collect();
+        let ty_var_kinds = {
+            let kind_solutions = &mut self.kind_solutions;
+            ty_vars
+                .into_iter()
+                .map(|var| (var, fresh_kindvar!(kind_solutions)))
+                .collect()
+        };
 
         let (_, args) = head.unwrap_app();
         let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
@@ -1080,8 +1087,11 @@ impl Typechecker {
             .collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
-        self.check_kind(None, &head, syntax::Kind::Constraint)?;
-        self.bound_tyvars.delete(ty_var_kinds.len());
+        with_position!(
+            self,
+            name.pos,
+            self.check_kind(None, &head, syntax::Kind::Constraint)
+        )?;
 
         // type check members
         let mut new_members = Vec::with_capacity(members.len());
@@ -1118,6 +1128,8 @@ impl Typechecker {
                 }
             }
         }
+
+        self.bound_tyvars.delete(ty_var_kinds.len());
 
         self.evidence = Evidence::new();
 
@@ -1450,7 +1462,9 @@ impl Typechecker {
                 Some(kind) => Ok((Type::Name(n.clone()), kind.clone())),
             },
             Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
-                None => panic!("missing tyvar {:?}", ix),
+                None => {
+                    panic!("missing tyvar {:?}", ix);
+                }
                 Some((_, kind)) => Ok((Type::Var(*ix), kind.clone())),
             },
             Type::Bool => Ok((Type::Bool, syntax::Kind::Type)),

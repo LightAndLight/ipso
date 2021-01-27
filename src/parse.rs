@@ -1080,15 +1080,18 @@ impl Parser {
         )
     }
 
-    fn assumptions(&mut self) -> ParseResult<Vec<Type<String>>> {
-        optional!(self, self.type_()).and_then(|m_ty| match m_ty {
+    fn assumptions(&mut self) -> ParseResult<Vec<Spanned<Type<String>>>> {
+        optional!(
+            self,
+            between!(
+                keep_left!(self.token(&TokenType::LParen), self.spaces()),
+                keep_left!(self.token(&TokenType::RParen), self.spaces()),
+                many!(self, spanned!(self, self.type_()))
+            )
+        )
+        .and_then(|m_tys| match m_tys {
             None => ParseResult::pure(Vec::new()),
-            Some(ty) => keep_left!(self.token(&TokenType::FatArrow), self.spaces()).map(|_| {
-                ty.flatten_constraints()
-                    .into_iter()
-                    .map(|x| x.clone())
-                    .collect()
-            }),
+            Some(tys) => keep_left!(self.token(&TokenType::FatArrow), self.spaces()).map(|_| tys),
         })
     }
 
@@ -1147,27 +1150,29 @@ impl Parser {
 
     fn instance(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.keyword(Keyword::Instance), self.spaces()).and_then(|_| {
-            keep_left!(spanned!(self, self.ctor()), self.spaces()).and_then(|name| {
-                many!(self, keep_left!(self.type_(), self.spaces())).and_then(|args| {
-                    keep_left!(
-                        self.keyword(Keyword::Where),
-                        many_!(self, self.token(&TokenType::Space))
-                    )
-                    .and_then(|_| {
-                        keep_right!(
-                            self.indent(),
-                            sep_by!(self, self.instance_member(), self.newline()).and_then(
-                                |members| keep_right!(
-                                    self.dedent(),
-                                    ParseResult::pure(Declaration::Instance {
-                                        assumes: Vec::new(),
-                                        name,
-                                        args,
-                                        members,
-                                    })
+            self.assumptions().and_then(|assumes| {
+                keep_left!(spanned!(self, self.ctor()), self.spaces()).and_then(|name| {
+                    many!(self, keep_left!(self.type_(), self.spaces())).and_then(|args| {
+                        keep_left!(
+                            self.keyword(Keyword::Where),
+                            many_!(self, self.token(&TokenType::Space))
+                        )
+                        .and_then(|_| {
+                            keep_right!(
+                                self.indent(),
+                                sep_by!(self, self.instance_member(), self.newline()).and_then(
+                                    |members| keep_right!(
+                                        self.dedent(),
+                                        ParseResult::pure(Declaration::Instance {
+                                            assumes,
+                                            name,
+                                            args,
+                                            members,
+                                        })
+                                    )
                                 )
                             )
-                        )
+                        })
                     })
                 })
             })
