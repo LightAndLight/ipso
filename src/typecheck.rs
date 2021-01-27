@@ -1142,7 +1142,7 @@ impl Typechecker {
         Ok(core::Declaration::Instance {
             ty_vars: ty_var_kinds,
             superclass_constructors,
-            assumes: Vec::new(),
+            assumes,
             head,
             members: new_members,
         })

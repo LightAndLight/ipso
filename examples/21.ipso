@@ -1,0 +1,11 @@
+class A x where
+  a : x -> String
+
+class (A x) => B x where
+  b : x -> String
+
+instance (B a) => A (Array a) where
+  a _ = "A Array"
+
+instance B (Array a) where
+  b _ = "B Array"
