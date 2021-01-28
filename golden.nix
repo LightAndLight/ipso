@@ -1,4 +1,4 @@
-{ pkgs ? import <nixos-unstable> {}, RUST_BACKTRACE ? false }:
+{ pkgs ? import <nixos-unstable> {}, RUST_BACKTRACE ? false, only ? [] }:
 let
   ipso = import ./. { inherit pkgs; };
   ipso-golden = import ./golden { inherit pkgs; };
@@ -27,7 +27,13 @@ in
     checkPhase = ''
       ipso-golden \
         --bin ${ipso}/bin/ipso \
-        --dir examples
+        --dir examples ${
+          if only == []
+          then ""
+          else ''\
+            --only ${pkgs.lib.concatStringsSep "," (map toString only)}
+          ''
+        }
     '';
 
     installPhase = ''

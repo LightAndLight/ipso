@@ -12,10 +12,10 @@ import qualified Data.Text as Text
 import Data.Traversable (for)
 import Data.Vector (Vector)
 import qualified Dhall
-import Options.Applicative (Parser, execParser, fullDesc, help, info, long, metavar, strOption)
+import Options.Applicative (Parser, ReadM, execParser, fullDesc, help, info, long, metavar, option, str, strOption, value)
 import System.Directory (getCurrentDirectory, listDirectory, setCurrentDirectory)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
-import System.FilePath (takeExtension, (</>))
+import System.FilePath (takeBaseName, takeExtension, (</>))
 import System.Process (readProcessWithExitCode)
 
 data Example = Example
@@ -88,11 +88,24 @@ runExample config example = do
 data Config = Config
   { cfgBin :: FilePath
   , cfgDir :: FilePath
+  , cfgOnly :: Maybe [String]
   }
+
+commasReader :: ReadM [String]
+commasReader = go <$> str
+ where
+  go :: String -> [String]
+  go input =
+    let (prefix, suffix) = break (== ',') input
+     in prefix :
+        case suffix of
+          [] -> []
+          _ : rest ->
+            go rest
 
 configParser :: FilePath -> Parser Config
 configParser curDir =
-  (\bin dir -> Config (curDir </> bin) (curDir </> dir))
+  (\bin dir only -> Config (curDir </> bin) (curDir </> dir) only)
     <$> strOption
       ( long "bin"
           <> help "path to binary"
@@ -103,6 +116,12 @@ configParser curDir =
           <> help "location of golden tests"
           <> metavar "DIRECTORY"
       )
+    <*> option
+      (Just <$> commasReader)
+      ( long "only"
+          <> help "comma separated list of examples to run"
+          <> value Nothing
+      )
 
 main :: IO ()
 main = do
@@ -110,7 +129,13 @@ main = do
   config <- execParser (info (configParser curDir) fullDesc)
   setCurrentDirectory $ cfgDir config
   files <- listDirectory "."
-  results <- for (filter ((".dhall" ==) . takeExtension) files) $ \file -> do
+  let filterOnly =
+        case cfgOnly config of
+          Nothing ->
+            const True
+          Just names ->
+            \file -> takeBaseName file `elem` names
+  results <- for (filter (\file -> ".dhall" == takeExtension file && filterOnly file) files) $ \file -> do
     example <- Dhall.inputFile (exampleDecoder file) file
     runExample config example
   let (failures, successes) = Either.partitionEithers results
