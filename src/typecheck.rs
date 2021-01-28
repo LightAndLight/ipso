@@ -849,8 +849,6 @@ impl Typechecker {
             .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
-        self.evidence = Evidence::new();
-
         Ok((expr, sig))
     }
 
@@ -906,6 +904,7 @@ impl Typechecker {
             ty.clone(),
         )?;
         let (body, sig) = self.generalise(body, ty.clone())?;
+        self.evidence = Evidence::new();
 
         self.bound_tyvars.delete(ty_var_kinds_len);
 
@@ -1115,15 +1114,19 @@ impl Typechecker {
                 Some(member_type) => {
                     self.bound_tyvars.insert(&member_type.sig.ty_vars);
 
-                    match self.check_expr(
-                        Spanned {
-                            pos: member_name.pos,
-                            item: syntax::Expr::mk_lam(member_args, member_body),
-                        },
-                        member_type.sig.body.clone(),
-                    ) {
+                    match self
+                        .check_expr(
+                            Spanned {
+                                pos: member_name.pos,
+                                item: syntax::Expr::mk_lam(member_args, member_body),
+                            },
+                            member_type.sig.body.clone(),
+                        )
+                        .and_then(|member_body| {
+                            self.generalise(member_body, member_type.sig.body.clone())
+                        }) {
                         Err(err) => return Err(err),
-                        Ok(member_body) => {
+                        Ok((member_body, _)) => {
                             self.bound_tyvars.delete(member_type.sig.ty_vars.len());
                             new_members.push(core::InstanceMember {
                                 name: member_name.item.clone(),
@@ -1134,13 +1137,17 @@ impl Typechecker {
                 }
             }
         }
+        self.evidence = Evidence::new();
 
         self.bound_tyvars.delete(ty_var_kinds.len());
 
-        self.evidence = Evidence::new();
+        let ty_vars = ty_var_kinds
+            .into_iter()
+            .map(|(a, b)| (a, self.zonk_kind(true, b)))
+            .collect();
 
         Ok(core::Declaration::Instance {
-            ty_vars: ty_var_kinds,
+            ty_vars,
             superclass_constructors,
             assumes,
             head,

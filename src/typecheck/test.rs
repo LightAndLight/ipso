@@ -2108,3 +2108,147 @@ fn class_and_instance_1() {
         "After `instance Eq Int` is brought into scope, `instance Ord Int` is valid"
     );
 }
+
+#[test]
+fn class_and_instance_2() {
+    /*
+    class Eq a where
+      eq : a -> a -> Bool
+
+    instance Eq Int where
+      eq = eqInt
+
+    instance Eq a => Eq (Array a) where
+      eq = eqArray eq
+     */
+
+    let mut tc = Typechecker::new_with_builtins();
+
+    tc.register_class(&core::ClassDeclaration {
+        supers: Vec::new(),
+        name: String::from("Eq"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![core::ClassMember {
+            name: String::from("eq"),
+            sig: core::TypeSig {
+                ty_vars: vec![(String::from("a"), Kind::Type)],
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+
+    tc.register_class(&core::ClassDeclaration {
+        supers: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+        name: String::from("Ord"),
+        args: vec![(String::from("a"), Kind::Type)],
+        members: vec![core::ClassMember {
+            name: String::from("lt"),
+            sig: core::TypeSig {
+                ty_vars: vec![(String::from("a"), Kind::Type)],
+                body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+            },
+        }],
+    });
+
+    let instance_eq_int_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            assumes: Vec::new(),
+            name: Spanned {
+                pos: 0,
+                item: String::from("Eq"),
+            },
+            args: vec![Type::Int],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("eq"),
+                },
+                Vec::new(),
+                Spanned {
+                    pos: 0,
+                    item: syntax::Expr::Var(String::from("eqInt")),
+                },
+            )],
+        },
+    };
+
+    let instance_eq_array_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            assumes: vec![Spanned {
+                pos: 0,
+                item: Type::mk_app(Type::Name(String::from("Eq")), Type::Var(String::from("a"))),
+            }],
+            name: Spanned {
+                pos: 0,
+                item: String::from("Eq"),
+            },
+            args: vec![Type::mk_app(Type::Array, Type::Var(String::from("a")))],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("eq"),
+                },
+                Vec::new(),
+                syntax::Expr::mk_app(
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Var(String::from("eqArray")),
+                    },
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Var(String::from("eq")),
+                    },
+                ),
+            )],
+        },
+    };
+
+    let expected_instance_eq_int_result = Ok(core::Declaration::Instance {
+        ty_vars: Vec::new(),
+        superclass_constructors: Vec::new(),
+        assumes: Vec::new(),
+        head: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+        members: vec![core::InstanceMember {
+            name: String::from("eq"),
+            body: core::Expr::Name(String::from("eqInt")),
+        }],
+    });
+    let actual_instance_eq_int_result = tc.check_declaration(instance_eq_int_decl);
+
+    assert_eq!(
+        expected_instance_eq_int_result, actual_instance_eq_int_result,
+        "`instance Eq Int` is valid"
+    );
+
+    tc.register_declaration(&actual_instance_eq_int_result.unwrap());
+
+    let expected_instance_eq_array_result = Ok(core::Declaration::Instance {
+        ty_vars: vec![(String::from("a"), Kind::Type)],
+        superclass_constructors: Vec::new(),
+        assumes: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+        head: Type::mk_app(
+            Type::Name(String::from("Eq")),
+            Type::mk_app(Type::Array, Type::Var(0)),
+        ),
+        members: vec![core::InstanceMember {
+            name: String::from("eq"),
+            body: core::Expr::mk_lam(
+                true,
+                core::Expr::mk_app(
+                    core::Expr::Name(String::from("eqArray")),
+                    core::Expr::mk_app(core::Expr::Name(String::from("eq")), core::Expr::Var(0)),
+                ),
+            ),
+        }],
+    });
+    let actual_instance_eq_array_result = tc.check_declaration(instance_eq_array_decl);
+
+    assert_eq!(
+        expected_instance_eq_array_result, actual_instance_eq_array_result,
+        "`instance Eq a => Eq (Array a)` is valid"
+    );
+
+    tc.register_declaration(&actual_instance_eq_array_result.unwrap());
+}
