@@ -96,9 +96,9 @@ pub struct Branch {
 }
 
 impl Branch {
-    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: &F) -> Branch {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch {
         Branch {
-            pattern: self.pattern.map_expr(f),
+            pattern: self.pattern.map_expr(&f),
             body: f(&self.body),
         }
     }
@@ -388,15 +388,15 @@ impl Expr {
                     go(a, f),
                     bs.iter()
                         .map(|b| match &b.pattern {
-                            Pattern::Name => b.map_expr(&|e| go(e, &Function::Under(1, f))),
+                            Pattern::Name => b.map_expr(|e| go(e, &Function::Under(1, f))),
                             Pattern::Record { names, rest } => {
                                 let offset = names.len() + if *rest { 1 } else { 0 };
-                                b.map_expr(&|e| go(e, &Function::Under(offset, f)))
+                                b.map_expr(|e| go(e, &Function::Under(offset, f)))
                             }
                             Pattern::Variant { tag: _ } => {
-                                b.map_expr(&|e| go(e, &Function::Under(1, f)))
+                                b.map_expr(|e| go(e, &Function::Under(1, f)))
                             }
-                            Pattern::Wildcard => b.map_expr(&|e| go(e, f)),
+                            Pattern::Wildcard => b.map_expr(|e| go(e, f)),
                         })
                         .collect(),
                 ),
