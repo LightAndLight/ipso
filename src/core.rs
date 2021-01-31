@@ -253,7 +253,19 @@ impl Expr {
     }
 
     pub fn mk_project(expr: Expr, offset: Expr) -> Expr {
-        Expr::Project(Box::new(expr), Box::new(offset))
+        match expr {
+            Expr::Record(fields) => match offset {
+                Expr::Int(ix) => match fields.iter().find_map(|(pos, val)| match pos {
+                    Expr::Int(ixx) if ix == *ixx => Some(val.clone()),
+                    _ => None,
+                }) {
+                    Some(val) => val,
+                    None => Self::Project(Box::new(Expr::Record(fields)), Box::new(Expr::Int(ix))),
+                },
+                offset => Self::Project(Box::new(Expr::Record(fields)), Box::new(offset)),
+            },
+            expr => Self::Project(Box::new(expr), Box::new(offset)),
+        }
     }
 
     pub fn mk_extend(field: Expr, value: Expr, rest: Expr) -> Expr {
