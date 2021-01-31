@@ -118,7 +118,7 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     };
     let module: syntax::Module = parse::parse_file(filename)?;
     let mut tc: Typechecker = Typechecker::new_with_builtins();
-    let module: core::Module = dbg!(tc.check_module(module))?;
+    let module: core::Module = tc.check_module(module)?;
 
     let (target, target_sig) = find_entrypoint_body(entrypoint, &module)?;
     {

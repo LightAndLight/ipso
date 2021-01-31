@@ -952,7 +952,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     .map(|(ev, field)| (self.eval(env, ev).unpack_int(), self.eval(env, field)))
                     .collect();
                 fields.sort_by_key(|x| x.0);
-                for (_index, field) in fields.into_iter().rev() {
+                for (_index, field) in fields.into_iter() {
                     record.push(field);
                 }
                 self.alloc_value(Value::Record(record))
