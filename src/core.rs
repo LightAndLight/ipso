@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{iter::Step, syntax};
 
 #[cfg(test)]
@@ -12,6 +14,18 @@ pub enum Pattern {
 }
 
 impl Pattern {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
+        match self {
+            Pattern::Name => Pattern::Name,
+            Pattern::Record { names, rest } => Pattern::Record {
+                names: names.iter().map(|name| f(name)).collect(),
+                rest: *rest,
+            },
+            Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
+            Pattern::Wildcard => Pattern::Wildcard,
+        }
+    }
+
     pub fn mk_variant(tag: Expr) -> Pattern {
         Pattern::Variant { tag: Box::new(tag) }
     }
@@ -82,6 +96,13 @@ pub struct Branch {
 }
 
 impl Branch {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: &F) -> Branch {
+        Branch {
+            pattern: self.pattern.map_expr(f),
+            body: f(&self.body),
+        }
+    }
+
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &self,
         f: &mut F,
@@ -133,6 +154,13 @@ pub enum StringPart {
 }
 
 impl StringPart {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
+        match self {
+            StringPart::String(s) => StringPart::String(s.clone()),
+            StringPart::Expr(e) => StringPart::Expr(f(e)),
+        }
+    }
+
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &self,
         f: &mut F,
@@ -244,6 +272,10 @@ impl Expr {
         Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
     }
 
+    pub fn mk_extend(ev: Expr, field: Expr, rest: Expr) -> Expr {
+        Expr::Extend(Box::new(ev), Box::new(field), Box::new(rest))
+    }
+
     pub fn mk_record(fields: Vec<(Expr, Expr)>, rest: Option<Expr>) -> Expr {
         match rest {
             None => Expr::Record(fields),
@@ -268,10 +300,6 @@ impl Expr {
             },
             expr => Self::Project(Box::new(expr), Box::new(offset)),
         }
-    }
-
-    pub fn mk_extend(field: Expr, value: Expr, rest: Expr) -> Expr {
-        Expr::Extend(Box::new(field), Box::new(value), Box::new(rest))
     }
 
     pub fn mk_variant(tag: Expr) -> Expr {
@@ -303,6 +331,80 @@ impl Expr {
         Expr::Placeholder(Placeholder(p))
     }
 
+    pub fn map_vars(&self, f: Rc<dyn Fn(usize) -> usize>) -> Expr {
+        match self {
+            Expr::Var(v) => Expr::Var(f(*v)),
+            Expr::EVar(v) => Expr::EVar(*v),
+            Expr::Placeholder(p) => Expr::Placeholder(*p),
+            Expr::Name(n) => Expr::Name(n.clone()),
+            Expr::Builtin(b) => Expr::Builtin(*b),
+            Expr::App(a, b) => Expr::mk_app(a.map_vars(f.clone()), b.map_vars(f)),
+            Expr::Lam { arg, body } => Expr::mk_lam(
+                *arg,
+                body.map_vars(if *arg {
+                    Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) })
+                } else {
+                    f
+                }),
+            ),
+            Expr::True => Expr::True,
+            Expr::False => Expr::False,
+            Expr::IfThenElse(a, b, c) => {
+                Expr::mk_ifthenelse(a.map_vars(f.clone()), b.map_vars(f.clone()), c.map_vars(f))
+            }
+            Expr::Int(n) => Expr::Int(*n),
+            Expr::Binop(op, l, r) => Expr::mk_binop(*op, l.map_vars(f.clone()), r.map_vars(f)),
+            Expr::Char(c) => Expr::Char(*c),
+            Expr::String(ss) => Expr::String(
+                ss.iter()
+                    .map(|s| s.map_expr(|e| e.map_vars(f.clone())))
+                    .collect(),
+            ),
+            Expr::Array(es) => Expr::Array(es.iter().map(|e| e.map_vars(f.clone())).collect()),
+            Expr::Extend(a, b, c) => {
+                Expr::mk_extend(a.map_vars(f.clone()), b.map_vars(f.clone()), c.map_vars(f))
+            }
+            Expr::Record(xs) => Expr::Record(
+                xs.iter()
+                    .map(|(a, b)| (a.map_vars(f.clone()), b.map_vars(f.clone())))
+                    .collect(),
+            ),
+            Expr::Project(a, b) => Expr::mk_project(a.map_vars(f.clone()), b.map_vars(f)),
+            Expr::Variant(a) => Expr::mk_variant(a.map_vars(f)),
+            Expr::Embed(a, b) => Expr::mk_embed(a.map_vars(f.clone()), b.map_vars(f)),
+            Expr::Case(a, bs) => Expr::mk_case(
+                a.map_vars(f.clone()),
+                bs.iter()
+                    .map(move |b| match &b.pattern {
+                        Pattern::Name => {
+                            let f = f.clone();
+                            b.map_expr(&move |e| {
+                                let f = f.clone();
+                                e.map_vars(Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) }))
+                            })
+                        }
+                        Pattern::Record { names, rest } => {
+                            let offset = names.len() + if *rest { 1 } else { 0 };
+                            let f = f.clone();
+                            b.map_expr(&move |e| {
+                                let f = f.clone();
+                                e.map_vars(Rc::new(
+                                    move |n| if n < offset { n } else { f(n - offset) },
+                                ))
+                            })
+                        }
+                        Pattern::Variant { tag: _ } => b.map_expr(&|e| {
+                            let f = f.clone();
+                            e.map_vars(Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) }))
+                        }),
+                        Pattern::Wildcard => b.map_expr(&|e| e.map_vars(f.clone())),
+                    })
+                    .collect(),
+            ),
+            Expr::Unit => Expr::Unit,
+        }
+    }
+
     pub fn instantiate(&self, val: &Expr) -> Expr {
         self.__instantiate(0, val)
     }
@@ -311,7 +413,7 @@ impl Expr {
         match self {
             Expr::Var(n) => {
                 if *n == depth {
-                    val.clone()
+                    val.map_vars(Rc::new(move |n| n + depth))
                 } else {
                     Expr::Var(*n)
                 }
