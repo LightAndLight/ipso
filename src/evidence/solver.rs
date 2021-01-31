@@ -12,18 +12,19 @@ use super::Constraint;
 mod test;
 
 pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
-    tc.evidence.environment.iter().enumerate().find_map(
-        |(ix, (other_constraint, _, other_evidence))| {
+    tc.evidence
+        .environment
+        .iter()
+        .find_map(|(other_constraint, _, other_evidence)| {
             if tc.eq_zonked_constraint(constraint, other_constraint) {
                 match other_evidence {
-                    None => Some(core::Expr::mk_evar(ix)),
+                    None => None,
                     Some(expr) => Some(expr.clone()),
                 }
             } else {
                 None
             }
-        },
-    )
+        })
 }
 
 pub fn solve_constraint(
@@ -150,6 +151,7 @@ pub fn solve_constraint(
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
                             let ev = tc.evidence.assume(None, constraint.clone());
+                            debug_assert!(tc.evidence.lookup_evar(&ev) != None);
                             Ok(core::Expr::EVar(ev))
                         }
                         Some(evidence) => Ok(evidence),

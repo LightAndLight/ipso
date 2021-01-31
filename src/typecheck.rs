@@ -796,51 +796,58 @@ impl Typechecker {
         Ok(ty)
     }
 
-    fn generalise(
+    fn abstract_evidence(
         &mut self,
         expr: core::Expr,
-        ty: Type<usize>,
-    ) -> Result<(core::Expr, core::TypeSig), TypeError> {
-        let mut unsolved_constraints: Vec<(core::EVar, evidence::Constraint)> = Vec::new();
+    ) -> Result<(core::Expr, Vec<Type<usize>>), TypeError> {
         let expr = expr.subst_placeholder(&mut |p| {
-            let (expr, solved_constraint) = solve_placeholder(self, *p)?;
-            match expr {
-                core::Expr::EVar(ev) => {
-                    unsolved_constraints.push((ev, solved_constraint));
-                }
-                _ => {}
-            }
+            let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
             Ok(expr)
         })?;
 
+        let mut unsolved_constraints: Vec<(core::EVar, Type<usize>)> = Vec::new();
+        let mut seen_evars: HashSet<core::EVar> = HashSet::new();
+        let _ = dbg!("before expr", &expr);
+        for ev in expr.iter_evars() {
+            let _ = dbg!("ev", ev);
+            if !seen_evars.contains(ev) {
+                seen_evars.insert(*ev);
+                let constraint = self.evidence.lookup_evar(ev).unwrap();
+                unsolved_constraints.push((*ev, self.zonk_type(constraint.to_type())));
+            }
+        }
+
+        let _ = dbg!("unsolved_constraints", &unsolved_constraints);
+
         let mut expr = expr;
-        let mut ty = ty;
-        for (ev, constraint) in unsolved_constraints.iter().rev() {
-            expr = expr.abstract_evar(*ev);
-            let constraint = self.zonk_type(constraint.to_type());
+        let mut new_unsolved_constraints = Vec::new();
+        for (ev, constraint) in unsolved_constraints.into_iter().rev() {
+            expr = expr.abstract_evar(ev);
             match constraint.iter_metas().next() {
                 None => {}
                 Some(_) => {
                     todo!("handle ambiguous constraints")
                 }
             }
+            new_unsolved_constraints.push(constraint);
+        }
+        new_unsolved_constraints.reverse();
+
+        Ok((expr, new_unsolved_constraints))
+    }
+
+    fn generalise(
+        &mut self,
+        expr: core::Expr,
+        ty: Type<usize>,
+    ) -> Result<(core::Expr, core::TypeSig), TypeError> {
+        let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
+
+        let mut ty = ty;
+        for constraint in unsolved_constraints.into_iter().rev() {
             ty = Type::mk_fatarrow(constraint, ty);
         }
 
-        /*
-        let ty = self.zonk_type(ty);
-        let ty_vars = {
-            let mut seen: HashSet<usize> = HashSet::new();
-            let mut kinds: Vec<syntax::Kind> = Vec::new();
-            for meta in ty.iter_metas() {
-                if !seen.contains(&meta) {
-                    seen.insert(meta);
-                    kinds.push(self.type_solutions[meta].0.clone());
-                }
-            }
-            kinds
-        };
-        */
         let ty_vars = self
             .bound_tyvars
             .info
@@ -1073,11 +1080,15 @@ impl Typechecker {
                     }),
                     self,
                     &evidence::Constraint::from_type(&superclass),
-                ) {
+                )
+                .and_then(|evidence| self.abstract_evidence(evidence))
+                {
                     Err(err) => {
                         return Err(err);
                     }
-                    Ok(evidence) => superclass_constructors.push(evidence),
+                    Ok((evidence, _)) => {
+                        superclass_constructors.push(evidence);
+                    }
                 }
             }
             superclass_constructors

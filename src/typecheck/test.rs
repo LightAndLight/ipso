@@ -2120,6 +2120,9 @@ fn class_and_instance_2() {
 
     instance Eq a => Eq (Array a) where
       eq = eqArray eq
+
+    instance Ord a => Ord (Array a) where
+      lt = ltArray lt
      */
 
     let mut tc = Typechecker::new_with_builtins();
@@ -2251,4 +2254,81 @@ fn class_and_instance_2() {
     );
 
     tc.register_declaration(&actual_instance_eq_array_result.unwrap());
+
+    let instance_ord_array_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            assumes: vec![Spanned {
+                pos: 0,
+                item: Type::mk_app(
+                    Type::Name(String::from("Ord")),
+                    Type::Var(String::from("a")),
+                ),
+            }],
+            name: Spanned {
+                pos: 0,
+                item: String::from("Ord"),
+            },
+            args: vec![Type::mk_app(Type::Array, Type::Var(String::from("a")))],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("lt"),
+                },
+                Vec::new(),
+                syntax::Expr::mk_app(
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Var(String::from("ltArray")),
+                    },
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Var(String::from("lt")),
+                    },
+                ),
+            )],
+        },
+    };
+
+    let expected_instance_ord_array_result = Ok(core::Declaration::Instance {
+        ty_vars: vec![(String::from("a"), Kind::Type)],
+        superclass_constructors: vec![core::Expr::mk_lam(
+            true, // dict : Ord a
+            core::Expr::mk_record(
+                vec![(
+                    core::Expr::Int(0),
+                    core::Expr::mk_app(
+                        core::Expr::Name(String::from("eqArray")),
+                        core::Expr::mk_app(
+                            core::Expr::Name(String::from("eq")),
+                            // dict.0 : Eq a
+                            core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
+                        ),
+                    ),
+                )],
+                None,
+            ),
+        )],
+        assumes: vec![Type::mk_app(Type::Name(String::from("Ord")), Type::Var(0))],
+        head: Type::mk_app(
+            Type::Name(String::from("Ord")),
+            Type::mk_app(Type::Array, Type::Var(0)),
+        ),
+        members: vec![core::InstanceMember {
+            name: String::from("lt"),
+            body: core::Expr::mk_lam(
+                true,
+                core::Expr::mk_app(
+                    core::Expr::Name(String::from("ltArray")),
+                    core::Expr::mk_app(core::Expr::Name(String::from("lt")), core::Expr::Var(0)),
+                ),
+            ),
+        }],
+    });
+    let actual_instance_ord_array_result = tc.check_declaration(instance_ord_array_decl);
+
+    assert_eq!(
+        expected_instance_ord_array_result, actual_instance_ord_array_result,
+        "`instance Ord a => Ord (Array a)` is valid"
+    );
 }

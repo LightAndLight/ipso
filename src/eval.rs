@@ -789,6 +789,47 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 });
                 closure
             }
+            Builtin::LtArray => {
+                function3!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let lt = env[1];
+                        let a = env[0].unpack_array();
+                        let b = arg.unpack_array();
+
+                        let mut ix = 0;
+                        let a_len = a.len();
+                        let b_len = b.len();
+                        loop {
+                            // the prefix of a matches the prefix of b
+                            if ix < a_len {
+                                if ix < b_len {
+                                    let a_val = a[ix];
+                                    let b_val = b[ix];
+                                    if lt.apply(eval, a_val).apply(eval, b_val).unpack_bool() {
+                                        ix += 1;
+                                    } else {
+                                        return eval.alloc_value(Value::False);
+                                    }
+                                } else {
+                                    // a is longer than b
+                                    return eval.alloc_value(Value::False);
+                                }
+                            } else {
+                                if ix < b_len {
+                                    // a is shorter than b
+                                    return eval.alloc_value(Value::True);
+                                } else {
+                                    // a is the same length as b
+                                    return eval.alloc_value(Value::False);
+                                }
+                            }
+                        }
+                    }
+                )
+            }
             Builtin::FoldlArray => {
                 function3!(
                     self,

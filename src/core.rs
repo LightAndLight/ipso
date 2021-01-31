@@ -298,10 +298,6 @@ impl Expr {
         Expr::Case(Box::new(expr), branches)
     }
 
-    pub fn mk_evar(ev: usize) -> Expr {
-        Expr::EVar(EVar(ev))
-    }
-
     pub fn mk_placeholder(p: usize) -> Expr {
         Expr::Placeholder(Placeholder(p))
     }
@@ -572,6 +568,28 @@ impl Expr {
     /// let expr = Expr::mk_app(Expr::EVar(EVar(0)), Expr::mk_app(Expr::EVar(EVar(1)), Expr::EVar(EVar(2))));
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
     /// ```
+    ///
+    /// ```
+    /// use ipso::core::{Branch, EVar, Expr, Pattern};
+    /// let expr = Expr::mk_lam (
+    ///     true,
+    ///     Expr::mk_case(
+    ///         Expr::Var(0),
+    ///         vec![
+    ///             Branch {
+    ///                 pattern: Pattern::Record {
+    ///                     names: vec![
+    ///                         Expr::EVar(EVar(0))
+    ///                     ],
+    ///                     rest: true,
+    ///                 },
+    ///                 body: Expr::Var(1)
+    ///             },
+    ///         ],
+    ///     ),
+    /// );
+    /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0)]);
+    /// ```
     pub fn iter_evars<'a>(&'a self) -> IterEVars<'a> {
         IterEVars { next: vec![self] }
     }
@@ -620,7 +638,16 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::Embed(a, b) => Step::Continue(vec![a, b]),
                 Expr::Case(a, b) => Step::Continue({
                     let mut xs: Vec<&'a Expr> = vec![a];
-                    xs.extend(b.iter().map(|b| &b.body));
+                    xs.extend(b.iter().flat_map(|b| {
+                        let mut vals: Vec<&'a Expr> = match &b.pattern {
+                            Pattern::Name => Vec::new(),
+                            Pattern::Record { names, .. } => names.iter().collect(),
+                            Pattern::Variant { tag } => vec![tag],
+                            Pattern::Wildcard => Vec::new(),
+                        };
+                        vals.push(&b.body);
+                        vals.into_iter()
+                    }));
                     xs
                 }),
                 Expr::Unit => Step::Skip,

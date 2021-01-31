@@ -207,6 +207,25 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::EqArray)
             },
 
+            // ltArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
+            Declaration::Definition{
+                name: String::from("ltArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
+                        Type::mk_arrow(
+                            Type::mk_app(Type::Array, Type::Var(0)),
+                            Type::mk_arrow(
+                                Type::mk_app(Type::Array, Type::Var(0)),
+                                Type::Bool
+                            )
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::LtArray)
+            },
+
             // foldlArray : (b -> a -> b) -> b -> Array a -> b
             Declaration::Definition{
                 name: String::from("foldlArray"),

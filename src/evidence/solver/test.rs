@@ -70,7 +70,10 @@ fn solve_constraint_3() {
     assert_eq!(expected_result, actual_result);
 
     let expected_evidence = Evidence {
-        evars: 1,
+        evars: vec![Constraint::HasField {
+            field: String::from("z"),
+            rest: var.clone(),
+        }],
         environment: vec![(
             Constraint::HasField {
                 field: String::from("z"),

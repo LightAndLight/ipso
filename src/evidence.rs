@@ -7,7 +7,7 @@ pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evidence {
-    evars: usize,
+    evars: Vec<Constraint>,
     environment: Vec<(Constraint, Option<usize>, Option<Expr>)>,
 }
 
@@ -42,7 +42,7 @@ impl Constraint {
 impl Evidence {
     pub fn new() -> Self {
         Evidence {
-            evars: 0,
+            evars: Vec::new(),
             environment: Vec::new(),
         }
     }
@@ -54,9 +54,8 @@ impl Evidence {
     }
 
     pub fn assume(&mut self, pos: Option<usize>, constraint: Constraint) -> EVar {
-        let ev = self.evars;
-        self.evars += 1;
-        let ev = EVar(ev);
+        let ev = EVar(self.evars.len());
+        self.evars.push(constraint.clone());
         self.environment
             .push((constraint, pos, Some(Expr::EVar(ev))));
         ev
@@ -70,5 +69,9 @@ impl Evidence {
                 None
             }
         })
+    }
+
+    pub fn lookup_evar<'a>(&'a self, ev: &EVar) -> Option<&'a Constraint> {
+        self.evars.get(ev.0)
     }
 }
