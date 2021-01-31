@@ -36,5 +36,19 @@ fn instantiate_2() {
 #[test]
 fn map_vars_1() {
     let val = Expr::mk_lam(true, Expr::mk_lam(true, Expr::Var(1)));
-    assert_eq!(val, val.map_vars(Rc::new(move |n| n)));
+    assert_eq!(val, val.map_vars(|n| n));
+}
+#[test]
+fn map_vars_2() {
+    let val = Expr::mk_lam(
+        true,
+        Expr::mk_lam(true, Expr::mk_app(Expr::Var(2), Expr::Var(1))),
+    );
+    assert_eq!(
+        Expr::mk_lam(
+            true,
+            Expr::mk_lam(true, Expr::mk_app(Expr::Var(3), Expr::Var(1)))
+        ),
+        val.map_vars(|n| n + 1)
+    );
 }

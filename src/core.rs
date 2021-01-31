@@ -331,78 +331,80 @@ impl Expr {
         Expr::Placeholder(Placeholder(p))
     }
 
-    pub fn map_vars(&self, f: Rc<dyn Fn(usize) -> usize>) -> Expr {
-        match self {
-            Expr::Var(v) => Expr::Var(f(*v)),
-            Expr::EVar(v) => Expr::EVar(*v),
-            Expr::Placeholder(p) => Expr::Placeholder(*p),
-            Expr::Name(n) => Expr::Name(n.clone()),
-            Expr::Builtin(b) => Expr::Builtin(*b),
-            Expr::App(a, b) => Expr::mk_app(a.map_vars(f.clone()), b.map_vars(f)),
-            Expr::Lam { arg, body } => Expr::mk_lam(
-                *arg,
-                body.map_vars(if *arg {
-                    Rc::new(move |n| if n == 0 { 0 } else { 1 + f(n - 1) })
-                } else {
-                    f
-                }),
-            ),
-            Expr::True => Expr::True,
-            Expr::False => Expr::False,
-            Expr::IfThenElse(a, b, c) => {
-                Expr::mk_ifthenelse(a.map_vars(f.clone()), b.map_vars(f.clone()), c.map_vars(f))
-            }
-            Expr::Int(n) => Expr::Int(*n),
-            Expr::Binop(op, l, r) => Expr::mk_binop(*op, l.map_vars(f.clone()), r.map_vars(f)),
-            Expr::Char(c) => Expr::Char(*c),
-            Expr::String(ss) => Expr::String(
-                ss.iter()
-                    .map(|s| s.map_expr(|e| e.map_vars(f.clone())))
-                    .collect(),
-            ),
-            Expr::Array(es) => Expr::Array(es.iter().map(|e| e.map_vars(f.clone())).collect()),
-            Expr::Extend(a, b, c) => {
-                Expr::mk_extend(a.map_vars(f.clone()), b.map_vars(f.clone()), c.map_vars(f))
-            }
-            Expr::Record(xs) => Expr::Record(
-                xs.iter()
-                    .map(|(a, b)| (a.map_vars(f.clone()), b.map_vars(f.clone())))
-                    .collect(),
-            ),
-            Expr::Project(a, b) => Expr::mk_project(a.map_vars(f.clone()), b.map_vars(f)),
-            Expr::Variant(a) => Expr::mk_variant(a.map_vars(f)),
-            Expr::Embed(a, b) => Expr::mk_embed(a.map_vars(f.clone()), b.map_vars(f)),
-            Expr::Case(a, bs) => Expr::mk_case(
-                a.map_vars(f.clone()),
-                bs.iter()
-                    .map(move |b| match &b.pattern {
-                        Pattern::Name => {
-                            let f = f.clone();
-                            b.map_expr(&move |e| {
-                                let f = f.clone();
-                                e.map_vars(Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) }))
-                            })
-                        }
-                        Pattern::Record { names, rest } => {
-                            let offset = names.len() + if *rest { 1 } else { 0 };
-                            let f = f.clone();
-                            b.map_expr(&move |e| {
-                                let f = f.clone();
-                                e.map_vars(Rc::new(
-                                    move |n| if n < offset { n } else { f(n - offset) },
-                                ))
-                            })
-                        }
-                        Pattern::Variant { tag: _ } => b.map_expr(&|e| {
-                            let f = f.clone();
-                            e.map_vars(Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) }))
-                        }),
-                        Pattern::Wildcard => b.map_expr(&|e| e.map_vars(f.clone())),
-                    })
-                    .collect(),
-            ),
-            Expr::Unit => Expr::Unit,
+    pub fn map_vars<F: Fn(usize) -> usize>(&self, f: F) -> Expr {
+        enum Function<'a, F> {
+            Code(F),
+            Under(usize, &'a Function<'a, F>),
         }
+
+        impl<'a, F: Fn(usize) -> usize> Function<'a, F> {
+            fn apply(&self, x: usize) -> usize {
+                match self {
+                    Function::Code(f) => f(x),
+                    Function::Under(n, f) => {
+                        if x < *n {
+                            x
+                        } else {
+                            n + f.apply(x - n)
+                        }
+                    }
+                }
+            }
+        }
+
+        fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
+            match expr {
+                Expr::Var(v) => Expr::Var(f.apply(*v)),
+                Expr::EVar(v) => Expr::EVar(*v),
+                Expr::Placeholder(p) => Expr::Placeholder(*p),
+                Expr::Name(n) => Expr::Name(n.clone()),
+                Expr::Builtin(b) => Expr::Builtin(*b),
+                Expr::App(a, b) => Expr::mk_app(go(a, f), go(b, f)),
+                Expr::Lam { arg, body } => {
+                    if *arg {
+                        Expr::mk_lam(*arg, go(body, &Function::Under(1, f)))
+                    } else {
+                        Expr::mk_lam(*arg, go(body, f))
+                    }
+                }
+                Expr::True => Expr::True,
+                Expr::False => Expr::False,
+                Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(go(a, f), go(b, f), go(c, f)),
+                Expr::Int(n) => Expr::Int(*n),
+                Expr::Binop(op, l, r) => Expr::mk_binop(*op, go(l, f), go(r, f)),
+                Expr::Char(c) => Expr::Char(*c),
+                Expr::String(ss) => {
+                    Expr::String(ss.iter().map(|s| s.map_expr(|e| go(e, f))).collect())
+                }
+                Expr::Array(es) => Expr::Array(es.iter().map(|e| go(e, f)).collect()),
+                Expr::Extend(a, b, c) => Expr::mk_extend(go(a, f), go(b, f), go(c, f)),
+                Expr::Record(xs) => {
+                    Expr::Record(xs.iter().map(|(a, b)| (go(a, f), go(b, f))).collect())
+                }
+                Expr::Project(a, b) => Expr::mk_project(go(a, f), go(b, f)),
+                Expr::Variant(a) => Expr::mk_variant(go(a, f)),
+                Expr::Embed(a, b) => Expr::mk_embed(go(a, f), go(b, f)),
+                Expr::Case(a, bs) => Expr::mk_case(
+                    go(a, f),
+                    bs.iter()
+                        .map(|b| match &b.pattern {
+                            Pattern::Name => b.map_expr(&|e| go(e, &Function::Under(1, f))),
+                            Pattern::Record { names, rest } => {
+                                let offset = names.len() + if *rest { 1 } else { 0 };
+                                b.map_expr(&|e| go(e, &Function::Under(offset, f)))
+                            }
+                            Pattern::Variant { tag: _ } => {
+                                b.map_expr(&|e| go(e, &Function::Under(1, f)))
+                            }
+                            Pattern::Wildcard => b.map_expr(&|e| go(e, f)),
+                        })
+                        .collect(),
+                ),
+                Expr::Unit => Expr::Unit,
+            }
+        }
+
+        go(self, &Function::Code(f))
     }
 
     /// ```
@@ -439,7 +441,7 @@ impl Expr {
         match self {
             Expr::Var(n) => {
                 if *n == depth {
-                    val.map_vars(Rc::new(move |n| n + depth))
+                    val.map_vars(|n| n + depth)
                 } else {
                     if *n > depth {
                         Expr::Var(*n - 1)
