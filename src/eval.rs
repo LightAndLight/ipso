@@ -920,7 +920,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let len = env[1].unpack_int() as usize;
                         let arr = arg.unpack_array();
 
-                        eval.alloc_value(Value::Array(Vec::from(&arr[start..len])))
+                        eval.alloc_value(Value::Array(Vec::from(&arr[start..start + len])))
                     }
                 )
             }
