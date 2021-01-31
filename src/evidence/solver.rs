@@ -82,7 +82,9 @@ pub fn solve_constraint(
                             consequent: tc.zonk_type(implication.consequent),
                             evidence: implication.evidence,
                         };
+
                         let mut evidence = Ok(implication.evidence);
+
                         for antecedent in &implication.antecedents {
                             match solve_constraint(context, tc, &Constraint::from_type(antecedent))
                             {
@@ -95,6 +97,7 @@ pub fn solve_constraint(
                                 }
                             }
                         }
+
                         match evidence {
                             Err(_err) => {
                                 continue;

@@ -1,5 +1,5 @@
 {
-  args = ["26.ipso"],
+  args = ["24.ipso"],
   stdin = None Text,
   stdout = "b",
   stderr = "",
