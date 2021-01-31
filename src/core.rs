@@ -247,9 +247,10 @@ impl Expr {
     pub fn mk_record(fields: Vec<(Expr, Expr)>, rest: Option<Expr>) -> Expr {
         match rest {
             None => Expr::Record(fields),
-            Some(rest) => fields.into_iter().rev().fold(rest, |acc, (ev, field)| {
-                Expr::Extend(Box::new(ev), Box::new(field), Box::new(acc))
-            }),
+            Some(rest) => fields
+                .into_iter()
+                .rev()
+                .fold(rest, |acc, (ev, field)| Expr::mk_extend(ev, field, acc)),
         }
     }
 
