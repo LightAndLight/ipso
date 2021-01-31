@@ -3,6 +3,8 @@ pkgs.rustPlatform.buildRustPackage {
   name = "ipso";
   src = pkgs.lib.cleanSourceWith {
     filter = path: type: builtins.all (x: x) [
+      (builtins.baseNameOf path != ".git")
+      (builtins.baseNameOf path != ".gitignore")
       (builtins.baseNameOf path != "default.nix")
       (builtins.baseNameOf path != "REFERENCE.md")
       (builtins.baseNameOf path != "target")
