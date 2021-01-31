@@ -464,10 +464,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap Vec<ValueRef<'heap>>,
                         ) -> ValueRef<'heap> {
-                            // env[0] : a -> b
-                            // env[1] : IO a
-                            let b = env[1].perform_io(interpreter); // type: a
-                            env[0].apply(interpreter, b) // type: b
+                            let f = env[0];
+                            let io_a = env[1];
+                            let a = io_a.perform_io(interpreter); // type: a
+                            f.apply(interpreter, a) // type: b
                         }
                         let env = interpreter.alloc_env({
                             let mut env = env.clone();
@@ -513,11 +513,11 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap Vec<ValueRef<'heap>>,
                         ) -> ValueRef<'heap> {
-                            // env[0] : IO a
-                            // env[1] : a -> IO b
-                            let a = env[0].perform_io(interpreter); // type: a
-                            let b = env[1].apply(interpreter, a); // type: IO b
-                            b.perform_io(interpreter) // type: b
+                            let io_a = env[0];
+                            let f = env[1];
+                            let a = io_a.perform_io(interpreter); // type: a
+                            let io_b = f.apply(interpreter, a); // type: IO b
+                            io_b.perform_io(interpreter) // type: b
                         }
                         let env = interpreter.alloc_env({
                             let mut env = env.clone();
