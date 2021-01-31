@@ -1,5 +1,9 @@
+use std::rc::Rc;
+
 #[cfg(test)]
 use crate::{core::Expr, syntax::Binop};
+
+use super::StringPart;
 
 #[test]
 fn instantiate_1() {
@@ -27,4 +31,10 @@ fn instantiate_2() {
     );
     let actual = term.instantiate(&Expr::Int(42));
     assert_eq!(expected, actual)
+}
+
+#[test]
+fn map_vars_1() {
+    let val = Expr::mk_lam(true, Expr::mk_lam(true, Expr::Var(1)));
+    assert_eq!(val, val.map_vars(Rc::new(move |n| n)));
 }

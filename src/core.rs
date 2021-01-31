@@ -342,7 +342,7 @@ impl Expr {
             Expr::Lam { arg, body } => Expr::mk_lam(
                 *arg,
                 body.map_vars(if *arg {
-                    Rc::new(move |n| if n == 0 { 0 } else { f(n - 1) })
+                    Rc::new(move |n| if n == 0 { 0 } else { 1 + f(n - 1) })
                 } else {
                     f
                 }),
