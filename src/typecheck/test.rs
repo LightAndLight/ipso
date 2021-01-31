@@ -2123,6 +2123,12 @@ fn class_and_instance_2() {
 
     instance Ord a => Ord (Array a) where
       lt = ltArray lt
+
+    instance Ord Int where
+      lt = ltInt
+
+    comparison : Bool
+    comparison = lt [0, 1, 2] [3, 4]
      */
 
     let mut tc = Typechecker::new_with_builtins();
@@ -2331,4 +2337,135 @@ fn class_and_instance_2() {
         expected_instance_ord_array_result, actual_instance_ord_array_result,
         "`instance Ord a => Ord (Array a)` is valid"
     );
+
+    tc.register_declaration(&actual_instance_ord_array_result.unwrap());
+
+    let instance_ord_int_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Instance {
+            assumes: Vec::new(),
+            name: Spanned {
+                pos: 0,
+                item: String::from("Ord"),
+            },
+            args: vec![Type::Int],
+            members: vec![(
+                Spanned {
+                    pos: 0,
+                    item: String::from("lt"),
+                },
+                Vec::new(),
+                Spanned {
+                    pos: 0,
+                    item: syntax::Expr::Var(String::from("ltInt")),
+                },
+            )],
+        },
+    };
+
+    let instance_ord_int_result = tc.check_declaration(instance_ord_int_decl).unwrap();
+    tc.register_declaration(&instance_ord_int_result);
+
+    let array_int_lt_decl = Spanned {
+        pos: 0,
+        item: syntax::Declaration::Definition {
+            name: String::from("comparison"),
+            ty: Type::Bool,
+            args: Vec::new(),
+            body: syntax::Expr::mk_app(
+                syntax::Expr::mk_app(
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Var(String::from("lt")),
+                    },
+                    Spanned {
+                        pos: 0,
+                        item: syntax::Expr::Array(vec![
+                            Spanned {
+                                pos: 0,
+                                item: syntax::Expr::Int(0),
+                            },
+                            Spanned {
+                                pos: 0,
+                                item: syntax::Expr::Int(1),
+                            },
+                            Spanned {
+                                pos: 0,
+                                item: syntax::Expr::Int(2),
+                            },
+                        ]),
+                    },
+                ),
+                Spanned {
+                    pos: 0,
+                    item: syntax::Expr::Array(vec![
+                        Spanned {
+                            pos: 0,
+                            item: syntax::Expr::Int(4),
+                        },
+                        Spanned {
+                            pos: 0,
+                            item: syntax::Expr::Int(5),
+                        },
+                    ]),
+                },
+            ),
+        },
+    };
+    let eq_int_dict = core::Expr::mk_record(
+        vec![(core::Expr::Int(0), core::Expr::Name(String::from("eqInt")))],
+        None,
+    );
+    let eq_array_int_dict = core::Expr::mk_record(
+        vec![(
+            core::Expr::Int(0),
+            core::Expr::mk_app(
+                core::Expr::Name(String::from("eqArray")),
+                core::Expr::mk_app(core::Expr::Name(String::from("eq")), eq_int_dict.clone()),
+            ),
+        )],
+        None,
+    );
+    let ord_int_dict = core::Expr::mk_record(
+        vec![
+            (core::Expr::Int(0), eq_int_dict),
+            (core::Expr::Int(1), core::Expr::Name(String::from("ltInt"))),
+        ],
+        None,
+    );
+    let lt_array_int = core::Expr::mk_app(
+        core::Expr::Name(String::from("ltArray")),
+        core::Expr::mk_app(core::Expr::Name(String::from("lt")), ord_int_dict),
+    );
+    let ord_array_int_dict = core::Expr::mk_record(
+        vec![
+            (core::Expr::Int(0), eq_array_int_dict),
+            (core::Expr::Int(1), lt_array_int),
+        ],
+        None,
+    );
+    let expected_array_int_lt_result = Ok(core::Declaration::Definition {
+        name: String::from("comparison"),
+        sig: TypeSig {
+            ty_vars: Vec::new(),
+            body: Type::Bool,
+        },
+        body: core::Expr::mk_app(
+            core::Expr::mk_app(
+                core::Expr::mk_app(core::Expr::Name(String::from("lt")), ord_array_int_dict),
+                core::Expr::Array(vec![
+                    core::Expr::Int(0),
+                    core::Expr::Int(1),
+                    core::Expr::Int(2),
+                ]),
+            ),
+            core::Expr::Array(vec![core::Expr::Int(4), core::Expr::Int(5)]),
+        ),
+    });
+    let actual_array_int_lt_result = tc.check_declaration(array_int_lt_decl);
+
+    assert_eq!(
+        expected_array_int_lt_result, actual_array_int_lt_result,
+        "comparison = lt [0, 1, 2] [4, 5] is valid"
+    )
 }

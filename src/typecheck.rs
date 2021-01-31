@@ -660,7 +660,8 @@ impl Typechecker {
         members: &Vec<core::InstanceMember>,
     ) {
         let mut dictionary: Vec<core::Expr> =
-            members.iter().map(|member| member.body.clone()).collect();
+            superclass_constructors.iter().map(|x| x.clone()).collect();
+        dictionary.extend(members.iter().map(|member| member.body.clone()));
 
         for (ix, _assume) in assumes.iter().enumerate().rev() {
             for item in &mut dictionary {
