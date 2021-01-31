@@ -807,17 +807,13 @@ impl Typechecker {
 
         let mut unsolved_constraints: Vec<(core::EVar, Type<usize>)> = Vec::new();
         let mut seen_evars: HashSet<core::EVar> = HashSet::new();
-        let _ = dbg!("before expr", &expr);
         for ev in expr.iter_evars() {
-            let _ = dbg!("ev", ev);
             if !seen_evars.contains(ev) {
                 seen_evars.insert(*ev);
                 let constraint = self.evidence.lookup_evar(ev).unwrap();
                 unsolved_constraints.push((*ev, self.zonk_type(constraint.to_type())));
             }
         }
-
-        let _ = dbg!("unsolved_constraints", &unsolved_constraints);
 
         let mut expr = expr;
         let mut new_unsolved_constraints = Vec::new();
