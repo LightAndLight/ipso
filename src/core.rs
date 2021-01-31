@@ -654,6 +654,23 @@ impl Expr {
         }
     }
 
+    /// ```
+    /// use ipso::core::{EVar, Expr};
+    ///
+    /// assert_eq!(
+    ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
+    ///     Expr::mk_lam(true, Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1))))
+    /// )
+    /// ```
+    ///
+    /// ```
+    /// use ipso::core::{EVar, Expr};
+    ///
+    /// assert_eq!(
+    ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(1), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
+    ///     Expr::mk_lam(true, Expr::mk_lam(true, Expr::mk_app(Expr::Var(2), Expr::Var(1))))
+    /// )
+    /// ```
     pub fn abstract_evar(&self, ev: EVar) -> Expr {
         Expr::mk_lam(true, self.__abstract_evar(0, ev))
     }

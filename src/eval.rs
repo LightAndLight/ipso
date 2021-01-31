@@ -795,8 +795,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
                      arg: ValueRef<'heap>| {
-                        let lt = env[1];
-                        let a = env[0].unpack_array();
+                        let lt = env[0];
+                        let a = env[1].unpack_array();
                         let b = arg.unpack_array();
 
                         let mut ix = 0;
@@ -836,8 +836,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
                      arg: ValueRef<'heap>| {
-                        let f = env[1];
-                        let z = env[0];
+                        let f = env[0];
+                        let z = env[1];
                         let arr = arg.unpack_array();
 
                         let mut acc = z;
@@ -907,14 +907,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
             Expr::String(parts) => {
                 let mut value = String::new();
+
                 for part in parts {
                     match part {
                         StringPart::Expr(expr) => {
-                            let expr = self.eval(env, expr);
-                            match expr {
-                                Value::String(s) => value.push_str(s.as_str()),
-                                expr => panic!("expected string, got {:?}", expr),
-                            }
+                            let s = self.eval(env, expr).unpack_string();
+                            value.push_str(s.as_str());
                         }
                         StringPart::String(s) => value.push_str(s.as_str()),
                     }
