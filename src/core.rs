@@ -1,4 +1,4 @@
-use crate::syntax;
+use crate::{iter::Step, syntax};
 
 #[cfg(test)]
 mod test;
@@ -173,6 +173,7 @@ pub enum Builtin {
     LtInt,
     FoldlArray,
     EqArray,
+    LtArray,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -556,6 +557,95 @@ impl Expr {
 
     pub fn abstract_evar(&self, ev: EVar) -> Expr {
         Expr::mk_lam(true, self.__abstract_evar(0, ev))
+    }
+
+    /// ```
+    /// use ipso::core::{EVar, Expr};
+    ///
+    /// let expr = Expr::mk_app(Expr::mk_app(Expr::EVar(EVar(0)), Expr::EVar(EVar(1))), Expr::EVar(EVar(2)));
+    /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
+    /// ```
+    ///
+    /// ```
+    /// use ipso::core::{EVar, Expr};
+    ///
+    /// let expr = Expr::mk_app(Expr::EVar(EVar(0)), Expr::mk_app(Expr::EVar(EVar(1)), Expr::EVar(EVar(2))));
+    /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
+    /// ```
+    pub fn iter_evars<'a>(&'a self) -> IterEVars<'a> {
+        IterEVars { next: vec![self] }
+    }
+}
+
+pub struct IterEVars<'a> {
+    next: Vec<&'a Expr>,
+}
+
+impl<'a> Iterator for IterEVars<'a> {
+    type Item = &'a EVar;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn step_expr<'a>(expr: &'a Expr) -> Step<'a, Expr, &'a EVar> {
+            match expr {
+                Expr::Var(_) => Step::Skip,
+                Expr::EVar(a) => Step::Yield(a),
+                Expr::Placeholder(_) => Step::Skip,
+                Expr::Name(_) => Step::Skip,
+                Expr::Builtin(_) => Step::Skip,
+                Expr::App(a, b) => Step::Continue(vec![a, b]),
+                Expr::Lam { arg, body } => Step::Continue(vec![body]),
+                Expr::True => Step::Skip,
+                Expr::False => Step::Skip,
+                Expr::IfThenElse(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::Int(_) => Step::Skip,
+                Expr::Binop(_, a, b) => Step::Continue(vec![a, b]),
+                Expr::Char(_) => Step::Skip,
+                Expr::String(a) => Step::Continue(
+                    a.iter()
+                        .flat_map(|x| match x {
+                            StringPart::String(_) => Vec::new().into_iter(),
+                            StringPart::Expr(e) => vec![e].into_iter(),
+                        })
+                        .collect(),
+                ),
+                Expr::Array(xs) => Step::Continue(xs.iter().collect()),
+                Expr::Extend(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::Record(xs) => Step::Continue(
+                    xs.iter()
+                        .flat_map(|(a, b)| vec![a, b].into_iter())
+                        .collect(),
+                ),
+                Expr::Project(a, b) => Step::Continue(vec![a, b]),
+                Expr::Variant(a) => Step::Continue(vec![a]),
+                Expr::Embed(a, b) => Step::Continue(vec![a, b]),
+                Expr::Case(a, b) => Step::Continue({
+                    let mut xs: Vec<&'a Expr> = vec![a];
+                    xs.extend(b.iter().map(|b| &b.body));
+                    xs
+                }),
+                Expr::Unit => Step::Skip,
+            }
+        }
+
+        loop {
+            match self.next.pop() {
+                None => {
+                    return None;
+                }
+                Some(expr) => match step_expr(expr) {
+                    Step::Yield(x) => {
+                        return Some(x);
+                    }
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue(xs) => {
+                        self.next.extend(xs.into_iter().rev());
+                        continue;
+                    }
+                },
+            }
+        }
     }
 }
 
