@@ -805,7 +805,7 @@ impl Parser {
         choices!(
             self,
             keep_right!(
-                self.token(&TokenType::DollarLBrace),
+                keep_left!(self.token(&TokenType::DollarLBrace), self.spaces()),
                 keep_left!(
                     self.expr().map(|x| StringPart::Expr(x)),
                     self.token(&TokenType::RBrace)
