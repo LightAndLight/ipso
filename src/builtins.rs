@@ -198,6 +198,16 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::ShowInt)
             },
 
+            // minusInt : Int -> Int -> Int
+            Declaration::Definition{
+                name: String::from("minusInt"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int))
+                },
+                body: Expr::Builtin(Builtin::MinusInt)
+            },
+
             // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
             Declaration::Definition{
                 name: String::from("eqArray"),
