@@ -1,0 +1,20 @@
+class Show a where
+  show : a -> String
+
+instance Show Int where
+  show = showInt
+
+prettyArray : Show a => Array a -> String
+prettyArray arr = 
+  "[${
+    if eqInt (lengthArray arr) 0
+    then ""
+    else 
+      foldlArray 
+        (\acc el -> "${acc}, ${show el}") 
+        (show (indexArray 0 arr))
+        (sliceArray 1 (minusInt (lengthArray arr) 1) arr)
+  }]"
+
+main : IO ()
+main = writeStdout stdout (toUtf8 (prettyArray [0, 1, 2, 3, 4]))
