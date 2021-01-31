@@ -405,6 +405,32 @@ impl Expr {
         }
     }
 
+    /// ```
+    /// use ipso::core::Expr;
+    ///
+    /// assert_eq!(
+    ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Int(99)),
+    ///     Expr::mk_app(Expr::Int(99), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Int(99))))
+    /// )
+    /// ```
+    ///
+    /// ```
+    /// use ipso::core::Expr;
+    ///
+    /// assert_eq!(
+    ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Var(0)),
+    ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1))))
+    /// )
+    /// ```
+    ///
+    /// ```
+    /// use ipso::core::Expr;
+    ///
+    /// assert_eq!(
+    ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(2)))).instantiate(&Expr::Int(99)),
+    ///     Expr::mk_app(Expr::Int(99), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1))))
+    /// )
+    /// ```
     pub fn instantiate(&self, val: &Expr) -> Expr {
         self.__instantiate(0, val)
     }
@@ -415,7 +441,11 @@ impl Expr {
                 if *n == depth {
                     val.map_vars(Rc::new(move |n| n + depth))
                 } else {
-                    Expr::Var(*n)
+                    if *n > depth {
+                        Expr::Var(*n - 1)
+                    } else {
+                        Expr::Var(*n)
+                    }
                 }
             }
             Expr::EVar(v) => Expr::EVar(*v),
