@@ -253,7 +253,36 @@ lazy_static! {
                     )
                 },
                 body: Expr::Builtin(Builtin::FoldlArray)
-            }
+            },
+
+            // lengthArray : Array a -> Int
+            Declaration::Definition{
+                name: String::from("lengthArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::mk_app(Type::Array, Type::Var(0)),
+                        Type::Int
+                    )
+                },
+                body: Expr::Builtin(Builtin::LengthArray)
+            },
+
+            // indexArray : Int -> Array a -> a
+            Declaration::Definition{
+                name: String::from("indexArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::Int,
+                        Type::mk_arrow(
+                            Type::mk_app(Type::Array, Type::Var(0)),
+                            Type::Var(0)
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::IndexArray)
+            },
         ]
 
 

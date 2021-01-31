@@ -873,6 +873,31 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::LengthArray => {
+                function1!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     _env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let arr = arg.unpack_array();
+
+                        eval.alloc_value(Value::Int(arr.len() as u32))
+                    }
+                )
+            }
+            Builtin::IndexArray => {
+                function2!(
+                    self,
+                    |_eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let ix = env[0].unpack_int() as usize;
+                        let arr = arg.unpack_array();
+
+                        arr[ix]
+                    }
+                )
+            }
         }
     }
 

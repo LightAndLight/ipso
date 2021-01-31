@@ -201,6 +201,8 @@ pub enum Builtin {
     FoldlArray,
     EqArray,
     LtArray,
+    LengthArray,
+    IndexArray,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
