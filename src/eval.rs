@@ -898,6 +898,20 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::SliceArray => {
+                function3!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let start = env[0].unpack_int() as usize;
+                        let len = env[1].unpack_int() as usize;
+                        let arr = arg.unpack_array();
+
+                        eval.alloc_value(Value::Array(Vec::from(&arr[start..len])))
+                    }
+                )
+            }
         }
     }
 

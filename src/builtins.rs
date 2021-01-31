@@ -283,6 +283,25 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::IndexArray)
             },
+
+            // sliceArray : Int -> Int -> Array a -> Array a
+            Declaration::Definition{
+                name: String::from("sliceArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::Int,
+                        Type::mk_arrow(
+                            Type::Int,
+                            Type::mk_arrow(
+                                Type::mk_app(Type::Array, Type::Var(0)),
+                                Type::mk_app(Type::Array, Type::Var(0))
+                            )
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::SliceArray)
+            },
         ]
 
 

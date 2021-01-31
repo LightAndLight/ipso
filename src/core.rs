@@ -203,6 +203,7 @@ pub enum Builtin {
     LtArray,
     LengthArray,
     IndexArray,
+    SliceArray,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
