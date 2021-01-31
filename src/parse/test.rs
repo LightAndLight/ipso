@@ -148,6 +148,7 @@ fn parse_definition_3() {
                 TokenType::Ident(String::from("case")),
                 TokenType::Ident(String::from("true")),
                 TokenType::Ident(String::from("false")),
+                TokenType::Ident(String::from("if")),
                 TokenType::Ctor,
                 TokenType::Space,
                 TokenType::LAngle,
@@ -155,7 +156,7 @@ fn parse_definition_3() {
                 TokenType::LBrace,
                 TokenType::LBracket,
                 TokenType::DoubleQuote,
-                TokenType::Backslash
+                TokenType::Backslash,
             ]
             .into_iter()
             .collect()

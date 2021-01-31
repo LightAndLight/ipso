@@ -1016,8 +1016,32 @@ impl Parser {
         )
     }
 
+    fn expr_ifthenelse(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            keep_left!(self.keyword(Keyword::If), self.spaces()).and_then(|_| self
+                .expr()
+                .and_then(
+                    |cond| keep_left!(self.keyword(Keyword::Then), self.spaces()).and_then(|_| {
+                        self.expr().and_then(|then| {
+                            keep_left!(self.keyword(Keyword::Else), self.spaces()).and_then(|_| {
+                                self.expr()
+                                    .map(|else_| syntax::Expr::mk_ifthenelse(cond, then, else_))
+                            })
+                        })
+                    })
+                ))
+        )
+    }
+
     fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
-        choices!(self, self.expr_app(), self.expr_case(), self.expr_lam())
+        choices!(
+            self,
+            self.expr_app(),
+            self.expr_case(),
+            self.expr_lam(),
+            self.expr_ifthenelse()
+        )
     }
 
     fn definition(&mut self) -> ParseResult<Declaration> {

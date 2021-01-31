@@ -149,6 +149,10 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn mk_ifthenelse(cond: Spanned<Expr>, then: Spanned<Expr>, else_: Spanned<Expr>) -> Expr {
+        Expr::IfThenElse(Box::new(cond), Box::new(then), Box::new(else_))
+    }
+
     pub fn mk_var(v: &str) -> Expr {
         Expr::Var(String::from(v))
     }
