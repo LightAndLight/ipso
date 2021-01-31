@@ -188,6 +188,16 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::LtInt)
             },
 
+            // showInt : Int -> String
+            Declaration::Definition{
+                name: String::from("showInt"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::String)
+                },
+                body: Expr::Builtin(Builtin::ShowInt)
+            },
+
             // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
             Declaration::Definition{
                 name: String::from("eqArray"),

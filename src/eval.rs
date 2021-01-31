@@ -10,26 +10,14 @@ use typed_arena::Arena;
 
 mod test;
 
-macro_rules! function2 {
+macro_rules! function1 {
     ($self:expr, $body:expr) => {{
         fn code_0<'heap>(
             eval: &mut Interpreter<'_, 'heap>,
-            _env: &'heap Vec<ValueRef<'heap>>,
+            env: &'heap Vec<ValueRef<'heap>>,
             arg: ValueRef<'heap>,
         ) -> ValueRef<'heap> {
-            fn code_1<'heap>(
-                eval: &mut Interpreter<'_, 'heap>,
-                env: &'heap Vec<ValueRef<'heap>>,
-                arg: ValueRef<'heap>,
-            ) -> ValueRef<'heap> {
-                $body(eval, env, arg)
-            }
-            let env = eval.alloc_env(vec![arg]);
-            let closure = eval.alloc_value(Value::StaticClosure {
-                env,
-                body: StaticClosureBody(code_1),
-            });
-            closure
+            $body(eval, env, arg)
         };
 
         let env = $self.alloc_env(Vec::new());
@@ -38,6 +26,32 @@ macro_rules! function2 {
             body: StaticClosureBody(code_0),
         });
         closure
+    }};
+}
+
+macro_rules! function2 {
+    ($self:expr, $body:expr) => {{
+        function1!($self, |eval: &mut Interpreter<'_, 'heap>,
+                           env: &'heap Vec<ValueRef<'heap>>,
+                           arg: ValueRef<'heap>| {
+            fn code_1<'heap>(
+                eval: &mut Interpreter<'_, 'heap>,
+                env: &'heap Vec<ValueRef<'heap>>,
+                arg: ValueRef<'heap>,
+            ) -> ValueRef<'heap> {
+                $body(eval, env, arg)
+            }
+            let env = {
+                let mut env = env.clone();
+                env.push(arg);
+                eval.alloc_env(vec![arg])
+            };
+            let closure = eval.alloc_value(Value::StaticClosure {
+                env,
+                body: StaticClosureBody(code_1),
+            });
+            closure
+        })
     }};
 }
 
@@ -730,6 +744,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         } else {
                             eval.alloc_value(Value::False)
                         }
+                    }
+                )
+            }
+            Builtin::ShowInt => {
+                function1!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     _env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = arg.unpack_int();
+                        eval.alloc_value(Value::String(format!("{}", a)))
                     }
                 )
             }

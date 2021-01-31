@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{iter::Step, syntax};
 
 #[cfg(test)]
@@ -199,6 +197,7 @@ pub enum Builtin {
     ReadLineStdin,
     EqInt,
     LtInt,
+    ShowInt,
     FoldlArray,
     EqArray,
     LtArray,
