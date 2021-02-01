@@ -373,13 +373,14 @@ fn infer_lam_test_1() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term),
-        Ok((
-            core::Expr::mk_lam(true, core::Expr::Var(0)),
-            syntax::Type::mk_arrow(syntax::Type::Meta(0), syntax::Type::Meta(0))
-        ))
-    )
+    let expected = Ok((
+        core::Expr::mk_lam(true, core::Expr::Var(0)),
+        syntax::Type::mk_arrow(syntax::Type::Meta(4), syntax::Type::Meta(4)),
+    ));
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -408,37 +409,35 @@ fn infer_lam_test_2() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![core::Branch {
-                        pattern: core::Pattern::Record {
-                            names: vec![
-                                core::Expr::mk_placeholder(1),
-                                core::Expr::mk_placeholder(0)
-                            ],
-                            rest: false
-                        },
-                        body: core::Expr::Var(1)
-                    }]
-                )
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![core::Branch {
+                    pattern: core::Pattern::Record {
+                        names: vec![core::Expr::mk_placeholder(1), core::Expr::mk_placeholder(0)],
+                        rest: false,
+                    },
+                    body: core::Expr::Var(1),
+                }],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_record(
-                    vec![
-                        (String::from("x"), syntax::Type::Meta(0)),
-                        (String::from("y"), syntax::Type::Meta(1))
-                    ],
-                    None
-                ),
-                syntax::Type::Meta(0)
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_record(
+                vec![
+                    (String::from("x"), syntax::Type::Meta(4)),
+                    (String::from("y"), syntax::Type::Meta(5)),
+                ],
+                None,
+            ),
+            syntax::Type::Meta(4),
+        ),
+    ));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -467,37 +466,35 @@ fn infer_lam_test_3() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![core::Branch {
-                        pattern: core::Pattern::Record {
-                            names: vec![
-                                core::Expr::mk_placeholder(1),
-                                core::Expr::mk_placeholder(0)
-                            ],
-                            rest: false
-                        },
-                        body: core::Expr::Var(0)
-                    }]
-                )
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![core::Branch {
+                    pattern: core::Pattern::Record {
+                        names: vec![core::Expr::mk_placeholder(1), core::Expr::mk_placeholder(0)],
+                        rest: false,
+                    },
+                    body: core::Expr::Var(0),
+                }],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_record(
-                    vec![
-                        (String::from("x"), syntax::Type::Meta(0)),
-                        (String::from("y"), syntax::Type::Meta(1))
-                    ],
-                    None
-                ),
-                syntax::Type::Meta(1)
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_record(
+                vec![
+                    (String::from("x"), syntax::Type::Meta(4)),
+                    (String::from("y"), syntax::Type::Meta(5)),
+                ],
+                None,
+            ),
+            syntax::Type::Meta(5),
+        ),
+    ));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -546,15 +543,17 @@ fn infer_lam_test_4() {
         syntax::Type::mk_arrow(
             syntax::Type::mk_record(
                 vec![
-                    (String::from("x"), syntax::Type::Meta(0)),
-                    (String::from("y"), syntax::Type::Meta(1)),
+                    (String::from("x"), syntax::Type::Meta(4)),
+                    (String::from("y"), syntax::Type::Meta(5)),
                 ],
-                Some(syntax::Type::Meta(2)),
+                Some(syntax::Type::Meta(6)),
             ),
-            syntax::Type::mk_record(vec![], Some(syntax::Type::Meta(2))),
+            syntax::Type::mk_record(vec![], Some(syntax::Type::Meta(6))),
         ),
     ));
-    let actual = tc.infer_expr(term);
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
     assert_eq!(expected, actual)
 }
 
@@ -587,23 +586,24 @@ fn infer_lam_test_5() {
             ),
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
-        Ok((
+
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
             core::Expr::mk_lam(
                 true,
-                core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_app(core::Expr::Var(1), core::Expr::Var(0))
-                )
+                core::Expr::mk_app(core::Expr::Var(1), core::Expr::Var(0)),
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_arrow(syntax::Type::Meta(1), syntax::Type::Meta(3)),
-                syntax::Type::mk_arrow(syntax::Type::Meta(1), syntax::Type::Meta(3))
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_arrow(syntax::Type::Meta(6), syntax::Type::Meta(8)),
+            syntax::Type::mk_arrow(syntax::Type::Meta(6), syntax::Type::Meta(8)),
+        ),
+    ));
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -1004,26 +1004,26 @@ fn infer_case_1() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![core::Branch {
-                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
-                        body: core::Expr::Var(0)
-                    }]
-                )
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![core::Branch {
+                    pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
+                    body: core::Expr::Var(0),
+                }],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(2))], None),
-                syntax::Type::Meta(2)
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(6))], None),
+            syntax::Type::Meta(6),
+        ),
+    ));
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -1086,38 +1086,38 @@ fn infer_case_2() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![
-                        core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
-                            body: core::Expr::Var(0)
-                        },
-                        core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
-                            body: core::Expr::Var(0)
-                        },
-                    ]
-                )
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![
+                    core::Branch {
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
+                        body: core::Expr::Var(0),
+                    },
+                    core::Branch {
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
+                        body: core::Expr::Var(0),
+                    },
+                ],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_variant(
-                    vec![
-                        (String::from("Left"), syntax::Type::Meta(4)),
-                        (String::from("Right"), syntax::Type::Meta(4))
-                    ],
-                    None
-                ),
-                syntax::Type::Meta(4)
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_variant(
+                vec![
+                    (String::from("Left"), syntax::Type::Meta(8)),
+                    (String::from("Right"), syntax::Type::Meta(8)),
+                ],
+                None,
+            ),
+            syntax::Type::Meta(8),
+        ),
+    ));
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -1191,42 +1191,42 @@ fn infer_case_3() {
             },
         ),
     };
-    assert_eq!(
-        tc.infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
-        Ok((
-            core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(
-                    core::Expr::Var(0),
-                    vec![
-                        core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
-                            body: core::Expr::Var(0)
-                        },
-                        core::Branch {
-                            pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
-                            body: core::Expr::Var(0)
-                        },
-                        core::Branch {
-                            pattern: core::Pattern::Wildcard,
-                            body: core::Expr::Int(1)
-                        },
-                    ]
-                )
+    let expected = Ok((
+        core::Expr::mk_lam(
+            true,
+            core::Expr::mk_case(
+                core::Expr::Var(0),
+                vec![
+                    core::Branch {
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
+                        body: core::Expr::Var(0),
+                    },
+                    core::Branch {
+                        pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(1)),
+                        body: core::Expr::Var(0),
+                    },
+                    core::Branch {
+                        pattern: core::Pattern::Wildcard,
+                        body: core::Expr::Int(1),
+                    },
+                ],
             ),
-            syntax::Type::mk_arrow(
-                syntax::Type::mk_variant(
-                    vec![
-                        (String::from("Left"), syntax::Type::Int),
-                        (String::from("Right"), syntax::Type::Int)
-                    ],
-                    Some(syntax::Type::Meta(5))
-                ),
-                syntax::Type::Int
-            )
-        ))
-    )
+        ),
+        syntax::Type::mk_arrow(
+            syntax::Type::mk_variant(
+                vec![
+                    (String::from("Left"), syntax::Type::Int),
+                    (String::from("Right"), syntax::Type::Int),
+                ],
+                Some(syntax::Type::Meta(9)),
+            ),
+            syntax::Type::Int,
+        ),
+    ));
+    let actual = tc
+        .infer_expr(term)
+        .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -1642,41 +1642,40 @@ fn check_definition_4() {
             },
         },
     };
-    assert_eq!(
-        tc.check_declaration(decl),
-        Ok(core::Declaration::Definition {
-            name: String::from("getx"),
-            sig: core::TypeSig {
-                ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
-                body: syntax::Type::mk_fatarrow(
-                    syntax::Type::mk_hasfield(String::from("x"), syntax::Type::Var(0)),
-                    syntax::Type::mk_arrow(
-                        syntax::Type::mk_record(
-                            vec![(String::from("x"), syntax::Type::Int)],
-                            Some(syntax::Type::Var(0))
-                        ),
-                        syntax::Type::Int
+    let expected = Ok(core::Declaration::Definition {
+        name: String::from("getx"),
+        sig: core::TypeSig {
+            ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
+            body: syntax::Type::mk_fatarrow(
+                syntax::Type::mk_hasfield(String::from("x"), syntax::Type::Var(0)),
+                syntax::Type::mk_arrow(
+                    syntax::Type::mk_record(
+                        vec![(String::from("x"), syntax::Type::Int)],
+                        Some(syntax::Type::Var(0)),
                     ),
-                )
-            },
-            body: core::Expr::mk_lam(
+                    syntax::Type::Int,
+                ),
+            ),
+        },
+        body: core::Expr::mk_lam(
+            true,
+            core::Expr::mk_lam(
                 true,
-                core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_case(
-                        core::Expr::Var(0),
-                        vec![core::Branch {
-                            pattern: core::Pattern::Record {
-                                names: vec![core::Expr::Var(1)],
-                                rest: true
-                            },
-                            body: core::Expr::Var(1)
-                        }]
-                    )
-                )
-            )
-        })
-    )
+                core::Expr::mk_case(
+                    core::Expr::Var(0),
+                    vec![core::Branch {
+                        pattern: core::Pattern::Record {
+                            names: vec![core::Expr::Var(1)],
+                            rest: true,
+                        },
+                        body: core::Expr::Var(1),
+                    }],
+                ),
+            ),
+        ),
+    });
+    let actual = tc.check_declaration(decl);
+    assert_eq!(expected, actual)
 }
 
 #[test]
@@ -2468,4 +2467,34 @@ fn class_and_instance_2() {
         expected_array_int_lt_result, actual_array_int_lt_result,
         "comparison = lt [0, 1, 2] [4, 5] is valid"
     )
+}
+
+#[test]
+fn unify_1() {
+    let mut tc = Typechecker::new();
+    tc.bound_tyvars
+        .insert(&vec![(String::from("r"), Kind::Row)]);
+    let real = Type::mk_app(
+        Type::mk_app(
+            Type::Arrow,
+            Type::mk_app(
+                Type::Record,
+                Type::mk_rowcons(String::from("x"), Type::Int, Type::Var(0)),
+            ),
+        ),
+        Type::Int,
+    );
+    let m_0 = tc.fresh_typevar(Kind::Type);
+    let m_1 = tc.fresh_typevar(Kind::Type);
+    let holey = Type::mk_app(Type::mk_app(Type::Arrow, m_1), m_0);
+    let expected = Ok(real.clone());
+    let actual = {
+        let context = UnifyTypeContext {
+            expected: real.clone(),
+            actual: holey.clone(),
+        };
+        tc.unify_type(&context, real, holey.clone())
+            .map(|_| tc.zonk_type(holey))
+    };
+    assert_eq!(expected, actual)
 }

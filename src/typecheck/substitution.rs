@@ -4,6 +4,8 @@ use crate::syntax::Type;
 
 use super::{TypeError, Typechecker, UnifyTypeContext};
 
+mod test;
+
 pub struct Substitution(HashMap<usize, Type<usize>>);
 
 impl Substitution {
@@ -30,11 +32,11 @@ impl Substitution {
                 match m_expected_ty {
                     None => {
                         for (_, current_ty) in self.0.iter_mut() {
-                            *current_ty = (*current_ty).subst(&mut |current_var| {
-                                if *current_var == expected {
+                            *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                                if current_var == expected {
                                     actual.clone()
                                 } else {
-                                    Type::Var(*current_var)
+                                    Type::Meta(current_var)
                                 }
                             });
                         }
@@ -64,11 +66,11 @@ impl Substitution {
                 match m_actual_ty {
                     None => {
                         for (_, current_ty) in self.0.iter_mut() {
-                            *current_ty = (*current_ty).subst(&mut |current_var| {
-                                if *current_var == actual {
+                            *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                                if current_var == actual {
                                     expected.clone()
                                 } else {
-                                    Type::Var(*current_var)
+                                    Type::Meta(current_var)
                                 }
                             });
                         }

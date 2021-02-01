@@ -1,9 +1,5 @@
-use std::rc::Rc;
-
 #[cfg(test)]
 use crate::{core::Expr, syntax::Binop};
-
-use super::StringPart;
 
 #[test]
 fn instantiate_1() {

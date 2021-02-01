@@ -1788,9 +1788,13 @@ impl Typechecker {
         Ok(())
     }
 
-    fn check_duplicate_args(&self, args: &Vec<&Spanned<String>>) -> Result<(), TypeError> {
-        let mut seen: HashSet<&String> = HashSet::new();
+    fn check_duplicate_args(&self, args: &Vec<syntax::Pattern>) -> Result<(), TypeError> {
+        let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
         for arg in args {
+            arg_names_spanned.extend(arg.get_arg_names());
+        }
+        let mut seen: HashSet<&String> = HashSet::new();
+        for arg in arg_names_spanned {
             if seen.contains(&arg.item) {
                 return Err(TypeError::DuplicateArgument {
                     pos: arg.pos,
@@ -2000,56 +2004,17 @@ impl Typechecker {
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
                 syntax::Expr::Lam { args, body } => {
-                    {
-                        let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
-                        for arg in &args {
-                            arg_names_spanned.extend(arg.get_arg_names());
-                        }
-                        self.check_duplicate_args(&arg_names_spanned)?;
-                    }
-
-                    let mut args_core = Vec::new();
-                    let mut args_tys = Vec::new();
-                    let mut args_names_tys: Vec<(String, Type<usize>)> = Vec::new();
-                    for arg in &args {
-                        let (arg_core, arg_tys, arg_names_tys) = self.infer_pattern(&arg);
-                        args_core.push(arg_core);
-                        args_tys.push(arg_tys);
-                        args_names_tys.extend(arg_names_tys);
-                    }
-
-                    self.bound_vars.insert(&args_names_tys);
-                    let (body_core, body_ty) = self.infer_expr(*body)?;
-                    self.bound_vars.delete(args_names_tys.len());
-
-                    let mut expr_core = body_core;
-                    for arg_core in args_core.into_iter().rev() {
-                        match arg_core {
-                            core::Pattern::Name => {
-                                expr_core = core::Expr::mk_lam(true, expr_core);
-                            }
-                            core::Pattern::Wildcard => {
-                                expr_core = core::Expr::mk_lam(false, expr_core);
-                            }
-                            arg_core => {
-                                expr_core = core::Expr::mk_lam(
-                                    true,
-                                    core::Expr::mk_case(
-                                        core::Expr::Var(0),
-                                        vec![core::Branch {
-                                            pattern: arg_core,
-                                            body: expr_core,
-                                        }],
-                                    ),
-                                );
-                            }
-                        }
-                    }
-                    let mut expr_ty = body_ty;
-                    for arg_ty in args_tys.into_iter().rev() {
-                        expr_ty = Type::mk_arrow(arg_ty, expr_ty);
-                    }
-                    Ok((expr_core, expr_ty))
+                    let in_ty = self.fresh_typevar(syntax::Kind::Type);
+                    let out_ty = self.fresh_typevar(syntax::Kind::Type);
+                    let ty = Type::mk_arrow(in_ty, out_ty);
+                    let expr_core = self.check_expr(
+                        Spanned {
+                            pos: expr.pos,
+                            item: syntax::Expr::Lam { args, body },
+                        },
+                        ty.clone(),
+                    )?;
+                    Ok((expr_core, ty))
                 }
                 syntax::Expr::True => Ok((core::Expr::True, Type::Bool)),
                 syntax::Expr::False => Ok((core::Expr::False, Type::Bool)),
@@ -2423,15 +2388,84 @@ impl Typechecker {
         expr: syntax::Spanned<syntax::Expr>,
         ty: Type<usize>,
     ) -> Result<core::Expr, TypeError> {
-        with_position!(self, expr.pos, {
-            let expected = ty;
-            let (expr, actual) = self.infer_expr(expr)?;
-            let context = UnifyTypeContext {
-                expected: expected.clone(),
-                actual: actual.clone(),
-            };
-            self.unify_type(&context, expected, actual)?;
-            Ok(expr)
-        })
+        with_position!(
+            self,
+            expr.pos,
+            match expr.item {
+                syntax::Expr::Lam { args, body } => {
+                    self.check_duplicate_args(&args)?;
+
+                    let out_ty = self.fresh_typevar(syntax::Kind::Type);
+                    let mut actual = out_ty.clone();
+
+                    let mut arg_tys = Vec::new();
+                    for _ in args.iter().rev() {
+                        let arg_ty = self.fresh_typevar(syntax::Kind::Type);
+                        arg_tys.push(arg_ty.clone());
+                        actual = Type::mk_arrow(arg_ty, actual);
+                    }
+                    arg_tys.reverse();
+
+                    let context = UnifyTypeContext {
+                        expected: ty.clone(),
+                        actual: actual.clone(),
+                    };
+                    self.unify_type(&context, ty, actual)?;
+
+                    let mut args_core = Vec::new();
+                    let mut args_binds = Vec::new();
+                    for (arg, arg_ty) in args.iter().zip(arg_tys.iter()) {
+                        match self.check_pattern(arg, arg_ty.clone()) {
+                            Err(err) => {
+                                return Err(err);
+                            }
+                            Ok((arg_core, arg_binds)) => {
+                                args_core.push(arg_core);
+                                args_binds.extend(arg_binds);
+                            }
+                        }
+                    }
+
+                    self.bound_vars.insert(&args_binds);
+                    let body_core = self.check_expr(*body, out_ty)?;
+                    self.bound_vars.delete(args_binds.len());
+
+                    let mut expr_core = body_core;
+                    for arg_core in args_core.iter().rev() {
+                        match arg_core {
+                            core::Pattern::Wildcard => {
+                                expr_core = core::Expr::mk_lam(false, expr_core);
+                            }
+                            core::Pattern::Name => {
+                                expr_core = core::Expr::mk_lam(true, expr_core);
+                            }
+                            _ => {
+                                expr_core = core::Expr::mk_lam(
+                                    true,
+                                    core::Expr::mk_case(
+                                        core::Expr::Var(0),
+                                        vec![core::Branch {
+                                            pattern: arg_core.clone(),
+                                            body: expr_core,
+                                        }],
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                    Ok(expr_core)
+                }
+                _ => {
+                    let expected = ty;
+                    let (expr, actual) = self.infer_expr(expr)?;
+                    let context = UnifyTypeContext {
+                        expected: expected.clone(),
+                        actual: actual.clone(),
+                    };
+                    self.unify_type(&context, expected, actual)?;
+                    Ok(expr)
+                }
+            }
+        )
     }
 }

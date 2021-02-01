@@ -330,6 +330,35 @@ impl<'a, A> Iterator for IterVars<'a, A> {
 }
 
 impl Type<usize> {
+    pub fn subst_metas<F: Fn(usize) -> Type<usize>>(&self, f: &F) -> Type<usize> {
+        match self {
+            Type::Name(n) => Type::Name(n.clone()),
+            Type::Var(n) => Type::Var(*n),
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Bytes => Type::Bytes,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => {
+                Type::Constraints(cs.iter().map(|c| c.subst_metas(f)).collect())
+            }
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(a, b) => Type::mk_app(a.subst_metas(f), b.subst_metas(f)),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(field, ty, rest) => {
+                Type::mk_rowcons(field.clone(), ty.subst_metas(f), rest.subst_metas(f))
+            }
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst_metas(f)),
+            Type::Unit => Type::Unit,
+            Type::Meta(n) => f(*n),
+        }
+    }
+
     pub fn instantiate_many(&self, tys: &Vec<Type<usize>>) -> Self {
         match self {
             Type::Name(n) => Type::Name(n.clone()),
