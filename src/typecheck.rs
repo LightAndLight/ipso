@@ -6,6 +6,7 @@ use crate::syntax;
 use crate::syntax::{Spanned, Type};
 use crate::{builtins, evidence::Evidence};
 use crate::{core, evidence};
+use core::Declaration;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -1163,6 +1164,14 @@ impl Typechecker {
         })
     }
 
+    fn check_import(
+        &mut self,
+        module: String,
+        name: Option<String>,
+    ) -> Result<core::Declaration, TypeError> {
+        todo!("check import {:?}", (module, name))
+    }
+
     fn check_declaration(
         &mut self,
         decl: syntax::Spanned<syntax::Declaration>,
@@ -1177,9 +1186,7 @@ impl Typechecker {
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
-            syntax::Declaration::Import { module, name } => {
-                todo!("check import {:?}", (module, name))
-            }
+            syntax::Declaration::Import { module, name } => self.check_import(module, name),
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))
             }

@@ -3,6 +3,7 @@ pub mod core;
 pub mod diagnostic;
 pub mod eval;
 pub mod evidence;
+pub mod import;
 pub mod iter;
 pub mod lex;
 pub mod parse;
