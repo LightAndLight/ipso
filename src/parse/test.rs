@@ -539,6 +539,7 @@ fn parse_case_4() {
                 TokenType::LParen,
                 TokenType::LBrace,
                 TokenType::LBracket,
+                TokenType::Dot,
                 TokenType::Ctor,
                 TokenType::Ident(String::from("true")),
                 TokenType::Ident(String::from("false")),

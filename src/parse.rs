@@ -964,6 +964,26 @@ impl Parser {
         )
     }
 
+    fn expr_project(&mut self) -> ParseResult<Spanned<Expr>> {
+        self.expr_atom().and_then(|val| {
+            many!(
+                self,
+                keep_left!(self.token(&TokenType::Dot), self.spaces())
+                    .and_then(|_| keep_left!(self.ident(), self.spaces()))
+            )
+            .map(|fields| {
+                let mut expr = val;
+                for field in fields {
+                    expr = Spanned {
+                        pos: expr.pos,
+                        item: Expr::mk_project(expr, field),
+                    };
+                }
+                expr
+            })
+        })
+    }
+
     fn branch(&mut self) -> ParseResult<Branch> {
         keep_left!(spanned!(self, self.pattern()), self.spaces()).and_then(|pattern| {
             map2!(
@@ -995,8 +1015,8 @@ impl Parser {
     }
 
     fn expr_app(&mut self) -> ParseResult<Spanned<Expr>> {
-        self.expr_atom().and_then(|first| {
-            many!(self, self.expr_atom()).map(|rest| {
+        self.expr_project().and_then(|first| {
+            many!(self, self.expr_project()).map(|rest| {
                 rest.into_iter()
                     .fold(first, |acc, el| Expr::mk_app(acc, el))
             })

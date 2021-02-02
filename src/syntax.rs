@@ -149,6 +149,10 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn mk_project(val: Spanned<Expr>, field: String) -> Expr {
+        Expr::Project(Box::new(val), field)
+    }
+
     pub fn mk_ifthenelse(cond: Spanned<Expr>, then: Spanned<Expr>, else_: Spanned<Expr>) -> Expr {
         Expr::IfThenElse(Box::new(cond), Box::new(then), Box::new(else_))
     }
