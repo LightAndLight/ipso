@@ -1,12 +1,11 @@
 use evidence::{solver::solve_placeholder, Constraint};
 
-use crate::diagnostic;
 use crate::rope::Rope;
 use crate::syntax;
 use crate::syntax::{Spanned, Type};
 use crate::{builtins, evidence::Evidence};
 use crate::{core, evidence};
-use core::Declaration;
+use crate::{diagnostic, import::Modules};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -146,7 +145,7 @@ impl Implication {
     }
 }
 
-pub struct Typechecker {
+pub struct Typechecker<'modules> {
     kind_solutions: Vec<Option<syntax::Kind>>,
     pub type_solutions: Vec<(syntax::Kind, Option<Type<usize>>)>,
     pub implications: Vec<Implication>,
@@ -157,6 +156,7 @@ pub struct Typechecker {
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
+    modules: &'modules mut Modules,
 }
 
 macro_rules! with_position {
@@ -423,8 +423,8 @@ impl TypeError {
     }
 }
 
-impl Typechecker {
-    pub fn new() -> Self {
+impl<'modules> Typechecker<'modules> {
+    pub fn new(modules: &'modules mut Modules) -> Self {
         Typechecker {
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
@@ -436,11 +436,12 @@ impl Typechecker {
             bound_vars: BoundVars::new(),
             bound_tyvars: BoundVars::new(),
             position: None,
+            modules,
         }
     }
 
-    pub fn new_with_builtins() -> Self {
-        let mut tc = Self::new();
+    pub fn new_with_builtins(modules: &'modules mut Modules) -> Self {
+        let mut tc = Self::new(modules);
         tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
         tc
     }

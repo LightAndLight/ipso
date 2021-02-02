@@ -49,10 +49,10 @@ impl From<typecheck::TypeError> for ModuleError {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct ModuleRef(usize);
 
-struct Modules {
+pub struct Modules {
     data: Vec<ModuleInfo>,
     index: HashMap<String, usize>,
 }
@@ -113,7 +113,7 @@ impl Modules {
         let info = self.lookup_mut(module_ref);
         match info.stage {
             ModuleStage::Parsed(module) => {
-                let mut tc = Typechecker::new_with_builtins();
+                let mut tc = Typechecker::new_with_builtins(self);
                 let module = tc.check_module(module)?;
                 info.stage = ModuleStage::Checked(module);
                 Ok(module_ref)
