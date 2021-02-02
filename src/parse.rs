@@ -58,11 +58,11 @@ impl ParseError {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseResult<A> {
     consumed: bool,
-    result: Result<A, ParseError>,
+    pub result: Result<A, ParseError>,
 }
 
 impl<A> ParseResult<A> {
-    fn and_then<B, F>(self, f: F) -> ParseResult<B>
+    pub fn and_then<B, F>(self, f: F) -> ParseResult<B>
     where
         F: FnOnce(A) -> ParseResult<B>,
     {
@@ -78,7 +78,8 @@ impl<A> ParseResult<A> {
             }
         }
     }
-    fn map<B, F>(self, f: F) -> ParseResult<B>
+
+    pub fn map<B, F>(self, f: F) -> ParseResult<B>
     where
         F: FnOnce(A) -> B,
     {
@@ -325,7 +326,7 @@ macro_rules! spanned {
 }
 
 impl Parser {
-    fn new(input: Vec<Token>) -> Self {
+    pub fn new(input: Vec<Token>) -> Self {
         let mut input = input.into_iter();
         let current = input.next();
         Parser {
@@ -354,7 +355,7 @@ impl Parser {
         )
     }
 
-    fn eof(&self) -> ParseResult<()> {
+    pub fn eof(&self) -> ParseResult<()> {
         match self.current {
             None => ParseResult::pure(()),
             Some(_) => self.unexpected(false),
@@ -1249,7 +1250,7 @@ impl Parser {
         )
     }
 
-    fn module(&mut self) -> ParseResult<Module> {
+    pub fn module(&mut self) -> ParseResult<Module> {
         sep_by!(
             self,
             spanned!(self, self.declaration()),
