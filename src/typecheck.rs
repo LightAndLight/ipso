@@ -156,7 +156,7 @@ pub struct Typechecker<'modules> {
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
-    modules: &'modules mut Modules,
+    modules: &'modules Modules<'modules>,
 }
 
 macro_rules! with_position {
@@ -424,7 +424,7 @@ impl TypeError {
 }
 
 impl<'modules> Typechecker<'modules> {
-    pub fn new(modules: &'modules mut Modules) -> Self {
+    pub fn new(modules: &'modules Modules) -> Self {
         Typechecker {
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
@@ -440,7 +440,7 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn new_with_builtins(modules: &'modules mut Modules) -> Self {
+    pub fn new_with_builtins(modules: &'modules Modules) -> Self {
         let mut tc = Self::new(modules);
         tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
         tc

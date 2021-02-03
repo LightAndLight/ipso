@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{self, Read},
-};
+use typed_arena::Arena;
 
 use crate::{
     core,
@@ -12,20 +8,11 @@ use crate::{
     syntax,
     typecheck::{self, Typechecker},
 };
-
-#[derive(PartialEq, Eq, Debug, Hash)]
-struct ModuleName(Vec<String>);
-
-enum ModuleStage {
-    Unparsed(String),
-    Parsed(syntax::Module),
-    Checking,
-    Checked(core::Module),
-}
-
-pub struct ModuleInfo {
-    stage: ModuleStage,
-}
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self, Read},
+};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -62,87 +49,51 @@ impl From<typecheck::TypeError> for ModuleError {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct ModuleRef(usize);
-
-pub struct Modules {
-    data: Vec<ModuleInfo>,
-    index: HashMap<String, usize>,
+pub struct Modules<'a> {
+    data: &'a Arena<core::Module>,
+    index: HashMap<String, &'a core::Module>,
 }
 
-impl Modules {
-    pub fn new() -> Self {
+fn calculate_imports<'a>(module: &'a syntax::Module) -> Vec<&'a String> {
+    todo!()
+}
+
+impl<'a> Modules<'a> {
+    pub fn new(data: &'a Arena<core::Module>) -> Self {
         Modules {
-            data: Vec::new(),
+            data,
             index: HashMap::new(),
         }
     }
 
-    fn lookup_mut<'a>(&'a mut self, module_ref: ModuleRef) -> &'a mut ModuleInfo {
-        &mut self.data[module_ref.0]
-    }
-
-    pub fn lookup<'a>(&'a self, module_ref: ModuleRef) -> &'a ModuleInfo {
-        &self.data[module_ref.0]
-    }
-
-    pub fn load(&mut self, filepath: &String) -> Result<ModuleRef, ModuleError> {
-        match self.index.get(filepath) {
+    pub fn import(&mut self, path: &String) -> Result<&'a core::Module, ModuleError> {
+        match self.index.get(path) {
             None => {
-                let mut contents = String::new();
-                let _ = {
-                    let mut file = File::open(filepath)?;
-                    file.read_to_string(&mut contents)
-                }?;
-
-                let ix = self.data.len();
-                self.index.insert(filepath.clone(), ix);
-                self.data.push(ModuleInfo {
-                    stage: ModuleStage::Unparsed(contents),
-                });
-                Ok(ModuleRef(ix))
-            }
-            Some(ix) => Ok(ModuleRef(*ix)),
-        }
-    }
-
-    pub fn parse(&mut self, filepath: &String) -> Result<ModuleRef, ModuleError> {
-        let module_ref = self.load(filepath)?;
-        let info = self.lookup_mut(module_ref);
-        match &info.stage {
-            ModuleStage::Unparsed(content) => {
-                let lexer = Lexer::new(content);
-                let tokens = lexer.tokenize();
+                let mut file = File::open(path)?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+                let tokens = Lexer::new(&content).tokenize();
                 let mut parser = Parser::new(tokens);
                 let module = parser
                     .module()
                     .and_then(|module| parser.eof().map(|_| module))
                     .result?;
-                info.stage = ModuleStage::Parsed(module);
-                Ok(module_ref)
-            }
-            _ => Ok(module_ref),
-        }
-    }
-
-    pub fn check(&mut self, filepath: &String) -> Result<ModuleRef, ModuleError> {
-        let module_ref = self.parse(filepath)?;
-        let info = self.lookup_mut(module_ref);
-        let stage = std::mem::replace(&mut info.stage, ModuleStage::Checking);
-        match stage {
-            ModuleStage::Parsed(module) => {
+                let imports = calculate_imports(&module);
+                for import in imports.into_iter() {
+                    match self.import(import) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok(_) => {}
+                    }
+                }
                 let mut tc = Typechecker::new_with_builtins(self);
                 let module = tc.check_module(&module)?;
-                self.lookup_mut(module_ref).stage = ModuleStage::Checked(module);
+                let module_ref: &core::Module = self.data.alloc(module);
+                self.index.insert(path.clone(), module_ref);
                 Ok(module_ref)
             }
-            ModuleStage::Checking => {
-                panic!("loop when checking {}", filepath)
-            }
-            stage => {
-                let _ = std::mem::replace(&mut info.stage, stage);
-                Ok(module_ref)
-            }
+            Some(module_ref) => Ok(*module_ref),
         }
     }
 }

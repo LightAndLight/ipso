@@ -1,6 +1,6 @@
 use ipso::{
     core,
-    diagnostic::{self, Diagnostic, Item},
+    diagnostic::{self, Diagnostic},
     eval::Interpreter,
     import, parse, syntax,
     typecheck::{self, Typechecker},
@@ -124,9 +124,11 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
         None => &main,
         Some(ref value) => value,
     };
-    let mut modules = import::Modules::new();
-    let module = modules.check(filename)?;
+    let modules_data = Arena::new();
+    let mut modules = import::Modules::new(&modules_data);
+    let module = modules.import(filename)?;
 
+    let mut tc = Typechecker::new_with_builtins(&modules);
     let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
     {
         let var = tc.fresh_typevar(syntax::Kind::Type);
