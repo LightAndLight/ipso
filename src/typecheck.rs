@@ -720,8 +720,8 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn check_module(&mut self, module: syntax::Module) -> Result<core::Module, TypeError> {
-        let decls = module.decls.into_iter().fold(Ok(vec![]), |acc, decl| {
+    pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
+        let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
                 self.check_declaration(decl).and_then(|decl| {
                     self.register_declaration(&decl);
@@ -861,10 +861,10 @@ impl<'modules> Typechecker<'modules> {
     fn check_definition(
         &mut self,
         pos: usize,
-        name: String,
-        ty: Type<String>,
-        args: Vec<syntax::Pattern>,
-        body: Spanned<syntax::Expr>,
+        name: &String,
+        ty: &Type<String>,
+        args: &Vec<syntax::Pattern>,
+        body: &Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
         let ty_var_positions: HashMap<String, usize> = {
             let mut vars = HashMap::new();
@@ -905,7 +905,7 @@ impl<'modules> Typechecker<'modules> {
         let body = self.check_expr(
             syntax::Spanned {
                 pos,
-                item: syntax::Expr::mk_lam(args, body),
+                item: syntax::Expr::mk_lam(args.clone(), body.clone()),
             },
             ty.clone(),
         )?;
@@ -914,14 +914,18 @@ impl<'modules> Typechecker<'modules> {
 
         self.bound_tyvars.delete(ty_var_kinds_len);
 
-        Ok(core::Declaration::Definition { name, sig, body })
+        Ok(core::Declaration::Definition {
+            name: name.clone(),
+            sig,
+            body,
+        })
     }
 
     fn check_class_member(
         &mut self,
         class_args_kinds: &Vec<(String, syntax::Kind)>,
-        name: String,
-        type_: Type<String>,
+        name: &String,
+        type_: &Type<String>,
     ) -> Result<core::ClassMember, TypeError> {
         let class_args = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
         let (type_, ty_vars) = type_.abstract_vars(&class_args);
@@ -955,15 +959,18 @@ impl<'modules> Typechecker<'modules> {
             ty_vars,
             body: checked_type,
         };
-        Ok(core::ClassMember { name, sig })
+        Ok(core::ClassMember {
+            name: name.clone(),
+            sig,
+        })
     }
 
     fn check_class(
         &mut self,
-        supers: Vec<Spanned<Type<String>>>,
-        name: String,
-        args: Vec<Spanned<String>>,
-        members: Vec<(String, Type<String>)>,
+        supers: &Vec<Spanned<Type<String>>>,
+        name: &String,
+        args: &Vec<Spanned<String>>,
+        members: &Vec<(String, Type<String>)>,
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
         let arg_names = args.iter().map(|x| x.item.clone()).collect();
@@ -976,13 +983,13 @@ impl<'modules> Typechecker<'modules> {
                 } else {
                     seen.insert(arg.item.clone());
                 }
-                args_kinds.push((arg.item, self.fresh_kindvar()))
+                args_kinds.push((arg.item.clone(), self.fresh_kindvar()))
             }
             args_kinds
         };
 
         let mut new_supers = Vec::with_capacity(supers.len());
-        for s in &supers {
+        for s in supers {
             // abstract over variables
             let (s_item, _) = s.item.abstract_vars(&arg_names);
             with_position!(self, s.pos, {
@@ -1011,7 +1018,7 @@ impl<'modules> Typechecker<'modules> {
 
         Ok(core::Declaration::Class(core::ClassDeclaration {
             supers: new_supers,
-            name,
+            name: name.clone(),
             args: args_kinds
                 .into_iter()
                 .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
@@ -1022,10 +1029,10 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_instance(
         &mut self,
-        assumes: Vec<Spanned<Type<String>>>,
-        name: Spanned<String>,
-        args: Vec<Type<String>>,
-        members: Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
+        assumes: &Vec<Spanned<Type<String>>>,
+        name: &Spanned<String>,
+        args: &Vec<Type<String>>,
+        members: &Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
@@ -1036,7 +1043,7 @@ impl<'modules> Typechecker<'modules> {
         let (head, ty_vars) = args
             .into_iter()
             .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
-                syntax::Type::mk_app(acc, el)
+                syntax::Type::mk_app(acc, el.clone())
             })
             .abstract_vars(&Vec::new());
 
@@ -1128,7 +1135,10 @@ impl<'modules> Typechecker<'modules> {
                         .check_expr(
                             Spanned {
                                 pos: member_name.pos,
-                                item: syntax::Expr::mk_lam(member_args, member_body),
+                                item: syntax::Expr::mk_lam(
+                                    member_args.clone(),
+                                    member_body.clone(),
+                                ),
                             },
                             member_type.sig.body.clone(),
                         )
@@ -1167,17 +1177,17 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module: String,
-        name: Option<String>,
+        module: &String,
+        name: &Option<String>,
     ) -> Result<core::Declaration, TypeError> {
         todo!("check import {:?}", (module, name))
     }
 
     fn check_declaration(
         &mut self,
-        decl: syntax::Spanned<syntax::Declaration>,
+        decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<core::Declaration, TypeError> {
-        match decl.item {
+        match &decl.item {
             syntax::Declaration::Definition {
                 name,
                 ty,

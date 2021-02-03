@@ -2,7 +2,7 @@ use ipso::{
     core,
     diagnostic::{self, Diagnostic, Item},
     eval::Interpreter,
-    parse, syntax,
+    import, parse, syntax,
     typecheck::{self, Typechecker},
 };
 use std::path::Path;
@@ -65,6 +65,7 @@ fn report_config_error(err: ConfigError) {
 enum InterpreterError {
     ParseError(parse::ParseError),
     TypeError(typecheck::TypeError),
+    ModuleError(import::ModuleError),
     MissingEntrypoint(String),
 }
 
@@ -80,11 +81,18 @@ impl From<typecheck::TypeError> for InterpreterError {
     }
 }
 
+impl From<import::ModuleError> for InterpreterError {
+    fn from(err: import::ModuleError) -> Self {
+        InterpreterError::ModuleError(err)
+    }
+}
+
 fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Result<()> {
     let mut diagnostic = Diagnostic::new();
     match err {
         InterpreterError::ParseError(err) => err.report(&mut diagnostic),
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
+        InterpreterError::ModuleError(err) => err.report(&mut diagnostic),
         InterpreterError::MissingEntrypoint(name) => diagnostic.item(diagnostic::Item {
             pos: 0,
             message: format!("missing entrypoint {:?}", name),
@@ -116,11 +124,10 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
         None => &main,
         Some(ref value) => value,
     };
-    let module: syntax::Module = parse::parse_file(filename)?;
-    let mut tc: Typechecker = Typechecker::new_with_builtins();
-    let module: core::Module = tc.check_module(module)?;
+    let mut modules = import::Modules::new();
+    let module = modules.check(filename)?;
 
-    let (target, target_sig) = find_entrypoint_body(entrypoint, &module)?;
+    let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
     {
         let var = tc.fresh_typevar(syntax::Kind::Type);
         let expected = syntax::Type::mk_app(syntax::Type::IO, var);

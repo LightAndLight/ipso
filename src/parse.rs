@@ -46,7 +46,7 @@ impl ParseError {
         }
     }
 
-    pub fn report(self, diagnostic: &mut Diagnostic) {
+    pub fn report(&self, diagnostic: &mut Diagnostic) {
         diagnostic.item(Item {
             pos: self.position(),
             message: self.message(),
