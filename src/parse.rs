@@ -1109,7 +1109,7 @@ impl Parser {
                 optional!(
                     self,
                     keep_left!(self.keyword(Keyword::As), self.spaces())
-                        .and_then(|_| keep_left!(self.ident(), self.spaces()))
+                        .and_then(|_| keep_left!(spanned!(self, self.ident()), self.spaces()))
                 )
                 .map(|name| Declaration::Import { module, name })
             })

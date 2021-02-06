@@ -73,7 +73,10 @@ fn parse_import_as_1() {
                 pos: 7,
                 item: String::from("yes")
             },
-            name: Some(String::from("no"))
+            name: Some(Spanned {
+                pos: 14,
+                item: String::from("no")
+            })
         })
     )
 }
@@ -88,7 +91,10 @@ fn parse_import_as_2() {
                 pos: 7,
                 item: String::from("yes")
             },
-            name: Some(String::from("no"))
+            name: Some(Spanned {
+                pos: 15,
+                item: String::from("no")
+            })
         })
     )
 }

@@ -152,6 +152,7 @@ pub struct Typechecker<'modules> {
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
+    module_context: HashMap<String, HashMap<String, core::TypeSig>>,
     class_context: HashMap<String, core::ClassDeclaration>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
@@ -236,6 +237,9 @@ pub enum TypeError {
     CannotDeduce {
         context: Option<SolveConstraintContext>,
     },
+    ShadowedModuleName {
+        pos: usize,
+    },
 }
 
 impl syntax::Pattern {
@@ -292,6 +296,7 @@ impl TypeError {
                 None => 0,
                 Some(context) => context.pos,
             },
+            TypeError::ShadowedModuleName { pos, .. } => *pos,
         }
     }
 
@@ -357,6 +362,7 @@ impl TypeError {
                 None => String::from("cannot deduce"),
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
+            TypeError::ShadowedModuleName { .. } => String::from("shadowed module name"),
         }
     }
 
@@ -411,6 +417,7 @@ impl TypeError {
             TypeError::NoSuchClass { .. } => None,
             TypeError::NotAMember { .. } => None,
             TypeError::CannotDeduce { .. } => None,
+            TypeError::ShadowedModuleName { .. } => None,
         }
     }
 
@@ -449,6 +456,7 @@ impl<'modules> Typechecker<'modules> {
             bound_tyvars: BoundVars::new(),
             position: None,
             modules,
+            module_context: HashMap::new(),
         }
     }
 
@@ -1146,9 +1154,25 @@ impl<'modules> Typechecker<'modules> {
     fn check_import(
         &mut self,
         module: &Spanned<String>,
-        name: &Option<String>,
+        name: &Option<Spanned<String>>,
     ) -> Result<core::Declaration, TypeError> {
-        todo!("check import {:?}", (module, name))
+        let actual_name = match name {
+            None => module,
+            Some(name) => name,
+        };
+
+        match self.module_context.get(&actual_name.item) {
+            Some(_) => Err(TypeError::ShadowedModuleName {
+                pos: actual_name.pos,
+            }),
+            None => Ok(core::Declaration::Import {
+                module: module.item.clone(),
+                name: match name {
+                    None => None,
+                    Some(name) => Some(name.item.clone()),
+                },
+            }),
+        }
     }
 
     fn check_declaration(
