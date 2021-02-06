@@ -614,52 +614,8 @@ impl<'modules> Typechecker<'modules> {
                     }),
             );
 
-        let supers_len = decl.supers.len();
-
         // generate class members
-        self.context
-            .extend(decl.members.iter().enumerate().map(|(ix, member)| {
-                // we need each argument in the applied type to account for the extra variables
-                // bound by the member's signature
-                //
-                // e.g.
-                //
-                // class X a where
-                //   x : a -> b -> ()
-                //
-                // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
-                // bound variable
-                //
-                // this will panic if we allow ambiguous class members
-                let adjustment = if member.sig.ty_vars.len() > 0 {
-                    member.sig.ty_vars.len() - decl.args.len()
-                } else {
-                    0
-                };
-                let applied_type = (adjustment..adjustment + decl.args.len())
-                    .into_iter()
-                    .fold(Type::Name(decl.name.clone()), |acc, el| {
-                        Type::mk_app(acc, Type::Var(el))
-                    });
-                let sig = {
-                    let mut body = member.sig.body.clone();
-                    body = syntax::Type::mk_fatarrow(applied_type, body);
-
-                    core::TypeSig {
-                        ty_vars: member.sig.ty_vars.clone(),
-                        body,
-                    }
-                };
-                let body = core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_project(
-                        core::Expr::Var(0),
-                        core::Expr::Int(supers_len as u32 + ix as u32),
-                    ),
-                );
-
-                (member.name.clone(), (sig, body))
-            }));
+        self.context.extend(decl.get_bindings());
 
         // update class context
         self.class_context.insert(decl.name.clone(), decl.clone());

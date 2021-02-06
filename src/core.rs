@@ -1,4 +1,9 @@
-use crate::{iter::Step, syntax};
+use std::collections::HashMap;
+
+use crate::{
+    iter::Step,
+    syntax::{self, Type},
+};
 
 #[cfg(test)]
 mod test;
@@ -899,12 +904,84 @@ pub enum Declaration {
     },
 }
 
+impl Declaration {
+    pub fn get_bindings(&self) -> HashMap<String, Expr> {
+        match self {
+            Declaration::BuiltinType { .. } => HashMap::new(),
+            Declaration::Definition { name, sig: _, body } => {
+                let mut map = HashMap::new();
+                map.insert(name.clone(), body.clone());
+                map
+            }
+            Declaration::TypeAlias { .. } => HashMap::new(),
+            Declaration::Import { .. } => HashMap::new(),
+            Declaration::FromImport { .. } => HashMap::new(),
+            Declaration::Class(decl) => decl
+                .get_bindings()
+                .into_iter()
+                .map(|(a, b)| (a, b.1))
+                .collect(),
+            Declaration::Instance { .. } => HashMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassDeclaration {
     pub supers: Vec<syntax::Type<usize>>,
     pub name: String,
     pub args: Vec<(String, syntax::Kind)>,
     pub members: Vec<ClassMember>,
+}
+
+impl ClassDeclaration {
+    pub fn get_bindings(&self) -> HashMap<String, (TypeSig, Expr)> {
+        let supers_len = self.supers.len();
+
+        self.members
+            .iter()
+            .enumerate()
+            .map(|(ix, member)| {
+                // we need each argument in the applied type to account for the extra variables
+                // bound by the member's signature
+                //
+                // e.g.
+                //
+                // class X a where
+                //   x : a -> b -> ()
+                //
+                // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
+                // bound variable
+                //
+                // this will panic if we allow ambiguous class members
+                let adjustment = if member.sig.ty_vars.len() > 0 {
+                    member.sig.ty_vars.len() - self.args.len()
+                } else {
+                    0
+                };
+                let applied_type = (adjustment..adjustment + self.args.len())
+                    .into_iter()
+                    .fold(Type::Name(self.name.clone()), |acc, el| {
+                        Type::mk_app(acc, Type::Var(el))
+                    });
+                let sig = {
+                    let mut body = member.sig.body.clone();
+                    body = syntax::Type::mk_fatarrow(applied_type, body);
+
+                    TypeSig {
+                        ty_vars: member.sig.ty_vars.clone(),
+                        body,
+                    }
+                };
+                let body = Expr::mk_lam(
+                    true,
+                    Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as u32 + ix as u32)),
+                );
+
+                (member.name.clone(), (sig, body))
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

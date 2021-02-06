@@ -128,9 +128,9 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let mut modules = import::Modules::new(&modules_data);
     let module = modules.import(0, filename)?;
 
-    let mut tc = Typechecker::new_with_builtins(&modules);
     let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
     {
+        let mut tc = Typechecker::new_with_builtins(&modules);
         let var = tc.fresh_typevar(syntax::Kind::Type);
         let expected = syntax::Type::mk_app(syntax::Type::IO, var);
         let actual = target_sig.body;
@@ -145,13 +145,12 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let env = Vec::new();
     let _result = {
         let mut stdout = io::stdout();
-        let additional_context = tc
-            .context
+        let context = module
+            .decls
             .iter()
-            .map(|(name, (_, expr))| (name.clone(), expr.clone()))
+            .flat_map(|decl| decl.get_bindings().into_iter())
             .collect();
-        let mut interpreter =
-            Interpreter::new_with_builtins(&mut stdout, additional_context, &heap);
+        let mut interpreter = Interpreter::new_with_builtins(&mut stdout, context, &heap);
         let action = interpreter.eval(&env, target);
         action.perform_io(&mut interpreter)
     };

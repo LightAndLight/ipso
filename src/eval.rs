@@ -406,7 +406,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         let mut context: HashMap<String, Expr> = builtins::BUILTINS
             .decls
             .iter()
-            .filter_map(|decl| match decl {
+            .filter_map(|x| match x {
                 Declaration::Definition { name, sig: _, body } => {
                     Some((name.clone(), body.clone()))
                 }
@@ -414,7 +414,11 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             })
             .collect();
         context.extend(additional_context);
-        Self::new(stdout, context, heap)
+        Interpreter {
+            stdout,
+            context,
+            heap,
+        }
     }
 
     pub fn alloc_value(&self, val: Value<'heap>) -> ValueRef<'heap> {
@@ -932,7 +936,13 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
-            Expr::Name(name) => self.eval(env, self.context.get(&name).unwrap().clone()),
+            Expr::Name(name) => match self.context.get(&name).clone() {
+                None => panic!("{:?} not in scope", name),
+                Some(body) => {
+                    let body = body.clone();
+                    self.eval(env, body)
+                }
+            },
             Expr::Builtin(name) => self.eval_builtin(&name),
 
             Expr::App(a, b) => {
