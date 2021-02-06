@@ -120,7 +120,7 @@ impl<'a> Modules<'a> {
                             Ok(_) => {}
                         }
                     }
-                    let mut tc = Typechecker::new_with_builtins(self);
+                    let mut tc = Typechecker::new_with_builtins(working_dir, self);
                     let module = tc.check_module(&module)?;
                     let module_ref: &core::Module = self.data.alloc(module);
                     self.index.insert(path_str.clone(), module_ref);

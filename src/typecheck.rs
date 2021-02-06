@@ -1,14 +1,15 @@
 use evidence::{solver::solve_placeholder, Constraint};
 
-use crate::rope::Rope;
 use crate::syntax;
 use crate::syntax::{Spanned, Type};
 use crate::{builtins, evidence::Evidence};
 use crate::{core, evidence};
 use crate::{diagnostic, import::Modules};
+use crate::{import, rope::Rope};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    path::Path,
     todo,
 };
 
@@ -158,6 +159,7 @@ pub struct Typechecker<'modules> {
     bound_tyvars: BoundVars<syntax::Kind>,
     position: Option<usize>,
     modules: &'modules Modules<'modules>,
+    working_dir: &'modules Path,
 }
 
 macro_rules! with_position {
@@ -432,18 +434,18 @@ impl TypeError {
 
 #[macro_export]
 macro_rules! with_tc {
-    ($f:expr) => {{
+    ($path:expr, $f:expr) => {{
         use crate::import::Modules;
         use typed_arena::Arena;
         let modules_data = Arena::new();
         let modules = Modules::new(&modules_data);
-        let tc = Typechecker::new_with_builtins(&modules);
+        let tc = Typechecker::new_with_builtins(path, &modules);
         $f(tc)
     }};
 }
 
 impl<'modules> Typechecker<'modules> {
-    pub fn new(modules: &'modules Modules) -> Self {
+    pub fn new(working_dir: &'modules Path, modules: &'modules Modules) -> Self {
         Typechecker {
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
@@ -457,11 +459,12 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
+            working_dir,
         }
     }
 
-    pub fn new_with_builtins(modules: &'modules Modules) -> Self {
-        let mut tc = Self::new(modules);
+    pub fn new_with_builtins(working_dir: &'modules Path, modules: &'modules Modules) -> Self {
+        let mut tc = Self::new(working_dir, modules);
         tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
         tc
     }
@@ -667,6 +670,11 @@ impl<'modules> Typechecker<'modules> {
         });
     }
 
+    fn register_import(&mut self, module_name: &String) {
+        let path = import::get_module_path(self.working_dir, module_name);
+        todo!()
+    }
+
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
@@ -679,9 +687,7 @@ impl<'modules> Typechecker<'modules> {
             core::Declaration::TypeAlias { name, args, body } => {
                 todo!("register TypeAlias {:?}", (name, args, body))
             }
-            core::Declaration::Import { module, name } => {
-                todo!("register Import {:?}", (module, name))
-            }
+            core::Declaration::Import { module_name } => self.register_import(module_name),
             core::Declaration::FromImport { module, names } => {
                 todo!("register FromImport {:?}", (module, names))
             }
@@ -733,7 +739,7 @@ impl<'modules> Typechecker<'modules> {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::Import { module: _, name: _ } => {}
+                core::Declaration::Import { module_name: _ } => {}
                 core::Declaration::FromImport {
                     module: _,
                     names: _,
@@ -1166,11 +1172,7 @@ impl<'modules> Typechecker<'modules> {
                 pos: actual_name.pos,
             }),
             None => Ok(core::Declaration::Import {
-                module: module.item.clone(),
-                name: match name {
-                    None => None,
-                    Some(name) => Some(name.item.clone()),
-                },
+                module_name: actual_name.item.clone(),
             }),
         }
     }

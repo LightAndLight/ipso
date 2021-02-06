@@ -130,7 +130,8 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
 
     let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
     {
-        let mut tc = Typechecker::new_with_builtins(&modules);
+        let working_dir = std::env::current_dir().unwrap();
+        let mut tc = Typechecker::new_with_builtins(working_dir.as_path(), &modules);
         let var = tc.fresh_typevar(syntax::Kind::Type);
         let expected = syntax::Type::mk_app(syntax::Type::IO, var);
         let actual = target_sig.body;
