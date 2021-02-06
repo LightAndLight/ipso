@@ -887,8 +887,7 @@ pub enum Declaration {
         body: syntax::Type<usize>,
     },
     Import {
-        module: String,
-        name: Option<String>,
+        module_name: String,
     },
     FromImport {
         module: String,
