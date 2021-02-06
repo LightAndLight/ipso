@@ -423,6 +423,18 @@ impl TypeError {
     }
 }
 
+#[macro_export]
+macro_rules! with_tc {
+    ($f:expr) => {{
+        use crate::import::Modules;
+        use typed_arena::Arena;
+        let modules_data = Arena::new();
+        let modules = Modules::new(&modules_data);
+        let tc = Typechecker::new_with_builtins(&modules);
+        $f(tc)
+    }};
+}
+
 impl<'modules> Typechecker<'modules> {
     pub fn new(modules: &'modules Modules) -> Self {
         Typechecker {
