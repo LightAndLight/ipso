@@ -61,7 +61,7 @@ pub struct Modules<'a> {
     index: HashMap<String, &'a core::Module>,
 }
 
-fn get_module_path(working_dir: &Path, name: &String) -> String {
+pub fn get_module_path(working_dir: &Path, name: &String) -> String {
     format!("./{}/{}.ipso", working_dir.to_str().unwrap(), name)
 }
 
