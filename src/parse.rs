@@ -1105,7 +1105,7 @@ impl Parser {
 
     fn import(&mut self) -> ParseResult<Declaration> {
         keep_left!(self.keyword(Keyword::Import), self.spaces()).and_then(|_| {
-            keep_left!(self.ident(), self.spaces()).and_then(|module| {
+            keep_left!(spanned!(self, self.ident()), self.spaces()).and_then(|module| {
                 optional!(
                     self,
                     keep_left!(self.keyword(Keyword::As), self.spaces())
@@ -1119,7 +1119,7 @@ impl Parser {
     fn from_import(&mut self) -> ParseResult<Declaration> {
         keep_right!(
             keep_left!(self.keyword(Keyword::From), self.spaces()),
-            keep_left!(self.ident(), self.spaces()).and_then(|module| keep_right!(
+            keep_left!(spanned!(self, self.ident()), self.spaces()).and_then(|module| keep_right!(
                 keep_left!(self.keyword(Keyword::Import), self.spaces()),
                 choices!(
                     self,

@@ -1177,7 +1177,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module: &String,
+        module: &Spanned<String>,
         name: &Option<String>,
     ) -> Result<core::Declaration, TypeError> {
         todo!("check import {:?}", (module, name))

@@ -959,11 +959,11 @@ pub enum Declaration {
         body: Type<String>,
     },
     Import {
-        module: String,
+        module: Spanned<String>,
         name: Option<String>,
     },
     FromImport {
-        module: String,
+        module: Spanned<String>,
         names: Names,
     },
 }

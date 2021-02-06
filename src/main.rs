@@ -126,7 +126,7 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     };
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let module = modules.import(filename)?;
+    let module = modules.import(0, filename)?;
 
     let mut tc = Typechecker::new_with_builtins(&modules);
     let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;

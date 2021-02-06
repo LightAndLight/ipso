@@ -2,7 +2,7 @@ use typed_arena::Arena;
 
 use crate::{
     core,
-    diagnostic::Diagnostic,
+    diagnostic::{self, Diagnostic},
     lex::Lexer,
     parse::{self, Parser},
     syntax,
@@ -12,10 +12,12 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{self, Read},
+    path::Path,
 };
 
 #[derive(Debug)]
 pub enum ModuleError {
+    NotFound { pos: usize, path: String },
     IO(io::Error),
     Parse(parse::ParseError),
     Check(typecheck::TypeError),
@@ -24,6 +26,11 @@ pub enum ModuleError {
 impl ModuleError {
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         match self {
+            ModuleError::NotFound { pos, path } => diagnostic.item(diagnostic::Item {
+                pos: *pos,
+                message: String::from("module not found"),
+                addendum: Some(format!("file {} does not exist", path)),
+            }),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
             ModuleError::Check(err) => err.report(diagnostic),
@@ -54,8 +61,27 @@ pub struct Modules<'a> {
     index: HashMap<String, &'a core::Module>,
 }
 
-fn calculate_imports<'a>(module: &'a syntax::Module) -> Vec<&'a String> {
-    todo!()
+fn get_module_path(name: &String) -> String {
+    format!("./{}.ipso", name)
+}
+
+fn calculate_imports(module: &syntax::Module) -> Vec<(usize, String)> {
+    let mut paths = Vec::new();
+    for decl in &module.decls {
+        match &decl.item {
+            syntax::Declaration::Definition { .. }
+            | syntax::Declaration::Class { .. }
+            | syntax::Declaration::Instance { .. }
+            | syntax::Declaration::TypeAlias { .. } => {}
+            syntax::Declaration::Import { module, .. } => {
+                paths.push((module.pos, get_module_path(&module.item)));
+            }
+            syntax::Declaration::FromImport { module, .. } => {
+                paths.push((module.pos, get_module_path(&module.item)));
+            }
+        }
+    }
+    paths
 }
 
 impl<'a> Modules<'a> {
@@ -66,32 +92,39 @@ impl<'a> Modules<'a> {
         }
     }
 
-    pub fn import(&mut self, path: &String) -> Result<&'a core::Module, ModuleError> {
+    pub fn import(&mut self, pos: usize, path: &String) -> Result<&'a core::Module, ModuleError> {
         match self.index.get(path) {
             None => {
-                let mut file = File::open(path)?;
-                let mut content = String::new();
-                file.read_to_string(&mut content)?;
-                let tokens = Lexer::new(&content).tokenize();
-                let mut parser = Parser::new(tokens);
-                let module = parser
-                    .module()
-                    .and_then(|module| parser.eof().map(|_| module))
-                    .result?;
-                let imports = calculate_imports(&module);
-                for import in imports.into_iter() {
-                    match self.import(import) {
-                        Err(err) => {
-                            return Err(err);
+                if Path::new(path).exists() {
+                    let mut file = File::open(path)?;
+                    let mut content = String::new();
+                    file.read_to_string(&mut content)?;
+                    let tokens = Lexer::new(&content).tokenize();
+                    let mut parser = Parser::new(tokens);
+                    let module = parser
+                        .module()
+                        .and_then(|module| parser.eof().map(|_| module))
+                        .result?;
+                    let imports = calculate_imports(&module);
+                    for (pos, import) in imports.into_iter() {
+                        match self.import(pos, &import) {
+                            Err(err) => {
+                                return Err(err);
+                            }
+                            Ok(_) => {}
                         }
-                        Ok(_) => {}
                     }
+                    let mut tc = Typechecker::new_with_builtins(self);
+                    let module = tc.check_module(&module)?;
+                    let module_ref: &core::Module = self.data.alloc(module);
+                    self.index.insert(path.clone(), module_ref);
+                    Ok(module_ref)
+                } else {
+                    Err(ModuleError::NotFound {
+                        pos,
+                        path: path.clone(),
+                    })
                 }
-                let mut tc = Typechecker::new_with_builtins(self);
-                let module = tc.check_module(&module)?;
-                let module_ref: &core::Module = self.data.alloc(module);
-                self.index.insert(path.clone(), module_ref);
-                Ok(module_ref)
             }
             Some(module_ref) => Ok(*module_ref),
         }
