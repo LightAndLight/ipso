@@ -61,11 +61,11 @@ pub struct Modules<'a> {
     index: HashMap<String, &'a core::Module>,
 }
 
-fn get_module_path(name: &String) -> String {
-    format!("./{}.ipso", name)
+fn get_module_path(working_dir: &Path, name: &String) -> String {
+    format!("./{}/{}.ipso", working_dir.to_str().unwrap(), name)
 }
 
-fn calculate_imports(module: &syntax::Module) -> Vec<(usize, String)> {
+fn calculate_imports(working_dir: &Path, module: &syntax::Module) -> Vec<(usize, String)> {
     let mut paths = Vec::new();
     for decl in &module.decls {
         match &decl.item {
@@ -74,10 +74,10 @@ fn calculate_imports(module: &syntax::Module) -> Vec<(usize, String)> {
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
             syntax::Declaration::Import { module, .. } => {
-                paths.push((module.pos, get_module_path(&module.item)));
+                paths.push((module.pos, get_module_path(working_dir, &module.item)));
             }
             syntax::Declaration::FromImport { module, .. } => {
-                paths.push((module.pos, get_module_path(&module.item)));
+                paths.push((module.pos, get_module_path(working_dir, &module.item)));
             }
         }
     }
@@ -92,10 +92,15 @@ impl<'a> Modules<'a> {
         }
     }
 
-    pub fn import(&mut self, pos: usize, path: &String) -> Result<&'a core::Module, ModuleError> {
-        match self.index.get(path) {
+    pub fn import(
+        &mut self,
+        pos: usize,
+        path_str: &String,
+    ) -> Result<&'a core::Module, ModuleError> {
+        match self.index.get(path_str) {
             None => {
-                if Path::new(path).exists() {
+                let path = Path::new(path_str);
+                if path.exists() {
                     let mut file = File::open(path)?;
                     let mut content = String::new();
                     file.read_to_string(&mut content)?;
@@ -105,7 +110,8 @@ impl<'a> Modules<'a> {
                         .module()
                         .and_then(|module| parser.eof().map(|_| module))
                         .result?;
-                    let imports = calculate_imports(&module);
+                    let working_dir = path.parent().unwrap();
+                    let imports = calculate_imports(working_dir, &module);
                     for (pos, import) in imports.into_iter() {
                         match self.import(pos, &import) {
                             Err(err) => {
@@ -117,12 +123,12 @@ impl<'a> Modules<'a> {
                     let mut tc = Typechecker::new_with_builtins(self);
                     let module = tc.check_module(&module)?;
                     let module_ref: &core::Module = self.data.alloc(module);
-                    self.index.insert(path.clone(), module_ref);
+                    self.index.insert(path_str.clone(), module_ref);
                     Ok(module_ref)
                 } else {
                     Err(ModuleError::NotFound {
                         pos,
-                        path: path.clone(),
+                        path: path_str.clone(),
                     })
                 }
             }
