@@ -6,7 +6,7 @@ use crate::{
 
 #[test]
 fn subst_left_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         tc.bound_tyvars
             .insert(&vec![(String::from("r"), Kind::Row)]);
         tc.type_solutions = vec![

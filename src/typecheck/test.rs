@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use typed_arena::Arena;
 
-use crate::with_tc;
+use crate::current_dir_with_tc;
 #[cfg(test)]
 use crate::{
     core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
@@ -18,7 +18,7 @@ use super::SolveConstraintContext;
 
 #[test]
 fn infer_kind_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok((Type::Bool, Kind::Type));
         let actual = tc.infer_kind(&Type::Bool);
         assert_eq!(expected, actual)
@@ -27,7 +27,7 @@ fn infer_kind_test_1() {
 
 #[test]
 fn infer_kind_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok((Type::RowNil, Kind::Row));
         let actual = tc.infer_kind(&Type::RowNil);
         assert_eq!(expected, actual)
@@ -36,7 +36,7 @@ fn infer_kind_test_2() {
 
 #[test]
 fn infer_kind_test_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Err(TypeError::KindMismatch {
             pos: 0,
             context: UnifyKindContext {
@@ -58,7 +58,7 @@ fn infer_kind_test_3() {
 
 #[test]
 fn infer_kind_test_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(Kind::Type);
         let actual = tc
             .infer_kind(&Type::mk_app(
@@ -223,7 +223,7 @@ fn context_test_6() {
 
 #[test]
 fn infer_pattern_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let pat = syntax::Pattern::Name(syntax::Spanned {
             pos: 0,
             item: String::from("x"),
@@ -241,7 +241,7 @@ fn infer_pattern_test_1() {
 
 #[test]
 fn infer_pattern_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let pat = syntax::Pattern::Record {
             names: vec![
                 syntax::Spanned {
@@ -290,7 +290,7 @@ fn infer_pattern_test_2() {
 
 #[test]
 fn infer_pattern_test_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let pat = syntax::Pattern::Record {
             names: vec![
                 syntax::Spanned {
@@ -346,7 +346,7 @@ fn infer_pattern_test_3() {
 
 #[test]
 fn infer_pattern_test_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let pat = syntax::Pattern::Variant {
             name: String::from("just"),
             arg: syntax::Spanned {
@@ -370,7 +370,7 @@ fn infer_pattern_test_4() {
 
 #[test]
 fn infer_lam_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // \x -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -398,7 +398,7 @@ fn infer_lam_test_1() {
 
 #[test]
 fn infer_lam_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // \{x, y} -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -459,7 +459,7 @@ fn infer_lam_test_2() {
 
 #[test]
 fn infer_lam_test_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // \{x, y} -> y
         let term = syntax::Spanned {
             pos: 0,
@@ -520,7 +520,7 @@ fn infer_lam_test_3() {
 
 #[test]
 fn infer_lam_test_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // \{x, y, ...z} -> z
         let term = syntax::Spanned {
             pos: 0,
@@ -584,7 +584,7 @@ fn infer_lam_test_4() {
 
 #[test]
 fn infer_lam_test_5() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // \f x -> f x
         let term = syntax::Spanned {
             pos: 0,
@@ -634,7 +634,7 @@ fn infer_lam_test_5() {
 
 #[test]
 fn infer_array_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // [1, 2, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -669,7 +669,7 @@ fn infer_array_test_1() {
 
 #[test]
 fn infer_array_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // [1, true, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -705,7 +705,7 @@ fn infer_array_test_2() {
 
 #[test]
 fn unify_rows_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
                 &UnifyTypeContext {
@@ -734,7 +734,7 @@ fn unify_rows_test_1() {
 
 #[test]
 fn unify_rows_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
                 &UnifyTypeContext {
@@ -765,7 +765,7 @@ fn unify_rows_test_2() {
 
 #[test]
 fn unify_rows_test_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
                 &UnifyTypeContext {
@@ -796,7 +796,7 @@ fn unify_rows_test_3() {
 
 #[test]
 fn unify_rows_test_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
                 &UnifyTypeContext {
@@ -835,7 +835,7 @@ fn unify_rows_test_4() {
 
 #[test]
 fn infer_record_test_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // {}
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
@@ -851,7 +851,7 @@ fn infer_record_test_1() {
 
 #[test]
 fn infer_record_test_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // { x = 1, y = true }
         let term = syntax::Expr::mk_record(
             vec![
@@ -897,7 +897,7 @@ fn infer_record_test_2() {
 
 #[test]
 fn infer_record_test_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // { x = 1, y = true, ...{ z = 'c' } }
         let term = syntax::Expr::mk_record(
             vec![
@@ -959,7 +959,7 @@ fn infer_record_test_3() {
 
 #[test]
 fn infer_record_test_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         // { x = 1, y = true, ...1 }
         let term = syntax::Expr::mk_record(
             vec![
@@ -1001,7 +1001,7 @@ fn infer_record_test_4() {
 
 #[test]
 fn infer_case_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         \x -> case x of
           X a -> a
@@ -1065,7 +1065,7 @@ fn infer_case_1() {
 
 #[test]
 fn infer_case_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         \x -> case x of
           Left a -> a
@@ -1160,7 +1160,7 @@ fn infer_case_2() {
 
 #[test]
 fn infer_case_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         \x -> case x of
           Left a -> a
@@ -1270,7 +1270,7 @@ fn infer_case_3() {
 
 #[test]
 fn infer_case_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         \x -> case x of
           Left a -> a
@@ -1349,7 +1349,7 @@ fn infer_case_4() {
 
 #[test]
 fn infer_record_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected_expr = core::Expr::mk_record(
             vec![
                 (core::Expr::Placeholder(Placeholder(2)), core::Expr::False),
@@ -1469,7 +1469,7 @@ fn infer_record_1() {
 
 #[test]
 fn check_definition_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         id : a -> a
         id x = x
@@ -1508,7 +1508,7 @@ fn check_definition_1() {
 
 #[test]
 fn check_definition_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         thing : { r } -> { x : Int, r }
         thing r = { x = 0, ..r }
@@ -1580,7 +1580,7 @@ fn check_definition_2() {
 
 #[test]
 fn check_definition_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         thing : { z : Bool, y : String, x : Int }
         thing = { z = False, y = "", x = 0 }
@@ -1658,7 +1658,7 @@ fn check_definition_3() {
 
 #[test]
 fn check_definition_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         getx : { x : Int, r } -> Int
         getx { x, r } = x
@@ -1729,7 +1729,7 @@ fn check_definition_4() {
 
 #[test]
 fn kind_occurs_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let v1 = tc.fresh_kindvar();
         let v2 = tc.fresh_kindvar();
         assert_eq!(
@@ -1753,7 +1753,7 @@ fn kind_occurs_1() {
 
 #[test]
 fn type_occurs_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let v1 = tc.fresh_typevar(Kind::Type);
         let v2 = tc.fresh_typevar(Kind::Type);
         assert_eq!(
@@ -1776,7 +1776,7 @@ fn type_occurs_1() {
 
 #[test]
 fn check_class_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Eq"),
@@ -1858,7 +1858,7 @@ fn check_class_1() {
 
 #[test]
 fn check_class_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Wut"),
@@ -1953,7 +1953,7 @@ fn check_class_2() {
 
 #[test]
 fn check_instance_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(core::Declaration::Instance {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
@@ -2017,7 +2017,7 @@ fn check_instance_1() {
 
 #[test]
 fn class_and_instance_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         class Eq a where
           eq : a -> a -> Bool
@@ -2170,7 +2170,7 @@ fn class_and_instance_1() {
 
 #[test]
 fn class_and_instance_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
         class Eq a where
           eq : a -> a -> Bool
@@ -2540,7 +2540,7 @@ fn class_and_instance_2() {
 
 #[test]
 fn unify_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         tc.bound_tyvars
             .insert(&vec![(String::from("r"), Kind::Row)]);
         let real = Type::mk_app(

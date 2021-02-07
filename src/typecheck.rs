@@ -439,8 +439,16 @@ macro_rules! with_tc {
         use typed_arena::Arena;
         let modules_data = Arena::new();
         let modules = Modules::new(&modules_data);
-        let tc = Typechecker::new_with_builtins(path, &modules);
+        let tc = Typechecker::new_with_builtins($path, &modules);
         $f(tc)
+    }};
+}
+
+#[macro_export]
+macro_rules! current_dir_with_tc {
+    ($f:expr) => {{
+        let path = std::env::current_dir().unwrap();
+        crate::with_tc!(path.as_path(), $f)
     }};
 }
 

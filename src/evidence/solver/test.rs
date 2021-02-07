@@ -8,7 +8,7 @@ use crate::{
 
 #[test]
 fn solve_constraint_1() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
             field: String::from("x"),
             rest: Type::mk_rows(
@@ -27,7 +27,7 @@ fn solve_constraint_1() {
 
 #[test]
 fn solve_constraint_2() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
             field: String::from("y"),
             rest: Type::mk_rows(
@@ -46,7 +46,7 @@ fn solve_constraint_2() {
 
 #[test]
 fn solve_constraint_3() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let var = tc.fresh_typevar(Kind::Row);
         tc.evidence.assume(
             None,
@@ -92,7 +92,7 @@ fn solve_constraint_3() {
 
 #[test]
 fn solve_constraint_4() {
-    crate::with_tc!(|mut tc: Typechecker| {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
         tc.register_class(&ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Eq"),
