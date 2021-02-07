@@ -92,6 +92,10 @@ impl<'a> Modules<'a> {
         }
     }
 
+    pub fn lookup(&self, path: &String) -> Option<&core::Module> {
+        self.index.get(path).map(|x| *x)
+    }
+
     pub fn import(
         &mut self,
         pos: usize,

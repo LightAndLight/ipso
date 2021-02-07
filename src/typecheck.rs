@@ -680,7 +680,18 @@ impl<'modules> Typechecker<'modules> {
 
     fn register_import(&mut self, module_name: &String) {
         let path = import::get_module_path(self.working_dir, module_name);
-        todo!()
+        match self.modules.lookup(&path) {
+            None => panic!("missing module at {}", path),
+            Some(module) => {
+                let module_contents: HashMap<String, core::TypeSig> = module
+                    .decls
+                    .iter()
+                    .flat_map(|decl| decl.get_signatures())
+                    .collect();
+                self.module_context
+                    .insert(module_name.clone(), module_contents);
+            }
+        }
     }
 
     pub fn register_declaration(&mut self, decl: &core::Declaration) {

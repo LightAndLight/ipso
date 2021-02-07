@@ -923,6 +923,26 @@ impl Declaration {
             Declaration::Instance { .. } => HashMap::new(),
         }
     }
+
+    pub fn get_signatures(&self) -> HashMap<String, TypeSig> {
+        match self {
+            Declaration::BuiltinType { .. } => HashMap::new(),
+            Declaration::Definition { name, sig, body: _ } => {
+                let mut map = HashMap::new();
+                map.insert(name.clone(), sig.clone());
+                map
+            }
+            Declaration::TypeAlias { .. } => HashMap::new(),
+            Declaration::Import { .. } => HashMap::new(),
+            Declaration::FromImport { .. } => HashMap::new(),
+            Declaration::Class(decl) => decl
+                .get_bindings()
+                .into_iter()
+                .map(|(a, b)| (a, b.0))
+                .collect(),
+            Declaration::Instance { .. } => HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
