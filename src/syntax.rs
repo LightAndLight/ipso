@@ -110,10 +110,16 @@ pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ModuleName(Vec<String>);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
+    Module {
+        name: ModuleName,
+        item: String,
+    },
 
     App(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
     Lam {
@@ -600,11 +606,12 @@ impl<A> Type<A> {
                 _ => vec![ty],
             }
         }
+
         pub fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) -> &'a Type<A> {
             match ty.unwrap_fatarrow() {
                 None => ty,
                 Some((c, ty)) => {
-                    let mut more_constraints = flatten_constraints(c);
+                    let more_constraints = flatten_constraints(c);
                     constraints.extend(more_constraints.iter());
 
                     go(constraints, ty)
@@ -731,7 +738,7 @@ impl<A> Type<A> {
             Some((fields, rest)) => {
                 s.push('{');
                 let mut fields_iter = fields.iter();
-                let mut has_stuff = false;
+                let has_stuff = false;
                 match fields_iter.next() {
                     None => {}
                     Some((first_field, first_ty)) => {

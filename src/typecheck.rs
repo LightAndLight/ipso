@@ -2020,6 +2020,9 @@ impl<'modules> Typechecker<'modules> {
                         },
                     }
                 }
+                syntax::Expr::Module { name, item } => {
+                    todo!("infer module {:?} {:?}", name, item)
+                }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(*f)?;
                     let in_ty = self.fresh_typevar(syntax::Kind::Type);
