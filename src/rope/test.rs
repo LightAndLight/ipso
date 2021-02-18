@@ -71,7 +71,7 @@ fn rope_test_6() {
 fn rope_test_7() {
     assert_eq!(
         Rope::from_vec(&vec![("a", 0), ("b", 1), ("b", 2), ("c", 3)])
-            .delete_first(&|(x, _)| *x == "b")
+            .delete_first(|(x, _)| *x == "b")
             .map(|xs| xs.iter().collect()),
         Ok(vec![&("a", 0), &("b", 2), &("c", 3)])
     )
@@ -81,9 +81,9 @@ fn rope_test_7() {
 fn rope_test_8() {
     assert_eq!(
         Rope::from_vec(&vec![("a", 0), ("b", 1), ("b", 2), ("c", 3)])
-            .delete_first(&|(x, _)| *x == "b")
+            .delete_first(|(x, _)| *x == "b")
             .unwrap()
-            .delete_first(&|(x, _)| *x == "b")
+            .delete_first(|(x, _)| *x == "b")
             .map(|xs| xs.iter().collect()),
         Ok(vec![&("a", 0), &("c", 3)])
     )

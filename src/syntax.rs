@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash};
+use std::{
+    collections::{binary_heap::Iter, HashMap},
+    fmt::Display,
+    hash::Hash,
+};
 
 use crate::iter::Step;
 use lazy_static::lazy_static;
@@ -105,13 +109,58 @@ pub enum Pattern {
     Wildcard,
 }
 
+pub struct IterNames<'a> {
+    items: Vec<&'a Spanned<String>>,
+    pattern: Option<&'a Pattern>,
+}
+
+impl<'a> Iterator for IterNames<'a> {
+    type Item = &'a Spanned<String>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.pattern {
+            None => match self.items.pop() {
+                None => None,
+                Some(item) => Some(item),
+            },
+            Some(pattern) => {
+                self.pattern = None;
+                match pattern {
+                    Pattern::Name(n) => Some(n),
+                    Pattern::Record { names, rest } => {
+                        match rest {
+                            Some(n) => {
+                                self.items.push(n);
+                            }
+                            None => {}
+                        }
+                        self.items.extend(names.iter().rev());
+                        self.next()
+                    }
+                    Pattern::Variant { name, arg } => Some(arg),
+                    Pattern::Wildcard => None,
+                }
+            }
+        }
+    }
+}
+
+impl Pattern {
+    pub fn iter_names<'a>(&'a self) -> IterNames<'a> {
+        IterNames {
+            items: Vec::new(),
+            pattern: Some(self),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ModuleName(Vec<String>);
+pub struct ModuleName(pub Vec<String>);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
@@ -194,6 +243,22 @@ impl Expr {
 
     pub fn mk_embed(ctor: String, rest: Spanned<Expr>) -> Expr {
         Expr::Embed(ctor, Box::new(rest))
+    }
+
+    pub fn unwrap_projects(&self) -> (&Expr, Vec<&String>) {
+        fn go<'a>(expr: &'a Expr, fields: &mut Vec<&'a String>) -> &'a Expr {
+            match expr {
+                Expr::Project(value, field) => {
+                    let expr = go(&(*value).item, fields);
+                    fields.push(field);
+                    expr
+                }
+                _ => expr,
+            }
+        }
+        let mut fields = Vec::new();
+        let expr = go(self, &mut fields);
+        (expr, fields)
     }
 }
 

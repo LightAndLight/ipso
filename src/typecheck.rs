@@ -1727,7 +1727,7 @@ impl<'modules> Typechecker<'modules> {
                             }
                             Some((_, ty2)) => {
                                 rows2_remaining =
-                                    match rows2_remaining.delete_first(&|(f, _)| f == field1) {
+                                    match rows2_remaining.delete_first(|(f, _)| f == field1) {
                                         Err(new) => new,
                                         Ok(new) => new,
                                     };

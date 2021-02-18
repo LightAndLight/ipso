@@ -1,6 +1,6 @@
 mod test;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Rope<'a, A> {
     Empty,
     Slice(&'a [A]),
@@ -95,71 +95,74 @@ impl<'a, A> Rope<'a, A> {
         }
     }
 
-    pub fn delete_first<P: Fn(&A) -> bool>(
-        self,
-        predicate: &P,
-    ) -> Result<Rope<'a, A>, Rope<'a, A>> {
-        match self {
-            Rope::Empty => Err(Rope::Empty),
-            Rope::Item(a) => {
-                if predicate(a) {
-                    Ok(Rope::Empty)
-                } else {
-                    Err(Rope::Item(a))
-                }
-            }
-            Rope::Slice(slice) => match slice.iter().position(predicate) {
-                Some(ix) => {
-                    let (prefix, suffix) = slice.split_at(ix);
-                    let suffix = &suffix[1..];
-                    let prefix_len = prefix.len();
-                    let suffix_len = suffix.len();
-                    if prefix_len == 0 {
-                        Ok(Rope::Slice(suffix))
-                    } else if suffix_len == 0 {
-                        Ok(Rope::Slice(prefix))
+    pub fn delete_first<P: Fn(&A) -> bool>(self, predicate: P) -> Result<Rope<'a, A>, Rope<'a, A>> {
+        pub fn go<'a, A, P: Fn(&A) -> bool>(
+            rope: Rope<'a, A>,
+            predicate: &P,
+        ) -> Result<Rope<'a, A>, Rope<'a, A>> {
+            match rope {
+                Rope::Empty => Err(Rope::Empty),
+                Rope::Item(a) => {
+                    if predicate(a) {
+                        Ok(Rope::Empty)
                     } else {
-                        Ok(Rope::Branch(
-                            prefix_len + suffix_len,
-                            Box::new(Rope::Slice(prefix)),
-                            Box::new(Rope::Slice(suffix)),
-                        ))
+                        Err(Rope::Item(a))
                     }
                 }
-                None => Err(self),
-            },
-            Rope::Branch(size, mut left, mut right) => match left.delete_first(predicate) {
-                Err(new_left) => {
-                    *left = new_left;
-                    match right.delete_first(predicate) {
-                        Err(new_right) => {
-                            *right = new_right;
-                            Err(Rope::Branch(size, left, right))
+                Rope::Slice(slice) => match slice.iter().position(predicate) {
+                    Some(ix) => {
+                        let (prefix, suffix) = slice.split_at(ix);
+                        let suffix = &suffix[1..];
+                        let prefix_len = prefix.len();
+                        let suffix_len = suffix.len();
+                        if prefix_len == 0 {
+                            Ok(Rope::Slice(suffix))
+                        } else if suffix_len == 0 {
+                            Ok(Rope::Slice(prefix))
+                        } else {
+                            Ok(Rope::Branch(
+                                prefix_len + suffix_len,
+                                Box::new(Rope::Slice(prefix)),
+                                Box::new(Rope::Slice(suffix)),
+                            ))
                         }
-                        Ok(new_right) => {
-                            *right = new_right;
-                            let left_size = left.size();
-                            let right_size = right.size();
-                            if right.size() == 0 {
-                                Ok(*left)
-                            } else {
-                                Ok(Rope::Branch(left_size + right_size, left, right))
+                    }
+                    None => Err(rope),
+                },
+                Rope::Branch(size, mut left, mut right) => match go(*left, predicate) {
+                    Err(new_left) => {
+                        *left = new_left;
+                        match go(*right, predicate) {
+                            Err(new_right) => {
+                                *right = new_right;
+                                Err(Rope::Branch(size, left, right))
+                            }
+                            Ok(new_right) => {
+                                *right = new_right;
+                                let left_size = left.size();
+                                let right_size = right.size();
+                                if right.size() == 0 {
+                                    Ok(*left)
+                                } else {
+                                    Ok(Rope::Branch(left_size + right_size, left, right))
+                                }
                             }
                         }
                     }
-                }
-                Ok(new_left) => {
-                    *left = new_left;
-                    let left_size = left.size();
-                    let right_size = right.size();
-                    if left.size() == 0 {
-                        Ok(*right)
-                    } else {
-                        Ok(Rope::Branch(left_size + right_size, left, right))
+                    Ok(new_left) => {
+                        *left = new_left;
+                        let left_size = left.size();
+                        let right_size = right.size();
+                        if left.size() == 0 {
+                            Ok(*right)
+                        } else {
+                            Ok(Rope::Branch(left_size + right_size, left, right))
+                        }
                     }
-                }
-            },
+                },
+            }
         }
+        go(self, &predicate)
     }
 
     pub fn delete(self, ix: usize) -> Result<Rope<'a, A>, Rope<'a, A>> {
