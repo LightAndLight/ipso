@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     iter::Step,
-    syntax::{self, Type},
+    syntax::{self, ModuleName, Type},
 };
 
 #[cfg(test)]
@@ -224,6 +224,7 @@ pub enum Expr {
     EVar(EVar),
     Placeholder(Placeholder),
     Name(String),
+    Module(ModuleName, String),
     Builtin(Builtin),
 
     App(Box<Expr>, Box<Expr>),
@@ -363,6 +364,7 @@ impl Expr {
         fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
             match expr {
                 Expr::Var(v) => Expr::Var(f.apply(*v)),
+                Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
                 Expr::EVar(v) => Expr::EVar(*v),
                 Expr::Placeholder(p) => Expr::Placeholder(*p),
                 Expr::Name(n) => Expr::Name(n.clone()),
@@ -458,6 +460,7 @@ impl Expr {
                     }
                 }
             }
+            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
             Expr::EVar(v) => Expr::EVar(*v),
             Expr::Placeholder(v) => Expr::Placeholder(*v),
             Expr::Name(n) => Expr::Name(n.clone()),
@@ -527,6 +530,7 @@ impl Expr {
         match self {
             Expr::Var(n) => Ok(Expr::Var(*n)),
             Expr::EVar(n) => Ok(Expr::EVar(*n)),
+            Expr::Module(n, f) => Ok(Expr::Module(n.clone(), f.clone())),
             Expr::Placeholder(v) => f(v),
             Expr::Name(n) => Ok(Expr::Name(n.clone())),
             Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
@@ -633,6 +637,7 @@ impl Expr {
                 }
             }
             Expr::Name(n) => Expr::Name(n.clone()),
+            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
             Expr::Placeholder(n) => Expr::Placeholder(*n),
             Expr::Builtin(b) => Expr::Builtin(*b),
             Expr::App(a, b) => {
@@ -769,6 +774,7 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::EVar(a) => Step::Yield(a),
                 Expr::Placeholder(_) => Step::Skip,
                 Expr::Name(_) => Step::Skip,
+                Expr::Module(_, _) => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
                 Expr::App(a, b) => Step::Continue(vec![a, b]),
                 Expr::Lam { arg, body } => Step::Continue(vec![body]),

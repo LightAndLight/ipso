@@ -1,6 +1,6 @@
 use evidence::{solver::solve_placeholder, Constraint};
 
-use crate::syntax;
+use crate::syntax::{self, ModuleName};
 use crate::syntax::{Spanned, Type};
 use crate::{builtins, evidence::Evidence};
 use crate::{core, evidence};
@@ -153,7 +153,7 @@ pub struct Typechecker<'modules> {
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
-    module_context: HashMap<String, HashMap<String, core::TypeSig>>,
+    module_context: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
     class_context: HashMap<String, core::ClassDeclaration>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
@@ -203,6 +203,10 @@ pub enum TypeError {
     NotInScope {
         pos: usize,
         name: String,
+    },
+    NotInModule {
+        pos: usize,
+        item: String,
     },
     KindMismatch {
         pos: usize,
@@ -287,6 +291,7 @@ impl TypeError {
                 actual: _,
             } => *pos,
             TypeError::NotInScope { pos, name: _ } => *pos,
+            TypeError::NotInModule { pos, .. } => *pos,
             TypeError::DuplicateArgument { pos, name: _ } => *pos,
             TypeError::DuplicateClassArgument { pos } => *pos,
             TypeError::RedundantPattern { pos } => *pos,
@@ -337,6 +342,7 @@ impl TypeError {
                 message
             }
             TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
+            TypeError::NotInModule { .. } => String::from("not in scope"),
             TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
             TypeError::DuplicateClassArgument { .. } => {
                 String::from("duplicate type class argument")
@@ -414,6 +420,7 @@ impl TypeError {
             } => None,
             TypeError::RedundantPattern { pos: _ } => None,
             TypeError::NotInScope { pos: _, name: _ } => None,
+            TypeError::NotInModule { .. } => None,
             TypeError::KindOccurs { .. } => None,
             TypeError::TypeOccurs { .. } => None,
             TypeError::NoSuchClass { .. } => None,
@@ -689,7 +696,7 @@ impl<'modules> Typechecker<'modules> {
                     .flat_map(|decl| decl.get_signatures())
                     .collect();
                 self.module_context
-                    .insert(module_name.clone(), module_contents);
+                    .insert(ModuleName(vec![module_name.clone()]), module_contents);
             }
         }
     }
@@ -1186,7 +1193,10 @@ impl<'modules> Typechecker<'modules> {
             Some(name) => name,
         };
 
-        match self.module_context.get(&actual_name.item) {
+        match self
+            .module_context
+            .get(&ModuleName(vec![actual_name.item.clone()]))
+        {
             Some(_) => Err(TypeError::ShadowedModuleName {
                 pos: actual_name.pos,
             }),
@@ -1981,7 +1991,7 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn instantiate(&mut self, name: String, sig: core::TypeSig) -> (core::Expr, Type<usize>) {
+    fn instantiate(&mut self, expr: core::Expr, sig: core::TypeSig) -> (core::Expr, Type<usize>) {
         let metas: Vec<Type<usize>> = sig
             .ty_vars
             .into_iter()
@@ -1989,7 +1999,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let ty = sig.body.subst(&|&ix| metas[metas.len() - 1 - ix].clone());
         let (constraints, ty) = ty.unwrap_constraints();
-        let mut expr = core::Expr::Name(name);
+        let mut expr = expr;
         for constraint in constraints {
             let p = self.evidence.placeholder(
                 Some(self.current_position()),
@@ -2013,7 +2023,7 @@ impl<'modules> Typechecker<'modules> {
                         Some(entry) => Ok((core::Expr::Var(entry.0), entry.1)),
                         None => match self.lookup_name(&name) {
                             Some(sig) => {
-                                let (expr, ty) = self.instantiate(name, sig);
+                                let (expr, ty) = self.instantiate(core::Expr::Name(name), sig);
                                 Ok((expr, ty))
                             }
                             None => self.not_in_scope(&name),
@@ -2021,7 +2031,21 @@ impl<'modules> Typechecker<'modules> {
                     }
                 }
                 syntax::Expr::Module { name, item } => {
-                    todo!("infer module {:?} {:?}", name, item)
+                    let sig = match self.module_context.get(&name) {
+                        None => {
+                            // a module accessor will only be desugared if the module was in scope,
+                            // so we should never get here during a program run
+                            panic!("module not in scope: {:?}", name)
+                        }
+                        Some(defs) => match defs.get(&item) {
+                            None => Err(TypeError::NotInModule {
+                                pos: self.current_position(),
+                                item: item.clone(),
+                            }),
+                            Some(sig) => Ok(sig.clone()),
+                        },
+                    }?;
+                    Ok(self.instantiate(core::Expr::Module(name, item), sig))
                 }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(*f)?;

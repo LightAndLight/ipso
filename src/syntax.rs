@@ -159,7 +159,7 @@ pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleName(pub Vec<String>);
 
 #[derive(Debug, PartialEq, Eq, Clone)]

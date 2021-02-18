@@ -151,7 +151,9 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
             .iter()
             .flat_map(|decl| decl.get_bindings().into_iter())
             .collect();
-        let mut interpreter = Interpreter::new_with_builtins(&mut stdout, context, &heap);
+        let module_context = todo!("collect module context");
+        let mut interpreter =
+            Interpreter::new_with_builtins(&mut stdout, context, module_context, &heap);
         let action = interpreter.eval(&env, target);
         action.perform_io(&mut interpreter)
     };

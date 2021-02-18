@@ -15,7 +15,7 @@ fn eval_1() {
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
     );
-    let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), &heap);
+    let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), HashMap::new(), &heap);
     let env = interpreter.alloc_env(Vec::new());
 
     let expected_value = interpreter.alloc_value(Value::Int(1));
@@ -36,7 +36,7 @@ fn eval_2() {
         Expr::Builtin(Builtin::ToUtf8),
         Expr::String(vec![StringPart::String(str.clone())]),
     );
-    let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), &heap);
+    let mut interpreter = Interpreter::new(&mut stdout, HashMap::new(), HashMap::new(), &heap);
     let env = interpreter.alloc_env(Vec::new());
 
     let expected_value = interpreter.alloc_value(Value::Bytes(str.as_bytes()));

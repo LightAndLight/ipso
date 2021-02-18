@@ -2,7 +2,7 @@ use crate::{
     builtins,
     core::{Builtin, Declaration, Expr, Pattern, StringPart},
     rope::Rope,
-    syntax::Binop,
+    syntax::{Binop, ModuleName},
 };
 use std::collections::HashMap;
 use std::{fmt::Debug, io::Write};
@@ -383,17 +383,20 @@ pub struct Interpreter<'stdout, 'heap> {
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Expr>,
+    module_context: HashMap<ModuleName, HashMap<String, Expr>>,
 }
 
 impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn new(
         stdout: &'stdout mut dyn Write,
         context: HashMap<String, Expr>,
+        module_context: HashMap<ModuleName, HashMap<String, Expr>>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
         Interpreter {
             stdout,
             context,
+            module_context,
             heap,
         }
     }
@@ -401,6 +404,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn new_with_builtins(
         stdout: &'stdout mut dyn Write,
         additional_context: HashMap<String, Expr>,
+        module_context: HashMap<ModuleName, HashMap<String, Expr>>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
         let mut context: HashMap<String, Expr> = builtins::BUILTINS
@@ -417,6 +421,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         Interpreter {
             stdout,
             context,
+            module_context,
             heap,
         }
     }
@@ -943,6 +948,16 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     self.eval(env, body)
                 }
             },
+            Expr::Module(name, item) => {
+                let body = match self.module_context.get(&name) {
+                    None => panic!("{:?} not in scope", name),
+                    Some(defs) => match defs.get(&item) {
+                        None => panic!("{:?}.{:?} not in scope", name, item),
+                        Some(body) => body.clone(),
+                    },
+                };
+                self.eval(env, body)
+            }
             Expr::Builtin(name) => self.eval_builtin(&name),
 
             Expr::App(a, b) => {
