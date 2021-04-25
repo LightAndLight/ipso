@@ -63,7 +63,7 @@ pub struct Modules<'a> {
 }
 
 pub fn get_module_path(working_dir: &Path, name: &String) -> String {
-    format!("./{}/{}.ipso", working_dir.to_str().unwrap(), name)
+    String::from(working_dir.join(format!("{}.ipso", name)).to_str().unwrap())
 }
 
 fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::Expr) {
@@ -265,6 +265,11 @@ impl<'a> Modules<'a> {
         self.index.get(path).map(|x| *x)
     }
 
+    /// Import a module.
+    ///
+    /// Module imports are cached, so importing the same module repeatedly is cheap.
+    ///
+    /// * `pos` - source file offset for error reporting
     pub fn import(
         &mut self,
         pos: usize,
@@ -274,18 +279,25 @@ impl<'a> Modules<'a> {
             None => {
                 let path = Path::new(path_str);
                 if path.exists() {
-                    let mut file = File::open(path)?;
-                    let mut content = String::new();
-                    file.read_to_string(&mut content)?;
-                    let tokens = Lexer::new(&content).tokenize();
-                    let mut parser = Parser::new(tokens);
-                    let mut module = parser
-                        .module()
-                        .and_then(|module| parser.eof().map(|_| module))
-                        .result?;
+                    let mut module = {
+                        let content = {
+                            let mut file = File::open(path)?;
+                            let mut content = String::new();
+                            file.read_to_string(&mut content)?;
+                            content
+                        };
+
+                        let tokens = Lexer::new(&content).tokenize();
+                        let mut parser = Parser::new(tokens);
+
+                        parser
+                            .module()
+                            .and_then(|module| parser.eof().map(|_| module))
+                            .result
+                    }?;
+
                     let working_dir = path.parent().unwrap();
-                    let imports = calculate_imports(working_dir, &mut module);
-                    for import_info in imports.into_iter() {
+                    for import_info in calculate_imports(working_dir, &mut module).into_iter() {
                         match self.import(import_info.pos, &import_info.path) {
                             Err(err) => {
                                 return Err(err);
@@ -293,8 +305,10 @@ impl<'a> Modules<'a> {
                             Ok(_) => {}
                         }
                     }
-                    let mut tc = Typechecker::new_with_builtins(working_dir, self);
-                    let module = tc.check_module(&module)?;
+                    let module = {
+                        let mut tc = Typechecker::new_with_builtins(working_dir, self);
+                        tc.check_module(&module)
+                    }?;
                     let module_ref: &core::Module = self.data.alloc(module);
                     self.index.insert(path_str.clone(), module_ref);
                     Ok(module_ref)

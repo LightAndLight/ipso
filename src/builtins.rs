@@ -1,9 +1,11 @@
 use crate::core::{Builtin, Declaration, Expr, Module, TypeSig};
 use crate::syntax::{Kind, Type};
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 lazy_static! {
     pub static ref BUILTINS: Module = Module {
+        module_mapping: HashMap::new(),
         decls: vec![
             // mapIO : (a -> b) -> IO a -> IO b
             Declaration::Definition {

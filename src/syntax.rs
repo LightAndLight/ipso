@@ -1,8 +1,4 @@
-use std::{
-    collections::{binary_heap::Iter, HashMap},
-    fmt::Display,
-    hash::Hash,
-};
+use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::iter::Step;
 use lazy_static::lazy_static;

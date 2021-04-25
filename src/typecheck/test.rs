@@ -1493,15 +1493,15 @@ fn check_definition_1() {
             },
         };
         assert_eq!(
-            tc.check_declaration(&decl),
-            Ok(core::Declaration::Definition {
+            tc.check_declaration(&mut HashMap::new(), &decl),
+            Ok(Some(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
                     ty_vars: vec![(String::from("a"), syntax::Kind::Type)],
                     body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
                 },
                 body: core::Expr::mk_lam(true, core::Expr::Var(0))
-            })
+            }))
         )
     })
 }
@@ -1546,7 +1546,7 @@ fn check_definition_2() {
                 },
             },
         };
-        let expected = Ok(core::Declaration::Definition {
+        let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
                 ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
@@ -1572,8 +1572,8 @@ fn check_definition_2() {
                     ),
                 ),
             ),
-        });
-        let actual = tc.check_declaration(&decl);
+        }));
+        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
     })
 }
@@ -1629,7 +1629,7 @@ fn check_definition_3() {
                 },
             },
         };
-        let expected = Ok(core::Declaration::Definition {
+        let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
                 ty_vars: Vec::new(),
@@ -1650,8 +1650,8 @@ fn check_definition_3() {
                 ],
                 None,
             ),
-        });
-        let actual = tc.check_declaration(&decl);
+        }));
+        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
     })
 }
@@ -1690,7 +1690,7 @@ fn check_definition_4() {
                 },
             },
         };
-        let expected = Ok(core::Declaration::Definition {
+        let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("getx"),
             sig: core::TypeSig {
                 ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
@@ -1721,8 +1721,8 @@ fn check_definition_4() {
                     ),
                 ),
             ),
-        });
-        let actual = tc.check_declaration(&decl);
+        }));
+        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
     })
 }
@@ -1777,7 +1777,7 @@ fn type_occurs_1() {
 #[test]
 fn check_class_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
+        let expected = Ok(Some(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Eq"),
             args: vec![(String::from("a"), Kind::Type)],
@@ -1788,32 +1788,35 @@ fn check_class_1() {
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
-        }));
+        })));
         /*
         class Eq a where
           eq : a -> a -> Bool
         */
-        let actual = tc.check_declaration(&Spanned {
-            pos: 0,
-            item: syntax::Declaration::Class {
-                supers: Vec::new(),
-                name: String::from("Eq"),
-                args: vec![Spanned {
-                    pos: 9,
-                    item: String::from("a"),
-                }],
-                members: vec![(
-                    String::from("eq"),
-                    Type::mk_arrow(
-                        Type::Var(String::from("a")),
-                        Type::mk_arrow(Type::Var(String::from("a")), Type::Bool),
-                    ),
-                )],
+        let actual = tc.check_declaration(
+            &mut HashMap::new(),
+            &Spanned {
+                pos: 0,
+                item: syntax::Declaration::Class {
+                    supers: Vec::new(),
+                    name: String::from("Eq"),
+                    args: vec![Spanned {
+                        pos: 9,
+                        item: String::from("a"),
+                    }],
+                    members: vec![(
+                        String::from("eq"),
+                        Type::mk_arrow(
+                            Type::Var(String::from("a")),
+                            Type::mk_arrow(Type::Var(String::from("a")), Type::Bool),
+                        ),
+                    )],
+                },
             },
-        });
+        );
         assert_eq!(expected, actual);
 
-        let decl = actual.unwrap();
+        let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
         let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
@@ -1859,7 +1862,7 @@ fn check_class_1() {
 #[test]
 fn check_class_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok(core::Declaration::Class(core::ClassDeclaration {
+        let expected = Ok(Some(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Wut"),
             args: vec![(String::from("a"), Kind::Type)],
@@ -1873,32 +1876,35 @@ fn check_class_2() {
                     body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
-        }));
+        })));
         /*
         class Wut a where
           wut : a -> b -> Bool
         */
-        let actual = tc.check_declaration(&Spanned {
-            pos: 0,
-            item: syntax::Declaration::Class {
-                supers: Vec::new(),
-                name: String::from("Wut"),
-                args: vec![Spanned {
-                    pos: 9,
-                    item: String::from("a"),
-                }],
-                members: vec![(
-                    String::from("wut"),
-                    Type::mk_arrow(
-                        Type::Var(String::from("a")),
-                        Type::mk_arrow(Type::Var(String::from("b")), Type::Bool),
-                    ),
-                )],
+        let actual = tc.check_declaration(
+            &mut HashMap::new(),
+            &Spanned {
+                pos: 0,
+                item: syntax::Declaration::Class {
+                    supers: Vec::new(),
+                    name: String::from("Wut"),
+                    args: vec![Spanned {
+                        pos: 9,
+                        item: String::from("a"),
+                    }],
+                    members: vec![(
+                        String::from("wut"),
+                        Type::mk_arrow(
+                            Type::Var(String::from("a")),
+                            Type::mk_arrow(Type::Var(String::from("b")), Type::Bool),
+                        ),
+                    )],
+                },
             },
-        });
+        );
         assert_eq!(expected, actual);
 
-        let decl = actual.unwrap();
+        let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
         let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
@@ -1954,7 +1960,7 @@ fn check_class_2() {
 #[test]
 fn check_instance_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok(core::Declaration::Instance {
+        let expected = Ok(Some(core::Declaration::Instance {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
@@ -1963,7 +1969,7 @@ fn check_instance_1() {
                 name: String::from("eq"),
                 body: core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
             }],
-        });
+        }));
         tc.register_declaration(&core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
             name: String::from("Eq"),
@@ -1980,37 +1986,40 @@ fn check_instance_1() {
         instance Eq () where
           eq x y = True
         */
-        let actual = tc.check_declaration(&Spanned {
-            pos: 0,
-            item: syntax::Declaration::Instance {
-                assumes: Vec::new(),
-                name: Spanned {
-                    pos: 9,
-                    item: String::from("Eq"),
+        let actual = tc.check_declaration(
+            &mut HashMap::new(),
+            &Spanned {
+                pos: 0,
+                item: syntax::Declaration::Instance {
+                    assumes: Vec::new(),
+                    name: Spanned {
+                        pos: 9,
+                        item: String::from("Eq"),
+                    },
+                    args: vec![Type::Unit],
+                    members: vec![(
+                        Spanned {
+                            pos: 22,
+                            item: String::from("eq"),
+                        },
+                        vec![
+                            syntax::Pattern::Name(Spanned {
+                                pos: 25,
+                                item: String::from("x"),
+                            }),
+                            syntax::Pattern::Name(Spanned {
+                                pos: 27,
+                                item: String::from("y"),
+                            }),
+                        ],
+                        Spanned {
+                            pos: 31,
+                            item: syntax::Expr::True,
+                        },
+                    )],
                 },
-                args: vec![Type::Unit],
-                members: vec![(
-                    Spanned {
-                        pos: 22,
-                        item: String::from("eq"),
-                    },
-                    vec![
-                        syntax::Pattern::Name(Spanned {
-                            pos: 25,
-                            item: String::from("x"),
-                        }),
-                        syntax::Pattern::Name(Spanned {
-                            pos: 27,
-                            item: String::from("y"),
-                        }),
-                    ],
-                    Spanned {
-                        pos: 31,
-                        item: syntax::Expr::True,
-                    },
-                )],
             },
-        });
+        );
         assert_eq!(expected, actual)
     })
 }
@@ -2119,7 +2128,8 @@ fn class_and_instance_1() {
                 constraint: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
             }),
         });
-        let actual_instance_ord_int_result = tc.check_declaration(&instance_ord_int_decl.clone());
+        let actual_instance_ord_int_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_ord_int_decl.clone());
 
         assert_eq!(
         expected_instance_ord_int_result,
@@ -2127,7 +2137,7 @@ fn class_and_instance_1() {
         "When `instance Eq Int` is not in scope, `instance Ord Int` fails to type check because `Eq` is a superclass of `Ord`"
     );
 
-        let expected_instance_eq_int_result = Ok(core::Declaration::Instance {
+        let expected_instance_eq_int_result = Ok(Some(core::Declaration::Instance {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
@@ -2136,17 +2146,18 @@ fn class_and_instance_1() {
                 name: String::from("eq"),
                 body: core::Expr::Name(String::from("eqInt")),
             }],
-        });
-        let actual_instance_eq_int_result = tc.check_declaration(&instance_eq_int_decl);
+        }));
+        let actual_instance_eq_int_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_eq_int_decl);
 
         assert_eq!(
             expected_instance_eq_int_result, actual_instance_eq_int_result,
             "`instance Eq Int` is valid"
         );
 
-        tc.register_declaration(&actual_instance_eq_int_result.unwrap());
+        tc.register_declaration(&actual_instance_eq_int_result.unwrap().unwrap());
 
-        let expected_instance_ord_int_result = Ok(core::Declaration::Instance {
+        let expected_instance_ord_int_result = Ok(Some(core::Declaration::Instance {
             ty_vars: Vec::new(),
             superclass_constructors: vec![core::Expr::mk_record(
                 vec![(core::Expr::Int(0), core::Expr::Name(String::from("eqInt")))],
@@ -2158,8 +2169,9 @@ fn class_and_instance_1() {
                 name: String::from("lt"),
                 body: core::Expr::Name(String::from("ltInt")),
             }],
-        });
-        let actual_instance_ord_int_result = tc.check_declaration(&instance_ord_int_decl);
+        }));
+        let actual_instance_ord_int_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_ord_int_decl);
 
         assert_eq!(
             expected_instance_ord_int_result, actual_instance_ord_int_result,
@@ -2275,7 +2287,7 @@ fn class_and_instance_2() {
             },
         };
 
-        let expected_instance_eq_int_result = Ok(core::Declaration::Instance {
+        let expected_instance_eq_int_result = Ok(Some(core::Declaration::Instance {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
@@ -2284,17 +2296,18 @@ fn class_and_instance_2() {
                 name: String::from("eq"),
                 body: core::Expr::Name(String::from("eqInt")),
             }],
-        });
-        let actual_instance_eq_int_result = tc.check_declaration(&instance_eq_int_decl);
+        }));
+        let actual_instance_eq_int_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_eq_int_decl);
 
         assert_eq!(
             expected_instance_eq_int_result, actual_instance_eq_int_result,
             "`instance Eq Int` is valid"
         );
 
-        tc.register_declaration(&actual_instance_eq_int_result.unwrap());
+        tc.register_declaration(&actual_instance_eq_int_result.unwrap().unwrap());
 
-        let expected_instance_eq_array_result = Ok(core::Declaration::Instance {
+        let expected_instance_eq_array_result = Ok(Some(core::Declaration::Instance {
             ty_vars: vec![(String::from("a"), Kind::Type)],
             superclass_constructors: Vec::new(),
             assumes: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
@@ -2315,15 +2328,16 @@ fn class_and_instance_2() {
                     ),
                 ),
             }],
-        });
-        let actual_instance_eq_array_result = tc.check_declaration(&instance_eq_array_decl);
+        }));
+        let actual_instance_eq_array_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_eq_array_decl);
 
         assert_eq!(
             expected_instance_eq_array_result, actual_instance_eq_array_result,
             "`instance Eq a => Eq (Array a)` is valid"
         );
 
-        tc.register_declaration(&actual_instance_eq_array_result.unwrap());
+        tc.register_declaration(&actual_instance_eq_array_result.unwrap().unwrap());
 
         let instance_ord_array_decl = Spanned {
             pos: 0,
@@ -2360,7 +2374,7 @@ fn class_and_instance_2() {
             },
         };
 
-        let expected_instance_ord_array_result = Ok(core::Declaration::Instance {
+        let expected_instance_ord_array_result = Ok(Some(core::Declaration::Instance {
             ty_vars: vec![(String::from("a"), Kind::Type)],
             superclass_constructors: vec![core::Expr::mk_lam(
                 true, // dict : Ord a
@@ -2397,15 +2411,16 @@ fn class_and_instance_2() {
                     ),
                 ),
             }],
-        });
-        let actual_instance_ord_array_result = tc.check_declaration(&instance_ord_array_decl);
+        }));
+        let actual_instance_ord_array_result =
+            tc.check_declaration(&mut HashMap::new(), &instance_ord_array_decl);
 
         assert_eq!(
             expected_instance_ord_array_result, actual_instance_ord_array_result,
             "`instance Ord a => Ord (Array a)` is valid"
         );
 
-        tc.register_declaration(&actual_instance_ord_array_result.unwrap());
+        tc.register_declaration(&actual_instance_ord_array_result.unwrap().unwrap());
 
         let instance_ord_int_decl = Spanned {
             pos: 0,
@@ -2430,7 +2445,10 @@ fn class_and_instance_2() {
             },
         };
 
-        let instance_ord_int_result = tc.check_declaration(&instance_ord_int_decl).unwrap();
+        let instance_ord_int_result = tc
+            .check_declaration(&mut HashMap::new(), &instance_ord_int_decl)
+            .unwrap()
+            .unwrap();
         tc.register_declaration(&instance_ord_int_result);
 
         let array_int_lt_decl = Spanned {
@@ -2511,7 +2529,7 @@ fn class_and_instance_2() {
             ],
             None,
         );
-        let expected_array_int_lt_result = Ok(core::Declaration::Definition {
+        let expected_array_int_lt_result = Ok(Some(core::Declaration::Definition {
             name: String::from("comparison"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
@@ -2528,8 +2546,9 @@ fn class_and_instance_2() {
                 ),
                 core::Expr::Array(vec![core::Expr::Int(4), core::Expr::Int(5)]),
             ),
-        });
-        let actual_array_int_lt_result = tc.check_declaration(&array_int_lt_decl);
+        }));
+        let actual_array_int_lt_result =
+            tc.check_declaration(&mut HashMap::new(), &array_int_lt_decl);
 
         assert_eq!(
             expected_array_int_lt_result, actual_array_int_lt_result,

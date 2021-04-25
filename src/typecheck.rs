@@ -1,11 +1,11 @@
-use evidence::{solver::solve_placeholder, Constraint};
-
-use crate::syntax::{self, ModuleName};
-use crate::syntax::{Spanned, Type};
-use crate::{builtins, evidence::Evidence};
-use crate::{core, evidence};
-use crate::{diagnostic, import::Modules};
-use crate::{import, rope::Rope};
+use crate::{
+    builtins, core, diagnostic, evidence,
+    evidence::{solver::solve_placeholder, Constraint, Evidence},
+    import,
+    import::Modules,
+    rope::Rope,
+    syntax::{self, ModuleName, Spanned, Type},
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -685,22 +685,6 @@ impl<'modules> Typechecker<'modules> {
         });
     }
 
-    fn register_import(&mut self, module_name: &String) {
-        let path = import::get_module_path(self.working_dir, module_name);
-        match self.modules.lookup(&path) {
-            None => panic!("missing module at {}", path),
-            Some(module) => {
-                let module_contents: HashMap<String, core::TypeSig> = module
-                    .decls
-                    .iter()
-                    .flat_map(|decl| decl.get_signatures())
-                    .collect();
-                self.module_context
-                    .insert(ModuleName(vec![module_name.clone()]), module_contents);
-            }
-        }
-    }
-
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
@@ -712,10 +696,6 @@ impl<'modules> Typechecker<'modules> {
             }
             core::Declaration::TypeAlias { name, args, body } => {
                 todo!("register TypeAlias {:?}", (name, args, body))
-            }
-            core::Declaration::Import { module_name } => self.register_import(module_name),
-            core::Declaration::FromImport { module, names } => {
-                todo!("register FromImport {:?}", (module, names))
             }
             core::Declaration::Class(decl) => self.register_class(decl),
             core::Declaration::Instance {
@@ -729,16 +709,24 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
+        let mut module_mapping = HashMap::new();
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(decl).and_then(|decl| {
-                    self.register_declaration(&decl);
-                    decls.push(decl);
-                    Ok(decls)
-                })
+                self.check_declaration(&mut module_mapping, decl)
+                    .and_then(|m_decl| match m_decl {
+                        Option::None => Ok(decls),
+                        Option::Some(decl) => {
+                            self.register_declaration(&decl);
+                            decls.push(decl);
+                            Ok(decls)
+                        }
+                    })
             })
         })?;
-        Ok(core::Module { decls })
+        Ok(core::Module {
+            module_mapping,
+            decls,
+        })
     }
 
     fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
@@ -765,11 +753,6 @@ impl<'modules> Typechecker<'modules> {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::Import { module_name: _ } => {}
-                core::Declaration::FromImport {
-                    module: _,
-                    names: _,
-                } => {}
                 core::Declaration::Class(core::ClassDeclaration {
                     supers,
                     name,
@@ -1185,42 +1168,57 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
+        module_mapping: &mut HashMap<String, core::ModuleUsage>,
         module: &Spanned<String>,
         name: &Option<Spanned<String>>,
-    ) -> Result<core::Declaration, TypeError> {
+    ) -> Result<(), TypeError> {
+        let path = String::from(
+            self.working_dir
+                .join(format!("{}.ipso", module.item))
+                .to_str()
+                .unwrap(),
+        );
+
         let actual_name = match name {
             None => module,
             Some(name) => name,
         };
 
-        match self
-            .module_context
-            .get(&ModuleName(vec![actual_name.item.clone()]))
-        {
+        match module_mapping.get(&path) {
+            None => {
+                self.module_context.insert(
+                    ModuleName(vec![actual_name.item.clone()]),
+                    self.modules.lookup(&path).unwrap().get_signatures(),
+                );
+                module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
+                Ok(())
+            }
             Some(_) => Err(TypeError::ShadowedModuleName {
                 pos: actual_name.pos,
-            }),
-            None => Ok(core::Declaration::Import {
-                module_name: actual_name.item.clone(),
             }),
         }
     }
 
     fn check_declaration(
         &mut self,
+        module_mapping: &mut HashMap<String, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
-    ) -> Result<core::Declaration, TypeError> {
+    ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
             syntax::Declaration::Definition {
                 name,
                 ty,
                 args,
                 body,
-            } => self.check_definition(decl.pos, name, ty, args, body),
+            } => self
+                .check_definition(decl.pos, name, ty, args, body)
+                .map(|x| Option::Some(x)),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
-            syntax::Declaration::Import { module, name } => self.check_import(module, name),
+            syntax::Declaration::Import { module, name } => self
+                .check_import(module_mapping, module, name)
+                .map(|()| Option::None),
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))
             }
@@ -1229,13 +1227,17 @@ impl<'modules> Typechecker<'modules> {
                 name,
                 args,
                 members,
-            } => self.check_class(supers, name, args, members),
+            } => self
+                .check_class(supers, name, args, members)
+                .map(|x| Option::Some(x)),
             syntax::Declaration::Instance {
                 assumes,
                 name,
                 args,
                 members,
-            } => self.check_instance(assumes, name, args, members),
+            } => self
+                .check_instance(assumes, name, args, members)
+                .map(|x| Option::Some(x)),
         }
     }
 

@@ -892,13 +892,6 @@ pub enum Declaration {
         args: Vec<syntax::Kind>,
         body: syntax::Type<usize>,
     },
-    Import {
-        module_name: String,
-    },
-    FromImport {
-        module: String,
-        names: syntax::Names,
-    },
     Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(String, syntax::Kind)>,
@@ -919,8 +912,6 @@ impl Declaration {
                 map
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
-            Declaration::Import { .. } => HashMap::new(),
-            Declaration::FromImport { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings()
                 .into_iter()
@@ -939,8 +930,6 @@ impl Declaration {
                 map
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
-            Declaration::Import { .. } => HashMap::new(),
-            Declaration::FromImport { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings()
                 .into_iter()
@@ -1010,6 +999,28 @@ impl ClassDeclaration {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum ModuleUsage {
+    /// A module was given a particular name during importing
+    Named(String),
+    /// Specific names were imported from a module
+    Items(Vec<String>),
+    /// The entire contents of a module were imported
+    All,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Module {
+    /// Describes how each imported file is referenced by this module.
+    pub module_mapping: HashMap<String, ModuleUsage>,
     pub decls: Vec<Declaration>,
+}
+
+impl Module {
+    pub fn get_signatures(&self) -> HashMap<String, TypeSig> {
+        let signatures: HashMap<String, TypeSig> = HashMap::new();
+        self.decls.iter().fold(signatures, |mut acc, decl| {
+            acc.extend(decl.get_signatures().into_iter());
+            acc
+        })
+    }
 }

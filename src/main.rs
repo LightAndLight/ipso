@@ -5,8 +5,7 @@ use ipso::{
     import, parse, syntax,
     typecheck::{self, Typechecker},
 };
-use std::path::Path;
-use std::{env, io};
+use std::{collections::HashMap, env, io, path::Path};
 use typed_arena::Arena;
 
 #[derive(Debug)]
@@ -118,7 +117,8 @@ fn find_entrypoint_body(
 }
 
 fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
-    let filename: &String = &config.filename;
+    let working_dir = std::env::current_dir().unwrap();
+    let filepath: String = String::from(working_dir.join(&config.filename).to_str().unwrap());
     let main = String::from("main");
     let entrypoint: &String = match config.entrypoint {
         None => &main,
@@ -126,14 +126,12 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     };
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let module = modules.import(0, filename)?;
+    let module = modules.import(0, &filepath)?;
 
     let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
     {
-        let working_dir = std::env::current_dir().unwrap();
         let mut tc = Typechecker::new_with_builtins(working_dir.as_path(), &modules);
-        let var = tc.fresh_typevar(syntax::Kind::Type);
-        let expected = syntax::Type::mk_app(syntax::Type::IO, var);
+        let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(syntax::Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {
             expected: expected.clone(),
@@ -151,7 +149,7 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
             .iter()
             .flat_map(|decl| decl.get_bindings().into_iter())
             .collect();
-        let module_context = todo!("collect module context");
+        let module_context = HashMap::new();
         let mut interpreter =
             Interpreter::new_with_builtins(&mut stdout, context, module_context, &heap);
         let action = interpreter.eval(&env, target);
