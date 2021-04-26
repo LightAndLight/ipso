@@ -6,6 +6,7 @@ import Control.Monad (unless)
 import qualified Data.Either as Either
 import Data.Foldable (traverse_)
 import Data.IORef (modifyIORef, newIORef, readIORef)
+import qualified Data.List as List
 import Data.Semigroup (Option (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -137,7 +138,7 @@ main = do
             const True
           Just names ->
             \file -> takeBaseName file `elem` names
-  results <- for (filter (\file -> ".dhall" == takeExtension file && filterOnly file) files) $ \file -> do
+  results <- for (List.sort $ filter (\file -> ".dhall" == takeExtension file && filterOnly file) files) $ \file -> do
     example <- Dhall.inputFile (exampleDecoder file) file
     runExample config example
   let (failures, successes) = Either.partitionEithers results
