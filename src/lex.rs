@@ -13,7 +13,7 @@ pub enum TokenType {
     DoubleQuote,
     Dollar,
     DollarLBrace,
-    String(String),
+    String { value: String, length: usize },
 
     LBrace,
     RBrace,
@@ -70,7 +70,7 @@ impl TokenType {
             TokenType::DoubleQuote => String::from("'\"'"),
             TokenType::Dollar => String::from("'$'"),
             TokenType::DollarLBrace => String::from("'${'"),
-            TokenType::String(s) => format!("{:?}", s),
+            TokenType::String { value, .. } => format!("{:?}", value),
             TokenType::LBrace => String::from("'{'"),
             TokenType::RBrace => String::from("'}'"),
             TokenType::LParen => String::from("'('"),
@@ -133,7 +133,7 @@ impl TokenType {
             TokenType::DoubleQuote => 1,
             TokenType::Dollar => 1,
             TokenType::DollarLBrace => 2,
-            TokenType::String(s) => s.len(),
+            TokenType::String { length, .. } => *length,
             TokenType::Pipe => 1,
             TokenType::LAngle => 1,
             TokenType::RAngle => 1,
@@ -252,6 +252,8 @@ impl<'input> Lexer<'input> {
                         self.consume();
 
                         let mut str = String::new();
+
+                        let mut textual_len: usize = 1;
                         str.push(c);
 
                         loop {
@@ -264,6 +266,7 @@ impl<'input> Lexer<'input> {
                                         break;
                                     }
                                     '\\' => {
+                                        textual_len += 1;
                                         self.consume();
                                         match self.current {
                                             None => {
@@ -274,14 +277,17 @@ impl<'input> Lexer<'input> {
                                             }
                                             Some(c) => match c {
                                                 '$' | '"' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push(c);
                                                 }
                                                 'n' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push('\n');
                                                 }
                                                 't' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push('\t');
                                                 }
@@ -295,6 +301,7 @@ impl<'input> Lexer<'input> {
                                         }
                                     }
                                     c => {
+                                        textual_len += 1;
                                         self.consume();
                                         str.push(c);
                                     }
@@ -303,7 +310,10 @@ impl<'input> Lexer<'input> {
                         }
 
                         Some(Token {
-                            token_type: TokenType::String(str),
+                            token_type: TokenType::String {
+                                value: str,
+                                length: textual_len,
+                            },
                             pos,
                         })
                     }
