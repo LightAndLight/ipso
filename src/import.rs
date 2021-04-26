@@ -1,3 +1,4 @@
+use diagnostic::InputLocation;
 use typed_arena::Arena;
 
 use crate::{
@@ -67,7 +68,11 @@ impl ModulePath {
 
 #[derive(Debug)]
 pub enum ModuleError {
-    NotFound { pos: usize, path: ModulePath },
+    NotFound {
+        location: InputLocation,
+        pos: usize,
+        module_path: ModulePath,
+    },
     IO(io::Error),
     Parse(parse::ParseError),
     Check(typecheck::TypeError),
@@ -76,10 +81,15 @@ pub enum ModuleError {
 impl ModuleError {
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         match self {
-            ModuleError::NotFound { pos, path } => diagnostic.item(diagnostic::Item {
-                pos: *pos,
+            ModuleError::NotFound {
+                location,
+                pos,
+                module_path,
+            } => diagnostic.item(diagnostic::Item {
+                location: location.clone(),
+                offset: *pos,
                 message: String::from("module not found"),
-                addendum: Some(format!("file {} does not exist", path.to_str())),
+                addendum: Some(format!("file {} does not exist", module_path.to_str())),
             }),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
@@ -264,11 +274,12 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
 
 struct ImportInfo {
     pos: usize,
-    path: ModulePath,
+    module_path: ModulePath,
     module: Option<String>,
 }
 
-fn calculate_imports(working_dir: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
+fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
+    let working_dir = file.parent().unwrap();
     let mut paths: Vec<ImportInfo> = Vec::new();
     for decl in &mut module.decls {
         match &decl.item {
@@ -279,7 +290,7 @@ fn calculate_imports(working_dir: &Path, module: &mut syntax::Module) -> Vec<Imp
             syntax::Declaration::Import { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: ModulePath::from_module(
+                    module_path: ModulePath::from_module(
                         working_dir,
                         &ModuleName(vec![module.item.clone()]),
                     ),
@@ -289,7 +300,7 @@ fn calculate_imports(working_dir: &Path, module: &mut syntax::Module) -> Vec<Imp
             syntax::Declaration::FromImport { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: ModulePath::from_module(
+                    module_path: ModulePath::from_module(
                         working_dir,
                         &ModuleName(vec![module.item.clone()]),
                     ),
@@ -324,9 +335,11 @@ impl<'a> Modules<'a> {
     ///
     /// Module imports are cached, so importing the same module repeatedly is cheap.
     ///
+    /// * `location` - source file location for error reporting
     /// * `pos` - source file offset for error reporting
     pub fn import(
         &mut self,
+        location: &InputLocation,
         pos: usize,
         module_path: &ModulePath,
     ) -> Result<&'a core::Module, ModuleError> {
@@ -334,6 +347,9 @@ impl<'a> Modules<'a> {
             None => {
                 let path = module_path.as_path();
                 if path.exists() {
+                    let input_location = InputLocation::File {
+                        path: PathBuf::from(path),
+                    };
                     let mut module = {
                         let content = {
                             let mut file = File::open(path)?;
@@ -343,7 +359,7 @@ impl<'a> Modules<'a> {
                         };
 
                         let tokens = Lexer::new(&content).tokenize();
-                        let mut parser = Parser::new(tokens);
+                        let mut parser = Parser::new(input_location.clone(), tokens);
 
                         parser
                             .module()
@@ -351,9 +367,14 @@ impl<'a> Modules<'a> {
                             .result
                     }?;
 
-                    let working_dir = path.parent().unwrap();
-                    for import_info in calculate_imports(working_dir, &mut module).into_iter() {
-                        match self.import(import_info.pos, &import_info.path) {
+                    for import_info in calculate_imports(path, &mut module).into_iter() {
+                        match self.import(
+                            &InputLocation::File {
+                                path: PathBuf::from(path),
+                            },
+                            import_info.pos,
+                            &import_info.module_path,
+                        ) {
                             Err(err) => {
                                 return Err(err);
                             }
@@ -361,7 +382,9 @@ impl<'a> Modules<'a> {
                         }
                     }
                     let module = {
-                        let mut tc = Typechecker::new_with_builtins(working_dir, self);
+                        let working_dir = path.parent().unwrap();
+                        let mut tc =
+                            Typechecker::new_with_builtins(working_dir, input_location, self);
                         tc.check_module(&module)
                     }?;
                     let module_ref: &core::Module = self.data.alloc(module);
@@ -369,8 +392,9 @@ impl<'a> Modules<'a> {
                     Ok(module_ref)
                 } else {
                     Err(ModuleError::NotFound {
+                        location: location.clone(),
                         pos,
-                        path: module_path.clone(),
+                        module_path: module_path.clone(),
                     })
                 }
             }

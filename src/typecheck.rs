@@ -1,7 +1,8 @@
 use crate::{
-    builtins, core, diagnostic, evidence,
+    builtins, core,
+    diagnostic::{self, InputLocation},
+    evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
-    import,
     import::{ModulePath, Modules},
     rope::Rope,
     syntax::{self, ModuleName, Spanned, Type},
@@ -147,6 +148,7 @@ impl Implication {
 }
 
 pub struct Typechecker<'modules> {
+    location: InputLocation,
     kind_solutions: Vec<Option<syntax::Kind>>,
     pub type_solutions: Vec<(syntax::Kind, Option<Type<usize>>)>,
     pub implications: Vec<Implication>,
@@ -195,56 +197,69 @@ pub struct SolveConstraintContext {
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
+        location: InputLocation,
         pos: usize,
         name: String,
     },
     DuplicateClassArgument {
+        location: InputLocation,
         pos: usize,
     },
     NotInScope {
+        location: InputLocation,
         pos: usize,
         name: String,
     },
     NotInModule {
+        location: InputLocation,
         pos: usize,
         item: String,
     },
     KindMismatch {
+        location: InputLocation,
         pos: usize,
         context: UnifyKindContext<String>,
         expected: syntax::Kind,
         actual: syntax::Kind,
     },
     TypeMismatch {
+        location: InputLocation,
         pos: usize,
         context: UnifyTypeContext<String>,
         expected: Type<String>,
         actual: Type<String>,
     },
     RedundantPattern {
+        location: InputLocation,
         pos: usize,
     },
     KindOccurs {
+        location: InputLocation,
         pos: usize,
         meta: usize,
         kind: syntax::Kind,
     },
     TypeOccurs {
+        location: InputLocation,
         pos: usize,
         meta: usize,
         ty: Type<String>,
     },
     NoSuchClass {
+        location: InputLocation,
         pos: usize,
     },
     NotAMember {
+        location: InputLocation,
         pos: usize,
         cls: String,
     },
     CannotDeduce {
+        location: InputLocation,
         context: Option<SolveConstraintContext>,
     },
     ShadowedModuleName {
+        location: InputLocation,
         pos: usize,
     },
 }
@@ -277,25 +292,33 @@ impl syntax::Pattern {
 }
 
 impl TypeError {
+    pub fn location(&self) -> InputLocation {
+        match self {
+            TypeError::KindMismatch { location, .. } => location.clone(),
+            TypeError::TypeMismatch { location, .. } => location.clone(),
+            TypeError::NotInScope { location, .. } => location.clone(),
+            TypeError::NotInModule { location, .. } => location.clone(),
+            TypeError::DuplicateArgument { location, .. } => location.clone(),
+            TypeError::DuplicateClassArgument { location, .. } => location.clone(),
+            TypeError::RedundantPattern { location, .. } => location.clone(),
+            TypeError::KindOccurs { location, .. } => location.clone(),
+            TypeError::TypeOccurs { location, .. } => location.clone(),
+            TypeError::NoSuchClass { location, .. } => location.clone(),
+            TypeError::NotAMember { location, .. } => location.clone(),
+            TypeError::CannotDeduce { location, .. } => location.clone(),
+            TypeError::ShadowedModuleName { location, .. } => location.clone(),
+        }
+    }
+
     pub fn position(&self) -> usize {
         match self {
-            TypeError::KindMismatch {
-                pos,
-                context: _,
-                expected: _,
-                actual: _,
-            } => *pos,
-            TypeError::TypeMismatch {
-                pos,
-                context: _,
-                expected: _,
-                actual: _,
-            } => *pos,
-            TypeError::NotInScope { pos, name: _ } => *pos,
+            TypeError::KindMismatch { pos, .. } => *pos,
+            TypeError::TypeMismatch { pos, .. } => *pos,
+            TypeError::NotInScope { pos, .. } => *pos,
             TypeError::NotInModule { pos, .. } => *pos,
-            TypeError::DuplicateArgument { pos, name: _ } => *pos,
-            TypeError::DuplicateClassArgument { pos } => *pos,
-            TypeError::RedundantPattern { pos } => *pos,
+            TypeError::DuplicateArgument { pos, .. } => *pos,
+            TypeError::DuplicateClassArgument { pos, .. } => *pos,
+            TypeError::RedundantPattern { pos, .. } => *pos,
             TypeError::KindOccurs { pos, .. } => *pos,
             TypeError::TypeOccurs { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
@@ -311,10 +334,7 @@ impl TypeError {
     pub fn message(&self) -> String {
         match self {
             TypeError::KindMismatch {
-                pos: _,
-                context: _,
-                expected,
-                actual,
+                expected, actual, ..
             } => {
                 let mut message = String::from("expected kind ");
                 message.push('"');
@@ -326,12 +346,7 @@ impl TypeError {
                 message.push('"');
                 message
             }
-            TypeError::TypeMismatch {
-                pos: _,
-                context,
-                expected: _,
-                actual: _,
-            } => {
+            TypeError::TypeMismatch { context, .. } => {
                 let mut message = String::from("expected type ");
                 message.push('"');
                 message.push_str(context.expected.render().as_str());
@@ -342,13 +357,13 @@ impl TypeError {
                 message.push('"');
                 message
             }
-            TypeError::NotInScope { pos: _, name: _ } => String::from("not in scope"),
+            TypeError::NotInScope { .. } => String::from("not in scope"),
             TypeError::NotInModule { .. } => String::from("not in scope"),
-            TypeError::DuplicateArgument { pos: _, name: _ } => String::from("duplicate argument"),
+            TypeError::DuplicateArgument { .. } => String::from("duplicate argument"),
             TypeError::DuplicateClassArgument { .. } => {
                 String::from("duplicate type class argument")
             }
-            TypeError::RedundantPattern { pos: _ } => String::from("redundant pattern"),
+            TypeError::RedundantPattern { .. } => String::from("redundant pattern"),
             TypeError::KindOccurs { meta, kind, .. } => {
                 format!(
                     "infinite kind from equating ?{} with \"{}\"",
@@ -367,7 +382,7 @@ impl TypeError {
             TypeError::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
-            TypeError::CannotDeduce { context } => match context {
+            TypeError::CannotDeduce { context, .. } => match context {
                 None => String::from("cannot deduce"),
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
@@ -377,12 +392,7 @@ impl TypeError {
 
     pub fn addendum(&self) -> Option<String> {
         match self {
-            TypeError::KindMismatch {
-                pos: _,
-                context,
-                expected: _,
-                actual: _,
-            } => match context {
+            TypeError::KindMismatch { context, .. } => match context {
                 UnifyKindContext {
                     ty,
                     has_kind,
@@ -411,16 +421,11 @@ impl TypeError {
                     Some(str)
                 }
             },
-            TypeError::DuplicateArgument { pos: _, name: _ } => None,
+            TypeError::DuplicateArgument { .. } => None,
             TypeError::DuplicateClassArgument { .. } => None,
-            TypeError::TypeMismatch {
-                pos: _,
-                context: _,
-                expected: _,
-                actual: _,
-            } => None,
-            TypeError::RedundantPattern { pos: _ } => None,
-            TypeError::NotInScope { pos: _, name: _ } => None,
+            TypeError::TypeMismatch { .. } => None,
+            TypeError::RedundantPattern { .. } => None,
+            TypeError::NotInScope { .. } => None,
             TypeError::NotInModule { .. } => None,
             TypeError::KindOccurs { .. } => None,
             TypeError::TypeOccurs { .. } => None,
@@ -433,7 +438,8 @@ impl TypeError {
 
     pub fn report(&self, diagnostic: &mut diagnostic::Diagnostic) {
         diagnostic.item(diagnostic::Item {
-            pos: self.position(),
+            location: self.location(),
+            offset: self.position(),
             message: self.message(),
             addendum: self.addendum(),
         })
@@ -442,12 +448,12 @@ impl TypeError {
 
 #[macro_export]
 macro_rules! with_tc {
-    ($path:expr, $f:expr) => {{
+    ($path:expr, $location:expr, $f:expr) => {{
         use crate::import::Modules;
         use typed_arena::Arena;
         let modules_data = Arena::new();
         let modules = Modules::new(&modules_data);
-        let tc = Typechecker::new_with_builtins($path, &modules);
+        let tc = Typechecker::new_with_builtins($path, $location, &modules);
         $f(tc)
     }};
 }
@@ -456,13 +462,24 @@ macro_rules! with_tc {
 macro_rules! current_dir_with_tc {
     ($f:expr) => {{
         let path = std::env::current_dir().unwrap();
-        crate::with_tc!(path.as_path(), $f)
+        crate::with_tc!(
+            path.as_path(),
+            crate::diagnostic::InputLocation::Interactive {
+                label: String::from("(typechecker)")
+            },
+            $f
+        )
     }};
 }
 
 impl<'modules> Typechecker<'modules> {
-    pub fn new(working_dir: &'modules Path, modules: &'modules Modules) -> Self {
+    pub fn new(
+        working_dir: &'modules Path,
+        location: InputLocation,
+        modules: &'modules Modules,
+    ) -> Self {
         Typechecker {
+            location,
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
             implications: Vec::new(),
@@ -480,8 +497,12 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn new_with_builtins(working_dir: &'modules Path, modules: &'modules Modules) -> Self {
-        let mut tc = Self::new(working_dir, modules);
+    pub fn new_with_builtins(
+        working_dir: &'modules Path,
+        location: InputLocation,
+        modules: &'modules Modules,
+    ) -> Self {
+        let mut tc = Self::new(working_dir, location, modules);
         tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
         tc
     }
@@ -972,7 +993,10 @@ impl<'modules> Typechecker<'modules> {
             let mut args_kinds = Vec::with_capacity(args_len);
             for arg in args.into_iter() {
                 if seen.contains(&arg.item) {
-                    return Err(TypeError::DuplicateClassArgument { pos: arg.pos });
+                    return Err(TypeError::DuplicateClassArgument {
+                        location: self.location(),
+                        pos: arg.pos,
+                    });
                 } else {
                     seen.insert(arg.item.clone());
                 }
@@ -1029,7 +1053,10 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
-            None => Err(TypeError::NoSuchClass { pos: name.pos }),
+            None => Err(TypeError::NoSuchClass {
+                location: self.location(),
+                pos: name.pos,
+            }),
             Some(class_decl) => Ok(class_decl.clone()),
         }?;
 
@@ -1117,6 +1144,7 @@ impl<'modules> Typechecker<'modules> {
             {
                 None => {
                     return Err(TypeError::NotAMember {
+                        location: self.location(),
                         pos: member_name.pos,
                         cls: name.item.clone(),
                     })
@@ -1192,6 +1220,7 @@ impl<'modules> Typechecker<'modules> {
                 Ok(())
             }
             Some(_) => Err(TypeError::ShadowedModuleName {
+                location: self.location(),
                 pos: actual_name.pos,
             }),
         }
@@ -1237,6 +1266,10 @@ impl<'modules> Typechecker<'modules> {
                 .check_instance(assumes, name, args, members)
                 .map(|x| Option::Some(x)),
         }
+    }
+
+    pub fn location(&self) -> InputLocation {
+        self.location.clone()
     }
 
     fn current_position(&self) -> usize {
@@ -1343,6 +1376,7 @@ impl<'modules> Typechecker<'modules> {
             }),
         };
         Err(TypeError::KindMismatch {
+            location: self.location(),
             pos: self.current_position(),
             context,
             expected,
@@ -1397,6 +1431,7 @@ impl<'modules> Typechecker<'modules> {
         }) {
             None => Ok(()),
             Some(_) => Err(TypeError::KindOccurs {
+                location: self.location(),
                 pos: self.current_position(),
                 meta,
                 kind: self.zonk_kind(false, kind.clone()),
@@ -1438,6 +1473,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn not_in_scope<A>(&self, name: &String) -> Result<A, TypeError> {
         Err(TypeError::NotInScope {
+            location: self.location(),
             pos: self.current_position(),
             name: name.clone(),
         })
@@ -1454,6 +1490,7 @@ impl<'modules> Typechecker<'modules> {
             actual: self.fill_ty_names(self.zonk_type(context.actual.clone())),
         };
         Err(TypeError::TypeMismatch {
+            location: self.location(),
             pos: self.current_position(),
             context,
             expected: self.fill_ty_names(expected),
@@ -1471,6 +1508,7 @@ impl<'modules> Typechecker<'modules> {
         }) {
             None => Ok(()),
             Some(_) => Err(TypeError::TypeOccurs {
+                location: self.location(),
                 pos: self.current_position(),
                 meta,
                 ty: self.fill_ty_names(self.zonk_type(ty.clone())),
@@ -1838,6 +1876,7 @@ impl<'modules> Typechecker<'modules> {
         for arg in arg_names_spanned {
             if seen.contains(&arg.item) {
                 return Err(TypeError::DuplicateArgument {
+                    location: self.location(),
                     pos: arg.pos,
                     name: arg.item.clone(),
                 });
@@ -2042,6 +2081,7 @@ impl<'modules> Typechecker<'modules> {
                         }
                         Some(defs) => match defs.get(&item) {
                             None => Err(TypeError::NotInModule {
+                                location: self.location(),
                                 pos: self.current_position(),
                                 item: item.clone(),
                             }),
@@ -2311,6 +2351,7 @@ impl<'modules> Typechecker<'modules> {
                             }
                         {
                             return Err(TypeError::RedundantPattern {
+                                location: self.location(),
                                 pos: branch.pattern.pos,
                             });
                         }

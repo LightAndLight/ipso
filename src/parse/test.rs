@@ -2,6 +2,7 @@
 use crate::syntax::{Spanned, StringPart};
 #[cfg(test)]
 use crate::{
+    diagnostic::InputLocation,
     keep_left,
     lex::{Lexer, TokenType},
     map2,
@@ -21,7 +22,12 @@ macro_rules! parse_test {
                     let lexer = Lexer::new(&input);
                     lexer.tokenize()
                 };
-                let mut parser = Parser::new(tokens);
+                let mut parser = Parser::new(
+                    InputLocation::Interactive {
+                        label: String::from("(parser)"),
+                    },
+                    tokens,
+                );
                 keep_left!(parser.$function(), parser.eof()).result
             },
             $output
@@ -40,6 +46,9 @@ fn parse_ident_2() {
         "import",
         ident,
         Err(ParseError::Unexpected {
+            location: InputLocation::Interactive {
+                label: String::from("(parser)"),
+            },
             pos: 0,
             expecting: vec![TokenType::Ident(String::from(""))]
                 .into_iter()
@@ -105,6 +114,9 @@ fn parse_import_as_3() {
         "import yes\nas no",
         import,
         Err(ParseError::Unexpected {
+            location: InputLocation::Interactive {
+                label: String::from("(parser)"),
+            },
             pos: 10,
             expecting: vec![TokenType::Space, TokenType::Ident(String::from("as"))]
                 .into_iter()
@@ -153,6 +165,9 @@ fn parse_definition_3() {
         "x : Int\nx =\n1",
         definition,
         Err(ParseError::Unexpected {
+            location: InputLocation::Interactive {
+                label: String::from("(parser)"),
+            },
             pos: 11,
             expecting: vec![
                 TokenType::Int {
@@ -551,6 +566,9 @@ fn parse_case_4() {
         "case x of\n  a -> b\n   c -> d",
         expr_case,
         Err(ParseError::Unexpected {
+            location: InputLocation::Interactive {
+                label: String::from("(parser)"),
+            },
             pos: 24,
             expecting: vec![
                 TokenType::Space,
@@ -588,6 +606,9 @@ fn parse_case_5() {
         "case x of\n  a -> b\n c -> d",
         expr_case,
         Err(ParseError::Unexpected {
+            location: InputLocation::Interactive {
+                label: String::from("(parser)"),
+            },
             pos: 20,
             expecting: vec![].into_iter().collect()
         })

@@ -7,6 +7,7 @@ use crate::current_dir_with_tc;
 #[cfg(test)]
 use crate::{
     core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
+    diagnostic::InputLocation,
     evidence::{solver::solve_placeholder, Constraint},
     import::Modules,
     syntax::{self, Binop, Kind, Spanned, Type},
@@ -38,6 +39,9 @@ fn infer_kind_test_2() {
 fn infer_kind_test_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Err(TypeError::KindMismatch {
+            location: InputLocation::Interactive {
+                label: String::from("(typechecker)"),
+            },
             pos: 0,
             context: UnifyKindContext {
                 ty: Type::RowNil,
@@ -691,6 +695,9 @@ fn infer_array_test_2() {
         assert_eq!(
             tc.infer_expr(term),
             Err(TypeError::TypeMismatch {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
                 pos: 4,
                 context: UnifyTypeContext {
                     expected: syntax::Type::Int,
@@ -821,6 +828,9 @@ fn unify_rows_test_4() {
                 )
             ),
             Err(TypeError::TypeMismatch {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
                 pos: 0,
                 context: UnifyTypeContext {
                     expected: syntax::Type::Unit,
@@ -987,6 +997,9 @@ fn infer_record_test_4() {
             tc.infer_expr(syntax::Spanned { pos: 0, item: term })
                 .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
             Err(TypeError::TypeMismatch {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
                 pos: 22,
                 context: UnifyTypeContext {
                     expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
@@ -1342,7 +1355,12 @@ fn infer_case_4() {
         assert_eq!(
             tc.infer_expr(term)
                 .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
-            Err(TypeError::RedundantPattern { pos: 32 })
+            Err(TypeError::RedundantPattern {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
+                pos: 32
+            })
         )
     })
 }
@@ -1743,6 +1761,9 @@ fn kind_occurs_1() {
                 Kind::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::KindOccurs {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
                 pos: 0,
                 meta: 0,
                 kind: Kind::mk_arrow(v1, v2)
@@ -1766,6 +1787,9 @@ fn type_occurs_1() {
                 Type::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::TypeOccurs {
+                location: InputLocation::Interactive {
+                    label: String::from("(typechecker)"),
+                },
                 pos: 0,
                 meta: 0,
                 ty: Type::mk_arrow(tc.fill_ty_names(v1), tc.fill_ty_names(v2))
@@ -2123,6 +2147,9 @@ fn class_and_instance_1() {
         };
 
         let expected_instance_ord_int_result = Err(TypeError::CannotDeduce {
+            location: InputLocation::Interactive {
+                label: String::from("(typechecker)"),
+            },
             context: Some(SolveConstraintContext {
                 pos: 0,
                 constraint: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),

@@ -1,34 +1,39 @@
 mod test;
 
-use crate::diagnostic::{Diagnostic, Item};
-use crate::syntax::Spanned;
-use std::collections::BTreeSet;
-use std::{fs::File, io::Read, vec::IntoIter};
-
-use crate::syntax::{self, Branch, Declaration, Expr, Module, Pattern, StringPart, Type};
 use crate::{
+    diagnostic::{Diagnostic, InputLocation, Item},
     lex::{Lexer, Token, TokenType},
-    syntax::{Keyword, Names},
+    syntax::{
+        self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
+    },
 };
+use std::{collections::BTreeSet, fs::File, io::Read, vec::IntoIter};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     Unexpected {
+        location: InputLocation,
         pos: usize,
         expecting: BTreeSet<TokenType>,
     },
 }
 
 impl ParseError {
+    fn location(&self) -> InputLocation {
+        match self {
+            ParseError::Unexpected { location, .. } => location.clone(),
+        }
+    }
+
     fn position(&self) -> usize {
         match self {
-            ParseError::Unexpected { pos, expecting: _ } => *pos,
+            ParseError::Unexpected { pos, .. } => *pos,
         }
     }
 
     fn message(&self) -> String {
         match self {
-            ParseError::Unexpected { pos: _, expecting } => {
+            ParseError::Unexpected { expecting, .. } => {
                 let mut str = String::from("expected one of: ");
                 let mut iter = expecting.iter();
                 match iter.next() {
@@ -48,7 +53,8 @@ impl ParseError {
 
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         diagnostic.item(Item {
-            pos: self.position(),
+            location: self.location(),
+            offset: self.position(),
             message: self.message(),
             addendum: None,
         })
@@ -173,7 +179,12 @@ pub fn parse_string(input: String) -> Result<Module, ParseError> {
         let lexer = Lexer::new(&input);
         lexer.tokenize()
     };
-    let mut parser: Parser = Parser::new(tokens);
+    let mut parser: Parser = Parser::new(
+        InputLocation::Interactive {
+            label: String::from("(string)"),
+        },
+        tokens,
+    );
     keep_left!(parser.module(), parser.eof()).result
 }
 
@@ -188,6 +199,7 @@ pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
 }
 
 pub struct Parser {
+    location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
     expecting: BTreeSet<TokenType>,
@@ -326,10 +338,11 @@ macro_rules! spanned {
 }
 
 impl Parser {
-    pub fn new(input: Vec<Token>) -> Self {
+    pub fn new(location: InputLocation, input: Vec<Token>) -> Self {
         let mut input = input.into_iter();
         let current = input.next();
         Parser {
+            location,
             pos: 0,
             indentation: vec![0],
             expecting: BTreeSet::new(),
@@ -349,6 +362,7 @@ impl Parser {
         self.fail(
             consumed,
             ParseError::Unexpected {
+                location: self.location.clone(),
                 pos: self.pos,
                 expecting: self.expecting.clone(),
             },

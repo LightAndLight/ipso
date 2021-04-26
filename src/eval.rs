@@ -18,7 +18,7 @@ macro_rules! function1 {
             arg: ValueRef<'heap>,
         ) -> ValueRef<'heap> {
             $body(eval, env, arg)
-        };
+        }
 
         let env = $self.alloc_env(Vec::new());
         let closure = $self.alloc_value(Value::StaticClosure {
@@ -739,7 +739,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         body: StaticClosureBody(eq_int_1),
                     });
                     closure
-                };
+                }
 
                 let env = self.alloc_env(Vec::new());
                 let closure = self.alloc_value(Value::StaticClosure {
@@ -834,7 +834,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         body: StaticClosureBody(eq_int_1),
                     });
                     closure
-                };
+                }
 
                 let env = self.alloc_env(Vec::new());
                 let closure = self.alloc_value(Value::StaticClosure {

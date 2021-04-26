@@ -1,13 +1,13 @@
+use diagnostic::InputLocation;
 use ipso::{
     core,
     diagnostic::{self, Diagnostic},
     eval::{self, Interpreter},
     import::{self, ModulePath},
-    parse,
-    syntax::{self, ModuleName},
+    parse, syntax,
     typecheck::{self, Typechecker},
 };
-use std::{collections::HashMap, env, io, path::Path};
+use std::{env, io, path::PathBuf};
 use typed_arena::Arena;
 
 #[derive(Debug)]
@@ -95,12 +95,15 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
         InterpreterError::ModuleError(err) => err.report(&mut diagnostic),
         InterpreterError::MissingEntrypoint(name) => diagnostic.item(diagnostic::Item {
-            pos: 0,
+            location: InputLocation::File {
+                path: PathBuf::from(&config.filename),
+            },
+            offset: 0,
             message: format!("missing entrypoint {:?}", name),
             addendum: None,
         }),
     }
-    diagnostic.report_all(&Path::new(&config.filename))
+    diagnostic.report_all()
 }
 
 fn find_entrypoint_signature(
@@ -128,11 +131,15 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     };
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let module = modules.import(0, &target_path)?;
+    let input_location = InputLocation::Interactive {
+        label: String::from("main"),
+    };
+    let module = modules.import(&input_location, 0, &target_path)?;
 
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc = Typechecker::new_with_builtins(working_dir.as_path(), &modules);
+        let mut tc =
+            Typechecker::new_with_builtins(working_dir.as_path(), input_location, &modules);
         let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(syntax::Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {

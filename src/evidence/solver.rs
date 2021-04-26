@@ -113,6 +113,7 @@ pub fn solve_constraint(
 
             match result {
                 None => Err(TypeError::CannotDeduce {
+                    location: tc.location(),
                     context: context.clone(),
                 }),
                 Some(evidence) => Ok(evidence),
@@ -176,7 +177,7 @@ pub fn solve_constraint(
                     let (kind, sol) = &tc.type_solutions[*n];
                     // we assume solving is done after unification, so any unsolved variables
                     // will never recieve solutions
-                    match sol {
+                    match sol.clone() {
                         None => {
                             match tc.zonk_kind(false, kind.clone()) {
                                 // row metavariables can be safely defaulted to the empty row in the
@@ -208,7 +209,7 @@ pub fn solve_constraint(
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
-                                rest: sol.clone(),
+                                rest: sol,
                             },
                         ),
                     }
