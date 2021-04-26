@@ -1,4 +1,5 @@
 {
+  description = "composite type mismatch in function argument",
   args = ["7.ipso"],
   stdin = None Text,
   stdout = "",

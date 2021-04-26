@@ -1,4 +1,5 @@
 {
+  description = "given `class A x` and `instance A x => A (Array x)`, you don't have `A (Array x)` when you don't have `A x`.",
   args = ["22.ipso"],
   stdin = None Text,
   stdout = "",

@@ -1,4 +1,5 @@
 {
+  description = "~ is an invalid character",
   args = ["2.ipso"],
   stdin = None Text,
   stdout = "",

@@ -1,4 +1,5 @@
 {
+  description = "unsatisfied superclass when declaring instance",
   args = ["20.ipso"],
   stdin = None Text,
   stdout = "",

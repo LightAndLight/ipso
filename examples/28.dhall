@@ -1,4 +1,5 @@
 {
+  description = "use an imported value in a way that causes a type error",
   args = ["28/main.ipso"],
   stdin = None Text,
   stdout = "",

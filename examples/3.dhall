@@ -1,4 +1,5 @@
 {
+  description = "not in scope error",
   args = ["3.ipso"],
   stdin = None Text,
   stdout = "",

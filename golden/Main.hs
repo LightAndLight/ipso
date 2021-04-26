@@ -20,6 +20,7 @@ import System.Process (readProcessWithExitCode)
 
 data Example = Example
   { exPath :: FilePath
+  , exDescription :: Text
   , exArgs :: Vector Text
   , exStdin :: Maybe Text
   , exStdout :: Text
@@ -31,7 +32,8 @@ exampleDecoder :: FilePath -> Dhall.Decoder Example
 exampleDecoder path =
   Dhall.record $
     Example path
-      <$> Dhall.field "args" (Dhall.vector Dhall.strictText)
+      <$> Dhall.field "description" Dhall.strictText
+        <*> Dhall.field "args" (Dhall.vector Dhall.strictText)
         <*> Dhall.field "stdin" (Dhall.maybe Dhall.strictText)
         <*> Dhall.field "stdout" Dhall.strictText
         <*> Dhall.field "stderr" Dhall.strictText

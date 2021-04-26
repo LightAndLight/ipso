@@ -1,4 +1,5 @@
 {
+  description = "duplicate type class argument error",
   args = ["19.ipso"],
   stdin = None Text,
   stdout = "",
