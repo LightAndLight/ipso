@@ -778,7 +778,7 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::Module(_, _) => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
                 Expr::App(a, b) => Step::Continue(vec![a, b]),
-                Expr::Lam { arg, body } => Step::Continue(vec![body]),
+                Expr::Lam { arg: _, body } => Step::Continue(vec![body]),
                 Expr::True => Step::Skip,
                 Expr::False => Step::Skip,
                 Expr::IfThenElse(a, b, c) => Step::Continue(vec![a, b, c]),

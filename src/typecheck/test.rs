@@ -1,15 +1,11 @@
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 
-use typed_arena::Arena;
-
-use crate::current_dir_with_tc;
 #[cfg(test)]
 use crate::{
     core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
     diagnostic::InputLocation,
     evidence::{solver::solve_placeholder, Constraint},
-    import::Modules,
     syntax::{self, Binop, Kind, Spanned, Type},
     typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
     void::Void,

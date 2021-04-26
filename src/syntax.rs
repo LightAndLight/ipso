@@ -133,7 +133,7 @@ impl<'a> Iterator for IterNames<'a> {
                         self.items.extend(names.iter().rev());
                         self.next()
                     }
-                    Pattern::Variant { name, arg } => Some(arg),
+                    Pattern::Variant { name: _, arg } => Some(arg),
                     Pattern::Wildcard => None,
                 }
             }
@@ -805,7 +805,6 @@ impl<A> Type<A> {
             Some((fields, rest)) => {
                 s.push('{');
                 let mut fields_iter = fields.iter();
-                let has_stuff = false;
                 match fields_iter.next() {
                     None => {}
                     Some((first_field, first_ty)) => {

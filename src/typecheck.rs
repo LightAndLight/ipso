@@ -761,17 +761,25 @@ impl<'modules> Typechecker<'modules> {
         };
         for decl in &module.decls {
             match decl {
-                core::Declaration::BuiltinType { name, kind } => {
+                core::Declaration::BuiltinType { name, kind: _ } => {
                     if should_import(name) {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::Definition { name, sig, body: _ } => {
+                core::Declaration::Definition {
+                    name,
+                    sig: _,
+                    body: _,
+                } => {
                     if should_import(name) {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::TypeAlias { name, args, body } => {
+                core::Declaration::TypeAlias {
+                    name,
+                    args: _,
+                    body: _,
+                } => {
                     if should_import(name) {
                         self.register_declaration(decl);
                     }
