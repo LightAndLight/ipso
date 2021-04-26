@@ -303,7 +303,10 @@ fn lex_string_1() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("hello")),
+            token_type: TokenType::String {
+                value: String::from("hello"),
+                length: 5,
+            },
             pos: 1,
         },
         Token {
@@ -325,7 +328,10 @@ fn lex_string_2() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("x ")),
+            token_type: TokenType::String {
+                value: String::from("x "),
+                length: 2,
+            },
             pos: 1,
         },
         Token {
@@ -337,7 +343,10 @@ fn lex_string_2() {
             pos: 4,
         },
         Token {
-            token_type: TokenType::String(String::from(" z")),
+            token_type: TokenType::String {
+                value: String::from(" z"),
+                length: 2,
+            },
             pos: 5,
         },
         Token {
@@ -359,7 +368,10 @@ fn lex_string_3() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("x ")),
+            token_type: TokenType::String {
+                value: String::from("x "),
+                length: 2,
+            },
             pos: 1,
         },
         Token {
@@ -371,7 +383,10 @@ fn lex_string_3() {
             pos: 4,
         },
         Token {
-            token_type: TokenType::String(String::from(" z")),
+            token_type: TokenType::String {
+                value: String::from(" z"),
+                length: 2,
+            },
             pos: 6,
         },
         Token {
@@ -393,7 +408,10 @@ fn lex_string_4() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("x ")),
+            token_type: TokenType::String {
+                value: String::from("x "),
+                length: 2,
+            },
             pos: 1,
         },
         Token {
@@ -409,7 +427,10 @@ fn lex_string_4() {
             pos: 7,
         },
         Token {
-            token_type: TokenType::String(String::from(" z")),
+            token_type: TokenType::String {
+                value: String::from(" z"),
+                length: 2,
+            },
             pos: 8,
         },
         Token {
@@ -431,7 +452,10 @@ fn lex_string_5() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("x ")),
+            token_type: TokenType::String {
+                value: String::from("x "),
+                length: 2,
+            },
             pos: 1,
         },
         Token {
@@ -463,7 +487,10 @@ fn lex_string_5() {
             pos: 10,
         },
         Token {
-            token_type: TokenType::String(String::from(" z")),
+            token_type: TokenType::String {
+                value: String::from(" z"),
+                length: 2,
+            },
             pos: 11,
         },
         Token {
@@ -485,7 +512,10 @@ fn lex_string_6() {
             pos: 0,
         },
         Token {
-            token_type: TokenType::String(String::from("hello ")),
+            token_type: TokenType::String {
+                value: String::from("hello "),
+                length: 6,
+            },
             pos: 1,
         },
         Token {
@@ -499,6 +529,31 @@ fn lex_string_6() {
         Token {
             token_type: TokenType::DoubleQuote,
             pos: 12,
+        },
+    ];
+    let actual = lexer.tokenize();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_string_7() {
+    let input = String::from("\"hello\\n\\n\\nworld\"");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 0,
+        },
+        Token {
+            token_type: TokenType::String {
+                value: String::from("hello\n\n\nworld"),
+                length: 16,
+            },
+            pos: 1,
+        },
+        Token {
+            token_type: TokenType::DoubleQuote,
+            pos: 17,
         },
     ];
     let actual = lexer.tokenize();
