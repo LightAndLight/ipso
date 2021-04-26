@@ -253,6 +253,7 @@ impl<'input> Lexer<'input> {
 
                         let mut str = String::new();
 
+                        let mut textual_len: usize = 1;
                         str.push(c);
 
                         loop {
@@ -265,6 +266,7 @@ impl<'input> Lexer<'input> {
                                         break;
                                     }
                                     '\\' => {
+                                        textual_len += 1;
                                         self.consume();
                                         match self.current {
                                             None => {
@@ -275,14 +277,17 @@ impl<'input> Lexer<'input> {
                                             }
                                             Some(c) => match c {
                                                 '$' | '"' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push(c);
                                                 }
                                                 'n' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push('\n');
                                                 }
                                                 't' => {
+                                                    textual_len += 1;
                                                     self.consume();
                                                     str.push('\t');
                                                 }
@@ -296,6 +301,7 @@ impl<'input> Lexer<'input> {
                                         }
                                     }
                                     c => {
+                                        textual_len += 1;
                                         self.consume();
                                         str.push(c);
                                     }
@@ -303,9 +309,11 @@ impl<'input> Lexer<'input> {
                             }
                         }
 
-                        let length = str.len();
                         Some(Token {
-                            token_type: TokenType::String { value: str, length },
+                            token_type: TokenType::String {
+                                value: str,
+                                length: textual_len,
+                            },
                             pos,
                         })
                     }
