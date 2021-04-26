@@ -1,0 +1,39 @@
+parseCommand : String -> < Quit : () | Help : () | Invalid : () >
+parseCommand line =
+  if eqString line "quit\n"
+  then Quit ()
+  else if eqString line "help\n"
+  then Help ()
+  else Invalid ()
+
+runCommand : < Quit : () | Help : () | Invalid : () > -> IO < Continue : () | Quit : () >
+runCommand cmd =
+  case cmd of
+    Quit x -> 
+      pureIO (Quit ())
+    Help x -> 
+      bindIO (writeStdout stdout (toUtf8 "help - display this message\n")) (\_ ->
+      bindIO (writeStdout stdout (toUtf8 "quit - exit the application\n")) (\_ ->
+      bindIO (writeStdout stdout (toUtf8 "list - display the todolist\n")) (\_ ->
+      bindIO (writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")) (\_ ->
+      bindIO (writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")) (\_ ->
+        pureIO (Continue ())
+      )))))
+    Invalid x -> 
+      mapIO 
+        (\_ -> Continue ()) 
+        (writeStdout stdout (toUtf8 "error: invalid command"))
+
+loop : IO ()
+loop =
+  bindIO (writeStdout stdout (toUtf8 "> ")) (\_ ->
+  bindIO (readLineStdin stdin) (\line ->
+  bindIO (runCommand (parseCommand line)) (\next ->
+    case next of
+      Continue x -> loop
+      Quit x -> pureIO ()
+  )))
+
+main : IO ()
+main = 
+  bindIO (writeStdout stdout (toUtf8 "Welcome to your TODO list\n")) (\_ -> loop)
