@@ -5,7 +5,7 @@
   stdout = "",
   stderr =
     ''
-    25.ipso:15:9: error: expected type "String", got type "a"
+    /build/source/examples/25.ipso:15:9: error: expected type "String", got type "a"
        |
     15 |         (indexArray 0 arr)
        |         ^

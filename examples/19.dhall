@@ -5,7 +5,7 @@
   stdout = "",
   stderr = 
     ''
-    19.ipso:1:11: error: duplicate type class argument
+    /build/source/examples/19.ipso:1:11: error: duplicate type class argument
       |
     1 | class A b b where
       |           ^

@@ -5,7 +5,7 @@
   stdout = "",
   stderr = 
     ''
-    20.ipso:7:19: error: cannot deduce "A (Array a)"
+    /build/source/examples/20.ipso:7:19: error: cannot deduce "A (Array a)"
       |
     7 | instance (B a) => B (Array a) where
       |                   ^
