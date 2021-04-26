@@ -13,12 +13,33 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{self, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
+
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+pub struct ModulePath(PathBuf);
+
+impl ModulePath {
+    pub fn new(dir: &Path, module_name: &String) -> Self {
+        ModulePath(dir.join(format!("{}.ipso", module_name)))
+    }
+
+    pub fn from_path(path: &Path) -> Self {
+        ModulePath(PathBuf::from(path))
+    }
+
+    pub fn as_path<'a>(&'a self) -> &'a Path {
+        self.0.as_path()
+    }
+
+    pub fn to_str<'a>(&'a self) -> &'a str {
+        self.0.to_str().unwrap()
+    }
+}
 
 #[derive(Debug)]
 pub enum ModuleError {
-    NotFound { pos: usize, path: String },
+    NotFound { pos: usize, path: ModulePath },
     IO(io::Error),
     Parse(parse::ParseError),
     Check(typecheck::TypeError),
@@ -30,7 +51,7 @@ impl ModuleError {
             ModuleError::NotFound { pos, path } => diagnostic.item(diagnostic::Item {
                 pos: *pos,
                 message: String::from("module not found"),
-                addendum: Some(format!("file {} does not exist", path)),
+                addendum: Some(format!("file {} does not exist", path.to_str())),
             }),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
@@ -59,11 +80,7 @@ impl From<typecheck::TypeError> for ModuleError {
 
 pub struct Modules<'a> {
     data: &'a Arena<core::Module>,
-    index: HashMap<String, &'a core::Module>,
-}
-
-pub fn get_module_path(working_dir: &Path, name: &String) -> String {
-    String::from(working_dir.join(format!("{}.ipso", name)).to_str().unwrap())
+    index: HashMap<ModulePath, &'a core::Module>,
 }
 
 fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::Expr) {
@@ -219,7 +236,7 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
 
 struct ImportInfo {
     pos: usize,
-    path: String,
+    path: ModulePath,
     module: Option<String>,
 }
 
@@ -234,14 +251,14 @@ fn calculate_imports(working_dir: &Path, module: &mut syntax::Module) -> Vec<Imp
             syntax::Declaration::Import { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: get_module_path(working_dir, &module.item),
+                    path: ModulePath::new(working_dir, &module.item),
                     module: Some(module.item.clone()),
                 });
             }
             syntax::Declaration::FromImport { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: get_module_path(working_dir, &module.item),
+                    path: ModulePath::new(working_dir, &module.item),
                     module: None,
                 });
             }
@@ -261,7 +278,7 @@ impl<'a> Modules<'a> {
         }
     }
 
-    pub fn lookup(&self, path: &String) -> Option<&core::Module> {
+    pub fn lookup(&self, path: &ModulePath) -> Option<&core::Module> {
         self.index.get(path).map(|x| *x)
     }
 
@@ -273,11 +290,11 @@ impl<'a> Modules<'a> {
     pub fn import(
         &mut self,
         pos: usize,
-        path_str: &String,
+        module_path: &ModulePath,
     ) -> Result<&'a core::Module, ModuleError> {
-        match self.index.get(path_str) {
+        match self.index.get(module_path) {
             None => {
-                let path = Path::new(path_str);
+                let path = module_path.as_path();
                 if path.exists() {
                     let mut module = {
                         let content = {
@@ -310,12 +327,12 @@ impl<'a> Modules<'a> {
                         tc.check_module(&module)
                     }?;
                     let module_ref: &core::Module = self.data.alloc(module);
-                    self.index.insert(path_str.clone(), module_ref);
+                    self.index.insert(module_path.clone(), module_ref);
                     Ok(module_ref)
                 } else {
                     Err(ModuleError::NotFound {
                         pos,
-                        path: path_str.clone(),
+                        path: module_path.clone(),
                     })
                 }
             }

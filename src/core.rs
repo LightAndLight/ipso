@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    import::ModulePath,
     iter::Step,
     syntax::{self, ModuleName, Type},
 };
@@ -1011,7 +1012,7 @@ pub enum ModuleUsage {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     /// Describes how each imported file is referenced by this module.
-    pub module_mapping: HashMap<String, ModuleUsage>,
+    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 

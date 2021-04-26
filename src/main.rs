@@ -2,7 +2,8 @@ use ipso::{
     core,
     diagnostic::{self, Diagnostic},
     eval::Interpreter,
-    import, parse, syntax,
+    import::{self, ModulePath},
+    parse, syntax,
     typecheck::{self, Typechecker},
 };
 use std::{collections::HashMap, env, io, path::Path};
@@ -118,7 +119,7 @@ fn find_entrypoint_body(
 
 fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let working_dir = std::env::current_dir().unwrap();
-    let filepath: String = String::from(working_dir.join(&config.filename).to_str().unwrap());
+    let filepath: ModulePath = ModulePath::from_path(&working_dir.join(&config.filename));
     let main = String::from("main");
     let entrypoint: &String = match config.entrypoint {
         None => &main,

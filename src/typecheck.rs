@@ -2,7 +2,7 @@ use crate::{
     builtins, core, diagnostic, evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
     import,
-    import::Modules,
+    import::{ModulePath, Modules},
     rope::Rope,
     syntax::{self, ModuleName, Spanned, Type},
 };
@@ -153,7 +153,8 @@ pub struct Typechecker<'modules> {
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
     pub context: HashMap<String, (core::TypeSig, core::Expr)>,
-    module_context: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
+    module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
+    module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<String, core::ClassDeclaration>,
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<syntax::Kind>,
@@ -474,6 +475,7 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
+            module_unmapping: HashMap::new(),
             working_dir,
         }
     }
@@ -1168,16 +1170,11 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module_mapping: &mut HashMap<String, core::ModuleUsage>,
+        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
         module: &Spanned<String>,
         name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
-        let path = String::from(
-            self.working_dir
-                .join(format!("{}.ipso", module.item))
-                .to_str()
-                .unwrap(),
-        );
+        let path = ModulePath::new(self.working_dir, &module.item);
 
         let actual_name = match name {
             None => module,
@@ -1186,10 +1183,10 @@ impl<'modules> Typechecker<'modules> {
 
         match module_mapping.get(&path) {
             None => {
-                self.module_context.insert(
-                    ModuleName(vec![actual_name.item.clone()]),
-                    self.modules.lookup(&path).unwrap().get_signatures(),
-                );
+                let signatures = self.modules.lookup(&path).unwrap().get_signatures();
+                self.module_context.insert(path.clone(), signatures);
+                self.module_unmapping
+                    .insert(ModuleName(vec![actual_name.item.clone()]), path.clone());
                 module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
                 Ok(())
             }
@@ -1201,7 +1198,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_declaration(
         &mut self,
-        module_mapping: &mut HashMap<String, core::ModuleUsage>,
+        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
@@ -2033,7 +2030,10 @@ impl<'modules> Typechecker<'modules> {
                     }
                 }
                 syntax::Expr::Module { name, item } => {
-                    let sig = match self.module_context.get(&name) {
+                    let sig = match self
+                        .module_context
+                        .get(self.module_unmapping.get(&name).unwrap())
+                    {
                         None => {
                             // a module accessor will only be desugared if the module was in scope,
                             // so we should never get here during a program run
