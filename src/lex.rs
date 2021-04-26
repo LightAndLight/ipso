@@ -13,7 +13,7 @@ pub enum TokenType {
     DoubleQuote,
     Dollar,
     DollarLBrace,
-    String(String),
+    String { value: String, length: usize },
 
     LBrace,
     RBrace,
@@ -70,7 +70,7 @@ impl TokenType {
             TokenType::DoubleQuote => String::from("'\"'"),
             TokenType::Dollar => String::from("'$'"),
             TokenType::DollarLBrace => String::from("'${'"),
-            TokenType::String(s) => format!("{:?}", s),
+            TokenType::String { value, .. } => format!("{:?}", value),
             TokenType::LBrace => String::from("'{'"),
             TokenType::RBrace => String::from("'}'"),
             TokenType::LParen => String::from("'('"),
@@ -133,7 +133,7 @@ impl TokenType {
             TokenType::DoubleQuote => 1,
             TokenType::Dollar => 1,
             TokenType::DollarLBrace => 2,
-            TokenType::String(s) => s.len(),
+            TokenType::String { length, .. } => *length,
             TokenType::Pipe => 1,
             TokenType::LAngle => 1,
             TokenType::RAngle => 1,
@@ -252,6 +252,7 @@ impl<'input> Lexer<'input> {
                         self.consume();
 
                         let mut str = String::new();
+
                         str.push(c);
 
                         loop {
@@ -302,8 +303,9 @@ impl<'input> Lexer<'input> {
                             }
                         }
 
+                        let length = str.len();
                         Some(Token {
-                            token_type: TokenType::String(str),
+                            token_type: TokenType::String { value: str, length },
                             pos,
                         })
                     }

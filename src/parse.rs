@@ -834,10 +834,13 @@ impl Parser {
     }
 
     fn string_part_string(&mut self) -> ParseResult<StringPart> {
-        self.expecting.insert(TokenType::String(String::new()));
+        self.expecting.insert(TokenType::String {
+            value: String::new(),
+            length: 0,
+        });
         let str = match &self.current {
             Some(current) => match &current.token_type {
-                TokenType::String(str) => str.clone(),
+                TokenType::String { value, .. } => value.clone(),
                 _ => return self.unexpected(false),
             },
             None => return self.unexpected(false),
