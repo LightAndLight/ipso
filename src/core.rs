@@ -999,7 +999,7 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ModuleUsage {
     /// A module was given a particular name during importing
     Named(String),
@@ -1017,6 +1017,14 @@ pub struct Module {
 }
 
 impl Module {
+    pub fn get_bindings(&self) -> HashMap<String, Expr> {
+        let bindings: HashMap<String, Expr> = HashMap::new();
+        self.decls.iter().fold(bindings, |mut acc, decl| {
+            acc.extend(decl.get_bindings().into_iter());
+            acc
+        })
+    }
+
     pub fn get_signatures(&self) -> HashMap<String, TypeSig> {
         let signatures: HashMap<String, TypeSig> = HashMap::new();
         self.decls.iter().fold(signatures, |mut acc, decl| {

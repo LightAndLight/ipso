@@ -6,7 +6,7 @@ use crate::{
     lex::Lexer,
     parse::{self, Parser},
     rope::Rope,
-    syntax,
+    syntax::{self, ModuleName},
     typecheck::{self, Typechecker},
 };
 use std::{
@@ -17,23 +17,51 @@ use std::{
 };
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub struct ModulePath(PathBuf);
+pub enum ModulePath {
+    Module {
+        module_name: ModuleName,
+        path: PathBuf,
+    },
+    File {
+        path: PathBuf,
+    },
+}
 
 impl ModulePath {
-    pub fn new(dir: &Path, module_name: &String) -> Self {
-        ModulePath(dir.join(format!("{}.ipso", module_name)))
+    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
+        let mut path = module_name
+            .iter()
+            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
+        path.set_extension("ipso");
+        ModulePath::Module {
+            module_name: module_name.clone(),
+            path,
+        }
     }
 
-    pub fn from_path(path: &Path) -> Self {
-        ModulePath(PathBuf::from(path))
+    pub fn from_file(file: &Path) -> Self {
+        ModulePath::File {
+            path: PathBuf::from(file),
+        }
     }
 
     pub fn as_path<'a>(&'a self) -> &'a Path {
-        self.0.as_path()
+        let path = match self {
+            ModulePath::Module { path, .. } => path,
+            ModulePath::File { path, .. } => path,
+        };
+        path.as_path()
     }
 
     pub fn to_str<'a>(&'a self) -> &'a str {
-        self.0.to_str().unwrap()
+        self.as_path().to_str().unwrap()
+    }
+
+    pub fn get_module_name(&self) -> Option<&ModuleName> {
+        match self {
+            ModulePath::Module { module_name, .. } => Option::Some(module_name),
+            ModulePath::File { .. } => None,
+        }
     }
 }
 
@@ -251,14 +279,20 @@ fn calculate_imports(working_dir: &Path, module: &mut syntax::Module) -> Vec<Imp
             syntax::Declaration::Import { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: ModulePath::new(working_dir, &module.item),
+                    path: ModulePath::from_module(
+                        working_dir,
+                        &ModuleName(vec![module.item.clone()]),
+                    ),
                     module: Some(module.item.clone()),
                 });
             }
             syntax::Declaration::FromImport { module, .. } => {
                 paths.push(ImportInfo {
                     pos: module.pos,
-                    path: ModulePath::new(working_dir, &module.item),
+                    path: ModulePath::from_module(
+                        working_dir,
+                        &ModuleName(vec![module.item.clone()]),
+                    ),
                     module: None,
                 });
             }
@@ -276,6 +310,10 @@ impl<'a> Modules<'a> {
             data,
             index: HashMap::new(),
         }
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<ModulePath, &core::Module> {
+        self.index.iter()
     }
 
     pub fn lookup(&self, path: &ModulePath) -> Option<&core::Module> {

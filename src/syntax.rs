@@ -158,6 +158,12 @@ pub struct Branch {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleName(pub Vec<String>);
 
+impl ModuleName {
+    pub fn iter(&self) -> std::slice::Iter<String> {
+        self.0.iter()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),

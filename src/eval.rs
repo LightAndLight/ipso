@@ -1,11 +1,11 @@
 use crate::{
     builtins,
-    core::{Builtin, Declaration, Expr, Pattern, StringPart},
+    core::{Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart},
+    import::ModulePath,
     rope::Rope,
     syntax::{Binop, ModuleName},
 };
-use std::collections::HashMap;
-use std::{fmt::Debug, io::Write};
+use std::{collections::HashMap, fmt::Debug, io::Write};
 use typed_arena::Arena;
 
 mod test;
@@ -379,24 +379,31 @@ pub enum Object<'heap> {
     Env(Vec<ValueRef<'heap>>),
 }
 
+pub struct Module {
+    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
+    pub bindings: HashMap<String, Expr>,
+}
+
 pub struct Interpreter<'stdout, 'heap> {
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Expr>,
-    module_context: HashMap<ModuleName, HashMap<String, Expr>>,
+    module_context: HashMap<ModulePath, Module>,
+    module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
 }
 
 impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn new(
         stdout: &'stdout mut dyn Write,
         context: HashMap<String, Expr>,
-        module_context: HashMap<ModuleName, HashMap<String, Expr>>,
+        module_context: HashMap<ModulePath, Module>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
         Interpreter {
             stdout,
             context,
             module_context,
+            module_unmapping: Vec::with_capacity(1),
             heap,
         }
     }
@@ -404,7 +411,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn new_with_builtins(
         stdout: &'stdout mut dyn Write,
         additional_context: HashMap<String, Expr>,
-        module_context: HashMap<ModuleName, HashMap<String, Expr>>,
+        module_context: HashMap<ModulePath, Module>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
         let mut context: HashMap<String, Expr> = builtins::BUILTINS
@@ -422,6 +429,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             stdout,
             context,
             module_context,
+            module_unmapping: Vec::with_capacity(1),
             heap,
         }
     }
@@ -936,6 +944,40 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         }
     }
 
+    pub fn eval_from_module(
+        &mut self,
+        env: &'heap Vec<ValueRef<'heap>>,
+        path: &ModulePath,
+        binding: &String,
+    ) -> ValueRef<'heap> {
+        let (expr, next_module_mapping) = match self.module_context.get(path) {
+            None => panic!("no module found at {:?}", path),
+            Some(module) => match module.bindings.get(binding) {
+                None => panic!("{:?} not found in {:?}", binding, path),
+                Some(expr) => (expr.clone(), module.module_mapping.clone()),
+            },
+        };
+        self.module_unmapping.push(
+            next_module_mapping
+                .into_iter()
+                .filter_map(|(module_path, module_usage)| {
+                    let m_module_name = match module_usage {
+                        ModuleUsage::All => module_path.get_module_name().map(|x| x.clone()),
+                        ModuleUsage::Items(_) => module_path.get_module_name().map(|x| x.clone()),
+                        ModuleUsage::Named(name) => Some(ModuleName(vec![name])),
+                    };
+                    match m_module_name {
+                        None => None,
+                        Some(module_name) => Some((module_name, module_path)),
+                    }
+                })
+                .collect(),
+        );
+        let res = self.eval(env, expr.clone());
+        self.module_unmapping.pop();
+        res
+    }
+
     pub fn eval(&mut self, env: &'heap Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
         let out = match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
@@ -948,16 +990,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     self.eval(env, body)
                 }
             },
-            Expr::Module(name, item) => {
-                let body = match self.module_context.get(&name) {
-                    None => panic!("{:?} not in scope", name),
-                    Some(defs) => match defs.get(&item) {
-                        None => panic!("{:?}.{:?} not in scope", name, item),
-                        Some(body) => body.clone(),
-                    },
-                };
-                self.eval(env, body)
-            }
+            Expr::Module(name, item) => self.eval_from_module(
+                env,
+                &self
+                    .module_unmapping
+                    .last()
+                    .unwrap()
+                    .get(&name)
+                    .unwrap()
+                    .clone(),
+                &item,
+            ),
             Expr::Builtin(name) => self.eval_builtin(&name),
 
             Expr::App(a, b) => {

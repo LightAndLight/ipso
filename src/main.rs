@@ -1,9 +1,10 @@
 use ipso::{
     core,
     diagnostic::{self, Diagnostic},
-    eval::Interpreter,
+    eval::{self, Interpreter},
     import::{self, ModulePath},
-    parse, syntax,
+    parse,
+    syntax::{self, ModuleName},
     typecheck::{self, Typechecker},
 };
 use std::{collections::HashMap, env, io, path::Path};
@@ -102,10 +103,10 @@ fn report_interpreter_error(config: &Config, err: InterpreterError) -> io::Resul
     diagnostic.report_all(&Path::new(&config.filename))
 }
 
-fn find_entrypoint_body(
+fn find_entrypoint_signature(
     entrypoint: &String,
     module: &core::Module,
-) -> Result<(core::Expr, core::TypeSig), InterpreterError> {
+) -> Result<core::TypeSig, InterpreterError> {
     match module.decls.iter().find_map(|decl| match decl {
         core::Declaration::Definition {
             name, sig, body, ..
@@ -113,13 +114,13 @@ fn find_entrypoint_body(
         _ => None,
     }) {
         None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
-        Some(body) => Ok(body),
+        Some((_, sig)) => Ok(sig),
     }
 }
 
 fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let working_dir = std::env::current_dir().unwrap();
-    let filepath: ModulePath = ModulePath::from_path(&working_dir.join(&config.filename));
+    let target_path: ModulePath = ModulePath::from_file(&working_dir.join(&config.filename));
     let main = String::from("main");
     let entrypoint: &String = match config.entrypoint {
         None => &main,
@@ -127,9 +128,9 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     };
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let module = modules.import(0, &filepath)?;
+    let module = modules.import(0, &target_path)?;
 
-    let (target, target_sig) = find_entrypoint_body(entrypoint, module)?;
+    let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = Typechecker::new_with_builtins(working_dir.as_path(), &modules);
         let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(syntax::Kind::Type));
@@ -150,10 +151,21 @@ fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
             .iter()
             .flat_map(|decl| decl.get_bindings().into_iter())
             .collect();
-        let module_context = HashMap::new();
+        let eval_modules = modules
+            .iter()
+            .map(|(module_path, module)| {
+                (
+                    module_path.clone(),
+                    eval::Module {
+                        module_mapping: module.module_mapping.clone(),
+                        bindings: module.get_bindings(),
+                    },
+                )
+            })
+            .collect();
         let mut interpreter =
-            Interpreter::new_with_builtins(&mut stdout, context, module_context, &heap);
-        let action = interpreter.eval(&env, target);
+            Interpreter::new_with_builtins(&mut stdout, context, eval_modules, &heap);
+        let action = interpreter.eval_from_module(&env, &target_path, entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

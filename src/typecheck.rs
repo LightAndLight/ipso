@@ -1174,7 +1174,8 @@ impl<'modules> Typechecker<'modules> {
         module: &Spanned<String>,
         name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
-        let path = ModulePath::new(self.working_dir, &module.item);
+        let path =
+            ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
 
         let actual_name = match name {
             None => module,
