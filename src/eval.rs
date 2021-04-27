@@ -791,7 +791,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
-            Builtin::MinusInt => {
+            Builtin::Subtract => {
                 function2!(
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
@@ -800,6 +800,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         eval.alloc_value(Value::Int(a - b))
+                    }
+                )
+            }
+            Builtin::Add => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        eval.alloc_value(Value::Int(a + b))
                     }
                 )
             }

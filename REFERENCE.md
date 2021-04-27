@@ -193,7 +193,11 @@ Int
 ```ipso
 (+) : Int -> Int -> Int
 
+add : Int -> Int -> Int
+
 (-) : Int -> Int -> Int
+
+subtract : Int -> Int -> Int
 
 (*) : Int -> Int -> Int
 
