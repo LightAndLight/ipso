@@ -170,7 +170,7 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::ReadLineStdin)
             },
 
-            // eqString : eqString -> eqString -> Bool
+            // eqString : String -> String -> Bool
             Declaration::Definition{
                 name: String::from("eqString"),
                 sig: TypeSig{
