@@ -170,6 +170,16 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::ReadLineStdin)
             },
 
+            // eqString : eqString -> eqString -> Bool
+            Declaration::Definition{
+                name: String::from("eqString"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::String, Type::mk_arrow(Type::String, Type::Bool))
+                },
+                body: Expr::Builtin(Builtin::EqString)
+            },
+
             // eqInt : Int -> Int -> Bool
             Declaration::Definition{
                 name: String::from("eqInt"),
