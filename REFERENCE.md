@@ -241,7 +241,7 @@ x : String
 #### Builtins
 
 ```ipso
-eq : String -> String -> Bool
+eqString : String -> String -> Bool
 
 foldr : (Char -> a -> a) -> String -> a -> a
 
