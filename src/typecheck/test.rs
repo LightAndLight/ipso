@@ -1875,7 +1875,10 @@ fn check_class_1() {
                 core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
             ),
         );
-        assert_eq!(Some(&expected_member), tc.context.get(&String::from("eq")));
+        assert_eq!(
+            Some(&expected_member),
+            tc.registered_bindings.get(&String::from("eq"))
+        );
     })
 }
 
@@ -1971,7 +1974,7 @@ fn check_class_2() {
         );
         assert_eq!(
             Some(&expected_member),
-            tc.context.get(&String::from("wut")),
+            tc.registered_bindings.get(&String::from("wut")),
             "expected member"
         );
     })
