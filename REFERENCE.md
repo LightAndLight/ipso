@@ -198,6 +198,8 @@ Int
 (*) : Int -> Int -> Int
 
 (/) : Int -> Int -> Int
+
+eqInt : Int -> Int -> Bool
 ```
 
 ### Characters
@@ -325,6 +327,8 @@ foldr : (a -> b -> b) -> b -> Array a -> b
 foldl : (b -> a -> b) -> b -> Array a -> b
 
 map : (a -> b) -> Array a -> Array b
+
+eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
 ```
 
 ### Byte Arrays
