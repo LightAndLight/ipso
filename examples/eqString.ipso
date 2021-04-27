@@ -1,0 +1,13 @@
+printBool : Bool -> IO ()
+printBool b =
+  writeStdout stdout (toUtf8 (
+    if b
+    then "true\n"
+    else "false\n"
+  ))
+
+main : IO ()
+main = 
+  bindIO (printBool (eqString "yes" "yes")) (\_ ->
+  printBool (eqString "yes" "no")
+  )
