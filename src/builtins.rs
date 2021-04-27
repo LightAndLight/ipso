@@ -180,6 +180,26 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::EqString)
             },
 
+            // add : Int -> Int -> Int
+            Declaration::Definition{
+                name: String::from("add"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int))
+                },
+                body: Expr::Builtin(Builtin::Add)
+            },
+
+            // subtract : Int -> Int -> Int
+            Declaration::Definition{
+                name: String::from("subtract"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int))
+                },
+                body: Expr::Builtin(Builtin::Subtract)
+            },
+
             // eqInt : Int -> Int -> Bool
             Declaration::Definition{
                 name: String::from("eqInt"),
@@ -208,16 +228,6 @@ lazy_static! {
                     body: Type::mk_arrow(Type::Int, Type::String)
                 },
                 body: Expr::Builtin(Builtin::ShowInt)
-            },
-
-            // minusInt : Int -> Int -> Int
-            Declaration::Definition{
-                name: String::from("minusInt"),
-                sig: TypeSig{
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int))
-                },
-                body: Expr::Builtin(Builtin::MinusInt)
             },
 
             // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
