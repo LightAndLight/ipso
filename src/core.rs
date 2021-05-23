@@ -203,14 +203,16 @@ pub enum Builtin {
     ReadLineStdin,
     EqInt,
     LtInt,
+    Add,
+    Subtract,
     ShowInt,
-    MinusInt,
     FoldlArray,
     EqArray,
     LtArray,
     LengthArray,
     IndexArray,
     SliceArray,
+    EqString,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

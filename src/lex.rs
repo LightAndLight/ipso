@@ -248,13 +248,9 @@ impl<'input> Lexer<'input> {
                             }
                         }
                     }
-                    c => {
-                        self.consume();
-
+                    _ => {
                         let mut str = String::new();
-
-                        let mut textual_len: usize = 1;
-                        str.push(c);
+                        let mut textual_len: usize = 0;
 
                         loop {
                             match self.current {

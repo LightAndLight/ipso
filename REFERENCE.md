@@ -193,11 +193,17 @@ Int
 ```ipso
 (+) : Int -> Int -> Int
 
+add : Int -> Int -> Int
+
 (-) : Int -> Int -> Int
+
+subtract : Int -> Int -> Int
 
 (*) : Int -> Int -> Int
 
 (/) : Int -> Int -> Int
+
+eqInt : Int -> Int -> Bool
 ```
 
 ### Characters
@@ -241,7 +247,7 @@ x : String
 #### Builtins
 
 ```ipso
-eq : String -> String -> Bool
+eqString : String -> String -> Bool
 
 foldr : (Char -> a -> a) -> String -> a -> a
 
@@ -325,6 +331,8 @@ foldr : (a -> b -> b) -> b -> Array a -> b
 foldl : (b -> a -> b) -> b -> Array a -> b
 
 map : (a -> b) -> Array a -> Array b
+
+eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
 ```
 
 ### Byte Arrays

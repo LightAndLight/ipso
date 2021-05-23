@@ -714,6 +714,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 });
                 closure
             }
+            Builtin::EqString => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = env[0].unpack_string();
+                        let b = arg.unpack_string();
+                        if a == b {
+                            eval.alloc_value(Value::True)
+                        } else {
+                            eval.alloc_value(Value::False)
+                        }
+                    }
+                )
+            }
             Builtin::EqInt => {
                 fn eq_int_0<'heap>(
                     eval: &mut Interpreter<'_, 'heap>,
@@ -775,7 +791,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
-            Builtin::MinusInt => {
+            Builtin::Subtract => {
                 function2!(
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
@@ -784,6 +800,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         eval.alloc_value(Value::Int(a - b))
+                    }
+                )
+            }
+            Builtin::Add => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        eval.alloc_value(Value::Int(a + b))
                     }
                 )
             }
