@@ -154,7 +154,8 @@ pub struct Typechecker<'modules> {
     pub implications: Vec<Implication>,
     pub evidence: Evidence,
     type_context: HashMap<String, syntax::Kind>,
-    pub context: HashMap<String, (core::TypeSig, core::Expr)>,
+    context: HashMap<String, core::TypeSig>,
+    pub registered_bindings: HashMap<String, (core::TypeSig, core::Expr)>,
     module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
     module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<String, core::ClassDeclaration>,
@@ -486,6 +487,7 @@ impl<'modules> Typechecker<'modules> {
             evidence: Evidence::new(),
             type_context: HashMap::new(),
             context: HashMap::new(),
+            registered_bindings: HashMap::new(),
             class_context: HashMap::new(),
             bound_vars: BoundVars::new(),
             bound_tyvars: BoundVars::new(),
@@ -664,7 +666,13 @@ impl<'modules> Typechecker<'modules> {
             );
 
         // generate class members
-        self.context.extend(decl.get_bindings());
+        let decl_bindings = decl.get_bindings();
+        self.context.extend(
+            decl_bindings
+                .iter()
+                .map(|(name, (sig, _))| (name.clone(), sig.clone())),
+        );
+        self.registered_bindings.extend(decl_bindings);
 
         // update class context
         self.class_context.insert(decl.name.clone(), decl.clone());
@@ -714,7 +722,8 @@ impl<'modules> Typechecker<'modules> {
                 self.type_context.insert(name.clone(), kind.clone());
             }
             core::Declaration::Definition { name, sig, body } => {
-                self.context
+                self.context.insert(name.clone(), sig.clone());
+                self.registered_bindings
                     .insert(name.clone(), (sig.clone(), body.clone()));
             }
             core::Declaration::TypeAlias { name, args, body } => {
@@ -917,6 +926,14 @@ impl<'modules> Typechecker<'modules> {
             (ty, kinds)
         };
 
+        let _ = self.context.insert(
+            name.clone(),
+            core::TypeSig {
+                ty_vars: ty_var_kinds.clone(),
+                body: ty.clone(),
+            },
+        );
+
         self.bound_tyvars.insert(&ty_var_kinds);
 
         let (constraints, ty) = ty.unwrap_constraints();
@@ -924,6 +941,7 @@ impl<'modules> Typechecker<'modules> {
             self.evidence
                 .assume(None, evidence::Constraint::from_type(constraint));
         }
+
         let body = self.check_expr(
             syntax::Spanned {
                 pos,
@@ -931,10 +949,13 @@ impl<'modules> Typechecker<'modules> {
             },
             ty.clone(),
         )?;
+
         let (body, sig) = self.generalise(body, ty.clone())?;
         self.evidence = Evidence::new();
 
         self.bound_tyvars.delete(ty_var_kinds_len);
+
+        self.context.remove(name);
 
         Ok(core::Declaration::Definition {
             name: name.clone(),
@@ -1294,7 +1315,7 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn lookup_name(&self, name: &String) -> Option<core::TypeSig> {
-        self.context.get(name).map(|(sig, _)| sig.clone())
+        self.context.get(name).map(|x| x.clone())
     }
 
     pub fn zonk_constraint(&self, constraint: Constraint) -> Constraint {
