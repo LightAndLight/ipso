@@ -969,6 +969,25 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::FilterString => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let predicate = env[0];
+                        let string = arg.unpack_string();
+                        let new_string: String = string
+                            .chars()
+                            .filter(|&c| {
+                                let c_val = eval.alloc_value(Value::Char(c));
+                                predicate.apply(eval, c_val).unpack_bool()
+                            })
+                            .collect();
+                        eval.alloc_value(Value::String(new_string))
+                    }
+                )
+            }
         }
     }
 

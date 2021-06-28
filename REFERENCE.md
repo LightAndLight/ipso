@@ -255,6 +255,8 @@ foldl : (a -> Char -> a) -> String -> a -> a
 
 map : (Char -> Char) -> String -> String
 
+filterString : (Char -> Bool) -> String -> String
+
 pack : Array Char -> String
 
 unpack : String -> Array Char
