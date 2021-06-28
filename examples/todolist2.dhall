@@ -3,13 +3,14 @@ in {
   description = "todolist test 2",
   args = ["todolist.ipso"],
   stdin = Some (concatSep "\n" [
-    "add", 
+    "help",
+    "add entry1", 
     "list",
-    "add", 
+    "add entry2", 
     "list", 
-    "add", 
+    "add entry3", 
     "list", 
-    "delete", 
+    "delete 1", 
     "list", 
     "quit\n"
   ]),
