@@ -5,7 +5,7 @@
   stdout = "",
   stderr =
     ''
-    /build/source/examples/30.ipso:5:8: error: not in scope
+    30.ipso:5:8: error: not in scope
       |
     5 | main = hi
       |        ^
