@@ -1,10 +1,20 @@
-parseCommand : String -> < Quit : () | Help : () | Invalid : String >
+not : Bool -> Bool
+not a = if a then false else true
+
+and : Bool -> Bool -> Bool
+and a b = if a then b else false
+
+strip : String -> String
+strip = filterString (\c -> not (eqChar c '\n'))
+
+parseCommand : String -> < Quit : () | Help : () | Add : String | Invalid : String >
 parseCommand line =
-  if eqString line "quit\n"
-  then Quit ()
-  else if eqString line "help\n"
-  then Help ()
-  else Invalid line
+  (\lines ->
+    if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "quit") then Quit ()
+    else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
+    else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
+    else Invalid line
+  ) (splitString ' ' (strip line))
 
 runCommand : < Quit : () | Help : () | Invalid : String > -> IO < Continue : () | Quit : () >
 runCommand cmd =
