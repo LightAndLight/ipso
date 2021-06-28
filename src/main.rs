@@ -7,10 +7,7 @@ use ipso::{
     parse, syntax,
     typecheck::{self, Typechecker},
 };
-use std::{
-    env, io,
-    path::{Path, PathBuf},
-};
+use std::{env, io, path::PathBuf};
 use typed_arena::Arena;
 
 #[derive(Debug)]
