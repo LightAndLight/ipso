@@ -179,6 +179,13 @@ impl<'heap> Value<'heap> {
         }
     }
 
+    pub fn unpack_char<'stdout>(&'heap self) -> &'heap char {
+        match self {
+            Value::Char(c) => c,
+            val => panic!("expected char, got {:?}", val),
+        }
+    }
+
     pub fn unpack_bytes<'stdout>(&'heap self) -> &'heap [u8] {
         match self {
             Value::Bytes(bs) => bs,
@@ -985,6 +992,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             })
                             .collect();
                         eval.alloc_value(Value::String(new_string))
+                    }
+                )
+            }
+            Builtin::EqChar => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let c1 = env[0].unpack_char();
+                        let c2 = arg.unpack_char();
+                        eval.alloc_value(if c1 == c2 { Value::True } else { Value::False })
                     }
                 )
             }

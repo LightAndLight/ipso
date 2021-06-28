@@ -223,6 +223,8 @@ Char
 #### Builtins
 
 ```ipso
+eqChar : Char -> Char -> Bool
+
 prev : Char -> Char
 
 next : Char -> Char
