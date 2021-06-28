@@ -5,7 +5,7 @@
   stdout = "",
   stderr =
     ''
-    /build/source/examples/recursionTypeError.ipso:5:23: error: expected type "Int", got type "String"
+    recursionTypeError.ipso:5:23: error: expected type "Int", got type "String"
       |
     5 |   else add 1 (recount "hello")
       |                       ^
