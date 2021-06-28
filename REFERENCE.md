@@ -259,6 +259,8 @@ map : (Char -> Char) -> String -> String
 
 filterString : (Char -> Bool) -> String -> String
 
+splitString : Char -> String -> Array String
+
 pack : Array Char -> String
 
 unpack : String -> Array Char

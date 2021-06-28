@@ -215,6 +215,7 @@ pub enum Builtin {
     EqString,
     FilterString,
     EqChar,
+    SplitString,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
