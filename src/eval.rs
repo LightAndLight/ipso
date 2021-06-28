@@ -179,6 +179,13 @@ impl<'heap> Value<'heap> {
         }
     }
 
+    pub fn unpack_char<'stdout>(&'heap self) -> &'heap char {
+        match self {
+            Value::Char(c) => c,
+            val => panic!("expected char, got {:?}", val),
+        }
+    }
+
     pub fn unpack_bytes<'stdout>(&'heap self) -> &'heap [u8] {
         match self {
             Value::Bytes(bs) => bs,
@@ -966,6 +973,37 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let arr = arg.unpack_array();
 
                         eval.alloc_value(Value::Array(Vec::from(&arr[start..start + len])))
+                    }
+                )
+            }
+            Builtin::FilterString => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let predicate = env[0];
+                        let string = arg.unpack_string();
+                        let new_string: String = string
+                            .chars()
+                            .filter(|&c| {
+                                let c_val = eval.alloc_value(Value::Char(c));
+                                predicate.apply(eval, c_val).unpack_bool()
+                            })
+                            .collect();
+                        eval.alloc_value(Value::String(new_string))
+                    }
+                )
+            }
+            Builtin::EqChar => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let c1 = env[0].unpack_char();
+                        let c2 = arg.unpack_char();
+                        eval.alloc_value(if c1 == c2 { Value::True } else { Value::False })
                     }
                 )
             }

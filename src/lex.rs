@@ -15,6 +15,9 @@ pub enum TokenType {
     DollarLBrace,
     String { value: String, length: usize },
 
+    SingleQuote,
+    Char { value: char, length: usize },
+
     LBrace,
     RBrace,
     LParen,
@@ -71,6 +74,8 @@ impl TokenType {
             TokenType::Dollar => String::from("'$'"),
             TokenType::DollarLBrace => String::from("'${'"),
             TokenType::String { value, .. } => format!("{:?}", value),
+            TokenType::SingleQuote => String::from("'"),
+            TokenType::Char { value, .. } => format!("'{}'", value),
             TokenType::LBrace => String::from("'{'"),
             TokenType::RBrace => String::from("'}'"),
             TokenType::LParen => String::from("'('"),
@@ -131,9 +136,11 @@ impl TokenType {
             TokenType::Indent(n) => n + 1,
             TokenType::Space => 1,
             TokenType::DoubleQuote => 1,
+            TokenType::SingleQuote => 1,
             TokenType::Dollar => 1,
             TokenType::DollarLBrace => 2,
             TokenType::String { length, .. } => *length,
+            TokenType::Char { length, .. } => *length,
             TokenType::Pipe => 1,
             TokenType::LAngle => 1,
             TokenType::RAngle => 1,
@@ -152,6 +159,7 @@ pub struct Token {
 
 enum Mode {
     String,
+    Char,
     Ident,
     Normal,
 }
@@ -314,6 +322,76 @@ impl<'input> Lexer<'input> {
                         })
                     }
                 },
+                Mode::Char => match c {
+                    '\'' => {
+                        self.consume();
+                        let _ = self.mode.pop().unwrap();
+                        Some(Token {
+                            token_type: TokenType::SingleQuote,
+                            pos,
+                        })
+                    }
+                    _ => {
+                        let char;
+                        let mut textual_len: usize = 0;
+
+                        match self.current {
+                            None => {
+                                char = None;
+                            }
+                            Some(c) => match c {
+                                '\\' => {
+                                    textual_len += 1;
+                                    self.consume();
+                                    match self.current {
+                                        None => {
+                                            return Some(Token {
+                                                token_type: TokenType::Unexpected('\\'),
+                                                pos: self.pos,
+                                            })
+                                        }
+                                        Some(c) => match c {
+                                            '\'' | '\\' => {
+                                                textual_len += 1;
+                                                self.consume();
+                                                char = Some(c);
+                                            }
+                                            'n' => {
+                                                textual_len += 1;
+                                                self.consume();
+                                                char = Some('\n');
+                                            }
+                                            't' => {
+                                                textual_len += 1;
+                                                self.consume();
+                                                char = Some('\t');
+                                            }
+                                            _ => {
+                                                return Some(Token {
+                                                    token_type: TokenType::Unexpected('\\'),
+                                                    pos: self.pos,
+                                                });
+                                            }
+                                        },
+                                    }
+                                }
+                                c => {
+                                    textual_len += 1;
+                                    self.consume();
+                                    char = Some(c);
+                                }
+                            },
+                        }
+
+                        char.map(|value| Token {
+                            token_type: TokenType::Char {
+                                value,
+                                length: textual_len,
+                            },
+                            pos,
+                        })
+                    }
+                },
                 Mode::Normal => match c {
                     '\n' => {
                         self.consume();
@@ -337,6 +415,14 @@ impl<'input> Lexer<'input> {
                         self.mode.push(Mode::String);
                         Some(Token {
                             token_type: TokenType::DoubleQuote,
+                            pos,
+                        })
+                    }
+                    '\'' => {
+                        self.consume();
+                        self.mode.push(Mode::Char);
+                        Some(Token {
+                            token_type: TokenType::SingleQuote,
                             pos,
                         })
                     }

@@ -1,0 +1,5 @@
+main : IO ()
+main = 
+  writeStdout 
+    stdout 
+    (toUtf8 ("${filterString (\_ -> false) "the quick brown fox"}\n"))

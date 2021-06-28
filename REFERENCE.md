@@ -223,6 +223,8 @@ Char
 #### Builtins
 
 ```ipso
+eqChar : Char -> Char -> Bool
+
 prev : Char -> Char
 
 next : Char -> Char
@@ -254,6 +256,8 @@ foldr : (Char -> a -> a) -> String -> a -> a
 foldl : (a -> Char -> a) -> String -> a -> a
 
 map : (Char -> Char) -> String -> String
+
+filterString : (Char -> Bool) -> String -> String
 
 pack : Array Char -> String
 

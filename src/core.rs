@@ -213,6 +213,8 @@ pub enum Builtin {
     IndexArray,
     SliceArray,
     EqString,
+    FilterString,
+    EqChar,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
