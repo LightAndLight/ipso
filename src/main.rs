@@ -7,7 +7,10 @@ use ipso::{
     parse, syntax,
     typecheck::{self, Typechecker},
 };
-use std::{env, io, path::PathBuf};
+use std::{
+    env, io,
+    path::{Path, PathBuf},
+};
 use typed_arena::Arena;
 
 #[derive(Debug)]
@@ -123,7 +126,7 @@ fn find_entrypoint_signature(
 
 fn run_interpreter(config: &Config) -> Result<(), InterpreterError> {
     let working_dir = std::env::current_dir().unwrap();
-    let target_path: ModulePath = ModulePath::from_file(&working_dir.join(&config.filename));
+    let target_path: ModulePath = ModulePath::from_file(&PathBuf::from(config.filename.as_str()));
     let main = String::from("main");
     let entrypoint: &String = match config.entrypoint {
         None => &main,

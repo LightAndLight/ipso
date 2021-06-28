@@ -1,0 +1,3 @@
+#! /usr/bin/env bash
+
+ipso-golden --bin $(which ipso) --dir examples "$@"
