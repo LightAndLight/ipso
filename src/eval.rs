@@ -1113,7 +1113,11 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let a = self.eval(env, *a);
                 let b = self.eval(env, *b);
                 match op {
-                    Binop::Add => todo!("eval add {:?} {:?}", a, b),
+                    Binop::Add => {
+                        let a = a.unpack_int();
+                        let b = b.unpack_int();
+                        self.alloc_value(Value::Int(a + b))
+                    }
                     Binop::Multiply => todo!("eval multiply {:?} {:?}", a, b),
                     Binop::Subtract => todo!("eval subtract {:?} {:?}", a, b),
                     Binop::Divide => todo!("eval divide {:?} {:?}", a, b),
