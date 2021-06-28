@@ -186,6 +186,7 @@ fn parse_definition_3() {
                 TokenType::LBrace,
                 TokenType::LBracket,
                 TokenType::DoubleQuote,
+                TokenType::SingleQuote,
                 TokenType::Backslash,
             ]
             .into_iter()
@@ -584,6 +585,7 @@ fn parse_case_4() {
                 TokenType::Ident(String::from("false")),
                 TokenType::Ident(String::from("")),
                 TokenType::DoubleQuote,
+                TokenType::SingleQuote,
                 TokenType::Int {
                     value: 0,
                     length: 0

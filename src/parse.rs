@@ -63,7 +63,7 @@ impl ParseError {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseResult<A> {
-    consumed: bool,
+    pub consumed: bool,
     pub result: Result<A, ParseError>,
 }
 
@@ -172,6 +172,40 @@ macro_rules! between {
     ($l:expr, $r:expr, $x:expr) => {
         keep_right!($l, keep_left!($x, $r))
     };
+}
+
+#[macro_export]
+macro_rules! parse_string {
+    ($p:ident, $s:expr) => {{
+        use ipso::{
+            diagnostic::InputLocation,
+            keep_left,
+            lex::{Lexer, Token},
+            map2,
+            parse::{ParseResult, Parser},
+        };
+
+        let tokens: Vec<Token> = {
+            let lexer = Lexer::new(&$s);
+            lexer.tokenize()
+        };
+        let mut parser: Parser = Parser::new(
+            InputLocation::Interactive {
+                label: String::from("(string)"),
+            },
+            tokens,
+        );
+        keep_left!(parser.$p(), parser.eof()).result
+    }};
+}
+
+#[macro_export]
+macro_rules! parse_str {
+    ($p:ident, $s:expr) => {{
+        use ipso::parse_string;
+        let s = String::from($s);
+        parse_string!($p, s)
+    }};
 }
 
 pub fn parse_string(input: String) -> Result<Module, ParseError> {
@@ -539,6 +573,55 @@ impl Parser {
             },
             None => self.unexpected(false),
         }
+    }
+
+    /// ```
+    /// use ipso::{diagnostic::InputLocation, lex::TokenType, parse::ParseError, parse_str};
+    ///
+    /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
+    ///
+    /// assert_eq!(parse_str!(char, "\'\\\\\'"), Ok('\\'));
+    ///
+    /// assert_eq!(parse_str!(char, "\'\\n\'"), Ok('\n'));
+    ///
+    /// assert_eq!(parse_str!(char, "\'\\\'"), Err(ParseError::Unexpected {
+    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     pos: 3,
+    ///     expecting: vec![TokenType::SingleQuote].into_iter().collect(),
+    /// }));
+    ///
+    /// assert_eq!(parse_str!(char, "\'\\"), Err(ParseError::Unexpected {
+    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     pos: 1,
+    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
+    /// }));
+    ///
+    /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(ParseError::Unexpected {
+    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     pos: 1,
+    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
+    /// }));
+    /// ```
+    pub fn char(&mut self) -> ParseResult<char> {
+        between!(
+            self.token(&TokenType::SingleQuote),
+            self.token(&TokenType::SingleQuote),
+            {
+                self.expecting.insert(TokenType::Char {
+                    value: '\0',
+                    length: 0,
+                });
+                match self.current {
+                    Some(ref token) => match token.token_type {
+                        TokenType::Char { value, length: _ } => {
+                            map0!(value, self.consume())
+                        }
+                        _ => self.unexpected(false),
+                    },
+                    None => self.unexpected(false),
+                }
+            }
+        )
     }
 
     /*
@@ -958,6 +1041,7 @@ impl Parser {
                 choices!(
                     self,
                     self.int().map(|n| Expr::Int(n)),
+                    self.char().map(|c| Expr::Char(c)),
                     self.keyword(Keyword::False).map(|_| Expr::False),
                     self.keyword(Keyword::True).map(|_| Expr::True),
                     self.ident().map(|n| Expr::Var(n)),
