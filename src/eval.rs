@@ -1007,6 +1007,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::SplitString => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let c = env[0].unpack_char();
+                        let s = arg.unpack_string();
+                        let a = s
+                            .split(*c)
+                            .map(|s| eval.alloc_value(Value::String(String::from(s))))
+                            .collect();
+                        eval.alloc_value(Value::Array(a))
+                    }
+                )
+            }
         }
     }
 

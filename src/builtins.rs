@@ -360,6 +360,19 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::EqChar)
             },
+
+            // splitString : Char -> String -> Array String
+            Declaration::Definition{
+                name: String::from("splitString"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(
+                        Type::Char,
+                        Type::mk_arrow(Type::String, Type::mk_app(Type::Array, Type::String))
+                    )
+                },
+                body: Expr::Builtin(Builtin::SplitString)
+            },
         ]
     };
 }
