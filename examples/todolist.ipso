@@ -16,7 +16,7 @@ parseCommand line =
     else Invalid line
   ) (splitString ' ' (strip line))
 
-runCommand : < Quit : () | Help : () | Invalid : String > -> IO < Continue : () | Quit : () >
+runCommand : < Quit : () | Help : () | Invalid : String | r > -> IO < Continue : () | Quit : () >
 runCommand cmd =
   case cmd of
     Quit x -> 
@@ -33,6 +33,7 @@ runCommand cmd =
       mapIO 
         (\_ -> Continue ()) 
         (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
+    _ -> pureIO (Continue ())
 
 loop : IO ()
 loop =
