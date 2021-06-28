@@ -1,0 +1,5 @@
+main : IO ()
+main = 
+  writeStdout 
+    stdout 
+    (toUtf8 ("${filterString (\c -> not (eqChar c ' ')) "the quick brown fox"}\n"))

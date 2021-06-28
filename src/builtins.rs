@@ -347,6 +347,19 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::FilterString)
             },
+
+            // eqChar : Char -> Char -> Bool
+            Declaration::Definition{
+                name: String::from("eqChar"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(
+                        Type::Char,
+                        Type::mk_arrow(Type::Char, Type::Bool)
+                    )
+                },
+                body: Expr::Builtin(Builtin::EqChar)
+            },
         ]
     };
 }
