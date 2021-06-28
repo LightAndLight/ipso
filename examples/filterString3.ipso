@@ -1,3 +1,6 @@
+not : Bool -> Bool
+not x = if x then false else true
+
 main : IO ()
 main = 
   writeStdout 
