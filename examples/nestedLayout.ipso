@@ -1,9 +1,9 @@
-apply : 
-  < Err : e | Ok : (a -> b) > -> 
-  < Err : e | Ok : a > -> 
+apply :
+  < Err : e | Ok : (a -> b) > ->
+  < Err : e | Ok : a > ->
   < Err : e | Ok : b >
-apply = 
-  (\a b -> 
+apply =
+  (\a b ->
     case a of
       Err err -> Err err
       Ok f ->
@@ -13,4 +13,4 @@ apply =
   )
 
 main : IO ()
-main = pure ()
+main = pureIO ()
