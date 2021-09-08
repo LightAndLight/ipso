@@ -1,0 +1,5 @@
+main : IO ()
+main = 
+  writeStdout 
+    stdout 
+    (toUtf8 (showInt (foldlString (\acc c -> add acc 1) 0 "hello")))

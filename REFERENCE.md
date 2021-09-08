@@ -251,9 +251,9 @@ x : String
 ```ipso
 eqString : String -> String -> Bool
 
-foldr : (Char -> a -> a) -> String -> a -> a
+foldr : (Char -> a -> a) -> a -> String -> a
 
-foldl : (a -> Char -> a) -> String -> a -> a
+foldlString : (a -> Char -> a) -> a -> String -> a
 
 map : (Char -> Char) -> String -> String
 

@@ -373,6 +373,25 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::SplitString)
             },
+
+            // foldlString : (a -> Char -> a) -> a -> String -> a
+            Declaration::Definition{
+                name: String::from("foldlString"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Char, Type::Var(0))),
+                        Type::mk_arrow(
+                            Type::Var(0),
+                            Type::mk_arrow(
+                                Type::String,
+                                Type::Var(0)
+                            )
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::FoldlString)
+            },
         ]
     };
 }
