@@ -1,0 +1,18 @@
+apply :
+  < Err : e | Ok : (a -> b) > ->
+  < Err : e | Ok : a > ->
+  { x : < Err : e | Ok : b > }
+apply =
+  \a b ->
+  { 
+    x = 
+      case a of
+        Err err -> Err err
+        Ok f ->
+          case b of
+            Err err -> Err err
+            Ok a -> Ok (f a)
+  }
+
+main : IO ()
+main = pureIO ()
