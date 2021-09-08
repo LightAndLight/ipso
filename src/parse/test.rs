@@ -111,6 +111,10 @@ fn parse_import_as_2() {
 #[test]
 fn parse_import_as_3() {
     parse_test!(
+        /*
+        import yes
+        as no
+         */
         "import yes\nas no",
         import,
         Err(ParseError::Unexpected {
@@ -162,6 +166,11 @@ fn parse_definition_2() {
 #[test]
 fn parse_definition_3() {
     parse_test!(
+        /*
+        x : Int
+        x =
+        1
+         */
         "x : Int\nx =\n1",
         definition,
         Err(ParseError::Unexpected {
@@ -611,8 +620,29 @@ fn parse_case_5() {
             location: InputLocation::Interactive {
                 label: String::from("(parser)"),
             },
-            pos: 20,
-            expecting: vec![].into_iter().collect()
+            pos: 18,
+            expecting: vec![
+                TokenType::Ctor,
+                TokenType::Ident(String::from("")),
+                TokenType::Ident(String::from("false")),
+                TokenType::Ident(String::from("true")),
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                },
+                TokenType::DoubleQuote,
+                TokenType::SingleQuote,
+                TokenType::LBrace,
+                TokenType::LParen,
+                TokenType::LBracket,
+                TokenType::LAngle,
+                TokenType::Dot,
+                TokenType::Indent(2),
+                TokenType::Dedent,
+                TokenType::Space
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
