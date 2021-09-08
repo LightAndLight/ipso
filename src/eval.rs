@@ -822,6 +822,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::Multiply => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        eval.alloc_value(Value::Int(a * b))
+                    }
+                )
+            }
             Builtin::EqArray => {
                 fn eq_int_0<'heap>(
                     eval: &mut Interpreter<'_, 'heap>,

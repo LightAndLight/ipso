@@ -201,6 +201,8 @@ subtract : Int -> Int -> Int
 
 (*) : Int -> Int -> Int
 
+multiply : Int -> Int -> Int
+
 (/) : Int -> Int -> Int
 
 eqInt : Int -> Int -> Bool

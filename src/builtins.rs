@@ -200,6 +200,16 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::Subtract)
             },
 
+            // multiply : Int -> Int -> Int
+            Declaration::Definition{
+                name: String::from("multiply"),
+                sig: TypeSig{
+                    ty_vars: Vec::new(),
+                    body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int))
+                },
+                body: Expr::Builtin(Builtin::Multiply)
+            },
+
             // eqInt : Int -> Int -> Bool
             Declaration::Definition{
                 name: String::from("eqInt"),
