@@ -1023,6 +1023,23 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::FoldlString => {
+                function3!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let f = env[0];
+                        let mut acc = env[1];
+                        let s = arg.unpack_string();
+                        for c in s.chars() {
+                            let c_value = eval.alloc_value(Value::Char(c));
+                            acc = f.apply(eval, acc).apply(eval, c_value);
+                        }
+                        acc
+                    }
+                )
+            }
         }
     }
 
