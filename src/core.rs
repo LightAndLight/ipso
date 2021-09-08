@@ -205,6 +205,7 @@ pub enum Builtin {
     LtInt,
     Add,
     Subtract,
+    Multiply,
     ShowInt,
     FoldlArray,
     EqArray,
