@@ -7,7 +7,7 @@ use crate::{
         self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
     },
 };
-use std::{collections::BTreeSet, fs::File, io::Read, vec::IntoIter};
+use std::{cmp, collections::BTreeSet, fs::File, io::Read, vec::IntoIter};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -473,21 +473,19 @@ impl Parser {
             None => {
                 return self.unexpected(false);
             }
-            Some(n) => match self.indentation.binary_search(&n) {
-                Err(ix) if ix == 0 || ix == self.indentation.len() => {
-                    // n is outside the bounds of our indentation stack
-                    return self.unexpected(false);
-                }
-                Err(ix) => {
-                    // n is not an element of the indentation stack, but is somewhere between two elements
-                    self.consume();
-                    self.indentation = self.indentation.iter().map(|x| *x).take(ix).collect();
-                }
-                Ok(ix) => {
-                    // n is explictly an element of the indentation stack
-                    self.consume();
-                    self.indentation = self.indentation.iter().map(|x| *x).take(ix + 1).collect();
-                }
+            Some(n) => match self.indentation.last() {
+                None => panic!("dedent: indentation is empty"),
+                Some(top) => match n.cmp(top) {
+                    cmp::Ordering::Less => {
+                        self.indentation.pop();
+                    }
+                    cmp::Ordering::Equal => {
+                        return self.unexpected(false);
+                    }
+                    cmp::Ordering::Greater => {
+                        return self.unexpected(false);
+                    }
+                },
             },
         }
         ParseResult::pure(())
@@ -1157,12 +1155,15 @@ impl Parser {
     }
 
     fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
-        choices!(
-            self,
-            self.expr_app(),
-            self.expr_case(),
-            self.expr_lam(),
-            self.expr_ifthenelse()
+        keep_left!(
+            choices!(
+                self,
+                self.expr_app(),
+                self.expr_case(),
+                self.expr_lam(),
+                self.expr_ifthenelse()
+            ),
+            self.spaces()
         )
     }
 
