@@ -23,7 +23,7 @@ readDigit c =
 
 readInt : String -> < Err : () | Ok : Int >
 readInt str = 
-  if emptyString str 
+  if eqString "" str
   then Err ()
   else
     foldlString 
