@@ -1312,12 +1312,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                 let new_env = self.alloc_env(new_env);
                                 self.eval(new_env, branch.body.clone())
                             }
-                            pattern => panic!("expected record pattern, got {:?}", pattern),
+                            Pattern::Name {} | Pattern::Wildcard {} => {
+                                todo!("allow name and wildcard patterns")
+                            }
+                            Pattern::Variant { .. } => {
+                                panic!("expected record pattern, but got {:?}", branch.pattern)
+                            }
                         }
                     }
                     Value::Variant(tag, value) => {
                         // expect variant patterns
-                        let mut target: Option<(ValueRef, Expr)> = None;
+                        let mut target: Option<Expr> = None;
+                        let mut new_env = env.clone();
                         for branch in branches {
                             match branch.pattern {
                                 Pattern::Record { .. } => {
@@ -1327,24 +1333,26 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                     let branch_tag =
                                         self.eval(env, *branch_tag).unpack_int() as usize;
                                     if *tag == branch_tag {
-                                        target = Some((value, branch.body));
+                                        new_env.push(value);
+                                        target = Some(branch.body);
                                         break;
                                     }
                                 }
-                                Pattern::Name | Pattern::Wildcard => {
-                                    target = Some((expr, branch.body));
+                                Pattern::Name => {
+                                    new_env.push(expr);
+                                    target = Some(branch.body);
+                                    break;
+                                }
+                                Pattern::Wildcard => {
+                                    target = Some(branch.body);
                                     break;
                                 }
                             }
                         }
                         match target {
                             None => panic!("pattern match failure"),
-                            Some((value, body)) => {
-                                let env = self.alloc_env({
-                                    let mut env = env.clone();
-                                    env.push(value);
-                                    env
-                                });
+                            Some(body) => {
+                                let env = self.alloc_env(new_env);
                                 self.eval(env, body)
                             }
                         }
