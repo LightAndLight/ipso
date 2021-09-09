@@ -5,79 +5,93 @@ use crate::{
     rope::Rope,
     syntax::{Binop, ModuleName},
 };
+use paste::paste;
 use std::{collections::HashMap, fmt::Debug, io::Write};
 use typed_arena::Arena;
 
 mod test;
 
 macro_rules! function1 {
-    ($self:expr, $body:expr) => {{
-        fn code_0<'heap>(
-            eval: &mut Interpreter<'_, 'heap>,
-            env: &'heap Vec<ValueRef<'heap>>,
-            arg: ValueRef<'heap>,
-        ) -> ValueRef<'heap> {
-            $body(eval, env, arg)
-        }
+    ($name:ident, $self:expr, $body:expr) => {{
+        paste! {
+            fn [<$name _code_0>]<'heap>(
+                eval: &mut Interpreter<'_, 'heap>,
+                env: &'heap Vec<ValueRef<'heap>>,
+                arg: ValueRef<'heap>,
+            ) -> ValueRef<'heap> {
+                $body(eval, env, arg)
+            }
 
-        let env = $self.alloc_env(Vec::new());
-        let closure = $self.alloc_value(Value::StaticClosure {
-            env,
-            body: StaticClosureBody(code_0),
-        });
-        closure
+            let env = $self.alloc_env(Vec::new());
+
+            let closure = $self.alloc_value(Value::StaticClosure {
+                env,
+                body: StaticClosureBody([<$name _code_0>]),
+            });
+            closure
+        }
     }};
 }
 
 macro_rules! function2 {
-    ($self:expr, $body:expr) => {{
-        function1!($self, |eval: &mut Interpreter<'_, 'heap>,
-                           env: &'heap Vec<ValueRef<'heap>>,
-                           arg: ValueRef<'heap>| {
-            fn code_1<'heap>(
-                eval: &mut Interpreter<'_, 'heap>,
-                env: &'heap Vec<ValueRef<'heap>>,
-                arg: ValueRef<'heap>,
-            ) -> ValueRef<'heap> {
-                $body(eval, env, arg)
-            }
-            let env = {
-                let mut env = env.clone();
-                env.push(arg);
-                eval.alloc_env(vec![arg])
-            };
-            let closure = eval.alloc_value(Value::StaticClosure {
-                env,
-                body: StaticClosureBody(code_1),
-            });
-            closure
-        })
+    ($name:ident, $self:expr, $body:expr) => {{
+        function1!(
+            $name,
+            $self,
+            (|eval: &mut Interpreter<'_, 'heap>,
+              env: &'heap Vec<ValueRef<'heap>>,
+              arg: ValueRef<'heap>| {
+                paste! {
+                    fn [<$name _code_1>]<'heap>(
+                        eval: &mut Interpreter<'_, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>,
+                    ) -> ValueRef<'heap> {
+                        $body(eval, env, arg)
+                    }
+                    let env = {
+                        let mut env = env.clone();
+                        env.push(arg);
+                        eval.alloc_env(vec![arg])
+                    };
+                    let closure = eval.alloc_value(Value::StaticClosure {
+                        env,
+                        body: StaticClosureBody([<$name _code_1>]),
+                    });
+                    closure
+                }
+            })
+        )
     }};
 }
 
 macro_rules! function3 {
-    ($self:expr, $body:expr) => {{
-        function2!($self, |eval: &mut Interpreter<'_, 'heap>,
-                           env: &'heap Vec<ValueRef<'heap>>,
-                           arg| {
-            fn code_2<'heap>(
-                eval: &mut Interpreter<'_, 'heap>,
-                env: &'heap Vec<ValueRef<'heap>>,
-                arg: ValueRef<'heap>,
-            ) -> ValueRef<'heap> {
-                $body(eval, env, arg)
-            }
-            let env = {
-                let mut env = env.clone();
-                env.push(arg);
-                eval.alloc_env(env)
-            };
-            let closure = eval.alloc_value(Value::StaticClosure {
-                env,
-                body: StaticClosureBody(code_2),
-            });
-            closure
-        })
+    ($name:ident, $self:expr, $body:expr) => {{
+        function2!(
+            $name,
+            $self,
+            (|eval: &mut Interpreter<'_, 'heap>, env: &'heap Vec<ValueRef<'heap>>, arg| {
+                paste! {
+                    fn [<$name _code_2>]<'heap>(
+                        eval: &mut Interpreter<'_, 'heap>,
+                        env: &'heap Vec<ValueRef<'heap>>,
+                        arg: ValueRef<'heap>,
+                    ) -> ValueRef<'heap> {
+                        $body(eval, env, arg)
+                    }
+                    let env = {
+                        let mut env = env.clone();
+                        env.push(arg);
+                        eval.alloc_env(env)
+                    };
+                    let closure = eval.alloc_value(Value::StaticClosure {
+                        env,
+                        body: StaticClosureBody([<$name _code_2>]),
+                    });
+                    closure
+                }
+            })
+        )
     }};
 }
 
@@ -723,6 +737,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::EqString => {
                 function2!(
+                    eq_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -773,6 +788,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::LtInt => {
                 function2!(
+                    lt_int,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -789,6 +805,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::ShowInt => {
                 function1!(
+                    show_int,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      _env: &'heap Vec<ValueRef<'heap>>,
@@ -800,6 +817,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::Subtract => {
                 function2!(
+                    subtract,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -812,6 +830,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::Add => {
                 function2!(
+                    add,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -824,6 +843,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::Multiply => {
                 function2!(
+                    multiply,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -892,6 +912,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::LtArray => {
                 function3!(
+                    lt_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -933,6 +954,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::FoldlArray => {
                 function3!(
+                    foldl_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -951,6 +973,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::LengthArray => {
                 function1!(
+                    length_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      _env: &'heap Vec<ValueRef<'heap>>,
@@ -963,6 +986,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::IndexArray => {
                 function2!(
+                    index_array,
                     self,
                     |_eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -976,6 +1000,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::SliceArray => {
                 function3!(
+                    slice_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -990,6 +1015,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::FilterString => {
                 function2!(
+                    filter_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -1009,6 +1035,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::EqChar => {
                 function2!(
+                    eq_char,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -1021,6 +1048,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::SplitString => {
                 function2!(
+                    split_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
@@ -1037,6 +1065,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::FoldlString => {
                 function3!(
+                    foldl_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,

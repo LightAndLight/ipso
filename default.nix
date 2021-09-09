@@ -19,6 +19,6 @@ pkgs.rustPlatform.buildRustPackage ({
     cargo test
   '';
 
-  cargoSha256 = "1vwhpnnmljdgx4zgfzrifb5lyg7dydg1jz6g55yl747bfs8can39";
+  cargoSha256 = "0jsvgq55ixym3q80yl0666c9bl10j34m7sbmanl8dg84qs2f2gx2";
 } // (if debug then { buildType = "debug"; } else {})
 )
