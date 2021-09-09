@@ -1,0 +1,7 @@
+f : Int -> Int -> Int
+f x y =
+  case C x of
+    _ -> y
+
+main : IO ()
+main = writeStdout stdout (toUtf8 (showInt (f 0 1)))
