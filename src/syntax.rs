@@ -867,8 +867,9 @@ impl<A> Type<A> {
                     }
                     Some(ty) => {
                         if fields.len() > 0 {
-                            s.push_str(" | ")
+                            s.push_str(" |")
                         }
+                        s.push(' ');
                         s.push_str(ty.render().as_str());
                         s.push(' ');
                     }
