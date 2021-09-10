@@ -63,10 +63,14 @@ parseCommand line =
   ) (strip line)
 
 writeTodos : Array String -> IO ()
-writeTodos =
-  foldlArray
-    (\acc todo -> bindIO acc (\_ -> writeStdout stdout (toUtf8 "$todo\n")))
-    (pureIO ())
+writeTodos todos =
+  if eqArray eqString [] todos
+  then writeStdout stdout (toUtf8 "nothing to do\n")
+  else
+    foldlArray
+      (\acc todo -> bindIO acc (\_ -> writeStdout stdout (toUtf8 "$todo\n")))
+      (pureIO ())
+      todos
 
 runCommand :
   < Quit : () | Help : () | List : () | Invalid : String | r > ->
