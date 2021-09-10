@@ -22,12 +22,12 @@ readDigit c =
   else Err ()
 
 readInt : String -> < Err : () | Ok : Int >
-readInt str = 
+readInt str =
   if eqString "" str
   then Err ()
   else
-    foldlString 
-      (\acc el -> 
+    foldlString
+      (\acc el ->
         case acc of
           Err err -> Err err
           Ok val ->
@@ -38,14 +38,14 @@ readInt str =
       (Ok 0)
       str
 
-parseCommand : 
-  String -> 
-  < Quit : () 
-  | Help : () 
-  | Add : String 
-  | List : () 
-  | Delete : Int 
-  | Invalid : String 
+parseCommand :
+  String ->
+  < Quit : ()
+  | Help : ()
+  | Add : String
+  | List : ()
+  | Delete : Int
+  | Invalid : String
   >
 parseCommand line =
   (\stripped ->
@@ -54,7 +54,7 @@ parseCommand line =
       else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
       else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "list") then List ()
       else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
-      else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then 
+      else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then
         case readInt (indexArray 1 lines) of
           Err err -> Invalid stripped
           Ok n -> Delete n
@@ -62,38 +62,51 @@ parseCommand line =
     ) (splitString ' ' stripped)
   ) (strip line)
 
-runCommand : < Quit : () | Help : () | Invalid : String | r > -> IO < Continue : () | Quit : () >
-runCommand cmd =
+writeTodos : Array String -> IO ()
+writeTodos =
+  foldlArray
+    (\acc todo -> bindIO acc (\_ -> writeStdout stdout (toUtf8 "$todo\n")))
+    (pureIO ())
+
+runCommand :
+  < Quit : () | Help : () | List : () | Invalid : String | r > ->
+  Array String ->
+  IO < Continue : Array String | Quit : () >
+runCommand cmd todos =
   case cmd of
-    Quit x -> 
+    Quit x ->
       pureIO (Quit ())
-    Help x -> 
+    Help x ->
       bindIO (writeStdout stdout (toUtf8 "help - display this message\n")) (\_ ->
       bindIO (writeStdout stdout (toUtf8 "quit - exit the application\n")) (\_ ->
       bindIO (writeStdout stdout (toUtf8 "list - display the todolist\n")) (\_ ->
       bindIO (writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")) (\_ ->
       bindIO (writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")) (\_ ->
-        pureIO (Continue ())
+        pureIO (Continue todos)
       )))))
-    Invalid x -> 
-      mapIO 
-        (\_ -> Continue ()) 
+    Invalid x ->
+      mapIO
+        (\_ -> Continue todos)
         (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
+    List x ->
+      mapIO
+        (\_ -> Continue todos)
+        (writeTodos todos)
     _ ->
-      mapIO 
-        (\_ -> Continue ()) 
+      mapIO
+        (\_ -> Continue todos)
         (writeStdout stdout (toUtf8 "\n"))
 
-loop : IO ()
-loop =
+loop : Array String -> IO ()
+loop todos =
   bindIO (writeStdout stdout (toUtf8 "> ")) (\_ ->
   bindIO (readLineStdin stdin) (\line ->
-  bindIO (runCommand (parseCommand line)) (\next ->
+  bindIO (runCommand (parseCommand line) todos) (\next ->
     case next of
-      Continue x -> loop
+      Continue newTodos -> loop newTodos
       Quit x -> pureIO ()
   )))
 
 main : IO ()
-main = 
-  bindIO (writeStdout stdout (toUtf8 "Welcome to your TODO list\n")) (\_ -> loop)
+main =
+  bindIO (writeStdout stdout (toUtf8 "Welcome to your TODO list\n")) (\_ -> loop [])
