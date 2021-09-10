@@ -1,12 +1,13 @@
-{ pkgs ? import <nixos-unstable> {}, debug ? false, RUST_BACKTRACE ? false }:
+{ debug ? false, RUST_BACKTRACE ? false }:
 let
-  ipso = import ./. { inherit pkgs debug; };
+  ipso = import ./. {};
+  pkgs = ipso.pkgs;
   ipso-golden = import ./golden { inherit pkgs; };
 in
   pkgs.mkShell {
     RUST_BACKTRACE = if RUST_BACKTRACE then "1" else "0";
     buildInputs = [
-      ipso
+      (if debug then ipso.dev else ipso.release)
       ipso-golden
     ];
   }
