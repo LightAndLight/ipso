@@ -1,5 +1,5 @@
-{ pkgs ? import <nixos-unstable> {} }:
-pkgs.rustPlatform.buildRustPackage {
+{ pkgs ? import <nixos-unstable> {}, debug ? false }:
+pkgs.rustPlatform.buildRustPackage ({
   name = "ipso";
   src = pkgs.lib.cleanSourceWith {
     filter = path: type: builtins.all (x: x) [
@@ -14,9 +14,11 @@ pkgs.rustPlatform.buildRustPackage {
     ];
     src = ./.;
   };
+
   checkPhase = ''
     cargo test
   '';
 
   cargoSha256 = "1vwhpnnmljdgx4zgfzrifb5lyg7dydg1jz6g55yl747bfs8can39";
-}
+} // (if debug then { buildType = "debug"; } else {})
+)

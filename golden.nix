@@ -1,6 +1,6 @@
-{ pkgs ? import <nixos-unstable> {}, RUST_BACKTRACE ? false }:
+{ pkgs ? import <nixos-unstable> {}, debug ? false, RUST_BACKTRACE ? false }:
 let
-  ipso = import ./. { inherit pkgs; };
+  ipso = import ./. { inherit pkgs debug; };
   ipso-golden = import ./golden { inherit pkgs; };
 in
   pkgs.mkShell {
