@@ -22,6 +22,14 @@ in {
     list - display the todolist
     add STRING - add a task to the list
     delete INT - delete a task from the list
+    > > entry1
+    > > entry1
+    entry2
+    > > entry1
+    entry2
+    entry3
+    > > entry1
+    entry3
     > '',
   stderr = "",
   exitcode = 0

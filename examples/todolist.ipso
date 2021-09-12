@@ -73,7 +73,7 @@ writeTodos todos =
       todos
 
 runCommand :
-  < Quit : () | Help : () | List : () | Invalid : String | r > ->
+  < Quit : () | Help : () | Add : String | List : () | Invalid : String | r > ->
   Array String ->
   IO < Continue : Array String | Quit : () >
 runCommand cmd todos =
@@ -88,14 +88,16 @@ runCommand cmd todos =
       bindIO (writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")) (\_ ->
         pureIO (Continue todos)
       )))))
-    Invalid x ->
-      mapIO
-        (\_ -> Continue todos)
-        (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
+    Add todo ->
+      pureIO (Continue (snocArray todos todo))
     List x ->
       mapIO
         (\_ -> Continue todos)
         (writeTodos todos)
+    Invalid x ->
+      mapIO
+        (\_ -> Continue todos)
+        (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
     _ ->
       mapIO
         (\_ -> Continue todos)

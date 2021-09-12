@@ -1083,6 +1083,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::SnocArray => {
                 function2!(
+                    snoc_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
