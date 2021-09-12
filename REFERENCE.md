@@ -466,6 +466,8 @@ bindIO : IO a -> (a -> IO b) -> IO b
 
 ```ipso
 writeStdout : Stdout -> Bytes -> IO < Err : IOError | Ok : () >
+
+flushStdout : Stdout -> IO < Err : IOError | Ok : () >
 ```
 
 ## Type Classes
