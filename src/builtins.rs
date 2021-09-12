@@ -138,6 +138,20 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::WriteStdout)
             },
 
+            // flushStdout : Stdout -> IO ()
+            Declaration::Definition {
+                name: String::from("flushStdout"),
+                sig: TypeSig {
+                    ty_vars: vec![
+                    ],
+                    body: Type::mk_arrow(
+                            Type::Name(String::from("Stdout")),
+                            Type::mk_app(Type::IO, Type::Unit)
+                    )
+                },
+                body: Expr::Builtin(Builtin::FlushStdout)
+            },
+
             // Stdin : Type
             Declaration::BuiltinType {
                 name: String::from("Stdin"),
