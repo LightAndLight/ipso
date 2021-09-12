@@ -1001,6 +1001,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
             Builtin::GenerateArray => {
                 function2!(
+                    generate_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,
