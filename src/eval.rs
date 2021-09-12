@@ -1052,6 +1052,22 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::SnocArray => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let array = env[0].unpack_array();
+                        let new_array = {
+                            let mut new_array = array.clone();
+                            new_array.push(arg);
+                            new_array
+                        };
+                        eval.alloc_value(Value::Array(new_array))
+                    }
+                )
+            }
         }
     }
 

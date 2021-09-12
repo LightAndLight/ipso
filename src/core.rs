@@ -218,6 +218,7 @@ pub enum Builtin {
     EqChar,
     SplitString,
     FoldlString,
+    SnocArray,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
