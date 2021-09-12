@@ -311,6 +311,25 @@ lazy_static! {
                 body: Expr::Builtin(Builtin::FoldlArray)
             },
 
+            // generateArray : Int -> (Int -> a) -> Array a
+            Declaration::Definition{
+                name: String::from("generateArray"),
+                sig: TypeSig{
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::Int,
+                        Type::mk_arrow(
+                            Type::mk_arrow(
+                                Type::Int,
+                                Type::Var(0)
+                            ),
+                            Type::mk_app(Type::Array, Type::Var(0))
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::GenerateArray)
+            },
+
             // lengthArray : Array a -> Int
             Declaration::Definition{
                 name: String::from("lengthArray"),
