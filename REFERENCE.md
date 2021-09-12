@@ -326,7 +326,7 @@ cons : a -> Array a -> Array a
 
 uncons : Array a -> < None, Some : { first : a, rest : Array a } >
 
-snoc : Array a -> a -> Array a
+snocArray : Array a -> a -> Array a
 
 unsnoc : Array a -> < None, Some : { rest : Array a, last : a } >
 

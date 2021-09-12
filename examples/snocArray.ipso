@@ -1,0 +1,10 @@
+snoc3 : Array Int -> { before : Array Int, after : Array Int }
+snoc3 xs = { before = xs, after = snocArray xs 3 }
+
+showArray : Array Int -> String
+showArray = foldlArray (\acc el -> "$acc${showInt el}") ""
+
+main : IO ()
+main = 
+  case snoc3 [1, 2] of
+    { before, after } -> writeStdout stdout (toUtf8 "${showArray before}\n${showArray after}")
