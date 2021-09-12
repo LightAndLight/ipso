@@ -1,0 +1,6 @@
+showArray : Array Int -> String
+showArray = foldlArray (\acc el -> "$acc${showInt el}") ""
+
+main : IO ()
+main = 
+  writeStdout stdout (toUtf8 (showArray (generateArray 5 (\ix -> ix))))

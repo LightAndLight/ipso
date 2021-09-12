@@ -211,6 +211,7 @@ pub enum Builtin {
     FoldlArray,
     EqArray,
     LtArray,
+    GenerateArray,
     LengthArray,
     IndexArray,
     SliceArray,

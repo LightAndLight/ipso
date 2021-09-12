@@ -330,17 +330,23 @@ snocArray : Array a -> a -> Array a
 
 unsnoc : Array a -> < None, Some : { rest : Array a, last : a } >
 
-len : Array a -> Int
+lengthArray : Array a -> Int
+
+indexArray : Int -> Array a -> a
+
+sliceArray : Int -> Int -> Array a -> Array a
 
 (++) : Array a -> Array a -> Array a
 
 foldr : (a -> b -> b) -> b -> Array a -> b
 
-foldl : (b -> a -> b) -> b -> Array a -> b
+foldlArray : (b -> a -> b) -> b -> Array a -> b
 
 map : (a -> b) -> Array a -> Array b
 
 eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
+
+generateArray : Int -> (Int -> a) -> Array a
 ```
 
 ### Byte Arrays
