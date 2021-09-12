@@ -7,6 +7,19 @@ and a b = if a then b else false
 strip : String -> String
 strip = filterString (\c -> not (eqChar c '\n'))
 
+deleteAt : Int -> Array a -> Array a
+deleteAt target arr = 
+  if ltInt target (lengthArray arr)
+  then
+    generateArray 
+      (subtract (lengthArray arr) 1) 
+      (\ix ->
+        if ltInt ix target
+        then indexArray ix arr
+        else indexArray (add ix 1) arr
+      )
+  else arr
+
 readDigit : Char -> < Err : () | Ok : Int >
 readDigit c =
   if eqChar c '0' then Ok 0
@@ -73,7 +86,7 @@ writeTodos todos =
       todos
 
 runCommand :
-  < Quit : () | Help : () | Add : String | List : () | Invalid : String | r > ->
+  < Quit : () | Help : () | Add : String | List : () | Delete : Int | Invalid : String > ->
   Array String ->
   IO < Continue : Array String | Quit : () >
 runCommand cmd todos =
@@ -98,10 +111,8 @@ runCommand cmd todos =
       mapIO
         (\_ -> Continue todos)
         (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
-    _ ->
-      mapIO
-        (\_ -> Continue todos)
-        (writeStdout stdout (toUtf8 "\n"))
+    Delete ix ->
+      pureIO (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
 loop todos =
