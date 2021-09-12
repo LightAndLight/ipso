@@ -712,6 +712,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     interpreter.alloc_value(Value::Unit)
                 }
                 function1!(
+                    flush_stdout,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap Vec<ValueRef<'heap>>,

@@ -105,7 +105,7 @@ runCommand cmd todos =
 
 loop : Array String -> IO ()
 loop todos =
-  bindIO (writeStdout stdout (toUtf8 "> ")) (\_ ->
+  bindIO (bindIO (writeStdout stdout (toUtf8 "> ")) (\_ -> flushStdout stdout)) (\_ ->
   bindIO (readLineStdin stdin) (\line ->
   bindIO (runCommand (parseCommand line) todos) (\next ->
     case next of
