@@ -200,6 +200,7 @@ pub enum Builtin {
     Stdout,
     Stdin,
     WriteStdout,
+    FlushStdout,
     ReadLineStdin,
     EqInt,
     LtInt,

@@ -687,6 +687,33 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 });
                 closure
             }
+            Builtin::FlushStdout => {
+                fn flush_stdout<'stdout, 'heap>(
+                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                    env: &'heap Vec<ValueRef<'heap>>,
+                ) -> ValueRef<'heap> {
+                    // env[0] : Stdout
+                    env[0].unpack_stdout();
+                    std::io::stdout().flush().unwrap();
+                    interpreter.alloc_value(Value::Unit)
+                }
+                function1!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let env = eval.alloc_env({
+                            let mut env = env.clone();
+                            env.push(arg);
+                            env
+                        });
+                        eval.alloc_value(Value::IO {
+                            env,
+                            body: IOBody(flush_stdout),
+                        })
+                    }
+                )
+            }
             Builtin::ReadLineStdin => {
                 fn read_line_stdin_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
