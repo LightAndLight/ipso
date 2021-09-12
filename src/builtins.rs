@@ -402,6 +402,22 @@ lazy_static! {
                 },
                 body: Expr::Builtin(Builtin::FoldlString)
             },
+
+            // snocArray : Array a -> a -> Array a
+            Declaration::Definition{
+                name: String::from("snocArray"),
+                sig: TypeSig {
+                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    body: Type::mk_arrow(
+                        Type::mk_app(Type::Array, Type::Var(0)),
+                        Type::mk_arrow(
+                            Type::Var(0),
+                            Type::mk_app(Type::Array, Type::Var(0))
+                        )
+                    )
+                },
+                body: Expr::Builtin(Builtin::SnocArray)
+            }
         ]
     };
 }
