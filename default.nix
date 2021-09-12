@@ -1,15 +1,15 @@
-{ 
+{
   rust-overlaySrc ? builtins.fetchTarball {
-    url = 
+    url =
       let
-        rev = "1b723f746e48ea9500007d17c41ad19441b88276";
+        rev = "50d8019b4d68420471ebb012de175ea450f55c44";
       in
         "https://github.com/oxalica/rust-overlay/archive/${rev}.tar.gz";
-    sha256 = "1gx1528zp3sj9dk53szmi1pab8jjqmlmrbxygbx9ak33bq9nsiv1";
+    sha256 = "0w808jbvvcnq94a4ybl1b47v2hd23hf2b97kdh6qnbyvmj4382vr";
   },
   cargo2nixSrc ? builtins.fetchTarball {
-    url = 
-      let 
+    url =
+      let
         rev = "92103dc68ecf4f386c818321e19ae964c20b88d7";
       in
         "https://github.com/cargo2nix/cargo2nix/archive/${rev}.tar.gz";
@@ -19,18 +19,18 @@
 }:
 let
   nixpkgs = <nixos-unstable>;
-  pkgs = import nixpkgs { 
-    overlays = overlays ++ [ 
-      (import "${cargo2nixSrc}/overlay") 
-      (import rust-overlaySrc) 
-    ]; 
+  pkgs = import nixpkgs {
+    overlays = overlays ++ [
+      (import "${cargo2nixSrc}/overlay")
+      (import rust-overlaySrc)
+    ];
   };
-  
+
   cargo2nix = (import cargo2nixSrc {
     inherit nixpkgs;
     rust-overlay = rust-overlaySrc;
   }).package;
-  
+
   rustPkgs = args: pkgs.rustBuilder.makePackageSet' {
     rustChannel = "stable";
     packageFun = import ./Cargo.nix;
@@ -39,14 +39,14 @@ let
 
   ipso = rustPkgsArgs: args: (rustPkgs rustPkgsArgs).workspace.ipso args;
   ipsoTests = pkgs.rustBuilder.runTests (ipso { release = false; }) {};
-  
+
   mkDerivation = rustPkgsArgs:
     pkgs.stdenv.mkDerivation {
       name = "ipso";
       unpackPhase = "true";
-      
+
       buildPhase = "true";
-      
+
       doCheck = true;
       checkInputs = [
         ipsoTests
@@ -62,9 +62,16 @@ in
   {
     inherit pkgs;
     shell = pkgs.mkShell {
-      buildInputs = [
+      buildInputs = with pkgs; [
         cargo2nix
-        pkgs.rust-bin.stable.latest.default
+        (rust-bin.nightly.latest.default.override {
+          extensions = [
+            "cargo"
+            "rustc"
+            "rust-src"
+            "rustfmt"
+          ];
+        })
       ];
     };
     dev = mkDerivation { release = false; };
