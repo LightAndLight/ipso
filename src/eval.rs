@@ -976,6 +976,24 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     }
                 )
             }
+            Builtin::GenerateArray => {
+                function2!(
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap Vec<ValueRef<'heap>>,
+                     arg: ValueRef<'heap>| {
+                        let len = env[0].unpack_int();
+                        let f = arg;
+
+                        let mut array = Vec::with_capacity(len as usize);
+                        for ix in 0..len {
+                            let ix = eval.alloc_value(Value::Int(ix));
+                            array.push(f.apply(eval, ix));
+                        }
+                        eval.alloc_value(Value::Array(array))
+                    }
+                )
+            }
             Builtin::LengthArray => {
                 function1!(
                     self,

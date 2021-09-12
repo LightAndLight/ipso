@@ -345,6 +345,8 @@ foldlArray : (b -> a -> b) -> b -> Array a -> b
 map : (a -> b) -> Array a -> Array b
 
 eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
+
+generateArray : Int -> (Int -> a) -> Array a
 ```
 
 ### Byte Arrays
