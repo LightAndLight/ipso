@@ -24,31 +24,40 @@ impl Substitution {
         expected: usize,
         actual: Type<usize>,
     ) -> Result<(), TypeError> {
-        tc.occurs_type(expected, &actual)?;
-        let m_expected_ty = tc.type_solutions[expected].1.clone().map(|x| x.clone());
+        debug_assert!(
+            tc.type_solutions[expected].1 == None,
+            "solution found for expected"
+        );
+
+        let m_expected_ty = self.0.get(&expected).map(|x| x.clone());
         match m_expected_ty {
             None => {
-                let m_expected_ty = self.0.get(&expected).map(|x| x.clone());
-                match m_expected_ty {
-                    None => {
-                        for (_, current_ty) in self.0.iter_mut() {
-                            *current_ty = (*current_ty).subst_metas(&mut |current_var| {
-                                if current_var == expected {
-                                    actual.clone()
-                                } else {
-                                    Type::Meta(current_var)
-                                }
-                            });
+                match actual {
+                    Type::Meta(actual) => {
+                        if expected == actual {
+                            return Ok(());
                         }
-                        self.0.insert(expected, actual);
-                        Ok(())
                     }
-                    Some(expected_ty) => tc.unify_type_subst(self, context, expected_ty, actual),
-                }?;
+                    _ => {}
+                }
+
+                tc.occurs_type(expected, &actual)?;
+
+                for (_, current_ty) in self.0.iter_mut() {
+                    *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                        if current_var == expected {
+                            actual.clone()
+                        } else {
+                            Type::Meta(current_var)
+                        }
+                    });
+                }
+                self.0.insert(expected, actual);
                 Ok(())
             }
             Some(expected_ty) => tc.unify_type_subst(self, context, expected_ty, actual),
-        }
+        }?;
+        Ok(())
     }
 
     pub fn subst_right(
@@ -58,30 +67,44 @@ impl Substitution {
         expected: Type<usize>,
         actual: usize,
     ) -> Result<(), TypeError> {
-        tc.occurs_type(actual, &expected)?;
-        let m_actual_ty = tc.type_solutions[actual].1.clone().map(|x| x.clone());
+        debug_assert!(
+            tc.type_solutions[actual].1 == None,
+            "solution found for actual"
+        );
+
+        let m_actual_ty = self.0.get(&actual).map(|x| x.clone());
         match m_actual_ty {
             None => {
-                let m_actual_ty = self.0.get(&actual).map(|x| x.clone());
-                match m_actual_ty {
-                    None => {
-                        for (_, current_ty) in self.0.iter_mut() {
-                            *current_ty = (*current_ty).subst_metas(&mut |current_var| {
-                                if current_var == actual {
-                                    expected.clone()
-                                } else {
-                                    Type::Meta(current_var)
-                                }
-                            });
+                match expected {
+                    Type::Meta(expected) => {
+                        debug_assert!(
+                            tc.type_solutions[expected].1 == None,
+                            "solution found for expected"
+                        );
+
+                        if expected == actual {
+                            return Ok(());
                         }
-                        self.0.insert(actual, expected);
-                        Ok(())
                     }
-                    Some(actual_ty) => tc.unify_type_subst(self, context, expected, actual_ty),
-                }?;
+                    _ => {}
+                }
+
+                tc.occurs_type(actual, &expected)?;
+
+                for (_, current_ty) in self.0.iter_mut() {
+                    *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                        if current_var == actual {
+                            expected.clone()
+                        } else {
+                            Type::Meta(current_var)
+                        }
+                    });
+                }
+                self.0.insert(actual, expected);
                 Ok(())
             }
             Some(actual_ty) => tc.unify_type_subst(self, context, expected, actual_ty),
-        }
+        }?;
+        Ok(())
     }
 }

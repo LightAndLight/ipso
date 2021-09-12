@@ -129,7 +129,7 @@ macro_rules! map0 {
                 Ok(_) => Ok($a),
             },
         }
-    };};
+    }};
 }
 
 #[macro_export]
@@ -152,7 +152,7 @@ macro_rules! map2 {
                 }
             }
         }
-    };};
+    }};
 }
 
 macro_rules! keep_right {
@@ -339,8 +339,8 @@ macro_rules! choices {
             }
             Ok(val) => ParseResult{consumed:first.consumed, result:Ok(val)},
         }
-    };
-}}
+    }}
+}
 
 macro_rules! optional {
     ($self:expr, $a:expr) => {{

@@ -1528,20 +1528,40 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn occurs_type(&self, meta: usize, ty: &Type<usize>) -> Result<(), TypeError> {
-        match ty.iter_metas().find(|&other| {
-            meta == other
-                || match &self.type_solutions[other].1 {
-                    None => false,
-                    Some(ty) => self.occurs_type(meta, ty).is_err(),
+        debug_assert!(
+            match ty {
+                Type::Meta(n) => self.type_solutions[*n].1 == None,
+                _ => true,
+            },
+            "ty is a meta with a solution"
+        );
+
+        fn metas_set(tc: &Typechecker, ty: &Type<usize>, set: &mut HashSet<usize>) {
+            for meta in ty.iter_metas() {
+                match &tc.type_solutions[meta].1 {
+                    None => {
+                        set.insert(meta);
+                    }
+                    Some(ty) => metas_set(tc, ty, set),
                 }
-        }) {
-            None => Ok(()),
-            Some(_) => Err(TypeError::TypeOccurs {
+            }
+        }
+
+        let set = {
+            let mut set = HashSet::new();
+            metas_set(self, ty, &mut set);
+            set
+        };
+
+        if set.contains(&meta) {
+            Err(TypeError::TypeOccurs {
                 location: self.location(),
                 pos: self.current_position(),
                 meta,
                 ty: self.fill_ty_names(self.zonk_type(ty.clone())),
-            }),
+            })
+        } else {
+            Ok(())
         }
     }
 
@@ -1553,7 +1573,6 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(), TypeError> {
         match self.type_solutions[meta].1.clone() {
             None => {
-                let _ = self.occurs_type(meta, &expected)?;
                 self.type_solutions[meta].1 = Some(expected);
                 Ok(())
             }
@@ -1569,7 +1588,6 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(), TypeError> {
         match self.type_solutions[meta].1.clone() {
             None => {
-                let _ = self.occurs_type(meta, &actual)?;
                 self.type_solutions[meta].1 = Some(actual);
                 Ok(())
             }
@@ -1681,6 +1699,16 @@ impl<'modules> Typechecker<'modules> {
         Type::Meta(n)
     }
 
+    fn walk(&self, ty: Type<usize>) -> Type<usize> {
+        match ty {
+            Type::Meta(n) => match self.type_solutions[n].1.clone() {
+                None => ty,
+                Some(ty) => self.walk(ty),
+            },
+            _ => ty,
+        }
+    }
+
     pub fn unify_type_subst(
         &mut self,
         subst: &mut Substitution,
@@ -1688,8 +1716,12 @@ impl<'modules> Typechecker<'modules> {
         expected: Type<usize>,
         actual: Type<usize>,
     ) -> Result<(), TypeError> {
+        let expected = self.walk(expected);
+        let actual = self.walk(actual);
+
         let (_, expected_kind) = self.infer_kind(&expected)?;
         let _ = self.check_kind(Some(context), &actual, expected_kind)?;
+
         match expected {
             Type::App(a1, b1) => match actual {
                 Type::App(a2, b2) => {
