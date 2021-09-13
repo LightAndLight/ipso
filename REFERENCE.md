@@ -7,6 +7,7 @@
   - [Packages](#packages)
     - [Using Packages](#using-packages)
   - [Modules](#modules)
+    - [Comments](#comments)
     - [Declarations](#declarations)
     - [Type Aliases](#type-aliases)
     - [Imports](#imports)
@@ -63,6 +64,12 @@ $ IPSO_PACKAGES=/path/to/a:/path/to/b ipso my_file.ipso
 ```
     
 ## Modules
+
+### Comments
+
+```ipso
+# this is a single line comment
+```
 
 ### Declarations
 
