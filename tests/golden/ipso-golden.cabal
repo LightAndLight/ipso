@@ -9,8 +9,7 @@ executable ipso-golden
   main-is:             Main.hs
   build-depends:       base >=4.12 && <5
                      , dhall >=1.28
-                     , directory
-                     , filepath
+                     , ipso-tests-common
                      , optparse-applicative
                      , process
                      , selective
