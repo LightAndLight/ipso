@@ -1,5 +1,6 @@
 { pkgs ? import <nixpkgs> {} }:
 let 
+  ipso-tests-common = import ../common { inherit pkgs; };
   src = pkgs.lib.cleanSourceWith {
     filter = path: type: builtins.all (x: x) [
       (builtins.baseNameOf path != "default.nix")
@@ -9,4 +10,6 @@ let
     src = ./.;
   };
 in
-pkgs.haskellPackages.callCabal2nix "ipso-golden" src {}
+pkgs.haskellPackages.callCabal2nix "ipso-golden" src {
+  inherit ipso-tests-common;
+}
