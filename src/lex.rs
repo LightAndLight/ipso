@@ -6,6 +6,8 @@ use std::str::Chars;
 pub enum TokenType {
     Unexpected(char),
 
+    Comment { length: usize },
+
     Ctor,
     Ident(String),
     Int { value: usize, length: usize },
@@ -70,6 +72,7 @@ impl TokenType {
                     format!("\"{}\"", value)
                 }
             }
+            TokenType::Comment { .. } => String::from("comment"),
             TokenType::DoubleQuote => String::from("'\"'"),
             TokenType::Dollar => String::from("'$'"),
             TokenType::DollarLBrace => String::from("'${'"),
@@ -113,6 +116,7 @@ impl TokenType {
     pub fn length(&self) -> usize {
         match self {
             TokenType::Unexpected(_) => 1,
+            TokenType::Comment { length } => *length,
             TokenType::Ident(s) => s.len(),
             TokenType::Int { value: _, length } => *length,
             TokenType::LBrace => 1,
@@ -407,6 +411,34 @@ impl<'input> Lexer<'input> {
                         }
                         Some(Token {
                             token_type: TokenType::Indent(depth),
+                            pos,
+                        })
+                    }
+                    '#' => {
+                        self.consume();
+                        let mut textual_length = 1;
+
+                        match self.current {
+                            None => return None,
+                            Some(c) => {
+                                let mut c = c;
+                                while c != '\n' {
+                                    self.consume();
+                                    textual_length += 1;
+                                    match self.current {
+                                        None => return None,
+                                        Some(new_c) => {
+                                            c = new_c;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Some(Token {
+                            token_type: TokenType::Comment {
+                                length: textual_length,
+                            },
                             pos,
                         })
                     }

@@ -491,8 +491,19 @@ impl Parser {
         ParseResult::pure(())
     }
 
+    fn comment(&mut self) -> ParseResult<()> {
+        self.expecting.insert(TokenType::Comment { length: 0 });
+        match self.current {
+            None => self.unexpected(false),
+            Some(ref token) => match token.token_type {
+                TokenType::Comment { .. } => map0!((), self.consume()),
+                _ => self.unexpected(false),
+            },
+        }
+    }
+
     fn spaces(&mut self) -> ParseResult<()> {
-        many_!(self, self.space())
+        many_!(self, choices!(self, self.space(), self.comment()))
     }
 
     fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
@@ -813,17 +824,19 @@ impl Parser {
     }
 
     fn newline(&mut self) -> ParseResult<()> {
-        let current = self.current_indentation();
-        self.expecting.insert(TokenType::Indent(current));
-        match self.current {
-            None => self.unexpected(false),
-            Some(ref token) => match token.token_type {
-                TokenType::Indent(n) if n == current => {
-                    map0!((), self.consume())
-                }
-                _ => self.unexpected(false),
-            },
-        }
+        keep_right!(optional!(self, self.comment()), {
+            let current = self.current_indentation();
+            self.expecting.insert(TokenType::Indent(current));
+            match self.current {
+                None => self.unexpected(false),
+                Some(ref token) => match token.token_type {
+                    TokenType::Indent(n) if n == current => {
+                        map0!((), self.consume())
+                    }
+                    _ => self.unexpected(false),
+                },
+            }
+        })
     }
 
     /*
@@ -1353,11 +1366,14 @@ impl Parser {
     }
 
     pub fn module(&mut self) -> ParseResult<Module> {
-        sep_by!(
-            self,
-            spanned!(self, self.declaration()),
-            some_!(self, self.newline())
+        keep_right!(
+            many!(self, self.newline()),
+            sep_by!(
+                self,
+                spanned!(self, self.declaration()),
+                some_!(self, self.newline())
+            )
+            .map(|decls| Module { decls })
         )
-        .map(|decls| Module { decls })
     }
 }
