@@ -122,9 +122,13 @@ fn parse_import_as_3() {
                 label: String::from("(parser)"),
             },
             pos: 10,
-            expecting: vec![TokenType::Space, TokenType::Ident(String::from("as"))]
-                .into_iter()
-                .collect()
+            expecting: vec![
+                TokenType::Space,
+                TokenType::Ident(String::from("as")),
+                TokenType::Comment { length: 0 }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
@@ -197,6 +201,7 @@ fn parse_definition_3() {
                 TokenType::DoubleQuote,
                 TokenType::SingleQuote,
                 TokenType::Backslash,
+                TokenType::Comment { length: 0 },
             ]
             .into_iter()
             .collect()
@@ -598,7 +603,8 @@ fn parse_case_4() {
                 TokenType::Int {
                     value: 0,
                     length: 0
-                }
+                },
+                TokenType::Comment { length: 0 }
             ]
             .into_iter()
             .collect()
@@ -639,7 +645,8 @@ fn parse_case_5() {
                 TokenType::Dot,
                 TokenType::Indent(2),
                 TokenType::Dedent,
-                TokenType::Space
+                TokenType::Space,
+                TokenType::Comment { length: 0 }
             ]
             .into_iter()
             .collect()
