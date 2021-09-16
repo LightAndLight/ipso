@@ -6,7 +6,11 @@ use crate::{
     syntax::{Binop, ModuleName},
 };
 use paste::paste;
-use std::{collections::HashMap, fmt::Debug, io::Write};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    io::{BufRead, Write},
+};
 use typed_arena::Arena;
 
 mod test;
@@ -406,6 +410,7 @@ pub struct Module {
 }
 
 pub struct Interpreter<'stdout, 'heap> {
+    stdin: &'stdout mut dyn BufRead,
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Expr>,
@@ -415,12 +420,14 @@ pub struct Interpreter<'stdout, 'heap> {
 
 impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     pub fn new(
+        stdin: &'stdout mut dyn BufRead,
         stdout: &'stdout mut dyn Write,
         context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
         Interpreter {
+            stdin,
             stdout,
             context,
             module_context,
@@ -430,6 +437,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     }
 
     pub fn new_with_builtins(
+        stdin: &'stdout mut dyn BufRead,
         stdout: &'stdout mut dyn Write,
         additional_context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
@@ -447,6 +455,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             .collect();
         context.extend(additional_context);
         Interpreter {
+            stdin,
             stdout,
             context,
             module_context,
@@ -669,7 +678,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             // env[1] : Bytes
                             let () = env[0].unpack_stdout();
                             let bs = env[1].unpack_bytes();
-                            let _ = std::io::stdout().write_all(bs).unwrap();
+                            let _ = interpreter.stdout.write_all(bs).unwrap();
                             interpreter.alloc_value(Value::Unit)
                         }
 
@@ -708,7 +717,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 ) -> ValueRef<'heap> {
                     // env[0] : Stdout
                     env[0].unpack_stdout();
-                    std::io::stdout().flush().unwrap();
+                    interpreter.stdout.flush().unwrap();
                     interpreter.alloc_value(Value::Unit)
                 }
                 function1!(
@@ -742,7 +751,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         // env[0] : Stdin
                         let () = env[0].unpack_stdin();
                         let mut str = String::new();
-                        let _ = std::io::stdin().read_line(&mut str).unwrap();
+                        let _ = interpreter.stdin.read_line(&mut str).unwrap();
                         interpreter.alloc_value(Value::String(str))
                     }
                     let env = interpreter.alloc_env({
