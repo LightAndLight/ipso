@@ -1,0 +1,10 @@
+help
+add entry1
+list
+add entry2
+list
+add entry3
+list
+delete 1
+list
+quit

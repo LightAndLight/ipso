@@ -11,6 +11,13 @@ lazy_static = "1.4.0"
 paste = "1.0.5"
 typed-arena = "2.0.1"
 
+[dev-dependencies]
+criterion = "0.3"
+
 [lib]
 name = "ipso"
 path = "./src/ipso.rs"
+
+[[bench]]
+name = "todolist_1"
+harness = false
