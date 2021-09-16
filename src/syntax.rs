@@ -436,7 +436,7 @@ impl Type<usize> {
         }
     }
 
-    pub fn instantiate_many(&self, tys: &Vec<Type<usize>>) -> Self {
+    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> Self {
         match self {
             Type::Name(n) => Type::Name(n.clone()),
             Type::Var(n) => {

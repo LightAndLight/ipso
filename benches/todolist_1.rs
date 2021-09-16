@@ -9,15 +9,14 @@ fn one(c: &mut Criterion) {
                 let input =
                     File::open("benches/todolist_1_input.txt").expect("File::open() failed");
                 let output = Vec::new();
-                let config = ipso::run::Config {
+                ipso::run::Config {
                     filename: String::from("examples/todolist.ipso"),
                     entrypoint: None,
                     stdin: Some(Box::new(BufReader::new(input))),
                     stdout: Some(Box::new(output)),
-                };
-                config
+                }
             },
-            |config| ipso::run::run_interpreter(config),
+            ipso::run::run_interpreter,
             BatchSize::SmallInput,
         )
     });

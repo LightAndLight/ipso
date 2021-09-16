@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp, collections::HashMap};
 
 use crate::{
     import::ModulePath,
@@ -55,9 +55,7 @@ impl Pattern {
                 };
                 Ok(Pattern::Record { names, rest: *rest })
             }
-            Pattern::Variant { tag } => {
-                tag.subst_placeholder(f).map(|tag| Pattern::mk_variant(tag))
-            }
+            Pattern::Variant { tag } => tag.subst_placeholder(f).map(Pattern::mk_variant),
             Pattern::Wildcard => Ok(Pattern::Wildcard),
         }
     }
@@ -171,7 +169,7 @@ impl StringPart {
     ) -> Result<Self, E> {
         match self {
             StringPart::String(s) => Ok(StringPart::String(s.clone())),
-            StringPart::Expr(e) => e.subst_placeholder(f).map(|e| StringPart::Expr(e)),
+            StringPart::Expr(e) => e.subst_placeholder(f).map(StringPart::Expr),
         }
     }
 
@@ -331,14 +329,14 @@ impl Expr {
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
-        match op {
-            syntax::Binop::Add => match (&a, &b) {
+        if op == syntax::Binop::Add {
+            #[allow(clippy::single_match)]
+            match (&a, &b) {
                 (Expr::Int(a), Expr::Int(b)) => {
                     return Expr::Int(*a + *b);
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
         Expr::Binop(op, Box::new(a), Box::new(b))
     }
@@ -460,17 +458,11 @@ impl Expr {
 
     pub fn __instantiate(&self, depth: usize, val: &Expr) -> Expr {
         match self {
-            Expr::Var(n) => {
-                if *n == depth {
-                    val.map_vars(|n| n + depth)
-                } else {
-                    if *n > depth {
-                        Expr::Var(*n - 1)
-                    } else {
-                        Expr::Var(*n)
-                    }
-                }
-            }
+            Expr::Var(n) => match Ord::cmp(n, &depth) {
+                cmp::Ordering::Less => Expr::Var(*n),
+                cmp::Ordering::Equal => val.map_vars(|n| n + depth),
+                cmp::Ordering::Greater => Expr::Var(*n - 1),
+            },
             Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
             Expr::EVar(v) => Expr::EVar(*v),
             Expr::Placeholder(v) => Expr::Placeholder(*v),
@@ -614,7 +606,7 @@ impl Expr {
             Expr::Project(a, b) => a
                 .subst_placeholder(f)
                 .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_project(a, b))),
-            Expr::Variant(a) => a.subst_placeholder(f).map(|a| Expr::mk_variant(a)),
+            Expr::Variant(a) => a.subst_placeholder(f).map(Expr::mk_variant),
             Expr::Embed(a, b) => a
                 .subst_placeholder(f)
                 .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_embed(a, b))),
@@ -766,7 +758,7 @@ impl Expr {
     /// );
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0)]);
     /// ```
-    pub fn iter_evars<'a>(&'a self) -> IterEVars<'a> {
+    pub fn iter_evars(&self) -> IterEVars {
         IterEVars { next: vec![self] }
     }
 }
@@ -860,7 +852,7 @@ pub struct TypeSig {
 }
 
 impl TypeSig {
-    pub fn instantiate_many(&self, tys: &Vec<syntax::Type<usize>>) -> TypeSig {
+    pub fn instantiate_many(&self, tys: &[syntax::Type<usize>]) -> TypeSig {
         let mut ty_vars = self.ty_vars.clone();
         for _ty in tys.iter().rev() {
             match ty_vars.pop() {
@@ -979,7 +971,7 @@ impl ClassDeclaration {
                 // bound variable
                 //
                 // this will panic if we allow ambiguous class members
-                let adjustment = if member.sig.ty_vars.len() > 0 {
+                let adjustment = if !member.sig.ty_vars.is_empty() {
                     member.sig.ty_vars.len() - self.args.len()
                 } else {
                     0

@@ -1,4 +1,3 @@
-use std::iter::repeat;
 use std::str::from_utf8;
 use std::{
     collections::HashMap,
@@ -48,7 +47,7 @@ impl Diagnostic {
         }
     }
 
-    pub fn report_error_heading(path: &str, line: usize, col: usize, message: &String) -> String {
+    pub fn report_error_heading(path: &str, line: usize, col: usize, message: &str) -> String {
         format!("{}:{}:{}: error: {}", path, line, col, message)
     }
 
@@ -57,18 +56,18 @@ impl Diagnostic {
         col: usize,
         path: &str,
         line_str: &str,
-        message: &String,
+        message: &str,
         addendum: &Option<String>,
     ) -> String {
         let mut result = String::new();
         let caret: String = {
-            let mut caret: String = repeat(' ').take(col - 1).collect();
+            let mut caret: String = " ".repeat(col - 1);
             caret.push('^');
             caret
         };
         let line1 = Self::report_error_heading(path, line, col, message);
         let pad_amount = ((line as f32).log(10.0).floor() as usize) + 1;
-        let padding: String = repeat(' ').take(pad_amount).collect();
+        let padding: String = " ".repeat(pad_amount);
 
         let line2 = format!("{} |", padding);
         let line3 = format!("{} | {}", line, line_str);
@@ -103,10 +102,10 @@ impl Diagnostic {
             FileEntry(FileEntry),
         }
 
-        fn get_entry<'a>(
-            files: &'a mut HashMap<InputLocation, LocationEntry>,
+        fn get_entry(
+            files: &mut HashMap<InputLocation, LocationEntry>,
             location: InputLocation,
-        ) -> io::Result<&'a mut LocationEntry> {
+        ) -> io::Result<&mut LocationEntry> {
             Ok(files
                 .entry(location)
                 .or_insert_with_key(|location| match location {

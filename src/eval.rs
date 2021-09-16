@@ -20,9 +20,10 @@ macro_rules! function1 {
         paste! {
             fn [<$name _code_0>]<'heap>(
                 eval: &mut Interpreter<'_, 'heap>,
-                env: &'heap Vec<ValueRef<'heap>>,
+                env: &'heap [ValueRef<'heap>],
                 arg: ValueRef<'heap>,
             ) -> ValueRef<'heap> {
+                #[allow(clippy::redundant_closure_call)]
                 $body(eval, env, arg)
             }
 
@@ -43,18 +44,18 @@ macro_rules! function2 {
             $name,
             $self,
             (|eval: &mut Interpreter<'_, 'heap>,
-              env: &'heap Vec<ValueRef<'heap>>,
+              env: &'heap [ValueRef<'heap>],
               arg: ValueRef<'heap>| {
                 paste! {
                     fn [<$name _code_1>]<'heap>(
                         eval: &mut Interpreter<'_, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
                         $body(eval, env, arg)
                     }
                     let env = {
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         eval.alloc_env(vec![arg])
                     };
@@ -74,17 +75,17 @@ macro_rules! function3 {
         function2!(
             $name,
             $self,
-            (|eval: &mut Interpreter<'_, 'heap>, env: &'heap Vec<ValueRef<'heap>>, arg| {
+            (|eval: &mut Interpreter<'_, 'heap>, env: &'heap [ValueRef<'heap>], arg| {
                 paste! {
                     fn [<$name _code_2>]<'heap>(
                         eval: &mut Interpreter<'_, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
                         $body(eval, env, arg)
                     }
                     let env = {
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         eval.alloc_env(env)
                     };
@@ -103,11 +104,7 @@ type ValueRef<'heap> = &'heap Value<'heap>;
 
 #[derive(Clone)]
 pub struct StaticClosureBody<'heap>(
-    fn(
-        &mut Interpreter<'_, 'heap>,
-        &'heap Vec<ValueRef<'heap>>,
-        ValueRef<'heap>,
-    ) -> ValueRef<'heap>,
+    fn(&mut Interpreter<'_, 'heap>, &'heap [ValueRef<'heap>], ValueRef<'heap>) -> ValueRef<'heap>,
 );
 
 impl<'heap> Debug for StaticClosureBody<'heap> {
@@ -118,7 +115,7 @@ impl<'heap> Debug for StaticClosureBody<'heap> {
 
 #[derive(Clone)]
 pub struct IOBody<'heap>(
-    fn(&mut Interpreter<'_, 'heap>, &'heap Vec<ValueRef<'heap>>) -> ValueRef<'heap>,
+    fn(&mut Interpreter<'_, 'heap>, &'heap [ValueRef<'heap>]) -> ValueRef<'heap>,
 );
 
 impl<'heap> Debug for IOBody<'heap> {
@@ -130,16 +127,16 @@ impl<'heap> Debug for IOBody<'heap> {
 #[derive(Debug, Clone)]
 pub enum Value<'heap> {
     Closure {
-        env: &'heap Vec<ValueRef<'heap>>,
+        env: &'heap [ValueRef<'heap>],
         arg: bool,
         body: Expr,
     },
     StaticClosure {
-        env: &'heap Vec<ValueRef<'heap>>,
+        env: &'heap [ValueRef<'heap>],
         body: StaticClosureBody<'heap>,
     },
     IO {
-        env: &'heap Vec<ValueRef<'heap>>,
+        env: &'heap [ValueRef<'heap>],
         body: IOBody<'heap>,
     },
     True,
@@ -168,14 +165,14 @@ impl<'heap> Value<'heap> {
         }
     }
 
-    pub fn unpack_array<'stdout>(&'heap self) -> Vec<ValueRef<'heap>> {
+    pub fn unpack_array(&'heap self) -> Vec<ValueRef<'heap>> {
         match self {
             Value::Array(vals) => vals.clone(),
             val => panic!("expected array, got {:?}", val),
         }
     }
 
-    pub fn unpack_bool<'stdout>(&'heap self) -> bool {
+    pub fn unpack_bool(&'heap self) -> bool {
         match self {
             Value::False => false,
             Value::True => true,
@@ -183,42 +180,42 @@ impl<'heap> Value<'heap> {
         }
     }
 
-    pub fn unpack_int<'stdout>(&'heap self) -> u32 {
+    pub fn unpack_int(&'heap self) -> u32 {
         match self {
             Value::Int(n) => *n,
             val => panic!("expected int, got {:?}", val),
         }
     }
 
-    pub fn unpack_string<'stdout>(&'heap self) -> &'heap String {
+    pub fn unpack_string(&'heap self) -> &'heap String {
         match self {
             Value::String(str) => str,
             val => panic!("expected string, got {:?}", val),
         }
     }
 
-    pub fn unpack_char<'stdout>(&'heap self) -> &'heap char {
+    pub fn unpack_char(&'heap self) -> &'heap char {
         match self {
             Value::Char(c) => c,
             val => panic!("expected char, got {:?}", val),
         }
     }
 
-    pub fn unpack_bytes<'stdout>(&'heap self) -> &'heap [u8] {
+    pub fn unpack_bytes(&'heap self) -> &'heap [u8] {
         match self {
             Value::Bytes(bs) => bs,
             val => panic!("expected bytes, got {:?}", val),
         }
     }
 
-    pub fn unpack_stdout<'stdout>(&'heap self) -> () {
+    pub fn unpack_stdout(&'heap self) {
         match self {
             Value::Stdout => (),
             val => panic!("expected stdout, got {:?}", val),
         }
     }
 
-    pub fn unpack_stdin<'stdout>(&'heap self) -> () {
+    pub fn unpack_stdin(&'heap self) {
         match self {
             Value::Stdin => (),
             val => panic!("expected stdin, got {:?}", val),
@@ -244,7 +241,7 @@ impl<'heap> Value<'heap> {
                 body,
             } => {
                 let env = {
-                    let mut env: Vec<&Value> = (*env).clone();
+                    let mut env: Vec<&Value> = Vec::from(*env);
                     if *use_arg {
                         env.push(arg);
                     }
@@ -268,10 +265,10 @@ impl<'heap> Value<'heap> {
             Value::IO { env: _, body: _ } => String::from("<io>"),
             Value::True => String::from("true"),
             Value::False => String::from("false"),
-            Value::Int(n) => String::from(format!("{:?}", n)),
-            Value::Char(c) => String::from(format!("{:?}", c)),
-            Value::String(s) => String::from(format!("{:?}", s)),
-            Value::Bytes(bs) => String::from(format!("{:?}", bs)),
+            Value::Int(n) => format!("{:?}", n),
+            Value::Char(c) => format!("{:?}", c),
+            Value::String(s) => format!("{:?}", s),
+            Value::Bytes(bs) => format!("{:?}", bs),
             Value::Array(items) => {
                 let mut s = String::new();
                 s.push_str("[ ");
@@ -347,14 +344,8 @@ impl<'heap> PartialEq for Value<'heap> {
                 } => env == env2 && (body.0 as usize) == (body2.0 as usize),
                 _ => false,
             },
-            Value::True => match other {
-                Value::True => true,
-                _ => false,
-            },
-            Value::False => match other {
-                Value::False => true,
-                _ => false,
-            },
+            Value::True => matches!(other, Value::True),
+            Value::False => matches!(other, Value::False),
             Value::Int(n) => match other {
                 Value::Int(n2) => n == n2,
                 _ => false,
@@ -383,18 +374,9 @@ impl<'heap> PartialEq for Value<'heap> {
                 Value::Variant(tag2, value2) => tag == tag2 && value == value2,
                 _ => false,
             },
-            Value::Unit => match other {
-                Value::Unit => true,
-                _ => false,
-            },
-            Value::Stdout => match other {
-                Value::Stdout => true,
-                _ => false,
-            },
-            Value::Stdin => match other {
-                Value::Stdin => true,
-                _ => false,
-            },
+            Value::Unit => matches!(other, Value::Unit),
+            Value::Stdout => matches!(other, Value::Stdout),
+            Value::Stdin => matches!(other, Value::Stdin),
         }
     }
 }
@@ -471,7 +453,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         }
     }
 
-    pub fn alloc_env(&self, env: Vec<ValueRef<'heap>>) -> &'heap Vec<ValueRef<'heap>> {
+    pub fn alloc_env(&self, env: Vec<ValueRef<'heap>>) -> &'heap [ValueRef<'heap>] {
         match self.heap.alloc(Object::Env(env)) {
             Object::Env(env) => env,
             _ => panic!("impossible"),
@@ -483,17 +465,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::PureIO => {
                 fn pure_io_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     fn pure_io_1<'stdout, 'heap>(
                         _: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                     ) -> ValueRef<'heap> {
                         env[0]
                     }
-                    let env: &Vec<&Value> = interpreter.alloc_env({
-                        let mut env = env.clone();
+                    let env: &[&Value] = interpreter.alloc_env({
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -513,17 +495,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::MapIO => {
                 fn map_io_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>, // a -> b
                 ) -> ValueRef<'heap> {
                     fn map_io_1<'stdout, 'heap>(
                         interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>, // IO a
                     ) -> ValueRef<'heap> {
                         fn map_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
-                            env: &'heap Vec<ValueRef<'heap>>,
+                            env: &'heap [ValueRef<'heap>],
                         ) -> ValueRef<'heap> {
                             let f = env[0];
                             let io_a = env[1];
@@ -531,7 +513,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             f.apply(interpreter, a) // type: b
                         }
                         let env = interpreter.alloc_env({
-                            let mut env = env.clone();
+                            let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
@@ -542,7 +524,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         interpreter.alloc_value(closure)
                     }
                     let env = interpreter.alloc_env({
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -562,17 +544,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::BindIO => {
                 fn bind_io_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>, // IO a
                 ) -> ValueRef<'heap> {
                     fn bind_io_1<'stdout, 'heap>(
                         interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>, // a -> IO b
                     ) -> ValueRef<'heap> {
                         fn bind_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
-                            env: &'heap Vec<ValueRef<'heap>>,
+                            env: &'heap [ValueRef<'heap>],
                         ) -> ValueRef<'heap> {
                             let io_a = env[0];
                             let f = env[1];
@@ -581,7 +563,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             io_b.perform_io(interpreter) // type: b
                         }
                         let env = interpreter.alloc_env({
-                            let mut env = env.clone();
+                            let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
@@ -592,7 +574,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         interpreter.alloc_value(closure)
                     }
                     let env = interpreter.alloc_env({
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -612,19 +594,19 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::Trace => {
                 fn code_outer<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     fn code_inner<'stdout, 'heap>(
                         interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
                     let env = interpreter.alloc_env({
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -644,7 +626,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::ToUtf8 => {
                 fn to_utf8_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    _env: &'heap Vec<ValueRef<'heap>>,
+                    _env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     let a = arg.unpack_string();
@@ -662,17 +644,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::WriteStdout => {
                 fn write_stdout_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>, // Stdout
                 ) -> ValueRef<'heap> {
                     fn write_stdout_1<'stdout, 'heap>(
                         interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>, // Bytes
                     ) -> ValueRef<'heap> {
                         fn write_stdout_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
-                            env: &'heap Vec<ValueRef<'heap>>,
+                            env: &'heap [ValueRef<'heap>],
                         ) -> ValueRef<'heap> {
                             // env[0] : Stdout
                             // env[1] : Bytes
@@ -683,7 +665,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         }
 
                         let env = interpreter.alloc_env({
-                            let mut env = env.clone();
+                            let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
@@ -693,7 +675,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         })
                     }
                     let env = interpreter.alloc_env({
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -713,7 +695,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::FlushStdout => {
                 fn flush_stdout<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                 ) -> ValueRef<'heap> {
                     // env[0] : Stdout
                     env[0].unpack_stdout();
@@ -724,10 +706,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     flush_stdout,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let env = eval.alloc_env({
-                            let mut env = env.clone();
+                            let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
@@ -741,12 +723,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::ReadLineStdin => {
                 fn read_line_stdin_0<'stdout, 'heap>(
                     interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>, // Stdout
                 ) -> ValueRef<'heap> {
                     fn read_line_stdin_1<'stdout, 'heap>(
                         interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                     ) -> ValueRef<'heap> {
                         // env[0] : Stdin
                         let () = env[0].unpack_stdin();
@@ -755,7 +737,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         interpreter.alloc_value(Value::String(str))
                     }
                     let env = interpreter.alloc_env({
-                        let mut env = env.clone();
+                        let mut env = Vec::from(env);
                         env.push(arg);
                         env
                     });
@@ -777,7 +759,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     eq_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
@@ -792,12 +774,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::EqInt => {
                 fn eq_int_0<'heap>(
                     eval: &mut Interpreter<'_, 'heap>,
-                    _env: &'heap Vec<ValueRef<'heap>>,
+                    _env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     fn eq_int_1<'heap>(
                         eval: &mut Interpreter<'_, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
                         let a = env[0].unpack_int();
@@ -828,7 +810,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     lt_int,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
@@ -845,7 +827,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     show_int,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     _env: &'heap Vec<ValueRef<'heap>>,
+                     _env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = arg.unpack_int();
                         eval.alloc_value(Value::String(format!("{}", a)))
@@ -857,7 +839,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     subtract,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
@@ -870,7 +852,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     add,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
@@ -883,7 +865,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     multiply,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
@@ -894,17 +876,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Builtin::EqArray => {
                 fn eq_int_0<'heap>(
                     eval: &mut Interpreter<'_, 'heap>,
-                    _env: &'heap Vec<ValueRef<'heap>>,
+                    _env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     fn eq_int_1<'heap>(
                         eval: &mut Interpreter<'_, 'heap>,
-                        env: &'heap Vec<ValueRef<'heap>>,
+                        env: &'heap [ValueRef<'heap>],
                         arg: ValueRef<'heap>,
                     ) -> ValueRef<'heap> {
                         fn eq_int_2<'heap>(
                             eval: &mut Interpreter<'_, 'heap>,
-                            env: &'heap Vec<ValueRef<'heap>>,
+                            env: &'heap [ValueRef<'heap>],
                             arg: ValueRef<'heap>,
                         ) -> ValueRef<'heap> {
                             let f = env[0];
@@ -923,7 +905,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             } else {
                                 acc = Value::False;
                             }
-                            return eval.alloc_value(acc);
+                            eval.alloc_value(acc)
                         }
                         let env = eval.alloc_env(vec![env[0], arg]);
                         let closure = eval.alloc_value(Value::StaticClosure {
@@ -952,7 +934,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     lt_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let lt = env[0];
                         let a = env[1].unpack_array();
@@ -976,14 +958,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                     // a is longer than b
                                     return eval.alloc_value(Value::False);
                                 }
+                            } else if ix < b_len {
+                                // a is shorter than b
+                                return eval.alloc_value(Value::True);
                             } else {
-                                if ix < b_len {
-                                    // a is shorter than b
-                                    return eval.alloc_value(Value::True);
-                                } else {
-                                    // a is the same length as b
-                                    return eval.alloc_value(Value::False);
-                                }
+                                // a is the same length as b
+                                return eval.alloc_value(Value::False);
                             }
                         }
                     }
@@ -994,7 +974,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     foldl_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let f = env[0];
                         let z = env[1];
@@ -1013,7 +993,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     generate_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let len = env[0].unpack_int();
                         let f = arg;
@@ -1032,7 +1012,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     length_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     _env: &'heap Vec<ValueRef<'heap>>,
+                     _env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let arr = arg.unpack_array();
 
@@ -1045,7 +1025,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     index_array,
                     self,
                     |_eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let ix = env[0].unpack_int() as usize;
                         let arr = arg.unpack_array();
@@ -1059,7 +1039,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     slice_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let start = env[0].unpack_int() as usize;
                         let len = env[1].unpack_int() as usize;
@@ -1074,7 +1054,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     filter_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let predicate = env[0];
                         let string = arg.unpack_string();
@@ -1094,7 +1074,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     eq_char,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
@@ -1107,7 +1087,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     split_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
@@ -1124,7 +1104,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     foldl_string,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let f = env[0];
                         let mut acc = env[1];
@@ -1142,7 +1122,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     snoc_array,
                     self,
                     |eval: &mut Interpreter<'_, 'heap>,
-                     env: &'heap Vec<ValueRef<'heap>>,
+                     env: &'heap [ValueRef<'heap>],
                      arg: ValueRef<'heap>| {
                         let array = env[0].unpack_array();
                         let new_array = {
@@ -1159,9 +1139,9 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
     pub fn eval_from_module(
         &mut self,
-        env: &'heap Vec<ValueRef<'heap>>,
+        env: &'heap [ValueRef<'heap>],
         path: &ModulePath,
-        binding: &String,
+        binding: &str,
     ) -> ValueRef<'heap> {
         let (expr, next_module_mapping) = match self.module_context.get(path) {
             None => panic!("no module found at {:?}", path),
@@ -1175,28 +1155,25 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 .into_iter()
                 .filter_map(|(module_path, module_usage)| {
                     let m_module_name = match module_usage {
-                        ModuleUsage::All => module_path.get_module_name().map(|x| x.clone()),
-                        ModuleUsage::Items(_) => module_path.get_module_name().map(|x| x.clone()),
+                        ModuleUsage::All => module_path.get_module_name().cloned(),
+                        ModuleUsage::Items(_) => module_path.get_module_name().cloned(),
                         ModuleUsage::Named(name) => Some(ModuleName(vec![name])),
                     };
-                    match m_module_name {
-                        None => None,
-                        Some(module_name) => Some((module_name, module_path)),
-                    }
+                    m_module_name.map(|module_name| (module_name, module_path))
                 })
                 .collect(),
         );
-        let res = self.eval(env, expr.clone());
+        let res = self.eval(env, expr);
         self.module_unmapping.pop();
         res
     }
 
-    pub fn eval(&mut self, env: &'heap Vec<ValueRef<'heap>>, expr: Expr) -> ValueRef<'heap> {
+    pub fn eval(&mut self, env: &'heap [ValueRef<'heap>], expr: Expr) -> ValueRef<'heap> {
         let out = match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
-            Expr::Name(name) => match self.context.get(&name).clone() {
+            Expr::Name(name) => match self.context.get(&name) {
                 None => panic!("{:?} not in scope", name),
                 Some(body) => {
                     let body = body.clone();
@@ -1332,7 +1309,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 let env = self.alloc_env(vec![tag]);
                 fn code<'heap>(
                     interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap Vec<ValueRef<'heap>>,
+                    env: &'heap [ValueRef<'heap>],
                     arg: ValueRef<'heap>,
                 ) -> ValueRef<'heap> {
                     let tag = env[0].unpack_int() as usize;
@@ -1362,7 +1339,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let branch = &branches[0];
                         match &branch.pattern {
                             Pattern::Record { names, rest } => {
-                                let mut new_env = env.clone();
+                                let mut new_env = Vec::from(env);
                                 let mut extracted = Vec::new();
                                 for name in names {
                                     let ix = self.eval(env, name.clone()).unpack_int() as usize;
@@ -1371,12 +1348,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                 }
                                 if *rest {
                                     let mut leftover_fields = Rope::from_vec(fields);
-                                    extracted.sort();
+                                    extracted.sort_unstable();
                                     for ix in extracted.iter().rev() {
                                         leftover_fields = leftover_fields.delete(*ix).unwrap();
                                     }
                                     let leftover_fields: Vec<&Value> =
-                                        leftover_fields.iter().map(|x| *x).collect();
+                                        leftover_fields.iter().copied().collect();
                                     let leftover_record =
                                         self.alloc_value(Value::Record(leftover_fields));
                                     new_env.push(leftover_record);
@@ -1396,7 +1373,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     Value::Variant(tag, value) => {
                         // expect variant patterns
                         let mut target: Option<Expr> = None;
-                        let mut new_env = env.clone();
+                        let mut new_env = Vec::from(env);
                         for branch in branches {
                             match branch.pattern {
                                 Pattern::Record { .. } => {
