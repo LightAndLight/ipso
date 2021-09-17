@@ -40,6 +40,7 @@ impl Constraint {
 }
 
 impl Evidence {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Evidence {
             evars: Vec::new(),

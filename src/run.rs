@@ -48,7 +48,7 @@ impl From<import::ModuleError> for InterpreterError {
 }
 
 fn find_entrypoint_signature(
-    entrypoint: &String,
+    entrypoint: &str,
     module: &core::Module,
 ) -> Result<core::TypeSig, InterpreterError> {
     match module.decls.iter().find_map(|decl| match decl {
@@ -57,7 +57,7 @@ fn find_entrypoint_signature(
         } if name == entrypoint => Some((body.clone(), sig.clone())),
         _ => None,
     }) {
-        None => Err(InterpreterError::MissingEntrypoint(entrypoint.clone())),
+        None => Err(InterpreterError::MissingEntrypoint(entrypoint.to_string())),
         Some((_, sig)) => Ok(sig),
     }
 }
@@ -93,10 +93,10 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let heap = Arena::new();
     let env = Vec::new();
     let _result = {
-        let mut stdout = config.stdout.unwrap_or(Box::new(io::stdout()));
+        let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
         let mut stdin = config
             .stdin
-            .unwrap_or(Box::new(BufReader::new(io::stdin())));
+            .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
         let context = module
             .decls
             .iter()

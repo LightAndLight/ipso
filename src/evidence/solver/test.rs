@@ -111,21 +111,21 @@ fn solve_constraint_4() {
             &Vec::new(),
             &Vec::new(),
             &Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
-            &vec![InstanceMember {
+            &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
             }],
         );
 
         tc.register_instance(
-            &vec![(String::from("a"), Kind::Type)],
+            &[(String::from("a"), Kind::Type)],
             &Vec::new(),
-            &vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+            &[Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
             &Type::mk_app(
                 Type::Name(String::from("Eq")),
                 Type::mk_app(Type::Array, Type::Var(0)),
             ),
-            &vec![InstanceMember {
+            &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqArray),
             }],

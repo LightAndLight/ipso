@@ -67,6 +67,7 @@ in
         (rust-bin.nightly.latest.default.override {
           extensions = [
             "cargo"
+            "clippy"
             "rustc"
             "rust-src"
             "rustfmt"

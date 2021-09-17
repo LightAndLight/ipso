@@ -117,7 +117,7 @@ fn context_test_2() {
 #[test]
 fn context_test_3() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -125,7 +125,7 @@ fn context_test_3() {
             info: vec![(String::from("a"), Type::Unit),]
         }
     );
-    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -138,7 +138,7 @@ fn context_test_3() {
             ]
         }
     );
-    ctx.insert(&vec![(String::from("c"), Type::String)]);
+    ctx.insert(&[(String::from("c"), Type::String)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -161,7 +161,7 @@ fn context_test_3() {
 #[test]
 fn context_test_4() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -176,8 +176,8 @@ fn context_test_4() {
 #[test]
 fn context_test_5() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -203,8 +203,8 @@ fn context_test_5() {
 #[test]
 fn context_test_6() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![(String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&vec![(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(String::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
@@ -2586,8 +2586,7 @@ fn class_and_instance_2() {
 #[test]
 fn unify_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        tc.bound_tyvars
-            .insert(&vec![(String::from("r"), Kind::Row)]);
+        tc.bound_tyvars.insert(&[(String::from("r"), Kind::Row)]);
         let real = Type::mk_app(
             Type::mk_app(
                 Type::Arrow,

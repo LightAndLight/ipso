@@ -9,7 +9,7 @@ pub enum Rope<'a, A> {
 }
 
 impl<'a, A> Rope<'a, A> {
-    pub fn from_vec(v: &'a Vec<A>) -> Rope<'a, A> {
+    pub fn from_vec(v: &'a [A]) -> Rope<'a, A> {
         Rope::Slice(v)
     }
 
@@ -52,28 +52,26 @@ impl<'a, A> Rope<'a, A> {
                             Box::new(Rope::Slice(prefix)),
                             Box::new(Rope::Item(val)),
                         );
-                    } else {
-                        if prefix_len <= suffix_len {
-                            *self = Rope::Branch(
-                                prefix_len + suffix_len + 1,
-                                Box::new(Rope::Branch(
-                                    prefix_len + 1,
-                                    Box::new(Rope::Slice(prefix)),
-                                    Box::new(Rope::Item(val)),
-                                )),
-                                Box::new(Rope::Slice(suffix)),
-                            );
-                        } else {
-                            *self = Rope::Branch(
-                                prefix_len + suffix_len + 1,
+                    } else if prefix_len <= suffix_len {
+                        *self = Rope::Branch(
+                            prefix_len + suffix_len + 1,
+                            Box::new(Rope::Branch(
+                                prefix_len + 1,
                                 Box::new(Rope::Slice(prefix)),
-                                Box::new(Rope::Branch(
-                                    suffix_len + 1,
-                                    Box::new(Rope::Item(val)),
-                                    Box::new(Rope::Slice(suffix)),
-                                )),
-                            )
-                        }
+                                Box::new(Rope::Item(val)),
+                            )),
+                            Box::new(Rope::Slice(suffix)),
+                        );
+                    } else {
+                        *self = Rope::Branch(
+                            prefix_len + suffix_len + 1,
+                            Box::new(Rope::Slice(prefix)),
+                            Box::new(Rope::Branch(
+                                suffix_len + 1,
+                                Box::new(Rope::Item(val)),
+                                Box::new(Rope::Slice(suffix)),
+                            )),
+                        )
                     }
                 } else {
                     *self = Rope::Branch(

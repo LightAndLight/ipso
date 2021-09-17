@@ -9,6 +9,7 @@ mod test;
 pub struct Substitution(HashMap<usize, Type<usize>>);
 
 impl Substitution {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Substitution(HashMap::new())
     }
@@ -29,22 +30,19 @@ impl Substitution {
             "solution found for expected"
         );
 
-        let m_expected_ty = self.0.get(&expected).map(|x| x.clone());
+        let m_expected_ty = self.0.get(&expected).cloned();
         match m_expected_ty {
             None => {
-                match actual {
-                    Type::Meta(actual) => {
-                        if expected == actual {
-                            return Ok(());
-                        }
+                if let Type::Meta(actual) = actual {
+                    if expected == actual {
+                        return Ok(());
                     }
-                    _ => {}
                 }
 
                 tc.occurs_type(expected, &actual)?;
 
                 for (_, current_ty) in self.0.iter_mut() {
-                    *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                    *current_ty = (*current_ty).subst_metas(&|current_var| {
                         if current_var == expected {
                             actual.clone()
                         } else {
@@ -72,27 +70,24 @@ impl Substitution {
             "solution found for actual"
         );
 
-        let m_actual_ty = self.0.get(&actual).map(|x| x.clone());
+        let m_actual_ty = self.0.get(&actual).cloned();
         match m_actual_ty {
             None => {
-                match expected {
-                    Type::Meta(expected) => {
-                        debug_assert!(
-                            tc.type_solutions[expected].1 == None,
-                            "solution found for expected"
-                        );
+                if let Type::Meta(expected) = expected {
+                    debug_assert!(
+                        tc.type_solutions[expected].1 == None,
+                        "solution found for expected"
+                    );
 
-                        if expected == actual {
-                            return Ok(());
-                        }
+                    if expected == actual {
+                        return Ok(());
                     }
-                    _ => {}
                 }
 
                 tc.occurs_type(actual, &expected)?;
 
                 for (_, current_ty) in self.0.iter_mut() {
-                    *current_ty = (*current_ty).subst_metas(&mut |current_var| {
+                    *current_ty = (*current_ty).subst_metas(&|current_var| {
                         if current_var == actual {
                             expected.clone()
                         } else {

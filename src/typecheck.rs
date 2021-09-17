@@ -43,7 +43,7 @@ impl<A> BoundVars<A> {
         }
     }
 
-    fn lookup_name(&self, name: &String) -> Option<(usize, &A)> {
+    fn lookup_name(&self, name: &str) -> Option<(usize, &A)> {
         self.indices
             .get(name)
             .and_then(|entries| entries.last())
@@ -54,7 +54,7 @@ impl<A> BoundVars<A> {
         self.info.get(self.info.len() - 1 - ix)
     }
 
-    fn insert(&mut self, vars: &Vec<(String, A)>)
+    fn insert(&mut self, vars: &[(String, A)])
     where
         A: Debug + Clone,
     {
@@ -71,7 +71,7 @@ impl<A> BoundVars<A> {
             vars
         );
         let num_vars = vars.len();
-        for (_, entries) in &mut self.indices {
+        for entries in self.indices.values_mut() {
             for entry in entries {
                 *entry += num_vars;
             }
@@ -101,7 +101,7 @@ impl<A> BoundVars<A> {
                         None => panic!("context missing entry {:?}", name),
                         Some(ixs) => match ixs.pop() {
                             None => panic!("context ran out of indices in {:?}", name),
-                            Some(_) => ixs.len() == 0,
+                            Some(_) => ixs.is_empty(),
                         },
                     };
                     if should_delete {
@@ -127,7 +127,7 @@ pub struct Implication {
 }
 
 impl Implication {
-    pub fn instantiate_many(&self, tys: &Vec<Type<usize>>) -> Self {
+    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> Self {
         let mut ty_vars = self.ty_vars.clone();
         for _ in tys.iter().rev() {
             let _ = ty_vars.pop();
@@ -393,12 +393,13 @@ impl TypeError {
 
     pub fn addendum(&self) -> Option<String> {
         match self {
-            TypeError::KindMismatch { context, .. } => match context {
-                UnifyKindContext {
+            TypeError::KindMismatch { context, .. } => {
+                let UnifyKindContext {
                     ty,
                     has_kind,
                     unifying_types,
-                } => {
+                } = context;
+                {
                     let mut str = String::new();
                     str.push_str(
                         format!(
@@ -421,7 +422,7 @@ impl TypeError {
                     }
                     Some(str)
                 }
-            },
+            }
             TypeError::DuplicateArgument { .. } => None,
             TypeError::DuplicateClassArgument { .. } => None,
             TypeError::TypeMismatch { .. } => None,
@@ -529,58 +530,19 @@ impl<'modules> Typechecker<'modules> {
                 Type::Var(v2) => v == v2,
                 _ => false,
             },
-            Type::Bool => match t2 {
-                Type::Bool => true,
-                _ => false,
-            },
-            Type::Int => match t2 {
-                Type::Int => true,
-                _ => false,
-            },
-            Type::Char => match t2 {
-                Type::Char => true,
-                _ => false,
-            },
-            Type::String => match t2 {
-                Type::String => true,
-                _ => false,
-            },
-            Type::Bytes => match t2 {
-                Type::Bytes => true,
-                _ => false,
-            },
-            Type::Arrow => match t2 {
-                Type::Arrow => true,
-                _ => false,
-            },
-            Type::FatArrow => match t2 {
-                Type::FatArrow => true,
-                _ => false,
-            },
-            Type::Array => match t2 {
-                Type::Arrow => true,
-                _ => false,
-            },
-            Type::Record => match t2 {
-                Type::Record => true,
-                _ => false,
-            },
-            Type::Variant => match t2 {
-                Type::Variant => true,
-                _ => false,
-            },
-            Type::IO => match t2 {
-                Type::IO => true,
-                _ => false,
-            },
-            Type::RowNil => match t2 {
-                Type::RowNil => true,
-                _ => false,
-            },
-            Type::Unit => match t2 {
-                Type::Unit => true,
-                _ => false,
-            },
+            Type::Bool => matches!(t2, Type::Bool),
+            Type::Int => matches!(t2, Type::Int),
+            Type::Char => matches!(t2, Type::Char),
+            Type::String => matches!(t2, Type::String),
+            Type::Bytes => matches!(t2, Type::Bytes),
+            Type::Arrow => matches!(t2, Type::Arrow),
+            Type::FatArrow => matches!(t2, Type::FatArrow),
+            Type::Array => matches!(t2, Type::Arrow),
+            Type::Record => matches!(t2, Type::Record),
+            Type::Variant => matches!(t2, Type::Variant),
+            Type::IO => matches!(t2, Type::IO),
+            Type::RowNil => matches!(t2, Type::RowNil),
+            Type::Unit => matches!(t2, Type::Unit),
             Type::Constraints(cs) => match t2 {
                 Type::Constraints(cs2) => {
                     cs.len() == cs2.len()
@@ -680,14 +642,13 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn register_instance(
         &mut self,
-        ty_vars: &Vec<(String, syntax::Kind)>,
-        superclass_constructors: &Vec<core::Expr>,
-        assumes: &Vec<Type<usize>>,
+        ty_vars: &[(String, syntax::Kind)],
+        superclass_constructors: &[core::Expr],
+        assumes: &[Type<usize>],
         head: &Type<usize>,
-        members: &Vec<core::InstanceMember>,
+        members: &[core::InstanceMember],
     ) {
-        let mut dictionary: Vec<core::Expr> =
-            superclass_constructors.iter().map(|x| x.clone()).collect();
+        let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
         dictionary.extend(members.iter().map(|member| member.body.clone()));
 
         for (ix, _assume) in assumes.iter().enumerate().rev() {
@@ -710,7 +671,7 @@ impl<'modules> Typechecker<'modules> {
 
         self.implications.push(Implication {
             ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
-            antecedents: assumes.clone(),
+            antecedents: Vec::from(assumes),
             consequent: head.clone(),
             evidence,
         });
@@ -745,12 +706,12 @@ impl<'modules> Typechecker<'modules> {
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
                 self.check_declaration(&mut module_mapping, decl)
-                    .and_then(|m_decl| match m_decl {
-                        Option::None => Ok(decls),
+                    .map(|m_decl| match m_decl {
+                        Option::None => decls,
                         Option::Some(decl) => {
                             self.register_declaration(&decl);
                             decls.push(decl);
-                            Ok(decls)
+                            decls
                         }
                     })
             })
@@ -824,7 +785,7 @@ impl<'modules> Typechecker<'modules> {
         let context = UnifyKindContext {
             ty: ty.clone(),
             has_kind: expected.clone(),
-            unifying_types: context.map(|x| x.clone()),
+            unifying_types: context.cloned(),
         };
         self.unify_kind(&context, expected, actual)?;
         Ok(ty)
@@ -892,9 +853,9 @@ impl<'modules> Typechecker<'modules> {
     fn check_definition(
         &mut self,
         pos: usize,
-        name: &String,
+        name: &str,
         ty: &Type<String>,
-        args: &Vec<syntax::Pattern>,
+        args: &[syntax::Pattern],
         body: &Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
         let ty_var_positions: HashMap<String, usize> = {
@@ -927,7 +888,7 @@ impl<'modules> Typechecker<'modules> {
         };
 
         let _ = self.context.insert(
-            name.clone(),
+            name.to_string(),
             core::TypeSig {
                 ty_vars: ty_var_kinds.clone(),
                 body: ty.clone(),
@@ -945,7 +906,7 @@ impl<'modules> Typechecker<'modules> {
         let body = self.check_expr(
             syntax::Spanned {
                 pos,
-                item: syntax::Expr::mk_lam(args.clone(), body.clone()),
+                item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
             },
             ty.clone(),
         )?;
@@ -958,7 +919,7 @@ impl<'modules> Typechecker<'modules> {
         self.context.remove(name);
 
         Ok(core::Declaration::Definition {
-            name: name.clone(),
+            name: name.to_string(),
             sig,
             body,
         })
@@ -966,11 +927,11 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_class_member(
         &mut self,
-        class_args_kinds: &Vec<(String, syntax::Kind)>,
-        name: &String,
+        class_args_kinds: &[(String, syntax::Kind)],
+        name: &str,
         type_: &Type<String>,
     ) -> Result<core::ClassMember, TypeError> {
-        let class_args = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
+        let class_args: Vec<String> = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
         let (type_, ty_vars) = type_.abstract_vars(&class_args);
 
         let class_args_kinds_map: HashMap<String, syntax::Kind> = class_args_kinds
@@ -1003,24 +964,24 @@ impl<'modules> Typechecker<'modules> {
             body: checked_type,
         };
         Ok(core::ClassMember {
-            name: name.clone(),
+            name: name.to_string(),
             sig,
         })
     }
 
     fn check_class(
         &mut self,
-        supers: &Vec<Spanned<Type<String>>>,
-        name: &String,
-        args: &Vec<Spanned<String>>,
-        members: &Vec<(String, Type<String>)>,
+        supers: &[Spanned<Type<String>>],
+        name: &str,
+        args: &[Spanned<String>],
+        members: &[(String, Type<String>)],
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
-        let arg_names = args.iter().map(|x| x.item.clone()).collect();
+        let arg_names: Vec<String> = args.iter().map(|x| x.item.clone()).collect();
         let args_kinds = {
             let mut seen: HashSet<String> = HashSet::new();
             let mut args_kinds = Vec::with_capacity(args_len);
-            for arg in args.into_iter() {
+            for arg in args.iter() {
                 if seen.contains(&arg.item) {
                     return Err(TypeError::DuplicateClassArgument {
                         location: self.location(),
@@ -1064,7 +1025,7 @@ impl<'modules> Typechecker<'modules> {
 
         Ok(core::Declaration::Class(core::ClassDeclaration {
             supers: new_supers,
-            name: name.clone(),
+            name: name.to_string(),
             args: args_kinds
                 .into_iter()
                 .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
@@ -1075,10 +1036,10 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_instance(
         &mut self,
-        assumes: &Vec<Spanned<Type<String>>>,
+        assumes: &[Spanned<Type<String>>],
         name: &Spanned<String>,
-        args: &Vec<Type<String>>,
-        members: &Vec<(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)>,
+        args: &[Type<String>],
+        members: &[(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)],
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
@@ -1090,18 +1051,18 @@ impl<'modules> Typechecker<'modules> {
         }?;
 
         let (head, ty_vars) = args
-            .into_iter()
+            .iter()
             .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
                 syntax::Type::mk_app(acc, el.clone())
             })
             .abstract_vars(&Vec::new());
 
         let assumes: Vec<Type<usize>> = assumes
-            .into_iter()
+            .iter()
             .map(|assume| assume.item.abstract_vars(&ty_vars).0)
             .collect();
 
-        let ty_var_kinds = {
+        let ty_var_kinds: Vec<(String, syntax::Kind)> = {
             let kind_solutions = &mut self.kind_solutions;
             ty_vars
                 .into_iter()
@@ -1110,7 +1071,7 @@ impl<'modules> Typechecker<'modules> {
         };
 
         let (_, args) = head.unwrap_app();
-        let args: Vec<Type<usize>> = args.into_iter().map(|x| x.clone()).collect();
+        let args: Vec<Type<usize>> = args.into_iter().cloned().collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
 
@@ -1268,7 +1229,7 @@ impl<'modules> Typechecker<'modules> {
                 body,
             } => self
                 .check_definition(decl.pos, name, ty, args, body)
-                .map(|x| Option::Some(x)),
+                .map(Option::Some),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
@@ -1285,7 +1246,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_class(supers, name, args, members)
-                .map(|x| Option::Some(x)),
+                .map(Option::Some),
             syntax::Declaration::Instance {
                 assumes,
                 name,
@@ -1293,7 +1254,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_instance(assumes, name, args, members)
-                .map(|x| Option::Some(x)),
+                .map(Option::Some),
         }
     }
 
@@ -1302,29 +1263,26 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn current_position(&self) -> usize {
-        match self.position {
-            None => 0,
-            Some(n) => n,
-        }
+        self.position.unwrap_or(0)
     }
 
-    fn lookup_var(&self, name: &String) -> Option<(usize, Type<usize>)> {
+    fn lookup_var(&self, name: &str) -> Option<(usize, Type<usize>)> {
         self.bound_vars
             .lookup_name(name)
             .map(|(ix, ty)| (ix, ty.clone()))
     }
 
-    fn lookup_name(&self, name: &String) -> Option<core::TypeSig> {
-        self.context.get(name).map(|x| x.clone())
+    fn lookup_name(&self, name: &str) -> Option<core::TypeSig> {
+        self.context.get(name).cloned()
     }
 
     pub fn zonk_constraint(&self, constraint: Constraint) -> Constraint {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
-                field: field.clone(),
-                rest: self.zonk_type(rest.clone()),
+                field,
+                rest: self.zonk_type(rest),
             },
-            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty.clone())),
+            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty)),
         }
     }
 
@@ -1401,7 +1359,7 @@ impl<'modules> Typechecker<'modules> {
             has_kind: self.zonk_kind(false, context.has_kind.clone()),
             unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_type(x.expected.clone())),
-                actual: self.fill_ty_names(self.zonk_type(x.actual.clone())),
+                actual: self.fill_ty_names(self.zonk_type(x.actual)),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1419,7 +1377,7 @@ impl<'modules> Typechecker<'modules> {
         expected: syntax::Kind,
         actual: syntax::Kind,
     ) -> Result<(), TypeError> {
-        match expected.clone() {
+        match expected {
             syntax::Kind::Type => match actual {
                 syntax::Kind::Type => Ok(()),
                 syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
@@ -1440,8 +1398,14 @@ impl<'modules> Typechecker<'modules> {
                     self.unify_kind(context, *expected_a, *actual_a)?;
                     self.unify_kind(context, *expected_b, *actual_b)
                 }
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
-                _ => self.kind_mismatch(context, expected, actual),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(
+                    context,
+                    syntax::Kind::Arrow(expected_a, expected_b),
+                    m,
+                ),
+                _ => {
+                    self.kind_mismatch(context, syntax::Kind::Arrow(expected_a, expected_b), actual)
+                }
             },
             syntax::Kind::Meta(expected_m) => match actual {
                 syntax::Kind::Meta(actual_m) if expected_m == actual_m => Ok(()),
@@ -1500,11 +1464,11 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn not_in_scope<A>(&self, name: &String) -> Result<A, TypeError> {
+    fn not_in_scope<A>(&self, name: &str) -> Result<A, TypeError> {
         Err(TypeError::NotInScope {
             location: self.location(),
             pos: self.current_position(),
-            name: name.clone(),
+            name: name.to_string(),
         })
     }
 
@@ -1785,9 +1749,8 @@ impl<'modules> Typechecker<'modules> {
             Type::Constraints(constraints1) => match actual {
                 Type::Constraints(constraints2) => {
                     for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
-                        match self.unify_type_subst(subst, context, c1, c2) {
-                            Err(err) => return Err(err),
-                            Ok(_) => {}
+                        if let Err(err) = self.unify_type_subst(subst, context, c1, c2) {
+                            return Err(err);
                         }
                     }
                     Ok(())
@@ -1928,7 +1891,7 @@ impl<'modules> Typechecker<'modules> {
         Ok(())
     }
 
-    fn check_duplicate_args(&self, args: &Vec<syntax::Pattern>) -> Result<(), TypeError> {
+    fn check_duplicate_args(&self, args: &[syntax::Pattern]) -> Result<(), TypeError> {
         let mut arg_names_spanned: Vec<&Spanned<String>> = Vec::new();
         for arg in args {
             arg_names_spanned.extend(arg.get_arg_names());
@@ -1950,17 +1913,20 @@ impl<'modules> Typechecker<'modules> {
 
     fn infer_variant_pattern(
         &mut self,
-        name: &String,
+        name: &str,
         arg: &Spanned<String>,
     ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
         let arg_ty: Type<usize> = self.fresh_typevar(syntax::Kind::Type);
         let rest_row = self.fresh_typevar(syntax::Kind::Row);
-        let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let ty = Type::mk_variant(
+            vec![(name.to_string(), arg_ty.clone())],
+            Some(rest_row.clone()),
+        );
 
         let tag = self.evidence.placeholder(
             Some(self.current_position()),
             evidence::Constraint::HasField {
-                field: name.clone(),
+                field: name.to_string(),
                 rest: rest_row,
             },
         );
@@ -1995,17 +1961,16 @@ impl<'modules> Typechecker<'modules> {
 
     fn infer_record_pattern(
         &mut self,
-        names: &Vec<Spanned<String>>,
+        names: &[Spanned<String>],
         rest: &Option<Spanned<String>>,
     ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
         let mut names_tys: Vec<(Spanned<String>, Type<usize>)> = names
             .iter()
             .map(|name| (name.clone(), self.fresh_typevar(syntax::Kind::Type)))
             .collect();
-        let rest_row: Option<(Spanned<String>, Type<usize>)> = match rest {
-            None => None,
-            Some(name) => Some((name.clone(), self.fresh_typevar(syntax::Kind::Row))),
-        };
+        let rest_row: Option<(Spanned<String>, Type<usize>)> = rest
+            .as_ref()
+            .map(|name| (name.clone(), self.fresh_typevar(syntax::Kind::Row)));
         let ty = Type::mk_record(
             names_tys
                 .iter()
@@ -2042,19 +2007,16 @@ impl<'modules> Typechecker<'modules> {
         (
             core::Pattern::Record {
                 names: names_placeholders,
-                rest: match rest {
-                    None => false,
-                    Some(_) => true,
-                },
+                rest: rest.is_some(),
             },
             ty,
             names_tys.into_iter().map(|(a, b)| (a.item, b)).collect(),
         )
     }
 
-    fn infer_pattern<'a, 'b>(
-        &'a mut self,
-        arg: &'b syntax::Pattern,
+    fn infer_pattern(
+        &mut self,
+        arg: &syntax::Pattern,
     ) -> (core::Pattern, Type<usize>, Vec<(String, Type<usize>)>) {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
@@ -2064,9 +2026,9 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn check_pattern<'a, 'b>(
-        &'a mut self,
-        arg: &'b syntax::Pattern,
+    fn check_pattern(
+        &mut self,
+        arg: &syntax::Pattern,
         expected: Type<usize>,
     ) -> Result<(core::Pattern, Vec<(String, Type<usize>)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
@@ -2325,10 +2287,7 @@ impl<'modules> Typechecker<'modules> {
                     ));
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
-                        Type::mk_app(
-                            Type::Variant,
-                            Type::mk_rowcons(ctor.clone(), arg_ty, rest_rows),
-                        ),
+                        Type::mk_app(Type::Variant, Type::mk_rowcons(ctor, arg_ty, rest_rows)),
                     ))
                 }
                 syntax::Expr::Binop(op, left, right) => {
@@ -2525,7 +2484,7 @@ impl<'modules> Typechecker<'modules> {
                             .iter()
                             .map(|(x, y)| ((*x).clone(), (*y).clone()))
                             .collect();
-                        let rest: Option<Type<usize>> = rest.map(|x| x.clone());
+                        let rest: Option<Type<usize>> = rest.cloned();
                         let context = UnifyTypeContext {
                             expected: syntax::Type::mk_variant(ctors.clone(), None),
                             actual: syntax::Type::mk_variant(ctors, rest),
