@@ -176,11 +176,11 @@ pub struct Lexer<'input> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_'
+    ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || c == '_'
 }
 
 fn is_ident_continue(c: char) -> bool {
-    'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || c == '_'
+    ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c) || c == '_'
 }
 
 impl<'input> Lexer<'input> {
