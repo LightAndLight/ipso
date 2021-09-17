@@ -36,6 +36,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Diagnostic { items: Vec::new() }
     }

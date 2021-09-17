@@ -9,6 +9,7 @@ mod test;
 pub struct Substitution(HashMap<usize, Type<usize>>);
 
 impl Substitution {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Substitution(HashMap::new())
     }
