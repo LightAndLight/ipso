@@ -30,7 +30,7 @@ pub enum Keyword {
 }
 
 impl Keyword {
-    pub fn matches(&self, actual: &String) -> bool {
+    pub fn matches(&self, actual: &str) -> bool {
         self.to_string() == actual
     }
 
@@ -61,8 +61,8 @@ lazy_static! {
     ];
 }
 
-pub fn is_keyword(val: &String) -> bool {
-    KEYWORDS.contains(&val.as_str())
+pub fn is_keyword(val: &str) -> bool {
+    KEYWORDS.contains(&val)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -142,7 +142,7 @@ impl<'a> Iterator for IterNames<'a> {
 }
 
 impl Pattern {
-    pub fn iter_names<'a>(&'a self) -> IterNames<'a> {
+    pub fn iter_names(&self) -> IterNames {
         IterNames {
             items: Vec::new(),
             pattern: Some(self),
@@ -239,7 +239,7 @@ impl Expr {
     pub fn mk_record(fields: Vec<(String, Spanned<Expr>)>, rest: Option<Spanned<Expr>>) -> Expr {
         Expr::Record {
             fields,
-            rest: rest.map(|x| Box::new(x)),
+            rest: rest.map(Box::new),
         }
     }
 
@@ -296,7 +296,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn step_kind<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, usize> {
+        fn step_kind<A>(ty: &Type<A>) -> Step<Type<A>, usize> {
             match ty {
                 Type::Name(_) => Step::Skip,
                 Type::Var(_) => Step::Skip,
@@ -307,7 +307,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::Bytes => Step::Skip,
                 Type::Arrow => Step::Skip,
                 Type::FatArrow => Step::Skip,
-                Type::Constraints(cs) => Step::Continue(cs.iter().map(|x| x).collect()),
+                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
                 Type::Array => Step::Skip,
                 Type::Record => Step::Skip,
                 Type::Variant => Step::Skip,
@@ -355,7 +355,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
     type Item = &'a A;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn step_type<'a, A>(ty: &'a Type<A>) -> Step<'a, Type<A>, &'a A> {
+        fn step_type<A>(ty: &Type<A>) -> Step<Type<A>, &A> {
             match ty {
                 Type::Name(_) => Step::Skip,
                 Type::Var(n) => Step::Yield(n),
@@ -402,7 +402,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 },
             }
         }
-        return result;
+        result
     }
 }
 
@@ -474,7 +474,7 @@ impl Type<usize> {
 }
 
 impl<A> Type<A> {
-    pub fn flatten_constraints<'a>(&'a self) -> Vec<&'a Self> {
+    pub fn flatten_constraints(&self) -> Vec<&Self> {
         fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) {
             match ty {
                 Type::Constraints(cs) => {
@@ -482,7 +482,7 @@ impl<A> Type<A> {
                         go(constraints, c);
                     }
                 }
-                _ => constraints.push(&ty),
+                _ => constraints.push(ty),
             }
         }
         let mut constraints = Vec::new();
@@ -490,7 +490,7 @@ impl<A> Type<A> {
         constraints
     }
 
-    pub fn unwrap_name<'a>(&'a self) -> Option<&'a String> {
+    pub fn unwrap_name(&self) -> Option<&String> {
         match self {
             Type::Name(n) => Some(n),
             _ => None,
@@ -507,16 +507,9 @@ impl<A> Type<A> {
     pub fn unwrap_app<'a>(&'a self) -> (&'a Type<A>, Vec<&'a Type<A>>) {
         let mut target = self;
         let mut args: Vec<&'a Type<A>> = Vec::new();
-        loop {
-            match target {
-                Type::App(a, b) => {
-                    args.push(b);
-                    target = a;
-                }
-                _ => {
-                    break;
-                }
-            }
+        while let Type::App(a, b) = target {
+            args.push(b);
+            target = a;
         }
         args.reverse();
         (target, args)
@@ -577,7 +570,7 @@ impl<A> Type<A> {
     ///     )
     /// )
     /// ```
-    pub fn abstract_vars(&self, seen: &Vec<A>) -> (Type<usize>, Vec<A>)
+    pub fn abstract_vars(&self, seen: &[A]) -> (Type<usize>, Vec<A>)
     where
         A: Eq + Hash + Clone,
     {
@@ -658,16 +651,16 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn iter_vars<'a>(&'a self) -> IterVars<'a, A> {
-        IterVars { items: vec![&self] }
+    pub fn iter_vars(&self) -> IterVars<A> {
+        IterVars { items: vec![self] }
     }
 
-    pub fn iter_metas<'a>(&'a self) -> TypeIterMetas<'a, A> {
-        TypeIterMetas { items: vec![&self] }
+    pub fn iter_metas(&self) -> TypeIterMetas<A> {
+        TypeIterMetas { items: vec![self] }
     }
 
-    pub fn unwrap_constraints<'a>(&'a self) -> (Vec<&'a Type<A>>, &'a Type<A>) {
-        fn flatten_constraints<'a, A>(ty: &'a Type<A>) -> Vec<&'a Type<A>> {
+    pub fn unwrap_constraints(&self) -> (Vec<&Type<A>>, &Type<A>) {
+        fn flatten_constraints<A>(ty: &Type<A>) -> Vec<&Type<A>> {
             match ty {
                 Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
                 _ => vec![ty],
@@ -690,7 +683,7 @@ impl<A> Type<A> {
         (constraints, ty)
     }
 
-    fn unwrap_arrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
+    fn unwrap_arrow(&self) -> Option<(&Type<A>, &Type<A>)> {
         match self {
             Type::App(a, out_ty) => match **a {
                 Type::App(ref c, ref in_ty) => match **c {
@@ -703,7 +696,7 @@ impl<A> Type<A> {
         }
     }
 
-    fn unwrap_fatarrow<'a>(&'a self) -> Option<(&'a Type<A>, &'a Type<A>)> {
+    fn unwrap_fatarrow(&self) -> Option<(&Type<A>, &Type<A>)> {
         match self {
             Type::App(a, out_ty) => match **a {
                 Type::App(ref c, ref in_ty) => match **c {
@@ -716,7 +709,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_rows<'a>(&'a self) -> (Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>) {
+    pub fn unwrap_rows(&self) -> (Vec<(&String, &Type<A>)>, Option<&Type<A>>) {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
@@ -731,9 +724,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_record<'a>(
-        &'a self,
-    ) -> Option<(Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>)> {
+    pub fn unwrap_record(&self) -> Option<(Vec<(&String, &Type<A>)>, Option<&Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Record => Some(b.unwrap_rows()),
@@ -743,9 +734,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_variant<'a>(
-        &'a self,
-    ) -> Option<(Vec<(&'a String, &'a Type<A>)>, Option<&'a Type<A>>)> {
+    pub fn unwrap_variant(&self) -> Option<(Vec<(&String, &Type<A>)>, Option<&Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Variant => Some(b.unwrap_rows()),
@@ -801,119 +790,103 @@ impl<A> Type<A> {
     {
         let mut s = String::new();
 
-        match self.unwrap_record() {
-            Some((fields, rest)) => {
-                s.push('{');
-                let mut fields_iter = fields.iter();
-                match fields_iter.next() {
-                    None => {}
-                    Some((first_field, first_ty)) => {
-                        s.push(' ');
-                        s.push_str(first_field.as_str());
+        if let Some((fields, rest)) = self.unwrap_record() {
+            s.push('{');
+            let mut fields_iter = fields.iter();
+            match fields_iter.next() {
+                None => {}
+                Some((first_field, first_ty)) => {
+                    s.push(' ');
+                    s.push_str(first_field.as_str());
+                    s.push_str(" : ");
+                    s.push_str(first_ty.render().as_str());
+                    for (field, ty) in fields_iter {
+                        s.push_str(", ");
+                        s.push_str(field.as_str());
                         s.push_str(" : ");
-                        s.push_str(first_ty.render().as_str());
-                        for (field, ty) in fields_iter {
-                            s.push_str(", ");
-                            s.push_str(field.as_str());
-                            s.push_str(" : ");
-                            s.push_str(ty.render().as_str());
-                        }
-                    }
-                }
-                match rest {
-                    None => {
-                        if fields.len() > 0 {
-                            s.push(' ')
-                        }
-                    }
-                    Some(ty) => {
-                        if fields.len() > 0 {
-                            s.push_str(", ")
-                        }
                         s.push_str(ty.render().as_str());
-                        s.push(' ');
                     }
                 }
-                s.push('}');
-                return s;
             }
-            None => {}
+            match rest {
+                None => {
+                    if !fields.is_empty() {
+                        s.push(' ')
+                    }
+                }
+                Some(ty) => {
+                    if !fields.is_empty() {
+                        s.push_str(", ")
+                    }
+                    s.push_str(ty.render().as_str());
+                    s.push(' ');
+                }
+            }
+            s.push('}');
+            return s;
         }
 
-        match self.unwrap_variant() {
-            Some((fields, rest)) => {
-                s.push('<');
-                let mut fields_iter = fields.iter();
-                match fields_iter.next() {
-                    None => {}
-                    Some((first_field, first_ty)) => {
-                        s.push(' ');
-                        s.push_str(first_field.as_str());
+        if let Some((fields, rest)) = self.unwrap_variant() {
+            s.push('<');
+            let mut fields_iter = fields.iter();
+            match fields_iter.next() {
+                None => {}
+                Some((first_field, first_ty)) => {
+                    s.push(' ');
+                    s.push_str(first_field.as_str());
+                    s.push_str(" : ");
+                    s.push_str(first_ty.render().as_str());
+                    for (field, ty) in fields_iter {
+                        s.push_str(" | ");
+                        s.push_str(field.as_str());
                         s.push_str(" : ");
-                        s.push_str(first_ty.render().as_str());
-                        for (field, ty) in fields_iter {
-                            s.push_str(" | ");
-                            s.push_str(field.as_str());
-                            s.push_str(" : ");
-                            s.push_str(ty.render().as_str());
-                        }
-                    }
-                }
-                match rest {
-                    None => {
-                        if fields.len() > 0 {
-                            s.push(' ');
-                        }
-                    }
-                    Some(ty) => {
-                        if fields.len() > 0 {
-                            s.push_str(" |")
-                        }
-                        s.push(' ');
                         s.push_str(ty.render().as_str());
+                    }
+                }
+            }
+            match rest {
+                None => {
+                    if !fields.is_empty() {
                         s.push(' ');
                     }
                 }
-                s.push('>');
-                return s;
+                Some(ty) => {
+                    if !fields.is_empty() {
+                        s.push_str(" |")
+                    }
+                    s.push(' ');
+                    s.push_str(ty.render().as_str());
+                    s.push(' ');
+                }
             }
-            None => {}
+            s.push('>');
+            return s;
         }
 
-        match self.unwrap_arrow() {
-            Some((a, b)) => {
-                match a.unwrap_arrow() {
-                    Some(_) => s.push('('),
-                    None => {}
-                }
-                s.push_str(a.render().as_str());
-                match a.unwrap_arrow() {
-                    Some(_) => s.push(')'),
-                    None => {}
-                }
-                s.push_str(" -> ");
-                s.push_str(b.render().as_str());
-                return s;
+        if let Some((a, b)) = self.unwrap_arrow() {
+            if a.unwrap_arrow().is_some() {
+                s.push('(')
             }
-            None => {}
+            s.push_str(a.render().as_str());
+            if a.unwrap_arrow().is_some() {
+                s.push(')')
+            }
+            s.push_str(" -> ");
+            s.push_str(b.render().as_str());
+            return s;
         }
 
-        match self.unwrap_fatarrow() {
-            Some((a, b)) => {
-                match a.unwrap_arrow() {
-                    Some(_) => s.push('('),
-                    None => {}
-                }
-                s.push_str(a.render().as_str());
-                match a.unwrap_arrow() {
-                    Some(_) => s.push(')'),
-                    None => {}
-                }
-                s.push_str(" => ");
-                s.push_str(b.render().as_str());
-                return s;
+        if let Some((a, b)) = self.unwrap_fatarrow() {
+            if a.unwrap_arrow().is_some() {
+                s.push('(')
             }
-            None => {}
+            s.push_str(a.render().as_str());
+            if a.unwrap_arrow().is_some() {
+                s.push(')')
+            }
+            s.push_str(" => ");
+            s.push_str(b.render().as_str());
+            return s;
         }
 
         match self {
@@ -1064,7 +1037,7 @@ impl<'a> Iterator for KindIterMetas<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        fn step_kind<'a>(kind: &'a Kind) -> Step<'a, Kind, usize> {
+        fn step_kind(kind: &Kind) -> Step<Kind, usize> {
             match kind {
                 Kind::Type => Step::Skip,
                 Kind::Row => Step::Skip,
@@ -1100,7 +1073,7 @@ impl<'a> Iterator for KindIterMetas<'a> {
 }
 
 impl Kind {
-    pub fn iter_metas<'a>(&'a self) -> KindIterMetas<'a> {
+    pub fn iter_metas(&self) -> KindIterMetas {
         KindIterMetas { items: vec![self] }
     }
 
@@ -1112,14 +1085,12 @@ impl Kind {
         match self {
             Kind::Arrow(a, b) => {
                 let mut val = String::new();
-                match **a {
-                    Kind::Arrow(_, _) => val.push('('),
-                    _ => {}
+                if let Kind::Arrow(_, _) = **a {
+                    val.push('(')
                 }
                 val.push_str(a.render().as_str());
-                match **a {
-                    Kind::Arrow(_, _) => val.push(')'),
-                    _ => {}
+                if let Kind::Arrow(_, _) = **a {
+                    val.push(')')
                 }
                 val.push_str(" -> ");
                 val.push_str(b.render().as_str());

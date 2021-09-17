@@ -29,15 +29,15 @@ enum ConfigError {
     MissingEntrypoint,
 }
 
-fn get_filename(args: &Vec<String>) -> Result<String, ConfigError> {
+fn get_filename(args: &[String]) -> Result<String, ConfigError> {
     if args.len() > 1 {
-        return Ok(args[1].clone());
+        Ok(args[1].clone())
     } else {
-        return Err(ConfigError::MissingFilename);
+        Err(ConfigError::MissingFilename)
     }
 }
 
-fn get_entrypoint(args: &Vec<String>) -> Result<Option<String>, ConfigError> {
+fn get_entrypoint(args: &[String]) -> Result<Option<String>, ConfigError> {
     match args
         .iter()
         .enumerate()
@@ -51,7 +51,7 @@ fn get_entrypoint(args: &Vec<String>) -> Result<Option<String>, ConfigError> {
     }
 }
 
-fn get_config(args: &Vec<String>) -> Result<Config, ConfigError> {
+fn get_config(args: &[String]) -> Result<Config, ConfigError> {
     let filename = get_filename(args)?;
     let entrypoint = get_entrypoint(args)?;
     Ok(Config {
@@ -63,7 +63,7 @@ fn get_config(args: &Vec<String>) -> Result<Config, ConfigError> {
 }
 
 fn parse_args() -> Result<Config, ConfigError> {
-    let args = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     get_config(&args)
 }
 

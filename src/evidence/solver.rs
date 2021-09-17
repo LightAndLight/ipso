@@ -17,10 +17,7 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
         .iter()
         .find_map(|(other_constraint, _, other_evidence)| {
             if tc.eq_zonked_constraint(constraint, other_constraint) {
-                match other_evidence {
-                    None => None,
-                    Some(expr) => Some(expr.clone()),
-                }
+                other_evidence.as_ref().cloned()
             } else {
                 None
             }
@@ -240,14 +237,11 @@ pub fn solve_placeholder(
     p: Placeholder,
 ) -> Result<(core::Expr, Constraint), TypeError> {
     let (constraint, pos, evidence) = tc.evidence.environment[p.0].clone();
-    match evidence.clone() {
+    match evidence {
         None => {
             let expr = solve_constraint(
                 &Some(SolveConstraintContext {
-                    pos: match pos {
-                        None => 0,
-                        Some(pos) => pos,
-                    },
+                    pos: pos.unwrap_or(0),
                     constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type())),
                 }),
                 tc,

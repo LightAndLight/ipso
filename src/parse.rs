@@ -37,7 +37,7 @@ impl ParseError {
                 let mut str = String::from("expected one of: ");
                 let mut iter = expecting.iter();
                 match iter.next() {
-                    None => return str,
+                    None => str,
                     Some(token) => {
                         str.push_str(token.render().as_str());
                         for token in iter {
@@ -222,7 +222,7 @@ pub fn parse_string(input: String) -> Result<Module, ParseError> {
     keep_left!(parser.module(), parser.eof()).result
 }
 
-pub fn parse_file(filename: &String) -> Result<Module, ParseError> {
+pub fn parse_file(filename: &str) -> Result<Module, ParseError> {
     let input: String = {
         let mut content = String::new();
         let mut file: File = File::open(filename).unwrap();
@@ -538,7 +538,7 @@ impl Parser {
         self.expecting.insert(TokenType::Ident(String::new()));
         match self.current {
             Some(ref token) => match token.token_type {
-                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().nth(0) {
+                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_lowercase() => {
                         let s = s.clone();
                         map0!(s, self.consume())
@@ -555,7 +555,7 @@ impl Parser {
         self.expecting.insert(TokenType::Ctor);
         match self.current {
             Some(ref token) => match token.token_type {
-                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().nth(0) {
+                TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_uppercase() => {
                         let s = s.clone();
                         map0!(s, self.consume())
@@ -762,8 +762,8 @@ impl Parser {
                 map0!(Type::IO, self.token(&TokenType::Ident(String::from("IO")))),
                 self.type_record(),
                 self.type_variant(),
-                self.ctor().map(|s| Type::Name(s)),
-                self.ident().map(|s| Type::Var(s)),
+                self.ctor().map(Type::Name),
+                self.ident().map(Type::Var),
                 keep_right!(
                     keep_left!(self.token(&TokenType::LParen), self.spaces()),
                     keep_left!(
@@ -778,10 +778,7 @@ impl Parser {
 
     fn type_app(&mut self) -> ParseResult<Type<String>> {
         self.type_atom().and_then(|first| {
-            many!(self, self.type_atom()).map(|rest| {
-                rest.into_iter()
-                    .fold(first, |acc, el| Type::mk_app(acc, el))
-            })
+            many!(self, self.type_atom()).map(|rest| rest.into_iter().fold(first, Type::mk_app))
         })
     }
 
@@ -873,8 +870,7 @@ impl Parser {
                         keep_left!(parser.token(&TokenType::Dot), parser.token(&TokenType::Dot)),
                         parser.spaces()
                     ),
-                    keep_left!(spanned!(parser, parser.ident()), parser.spaces())
-                        .map(|ident| Some(ident))
+                    keep_left!(spanned!(parser, parser.ident()), parser.spaces()).map(Some)
                 )
             )
         }
@@ -901,7 +897,7 @@ impl Parser {
         keep_left!(
             choices!(
                 self,
-                spanned!(self, self.ident()).map(|s| Pattern::Name(s)),
+                spanned!(self, self.ident()).map(Pattern::Name),
                 self.pattern_record(),
                 self.pattern_variant(),
                 map0!(Pattern::Wildcard, self.token(&TokenType::Underscore))
@@ -916,13 +912,13 @@ impl Parser {
             keep_right!(
                 keep_left!(self.token(&TokenType::DollarLBrace), self.spaces()),
                 keep_left!(
-                    self.expr().map(|x| StringPart::Expr(x)),
+                    self.expr().map(StringPart::Expr),
                     self.token(&TokenType::RBrace)
                 )
             ),
             keep_right!(
                 self.token(&TokenType::Dollar),
-                spanned!(self, self.ident().map(|x| Expr::Var(x))).map(|x| StringPart::Expr(x))
+                spanned!(self, self.ident().map(Expr::Var)).map(StringPart::Expr)
             )
         )
     }
@@ -998,7 +994,7 @@ impl Parser {
                         keep_left!(parser.token(&TokenType::Dot), parser.token(&TokenType::Dot)),
                         parser.spaces()
                     ),
-                    keep_left!(parser.expr_atom(), parser.spaces()).map(|expr| Some(expr))
+                    keep_left!(parser.expr_atom(), parser.spaces()).map(Some)
                 )
             )
         }
@@ -1042,7 +1038,7 @@ impl Parser {
                 keep_left!(self.token(&TokenType::Comma), self.spaces())
             )
         )
-        .map(|es| Expr::Array(es))
+        .map(Expr::Array)
     }
 
     fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
@@ -1051,12 +1047,12 @@ impl Parser {
                 self,
                 choices!(
                     self,
-                    self.int().map(|n| Expr::Int(n)),
-                    self.char().map(|c| Expr::Char(c)),
+                    self.int().map(Expr::Int),
+                    self.char().map(Expr::Char),
                     self.keyword(Keyword::False).map(|_| Expr::False),
                     self.keyword(Keyword::True).map(|_| Expr::True),
-                    self.ident().map(|n| Expr::Var(n)),
-                    self.ctor().map(|n| Expr::Variant(n)),
+                    self.ident().map(Expr::Var),
+                    self.ctor().map(Expr::Variant),
                     self.expr_record(),
                     self.expr_embed(),
                     self.expr_array(),
@@ -1070,7 +1066,7 @@ impl Parser {
                             self.token(&TokenType::RParen)
                         )
                     ),
-                    self.string().map(|parts| Expr::String(parts))
+                    self.string().map(Expr::String)
                 )
             ),
             self.spaces()
@@ -1129,10 +1125,7 @@ impl Parser {
 
     fn expr_app(&mut self) -> ParseResult<Spanned<Expr>> {
         self.expr_project().and_then(|first| {
-            many!(self, self.expr_project()).map(|rest| {
-                rest.into_iter()
-                    .fold(first, |acc, el| Expr::mk_app(acc, el))
-            })
+            many!(self, self.expr_project()).map(|rest| rest.into_iter().fold(first, Expr::mk_app))
         })
     }
 
@@ -1247,7 +1240,7 @@ impl Parser {
                         keep_left!(self.ident(), self.spaces()),
                         keep_left!(self.token(&TokenType::Comma), self.spaces())
                     )
-                    .map(|names| Names::Names(names))
+                    .map(Names::Names)
                 )
                 .map(|names| Declaration::FromImport { module, names })
             ))

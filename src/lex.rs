@@ -59,7 +59,7 @@ impl TokenType {
         match self {
             TokenType::Unexpected(_) => String::from("unexpected"),
             TokenType::Ident(s) => {
-                if s.len() == 0 {
+                if s.is_empty() {
                     String::from("identifier")
                 } else {
                     format!("\"{}\"", s)
@@ -184,7 +184,7 @@ fn is_ident_continue(c: char) -> bool {
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(input: &String) -> Lexer {
+    pub fn new(input: &str) -> Lexer {
         let mut input = input.chars();
         Lexer {
             pos: 0,

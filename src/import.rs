@@ -46,7 +46,7 @@ impl ModulePath {
         }
     }
 
-    pub fn as_path<'a>(&'a self) -> &'a Path {
+    pub fn as_path(&self) -> &Path {
         let path = match self {
             ModulePath::Module { path, .. } => path,
             ModulePath::File { path, .. } => path,
@@ -54,7 +54,7 @@ impl ModulePath {
         path.as_path()
     }
 
-    pub fn to_str<'a>(&'a self) -> &'a str {
+    pub fn to_str(&self) -> &str {
         self.as_path().to_str().unwrap()
     }
 
@@ -184,7 +184,7 @@ fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::
                     Some(_) => {
                         let mut path: Vec<String> = Vec::with_capacity(tail.len() + 1);
                         path.push(head.clone());
-                        path.extend(tail.into_iter().map(|x| x.clone()));
+                        path.extend(tail.into_iter().cloned());
                         *expr = syntax::Expr::Module {
                             name: syntax::ModuleName(path),
                             item: field.clone(),
@@ -328,7 +328,7 @@ impl<'a> Modules<'a> {
     }
 
     pub fn lookup(&self, path: &ModulePath) -> Option<&core::Module> {
-        self.index.get(path).map(|x| *x)
+        self.index.get(path).copied()
     }
 
     /// Import a module.
@@ -368,17 +368,14 @@ impl<'a> Modules<'a> {
                     }?;
 
                     for import_info in calculate_imports(path, &mut module).into_iter() {
-                        match self.import(
+                        if let Err(err) = self.import(
                             &InputLocation::File {
                                 path: PathBuf::from(path),
                             },
                             import_info.pos,
                             &import_info.module_path,
                         ) {
-                            Err(err) => {
-                                return Err(err);
-                            }
-                            Ok(_) => {}
+                            return Err(err);
                         }
                     }
                     let module = {
