@@ -172,19 +172,19 @@ pub enum Expr {
         item: String,
     },
 
-    App(Box<Spanned<Expr>>, Box<Spanned<Expr>>),
+    App(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
     Lam {
         args: Vec<Pattern>,
-        body: Box<Spanned<Expr>>,
+        body: Rc<Spanned<Expr>>,
     },
 
     True,
     False,
-    IfThenElse(Box<Spanned<Expr>>, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
+    IfThenElse(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
     Int(u32),
 
-    Binop(Binop, Box<Spanned<Expr>>, Box<Spanned<Expr>>),
+    Binop(Binop, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
     Char(char),
 
@@ -194,24 +194,24 @@ pub enum Expr {
 
     Record {
         fields: Vec<(String, Spanned<Expr>)>,
-        rest: Option<Box<Spanned<Expr>>>,
+        rest: Option<Rc<Spanned<Expr>>>,
     },
-    Project(Box<Spanned<Expr>>, String),
+    Project(Rc<Spanned<Expr>>, String),
 
     Variant(String),
-    Embed(String, Box<Spanned<Expr>>),
-    Case(Box<Spanned<Expr>>, Vec<Branch>),
+    Embed(String, Rc<Spanned<Expr>>),
+    Case(Rc<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
 }
 
 impl Expr {
     pub fn mk_project(val: Spanned<Expr>, field: String) -> Expr {
-        Expr::Project(Box::new(val), field)
+        Expr::Project(Rc::new(val), field)
     }
 
     pub fn mk_ifthenelse(cond: Spanned<Expr>, then: Spanned<Expr>, else_: Spanned<Expr>) -> Expr {
-        Expr::IfThenElse(Box::new(cond), Box::new(then), Box::new(else_))
+        Expr::IfThenElse(Rc::new(cond), Rc::new(then), Rc::new(else_))
     }
 
     pub fn mk_var(v: &str) -> Expr {
@@ -221,30 +221,30 @@ impl Expr {
     pub fn mk_lam(args: Vec<Pattern>, body: Spanned<Expr>) -> Expr {
         Expr::Lam {
             args,
-            body: Box::new(body),
+            body: Rc::new(body),
         }
     }
 
     pub fn mk_case(cond: Spanned<Expr>, branches: Vec<Branch>) -> Expr {
-        Expr::Case(Box::new(cond), branches)
+        Expr::Case(Rc::new(cond), branches)
     }
 
     pub fn mk_app(a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
         Spanned {
             pos: a.pos,
-            item: Expr::App(Box::new(a), Box::new(b)),
+            item: Expr::App(Rc::new(a), Rc::new(b)),
         }
     }
 
     pub fn mk_record(fields: Vec<(String, Spanned<Expr>)>, rest: Option<Spanned<Expr>>) -> Expr {
         Expr::Record {
             fields,
-            rest: rest.map(Box::new),
+            rest: rest.map(Rc::new),
         }
     }
 
     pub fn mk_embed(ctor: String, rest: Spanned<Expr>) -> Expr {
-        Expr::Embed(ctor, Box::new(rest))
+        Expr::Embed(ctor, Rc::new(rest))
     }
 
     pub fn unwrap_projects(&self) -> (&Expr, Vec<&String>) {

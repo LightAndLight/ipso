@@ -15,6 +15,7 @@ use std::{
     fs::File,
     io::{self, Read},
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -121,17 +122,17 @@ pub struct Modules<'a> {
     index: HashMap<ModulePath, &'a core::Module>,
 }
 
-fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::Expr) {
+fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax::Expr) {
     match expr {
         syntax::Expr::Var(_) => {}
         syntax::Expr::Module { .. } => {}
         syntax::Expr::App(a, b) => {
-            desugar_module_accessors_expr(module_names.clone(), &mut (*a).item);
-            desugar_module_accessors_expr(module_names, &mut (*b).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Lam { args, body } => {
             let module_names = {
-                let mut module_names = module_names;
+                let mut module_names = module_names.clone();
                 for name in args.iter().flat_map(|pattern| pattern.iter_names()) {
                     module_names = module_names
                         .delete_first(|x| x == &name.item)
@@ -139,19 +140,19 @@ fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::
                 }
                 module_names
             };
-            desugar_module_accessors_expr(module_names, &mut (*body).item);
+            desugar_module_accessors_expr(&module_names, &mut Rc::make_mut(body).item)
         }
         syntax::Expr::True => {}
         syntax::Expr::False => {}
         syntax::Expr::IfThenElse(a, b, c) => {
-            desugar_module_accessors_expr(module_names.clone(), &mut (*a).item);
-            desugar_module_accessors_expr(module_names.clone(), &mut (*b).item);
-            desugar_module_accessors_expr(module_names, &mut (*c).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(c).item);
         }
         syntax::Expr::Int(_) => {}
         syntax::Expr::Binop(_, a, b) => {
-            desugar_module_accessors_expr(module_names.clone(), &mut (*a).item);
-            desugar_module_accessors_expr(module_names, &mut (*b).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Char(_) => {}
         syntax::Expr::String(parts) => {
@@ -159,22 +160,23 @@ fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::
                 match part {
                     syntax::StringPart::String(_) => {}
                     syntax::StringPart::Expr(e) => {
-                        desugar_module_accessors_expr(module_names.clone(), &mut e.item);
+                        desugar_module_accessors_expr(module_names, &mut e.item);
                     }
                 }
             }
         }
         syntax::Expr::Array(xs) => {
             for x in xs {
-                desugar_module_accessors_expr(module_names.clone(), &mut x.item);
+                desugar_module_accessors_expr(module_names, &mut x.item);
             }
         }
         syntax::Expr::Record { fields, rest } => {
             for (_, e) in fields {
-                desugar_module_accessors_expr(module_names.clone(), &mut e.item);
+                desugar_module_accessors_expr(module_names, &mut e.item);
             }
+
             for e in rest {
-                desugar_module_accessors_expr(module_names.clone(), &mut (*e).item);
+                desugar_module_accessors_expr(module_names, &mut Rc::make_mut(e).item);
             }
         }
         syntax::Expr::Project(value, field) => {
@@ -201,10 +203,11 @@ fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::
         }
         syntax::Expr::Variant(_) => {}
         syntax::Expr::Embed(_, a) => {
-            desugar_module_accessors_expr(module_names, &mut (*a).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
         }
         syntax::Expr::Case(a, branches) => {
-            desugar_module_accessors_expr(module_names.clone(), &mut (*a).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+
             for branch in branches {
                 let module_names = {
                     let mut module_names = module_names.clone();
@@ -215,7 +218,7 @@ fn desugar_module_accessors_expr(module_names: Rope<String>, expr: &mut syntax::
                     }
                     module_names
                 };
-                desugar_module_accessors_expr(module_names, &mut branch.body.item);
+                desugar_module_accessors_expr(&module_names, &mut branch.body.item);
             }
         }
         syntax::Expr::Unit => {}
@@ -241,7 +244,7 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
                 }
                 module_names
             };
-            desugar_module_accessors_expr(module_names, &mut body.item)
+            desugar_module_accessors_expr(&module_names, &mut body.item);
         }
         syntax::Declaration::Class { .. } => {}
         syntax::Declaration::Instance {
@@ -263,7 +266,7 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
                     }
                     module_names
                 };
-                desugar_module_accessors_expr(module_names, &mut body.item)
+                desugar_module_accessors_expr(&module_names, &mut body.item)
             }
         }
         syntax::Declaration::TypeAlias { .. } => {}
