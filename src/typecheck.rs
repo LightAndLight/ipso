@@ -1377,7 +1377,7 @@ impl<'modules> Typechecker<'modules> {
         expected: syntax::Kind,
         actual: syntax::Kind,
     ) -> Result<(), TypeError> {
-        match expected.clone() {
+        match expected {
             syntax::Kind::Type => match actual {
                 syntax::Kind::Type => Ok(()),
                 syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
@@ -1398,8 +1398,14 @@ impl<'modules> Typechecker<'modules> {
                     self.unify_kind(context, *expected_a, *actual_a)?;
                     self.unify_kind(context, *expected_b, *actual_b)
                 }
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
-                _ => self.kind_mismatch(context, expected, actual),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(
+                    context,
+                    syntax::Kind::Arrow(expected_a, expected_b),
+                    m,
+                ),
+                _ => {
+                    self.kind_mismatch(context, syntax::Kind::Arrow(expected_a, expected_b), actual)
+                }
             },
             syntax::Kind::Meta(expected_m) => match actual {
                 syntax::Kind::Meta(actual_m) if expected_m == actual_m => Ok(()),
