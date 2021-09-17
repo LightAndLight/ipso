@@ -61,8 +61,8 @@ pub fn solve_constraint(
                 match tc.unify_type_subst(
                     &mut subst,
                     &unify_context,
-                    constraint.clone(),
-                    implication.consequent.clone(),
+                    constraint,
+                    &implication.consequent,
                 ) {
                     Err(_) => {
                         continue;
@@ -74,9 +74,9 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.zonk_type(x))
+                                .map(|x| tc.zonk_type(&x))
                                 .collect(),
-                            consequent: tc.zonk_type(implication.consequent),
+                            consequent: tc.zonk_type(&implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -184,7 +184,7 @@ pub fn solve_constraint(
                                         expected: Type::Meta(*n),
                                         actual: Type::RowNil,
                                     };
-                                    tc.solve_typevar_left(&unify_type_context, *n, Type::RowNil)?;
+                                    tc.solve_typevar_left(&unify_type_context, *n, &Type::RowNil)?;
                                     solve_constraint(context, tc, constraint)
                                 }
                                 _ => {
@@ -242,7 +242,7 @@ pub fn solve_placeholder(
             let expr = solve_constraint(
                 &Some(SolveConstraintContext {
                     pos: pos.unwrap_or(0),
-                    constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type())),
+                    constraint: tc.fill_ty_names(tc.zonk_type(&constraint.to_type())),
                 }),
                 tc,
                 &constraint,

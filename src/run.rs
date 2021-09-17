@@ -87,7 +87,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             expected: expected.clone(),
             actual: actual.clone(),
         };
-        let _ = tc.unify_type(&context, expected, actual)?;
+        let _ = tc.unify_type(&context, &expected, &actual)?;
     }
 
     let heap = Arena::new();

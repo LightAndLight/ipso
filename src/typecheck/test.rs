@@ -391,7 +391,7 @@ fn infer_lam_test_1() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -424,7 +424,7 @@ fn infer_lam_test_2() {
         };
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         let expected = Ok((
             core::Expr::mk_lam(
                 true,
@@ -485,7 +485,7 @@ fn infer_lam_test_3() {
         };
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         let expected = Ok((
             core::Expr::mk_lam(
                 true,
@@ -577,7 +577,7 @@ fn infer_lam_test_4() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -627,7 +627,7 @@ fn infer_lam_test_5() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -715,14 +715,14 @@ fn unify_rows_test_1() {
                     expected: syntax::Type::Unit,
                     actual: syntax::Type::Unit
                 },
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("y"), Type::Bool)
                     ],
                     None
                 ),
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("y"), Type::Bool),
                         (String::from("x"), Type::Int)
@@ -744,7 +744,7 @@ fn unify_rows_test_2() {
                     expected: syntax::Type::Unit,
                     actual: syntax::Type::Unit,
                 },
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("x"), Type::Bool),
@@ -752,7 +752,7 @@ fn unify_rows_test_2() {
                     ],
                     None
                 ),
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("y"), Type::Bool),
                         (String::from("x"), Type::Int),
@@ -775,7 +775,7 @@ fn unify_rows_test_3() {
                     expected: syntax::Type::Unit,
                     actual: syntax::Type::Unit,
                 },
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("x"), Type::Bool),
@@ -783,7 +783,7 @@ fn unify_rows_test_3() {
                     ],
                     None
                 ),
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("y"), Type::Bool),
@@ -806,7 +806,7 @@ fn unify_rows_test_4() {
                     expected: syntax::Type::Unit,
                     actual: syntax::Type::Unit
                 },
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("x"), Type::Bool),
@@ -814,7 +814,7 @@ fn unify_rows_test_4() {
                     ],
                     None
                 ),
-                Type::mk_record(
+                &Type::mk_record(
                     vec![
                         (String::from("x"), Type::Int),
                         (String::from("y"), Type::Bool),
@@ -846,7 +846,7 @@ fn infer_record_test_1() {
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
             tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Ok((
                 core::Expr::mk_record(Vec::new(), None),
                 syntax::Type::mk_record(Vec::new(), None)
@@ -880,7 +880,7 @@ fn infer_record_test_2() {
         );
         assert_eq!(
             tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Ok((
                 core::Expr::mk_record(
                     vec![
@@ -938,7 +938,7 @@ fn infer_record_test_3() {
         );
         assert_eq!(
             tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Ok((
                 core::Expr::mk_record(
                     vec![
@@ -991,7 +991,7 @@ fn infer_record_test_4() {
         );
         assert_eq!(
             tc.infer_expr(syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Err(TypeError::TypeMismatch {
                 location: InputLocation::Interactive {
                     label: String::from("(typechecker)"),
@@ -1067,7 +1067,7 @@ fn infer_case_1() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1162,7 +1162,7 @@ fn infer_case_2() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1272,7 +1272,7 @@ fn infer_case_3() {
         ));
         let actual = tc
             .infer_expr(term)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1350,7 +1350,7 @@ fn infer_case_4() {
         };
         assert_eq!(
             tc.infer_expr(term)
-                .map(|(expr, ty)| (expr, tc.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Err(TypeError::RedundantPattern {
                 location: InputLocation::Interactive {
                     label: String::from("(typechecker)"),
@@ -1416,7 +1416,7 @@ fn infer_record_1() {
         };
         let actual_result = tc
             .infer_expr(expr)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected_result, actual_result, "checking results");
 
         let (actual_expr, _actual_ty) = actual_result.unwrap();
@@ -1442,7 +1442,7 @@ fn infer_record_1() {
                 }
             )),
             solve_placeholder(&mut tc, *p0)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
         );
 
         assert_eq!(
@@ -1454,7 +1454,7 @@ fn infer_record_1() {
                 }
             )),
             solve_placeholder(&mut tc, *p1)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
         );
 
         assert_eq!(
@@ -1476,7 +1476,7 @@ fn infer_record_1() {
                 }
             )),
             solve_placeholder(&mut tc, *p2)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(constraint)))
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
         );
     })
 }
@@ -1779,8 +1779,8 @@ fn type_occurs_1() {
                     expected: Type::Unit,
                     actual: Type::Unit,
                 },
-                v1.clone(),
-                Type::mk_arrow(v1.clone(), v2.clone())
+                &v1,
+                &Type::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::TypeOccurs {
                 location: InputLocation::Interactive {
@@ -2606,8 +2606,8 @@ fn unify_1() {
                 expected: real.clone(),
                 actual: holey.clone(),
             };
-            tc.unify_type(&context, real, holey.clone())
-                .map(|_| tc.zonk_type(holey))
+            tc.unify_type(&context, &real, &holey)
+                .map(|_| tc.zonk_type(&holey))
         };
         assert_eq!(expected, actual)
     })

@@ -425,7 +425,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         module_context: HashMap<ModulePath, Module>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
-        let mut context: HashMap<String, Expr> = builtins::BUILTINS
+        let mut context: HashMap<String, Expr> = builtins::builtins()
             .decls
             .iter()
             .filter_map(|x| match x {

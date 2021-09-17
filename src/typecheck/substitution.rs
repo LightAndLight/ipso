@@ -53,7 +53,7 @@ impl Substitution {
                 self.0.insert(expected, actual);
                 Ok(())
             }
-            Some(expected_ty) => tc.unify_type_subst(self, context, expected_ty, actual),
+            Some(expected_ty) => tc.unify_type_subst(self, context, &expected_ty, &actual),
         }?;
         Ok(())
     }
@@ -98,7 +98,7 @@ impl Substitution {
                 self.0.insert(actual, expected);
                 Ok(())
             }
-            Some(actual_ty) => tc.unify_type_subst(self, context, expected, actual_ty),
+            Some(actual_ty) => tc.unify_type_subst(self, context, &expected, &actual_ty),
         }?;
         Ok(())
     }

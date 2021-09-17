@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash};
+use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
 use crate::iter::Step;
 use lazy_static::lazy_static;
@@ -280,10 +280,10 @@ pub enum Type<A> {
     Record,
     Variant,
     IO,
-    App(Box<Type<A>>, Box<Type<A>>),
+    App(Rc<Type<A>>, Rc<Type<A>>),
     RowNil,
-    RowCons(String, Box<Type<A>>, Box<Type<A>>),
-    HasField(String, Box<Type<A>>),
+    RowCons(String, Rc<Type<A>>, Rc<Type<A>>),
+    HasField(String, Rc<Type<A>>),
     Unit,
     Meta(usize),
 }
@@ -745,7 +745,7 @@ impl<A> Type<A> {
     }
 
     pub fn mk_app(a: Type<A>, b: Type<A>) -> Type<A> {
-        Type::App(Box::new(a), Box::new(b))
+        Type::App(Rc::new(a), Rc::new(b))
     }
 
     pub fn mk_arrow(a: Type<A>, b: Type<A>) -> Type<A> {
@@ -761,11 +761,11 @@ impl<A> Type<A> {
     }
 
     pub fn mk_rowcons(field: String, a: Type<A>, b: Type<A>) -> Type<A> {
-        Type::RowCons(field, Box::new(a), Box::new(b))
+        Type::RowCons(field, Rc::new(a), Rc::new(b))
     }
 
     pub fn mk_hasfield(field: String, rest: Type<A>) -> Type<A> {
-        Type::HasField(field, Box::new(rest))
+        Type::HasField(field, Rc::new(rest))
     }
 
     pub fn mk_rows(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {

@@ -506,7 +506,7 @@ impl<'modules> Typechecker<'modules> {
         modules: &'modules Modules,
     ) -> Self {
         let mut tc = Self::new(working_dir, location, modules);
-        tc.register_from_import(&builtins::BUILTINS, &syntax::Names::All);
+        tc.register_from_import(&builtins::builtins(), &syntax::Names::All);
         tc
     }
 
@@ -806,7 +806,7 @@ impl<'modules> Typechecker<'modules> {
             if !seen_evars.contains(ev) {
                 seen_evars.insert(*ev);
                 let constraint = self.evidence.lookup_evar(ev).unwrap();
-                unsolved_constraints.push((*ev, self.zonk_type(constraint.to_type())));
+                unsolved_constraints.push((*ev, self.zonk_type(&constraint.to_type())));
             }
         }
 
@@ -1276,20 +1276,20 @@ impl<'modules> Typechecker<'modules> {
         self.context.get(name).cloned()
     }
 
-    pub fn zonk_constraint(&self, constraint: Constraint) -> Constraint {
+    pub fn zonk_constraint(&self, constraint: &Constraint) -> Constraint {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
-                field,
+                field: field.clone(),
                 rest: self.zonk_type(rest),
             },
             Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty)),
         }
     }
 
-    pub fn zonk_type(&self, ty: Type<usize>) -> Type<usize> {
+    pub fn zonk_type(&self, ty: &Type<usize>) -> Type<usize> {
         match ty {
-            Type::Name(n) => Type::Name(n),
-            Type::Var(n) => Type::Var(n),
+            Type::Name(n) => Type::Name(n.clone()),
+            Type::Var(n) => Type::Var(*n),
             Type::Bool => Type::Bool,
             Type::Int => Type::Int,
             Type::Char => Type::Char,
@@ -1298,22 +1298,22 @@ impl<'modules> Typechecker<'modules> {
             Type::Arrow => Type::Arrow,
             Type::FatArrow => Type::FatArrow,
             Type::Constraints(cs) => {
-                Type::Constraints(cs.iter().map(|c| self.zonk_type(c.clone())).collect())
+                Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
             }
             Type::Array => Type::Array,
             Type::Record => Type::Record,
             Type::Variant => Type::Variant,
             Type::IO => Type::IO,
-            Type::App(a, b) => Type::mk_app(self.zonk_type(*a), self.zonk_type(*b)),
+            Type::App(a, b) => Type::mk_app(self.zonk_type(a), self.zonk_type(b)),
             Type::RowNil => Type::RowNil,
             Type::Unit => Type::Unit,
             Type::RowCons(field, ty, rest) => {
-                Type::mk_rowcons(field, self.zonk_type(*ty), self.zonk_type(*rest))
+                Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
             }
-            Type::HasField(field, rest) => Type::mk_hasfield(field, self.zonk_type(*rest)),
-            Type::Meta(n) => match self.type_solutions[n].1 {
-                None => Type::Meta(n),
-                Some(ref ty) => self.zonk_type(ty.clone()),
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), self.zonk_type(rest)),
+            Type::Meta(n) => match &self.type_solutions[*n].1 {
+                None => Type::Meta(*n),
+                Some(ty) => self.zonk_type(ty),
             },
         }
     }
@@ -1355,11 +1355,11 @@ impl<'modules> Typechecker<'modules> {
         actual: syntax::Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(context.ty.clone())),
+            ty: self.fill_ty_names(self.zonk_type(&context.ty)),
             has_kind: self.zonk_kind(false, context.has_kind.clone()),
             unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
-                expected: self.fill_ty_names(self.zonk_type(x.expected.clone())),
-                actual: self.fill_ty_names(self.zonk_type(x.actual)),
+                expected: self.fill_ty_names(self.zonk_type(&x.expected)),
+                actual: self.fill_ty_names(self.zonk_type(&x.actual)),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1479,8 +1479,8 @@ impl<'modules> Typechecker<'modules> {
         actual: Type<usize>,
     ) -> Result<A, TypeError> {
         let context = UnifyTypeContext {
-            expected: self.fill_ty_names(self.zonk_type(context.expected.clone())),
-            actual: self.fill_ty_names(self.zonk_type(context.actual.clone())),
+            expected: self.fill_ty_names(self.zonk_type(&context.expected)),
+            actual: self.fill_ty_names(self.zonk_type(&context.actual)),
         };
         Err(TypeError::TypeMismatch {
             location: self.location(),
@@ -1522,7 +1522,7 @@ impl<'modules> Typechecker<'modules> {
                 location: self.location(),
                 pos: self.current_position(),
                 meta,
-                ty: self.fill_ty_names(self.zonk_type(ty.clone())),
+                ty: self.fill_ty_names(self.zonk_type(ty)),
             })
         } else {
             Ok(())
@@ -1532,12 +1532,12 @@ impl<'modules> Typechecker<'modules> {
     pub fn solve_typevar_right(
         &mut self,
         context: &UnifyTypeContext<usize>,
-        expected: Type<usize>,
+        expected: &Type<usize>,
         meta: usize,
     ) -> Result<(), TypeError> {
-        match self.type_solutions[meta].1.clone() {
+        match &self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta].1 = Some(expected);
+                self.type_solutions[meta].1 = Some(expected.clone());
                 Ok(())
             }
             Some(actual) => self.unify_type(context, expected, actual),
@@ -1548,11 +1548,11 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         context: &UnifyTypeContext<usize>,
         meta: usize,
-        actual: Type<usize>,
+        actual: &Type<usize>,
     ) -> Result<(), TypeError> {
-        match self.type_solutions[meta].1.clone() {
+        match &self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta].1 = Some(actual);
+                self.type_solutions[meta].1 = Some(actual.clone());
                 Ok(())
             }
             Some(expected) => self.unify_type(context, expected, actual),
@@ -1663,13 +1663,13 @@ impl<'modules> Typechecker<'modules> {
         Type::Meta(n)
     }
 
-    fn walk(&self, ty: Type<usize>) -> Type<usize> {
+    fn walk(&self, ty: &Type<usize>) -> Type<usize> {
         match ty {
-            Type::Meta(n) => match self.type_solutions[n].1.clone() {
-                None => ty,
+            Type::Meta(n) => match &self.type_solutions[*n].1 {
+                None => ty.clone(),
                 Some(ty) => self.walk(ty),
             },
-            _ => ty,
+            _ => ty.clone(),
         }
     }
 
@@ -1677,8 +1677,8 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         subst: &mut Substitution,
         context: &UnifyTypeContext<usize>,
-        expected: Type<usize>,
-        actual: Type<usize>,
+        expected: &Type<usize>,
+        actual: &Type<usize>,
     ) -> Result<(), TypeError> {
         let expected = self.walk(expected);
         let actual = self.walk(actual);
@@ -1689,8 +1689,8 @@ impl<'modules> Typechecker<'modules> {
         match expected {
             Type::App(a1, b1) => match actual {
                 Type::App(a2, b2) => {
-                    self.unify_type_subst(subst, context, *a1, *a2)?;
-                    self.unify_type_subst(subst, context, *b1, *b2)?;
+                    self.unify_type_subst(subst, context, &a1, &a2)?;
+                    self.unify_type_subst(subst, context, &b1, &b2)?;
                     Ok(())
                 }
                 Type::Meta(n) => subst.subst_right(self, context, Type::App(a1, b1), n),
@@ -1749,7 +1749,7 @@ impl<'modules> Typechecker<'modules> {
             Type::Constraints(constraints1) => match actual {
                 Type::Constraints(constraints2) => {
                     for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
-                        if let Err(err) = self.unify_type_subst(subst, context, c1, c2) {
+                        if let Err(err) = self.unify_type_subst(subst, context, &c1, &c2) {
                             return Err(err);
                         }
                     }
@@ -1819,8 +1819,7 @@ impl<'modules> Typechecker<'modules> {
                     //
                     // unify sames
                     for (_field, ty1, ty2) in sames {
-                        match self.unify_type_subst(subst, context, (*ty1).clone(), (*ty2).clone())
-                        {
+                        match self.unify_type_subst(subst, context, ty1, ty2) {
                             Err(err) => return Err(err),
                             Ok(()) => {}
                         }
@@ -1831,18 +1830,18 @@ impl<'modules> Typechecker<'modules> {
                         subst,
                         context,
                         match rest1 {
-                            None => Type::RowNil,
-                            Some(ty) => (*ty).clone(),
+                            None => &Type::RowNil,
+                            Some(ty) => ty,
                         },
-                        Type::mk_rows(not_in_rows1, rest3.clone()),
+                        &Type::mk_rows(not_in_rows1, rest3.clone()),
                     )?;
                     self.unify_type_subst(
                         subst,
                         context,
-                        Type::mk_rows(not_in_rows2, rest3),
+                        &Type::mk_rows(not_in_rows2, rest3),
                         match rest2 {
-                            None => Type::RowNil,
-                            Some(ty) => (*ty).clone(),
+                            None => &Type::RowNil,
+                            Some(ty) => ty,
                         },
                     )?;
 
@@ -1855,7 +1854,7 @@ impl<'modules> Typechecker<'modules> {
             },
             Type::HasField(field, rest) => match actual {
                 Type::HasField(field2, rest2) if field == field2 => {
-                    self.unify_type_subst(subst, context, *rest, *rest2)
+                    self.unify_type_subst(subst, context, &rest, &rest2)
                 }
                 Type::Meta(n) => subst.subst_right(self, context, Type::HasField(field, rest), n),
                 _ => self.type_mismatch(context, Type::HasField(field, rest), actual),
@@ -1882,8 +1881,8 @@ impl<'modules> Typechecker<'modules> {
     pub fn unify_type(
         &mut self,
         context: &UnifyTypeContext<usize>,
-        expected: Type<usize>,
-        actual: Type<usize>,
+        expected: &Type<usize>,
+        actual: &Type<usize>,
     ) -> Result<(), TypeError> {
         let mut subst = Substitution::new();
         self.unify_type_subst(&mut subst, context, expected, actual)?;
@@ -2029,14 +2028,14 @@ impl<'modules> Typechecker<'modules> {
     fn check_pattern(
         &mut self,
         arg: &syntax::Pattern,
-        expected: Type<usize>,
+        expected: &Type<usize>,
     ) -> Result<(core::Pattern, Vec<(String, Type<usize>)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
         let context = UnifyTypeContext {
             expected: expected.clone(),
             actual: actual.clone(),
         };
-        self.unify_type(&context, expected, actual)?;
+        self.unify_type(&context, expected, &actual)?;
         Ok((pat, binds))
     }
 
@@ -2123,7 +2122,7 @@ impl<'modules> Typechecker<'modules> {
                         expected: expected.clone(),
                         actual: actual.clone(),
                     };
-                    self.unify_type(&context, expected, actual)?;
+                    self.unify_type(&context, &expected, &actual)?;
                     let x_core = self.check_expr(*x, in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
@@ -2223,7 +2222,7 @@ impl<'modules> Typechecker<'modules> {
                             let actual =
                                 Type::mk_record(fields_rows.clone(), Some(rest_row_var.clone()));
                             let context = UnifyTypeContext { expected, actual };
-                            self.unify_type(&context, Type::RowNil, rest_row_var)
+                            self.unify_type(&context, &Type::RowNil, &rest_row_var)
                         }
                         Some(expr) => {
                             let expr_core = self.check_expr(
@@ -2421,8 +2420,8 @@ impl<'modules> Typechecker<'modules> {
                                                 };
                                             match self.unify_type(
                                                 &context,
-                                                expected_pattern_ty.clone(),
-                                                pattern_ty.clone(),
+                                                &expected_pattern_ty,
+                                                &pattern_ty,
                                             ) {
                                                 Err(err) => {
                                                     return Err(err);
@@ -2447,8 +2446,8 @@ impl<'modules> Typechecker<'modules> {
                                     };
                                     match self.unify_type(
                                         &context,
-                                        expected_pattern_ty.clone(),
-                                        pattern_ty.clone(),
+                                        &expected_pattern_ty,
+                                        &pattern_ty,
                                     ) {
                                         Err(err) => {
                                             return Err(err);
@@ -2478,7 +2477,7 @@ impl<'modules> Typechecker<'modules> {
                     }
 
                     if matching_variant && !seen_fallthrough {
-                        let expr_ty = self.zonk_type(expr_ty);
+                        let expr_ty = self.zonk_type(&expr_ty);
                         let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
                         let ctors: Vec<(String, syntax::Type<usize>)> = ctors
                             .iter()
@@ -2491,8 +2490,8 @@ impl<'modules> Typechecker<'modules> {
                         };
                         let _ = self.unify_type(
                             &context,
-                            expected_pattern_ty,
-                            Type::mk_variant(Vec::new(), None),
+                            &expected_pattern_ty,
+                            &Type::mk_variant(Vec::new(), None),
                         )?;
                     }
 
@@ -2532,12 +2531,12 @@ impl<'modules> Typechecker<'modules> {
                         expected: ty.clone(),
                         actual: actual.clone(),
                     };
-                    self.unify_type(&context, ty, actual)?;
+                    self.unify_type(&context, &ty, &actual)?;
 
                     let mut args_core = Vec::new();
                     let mut args_binds = Vec::new();
                     for (arg, arg_ty) in args.iter().zip(arg_tys.iter()) {
-                        match self.check_pattern(arg, arg_ty.clone()) {
+                        match self.check_pattern(arg, arg_ty) {
                             Err(err) => {
                                 return Err(err);
                             }
@@ -2584,7 +2583,7 @@ impl<'modules> Typechecker<'modules> {
                         expected: expected.clone(),
                         actual: actual.clone(),
                     };
-                    self.unify_type(&context, expected, actual)?;
+                    self.unify_type(&context, &expected, &actual)?;
                     Ok(expr)
                 }
             }
