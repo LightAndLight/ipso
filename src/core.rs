@@ -1,4 +1,4 @@
-use std::{cmp, collections::HashMap};
+use std::{cmp, collections::HashMap, rc::Rc};
 
 use crate::{
     import::ModulePath,
@@ -13,7 +13,7 @@ mod test;
 pub enum Pattern {
     Name,
     Record { names: Vec<Expr>, rest: bool },
-    Variant { tag: Box<Expr> },
+    Variant { tag: Rc<Expr> },
     Wildcard,
 }
 
@@ -31,7 +31,7 @@ impl Pattern {
     }
 
     pub fn mk_variant(tag: Expr) -> Pattern {
-        Pattern::Variant { tag: Box::new(tag) }
+        Pattern::Variant { tag: Rc::new(tag) }
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
@@ -236,16 +236,16 @@ pub enum Expr {
     Module(ModuleName, String),
     Builtin(Builtin),
 
-    App(Box<Expr>, Box<Expr>),
-    Lam { arg: bool, body: Box<Expr> },
+    App(Rc<Expr>, Rc<Expr>),
+    Lam { arg: bool, body: Rc<Expr> },
 
     True,
     False,
-    IfThenElse(Box<Expr>, Box<Expr>, Box<Expr>),
+    IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
 
     Int(u32),
 
-    Binop(syntax::Binop, Box<Expr>, Box<Expr>),
+    Binop(syntax::Binop, Rc<Expr>, Rc<Expr>),
 
     Char(char),
 
@@ -253,13 +253,13 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
-    Extend(Box<Expr>, Box<Expr>, Box<Expr>),
+    Extend(Rc<Expr>, Rc<Expr>, Rc<Expr>),
     Record(Vec<(Expr, Expr)>),
-    Project(Box<Expr>, Box<Expr>),
+    Project(Rc<Expr>, Rc<Expr>),
 
-    Variant(Box<Expr>),
-    Embed(Box<Expr>, Box<Expr>),
-    Case(Box<Expr>, Vec<Branch>),
+    Variant(Rc<Expr>),
+    Embed(Rc<Expr>, Rc<Expr>),
+    Case(Rc<Expr>, Vec<Branch>),
     Unit,
 }
 
@@ -272,26 +272,26 @@ impl Expr {
                     // todo: bind the arg with a let?
                     body.instantiate(&b)
                 } else {
-                    *body
+                    (*body).clone()
                 }
             }
-            a => Expr::App(Box::new(a), Box::new(b)),
+            a => Expr::App(Rc::new(a), Rc::new(b)),
         }
     }
 
     pub fn mk_lam(arg: bool, body: Expr) -> Expr {
         Expr::Lam {
             arg,
-            body: Box::new(body),
+            body: Rc::new(body),
         }
     }
 
     pub fn mk_ifthenelse(x: Expr, y: Expr, z: Expr) -> Expr {
-        Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
+        Expr::IfThenElse(Rc::new(x), Rc::new(y), Rc::new(z))
     }
 
     pub fn mk_extend(ev: Expr, field: Expr, rest: Expr) -> Expr {
-        Expr::Extend(Box::new(ev), Box::new(field), Box::new(rest))
+        Expr::Extend(Rc::new(ev), Rc::new(field), Rc::new(rest))
     }
 
     pub fn mk_record(fields: Vec<(Expr, Expr)>, rest: Option<Expr>) -> Expr {
@@ -312,20 +312,20 @@ impl Expr {
                     _ => None,
                 }) {
                     Some(val) => val,
-                    None => Self::Project(Box::new(Expr::Record(fields)), Box::new(Expr::Int(ix))),
+                    None => Self::Project(Rc::new(Expr::Record(fields)), Rc::new(Expr::Int(ix))),
                 },
-                offset => Self::Project(Box::new(Expr::Record(fields)), Box::new(offset)),
+                offset => Self::Project(Rc::new(Expr::Record(fields)), Rc::new(offset)),
             },
-            expr => Self::Project(Box::new(expr), Box::new(offset)),
+            expr => Self::Project(Rc::new(expr), Rc::new(offset)),
         }
     }
 
     pub fn mk_variant(tag: Expr) -> Expr {
-        Expr::Variant(Box::new(tag))
+        Expr::Variant(Rc::new(tag))
     }
 
     pub fn mk_embed(tag: Expr, rest: Expr) -> Expr {
-        Expr::Embed(Box::new(tag), Box::new(rest))
+        Expr::Embed(Rc::new(tag), Rc::new(rest))
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
@@ -338,11 +338,11 @@ impl Expr {
                 _ => {}
             }
         }
-        Expr::Binop(op, Box::new(a), Box::new(b))
+        Expr::Binop(op, Rc::new(a), Rc::new(b))
     }
 
     pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
-        Expr::Case(Box::new(expr), branches)
+        Expr::Case(Rc::new(expr), branches)
     }
 
     pub fn mk_placeholder(p: usize) -> Expr {

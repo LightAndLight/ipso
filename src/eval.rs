@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     io::{BufRead, Write},
+    rc::Rc,
 };
 use typed_arena::Arena;
 
@@ -129,7 +130,7 @@ pub enum Value<'heap> {
     Closure {
         env: &'heap [ValueRef<'heap>],
         arg: bool,
-        body: Expr,
+        body: Rc<Expr>,
     },
     StaticClosure {
         env: &'heap [ValueRef<'heap>],
@@ -395,7 +396,7 @@ pub struct Interpreter<'stdout, 'heap> {
     stdin: &'stdout mut dyn BufRead,
     stdout: &'stdout mut dyn Write,
     heap: &'heap Arena<Object<'heap>>,
-    context: HashMap<String, Expr>,
+    context: HashMap<String, Rc<Expr>>,
     module_context: HashMap<ModulePath, Module>,
     module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
 }
@@ -411,7 +412,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         Interpreter {
             stdin,
             stdout,
-            context,
+            context: context
+                .into_iter()
+                .map(|(name, expr)| (name, Rc::new(expr)))
+                .collect(),
             module_context,
             module_unmapping: Vec::with_capacity(1),
             heap,
@@ -425,17 +429,21 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         module_context: HashMap<ModulePath, Module>,
         heap: &'heap Arena<Object<'heap>>,
     ) -> Self {
-        let mut context: HashMap<String, Expr> = builtins::builtins()
+        let mut context: HashMap<String, Rc<Expr>> = builtins::builtins()
             .decls
             .iter()
             .filter_map(|x| match x {
                 Declaration::Definition { name, sig: _, body } => {
-                    Some((name.clone(), body.clone()))
+                    Some((name.clone(), Rc::new(body.clone())))
                 }
                 _ => None,
             })
             .collect();
-        context.extend(additional_context);
+        context.extend(
+            additional_context
+                .into_iter()
+                .map(|(name, expr)| (name, Rc::new(expr))),
+        );
         Interpreter {
             stdin,
             stdout,
@@ -1060,8 +1068,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let string = arg.unpack_string();
                         let new_string: String = string
                             .chars()
-                            .filter(|&c| {
-                                let c_val = eval.alloc_value(Value::Char(c));
+                            .filter(|c| {
+                                let c_val = eval.alloc_value(Value::Char(*c));
                                 predicate.apply(eval, c_val).unpack_bool()
                             })
                             .collect();
@@ -1163,20 +1171,20 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 })
                 .collect(),
         );
-        let res = self.eval(env, expr);
+        let res = self.eval(env, Rc::new(expr));
         self.module_unmapping.pop();
         res
     }
 
-    pub fn eval(&mut self, env: &'heap [ValueRef<'heap>], expr: Expr) -> ValueRef<'heap> {
-        let out = match expr {
+    pub fn eval(&mut self, env: &'heap [ValueRef<'heap>], expr: Rc<Expr>) -> ValueRef<'heap> {
+        let out = match expr.as_ref() {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
-            Expr::Name(name) => match self.context.get(&name) {
+            Expr::Name(name) => match self.context.get(name) {
                 None => panic!("{:?} not in scope", name),
                 Some(body) => {
-                    let body = body.clone();
+                    let body: Rc<Expr> = body.clone();
                     self.eval(env, body)
                 }
             },
@@ -1186,40 +1194,40 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     .module_unmapping
                     .last()
                     .unwrap()
-                    .get(&name)
+                    .get(name)
                     .unwrap()
                     .clone(),
-                &item,
+                item,
             ),
-            Expr::Builtin(name) => self.eval_builtin(&name),
+            Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {
-                let a = self.eval(env, *a);
-                let b = self.eval(env, *b);
+                let a = self.eval(env, a.clone());
+                let b = self.eval(env, b.clone());
                 a.apply(self, b)
             }
             Expr::Lam { arg, body } => self.alloc_value(Value::Closure {
                 env,
-                arg,
-                body: *body,
+                arg: *arg,
+                body: body.clone(),
             }),
 
             Expr::True => self.alloc_value(Value::True),
             Expr::False => self.alloc_value(Value::False),
             Expr::IfThenElse(cond, t, e) => {
-                let cond = self.eval(env, *cond);
+                let cond = self.eval(env, cond.clone());
                 match cond {
-                    Value::True => self.eval(env, *t),
-                    Value::False => self.eval(env, *e),
+                    Value::True => self.eval(env, t.clone()),
+                    Value::False => self.eval(env, e.clone()),
                     cond => panic!("expected bool, got {:?}", cond),
                 }
             }
 
-            Expr::Int(n) => self.alloc_value(Value::Int(n)),
+            Expr::Int(n) => self.alloc_value(Value::Int(*n)),
 
             Expr::Binop(op, a, b) => {
-                let a = self.eval(env, *a);
-                let b = self.eval(env, *b);
+                let a = self.eval(env, a.clone());
+                let b = self.eval(env, b.clone());
                 match op {
                     Binop::Add => {
                         let a = a.unpack_int();
@@ -1241,7 +1249,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 }
             }
 
-            Expr::Char(c) => self.alloc_value(Value::Char(c)),
+            Expr::Char(c) => self.alloc_value(Value::Char(*c)),
 
             Expr::String(parts) => {
                 let mut value = String::new();
@@ -1249,7 +1257,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 for part in parts {
                     match part {
                         StringPart::Expr(expr) => {
-                            let s = self.eval(env, expr).unpack_string();
+                            let s = self.eval(env, Rc::new(expr.clone())).unpack_string();
                             value.push_str(s.as_str());
                         }
                         StringPart::String(s) => value.push_str(s.as_str()),
@@ -1259,14 +1267,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
 
             Expr::Array(items) => {
-                let items = items.into_iter().map(|item| self.eval(env, item)).collect();
+                let items = items
+                    .iter()
+                    .map(|item| self.eval(env, Rc::new(item.clone())))
+                    .collect();
                 self.alloc_value(Value::Array(items))
             }
 
             Expr::Extend(ev, value, rest) => {
-                let ix = self.eval(env, *ev).unpack_int();
-                let value = self.eval(env, *value);
-                let rest = self.eval(env, *rest);
+                let ix = self.eval(env, ev.clone()).unpack_int();
+                let value = self.eval(env, value.clone());
+                let rest = self.eval(env, rest.clone());
                 match rest {
                     Value::Record(fields) => {
                         // assume: all stacks in fields are non-empty
@@ -1286,8 +1297,13 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Record(fields) => {
                 let mut record: Vec<ValueRef<'heap>> = Vec::with_capacity(fields.len());
                 let mut fields: Vec<(u32, ValueRef<'heap>)> = fields
-                    .into_iter()
-                    .map(|(ev, field)| (self.eval(env, ev).unpack_int(), self.eval(env, field)))
+                    .iter()
+                    .map(|(ev, field)| {
+                        (
+                            self.eval(env, Rc::new(ev.clone())).unpack_int(),
+                            self.eval(env, Rc::new(field.clone())),
+                        )
+                    })
                     .collect();
                 fields.sort_by_key(|x| x.0);
                 for (_index, field) in fields.into_iter() {
@@ -1296,8 +1312,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 self.alloc_value(Value::Record(record))
             }
             Expr::Project(expr, index) => {
-                let index = self.eval(env, *index).unpack_int();
-                let expr = self.eval(env, *expr);
+                let index = self.eval(env, index.clone()).unpack_int();
+                let expr = self.eval(env, expr.clone());
                 match expr {
                     Value::Record(fields) => fields[index as usize],
                     expr => panic!("expected record, got {:?}", expr),
@@ -1305,7 +1321,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
 
             Expr::Variant(tag) => {
-                let tag = self.eval(env, *tag);
+                let tag = self.eval(env, tag.clone());
                 let env = self.alloc_env(vec![tag]);
                 fn code<'heap>(
                     interpreter: &mut Interpreter<'_, 'heap>,
@@ -1322,8 +1338,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 self.alloc_value(closure)
             }
             Expr::Embed(tag, rest) => {
-                let tag = self.eval(env, *tag).unpack_int() as usize;
-                let rest = self.eval(env, *rest);
+                let tag = self.eval(env, tag.clone()).unpack_int() as usize;
+                let rest = self.eval(env, rest.clone());
                 let (old_tag, arg) = rest.unpack_variant();
                 self.alloc_value(Value::Variant(
                     if tag <= old_tag { old_tag + 1 } else { old_tag },
@@ -1331,7 +1347,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 ))
             }
             Expr::Case(expr, branches) => {
-                let expr = self.eval(env, *expr);
+                let expr = self.eval(env, expr.clone());
                 match expr {
                     Value::Record(fields) => {
                         // expect a record pattern
@@ -1342,7 +1358,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                 let mut new_env = Vec::from(env);
                                 let mut extracted = Vec::new();
                                 for name in names {
-                                    let ix = self.eval(env, name.clone()).unpack_int() as usize;
+                                    let ix =
+                                        self.eval(env, Rc::new(name.clone())).unpack_int() as usize;
                                     new_env.push(fields[ix]);
                                     extracted.push(ix);
                                 }
@@ -1360,7 +1377,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                 }
 
                                 let new_env = self.alloc_env(new_env);
-                                self.eval(new_env, branch.body.clone())
+                                self.eval(new_env, Rc::new(branch.body.clone()))
                             }
                             Pattern::Name {} | Pattern::Wildcard {} => {
                                 todo!("allow name and wildcard patterns")
@@ -1375,26 +1392,26 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let mut target: Option<Expr> = None;
                         let mut new_env = Vec::from(env);
                         for branch in branches {
-                            match branch.pattern {
+                            match &branch.pattern {
                                 Pattern::Record { .. } => {
                                     panic!("expected variant pattern, got {:?}", branch.pattern)
                                 }
                                 Pattern::Variant { tag: branch_tag } => {
                                     let branch_tag =
-                                        self.eval(env, *branch_tag).unpack_int() as usize;
+                                        self.eval(env, branch_tag.clone()).unpack_int() as usize;
                                     if *tag == branch_tag {
                                         new_env.push(value);
-                                        target = Some(branch.body);
+                                        target = Some(branch.body.clone());
                                         break;
                                     }
                                 }
                                 Pattern::Name => {
                                     new_env.push(expr);
-                                    target = Some(branch.body);
+                                    target = Some(branch.body.clone());
                                     break;
                                 }
                                 Pattern::Wildcard => {
-                                    target = Some(branch.body);
+                                    target = Some(branch.body.clone());
                                     break;
                                 }
                             }
@@ -1403,7 +1420,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             None => panic!("pattern match failure"),
                             Some(body) => {
                                 let env = self.alloc_env(new_env);
-                                self.eval(env, body)
+                                self.eval(env, Rc::new(body))
                             }
                         }
                     }

@@ -5,6 +5,8 @@ use crate::core::{Builtin, Expr, StringPart};
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
+use std::rc::Rc;
+#[cfg(test)]
 use typed_arena::Arena;
 
 #[test]
@@ -26,7 +28,7 @@ fn eval_1() {
     let env = interpreter.alloc_env(Vec::new());
 
     let expected_value = interpreter.alloc_value(Value::Int(1));
-    let actual_value = interpreter.eval(env, term);
+    let actual_value = interpreter.eval(env, Rc::new(term));
     assert_eq!(expected_value, actual_value);
 
     let actual_stdout = String::from_utf8(stdout).unwrap();
@@ -54,6 +56,6 @@ fn eval_2() {
     let env = interpreter.alloc_env(Vec::new());
 
     let expected_value = interpreter.alloc_value(Value::Bytes(str.as_bytes()));
-    let actual_value = interpreter.eval(env, term);
+    let actual_value = interpreter.eval(env, Rc::new(term));
     assert_eq!(expected_value, actual_value);
 }
