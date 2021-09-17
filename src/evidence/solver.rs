@@ -176,7 +176,7 @@ pub fn solve_constraint(
                     // will never recieve solutions
                     match sol.clone() {
                         None => {
-                            match tc.zonk_kind(false, kind.clone()) {
+                            match tc.zonk_kind(false, kind) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {

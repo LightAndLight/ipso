@@ -65,7 +65,7 @@ fn infer_kind_test_4() {
                 Type::Record,
                 Type::mk_rowcons(String::from("x"), Type::Bool, Type::RowNil),
             ))
-            .map(|(_, kind)| tc.zonk_kind(false, kind));
+            .map(|(_, kind)| tc.zonk_kind(false, &kind));
         assert_eq!(expected, actual)
     })
 }
@@ -1753,8 +1753,8 @@ fn kind_occurs_1() {
                     has_kind: Kind::Type,
                     unifying_types: None
                 },
-                v1.clone(),
-                Kind::mk_arrow(v1.clone(), v2.clone())
+                &v1,
+                &Kind::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::KindOccurs {
                 location: InputLocation::Interactive {

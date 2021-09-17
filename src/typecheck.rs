@@ -787,7 +787,7 @@ impl<'modules> Typechecker<'modules> {
             has_kind: expected.clone(),
             unifying_types: context.cloned(),
         };
-        self.unify_kind(&context, expected, actual)?;
+        self.unify_kind(&context, &expected, &actual)?;
         Ok(ty)
     }
 
@@ -843,7 +843,7 @@ impl<'modules> Typechecker<'modules> {
             .bound_tyvars
             .info
             .iter()
-            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
+            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind)))
             .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
@@ -957,7 +957,7 @@ impl<'modules> Typechecker<'modules> {
 
         let ty_vars = ty_var_kinds
             .iter()
-            .map(|(a, b)| (a.clone(), self.zonk_kind(true, b.clone())))
+            .map(|(a, b)| (a.clone(), self.zonk_kind(true, b)))
             .collect();
         let sig = core::TypeSig {
             ty_vars,
@@ -1028,7 +1028,7 @@ impl<'modules> Typechecker<'modules> {
             name: name.to_string(),
             args: args_kinds
                 .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
+                .map(|(name, kind)| (name, self.zonk_kind(true, &kind)))
                 .collect(),
             members: checked_members,
         }))
@@ -1174,7 +1174,7 @@ impl<'modules> Typechecker<'modules> {
 
         let ty_vars = ty_var_kinds
             .into_iter()
-            .map(|(a, b)| (a, self.zonk_kind(true, b)))
+            .map(|(a, b)| (a, self.zonk_kind(true, &b)))
             .collect();
 
         Ok(core::Declaration::Instance {
@@ -1318,21 +1318,21 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn zonk_kind(&self, close_unsolved: bool, kind: syntax::Kind) -> syntax::Kind {
+    pub fn zonk_kind(&self, close_unsolved: bool, kind: &syntax::Kind) -> syntax::Kind {
         match kind {
             syntax::Kind::Type => syntax::Kind::Type,
             syntax::Kind::Row => syntax::Kind::Row,
             syntax::Kind::Constraint => syntax::Kind::Constraint,
             syntax::Kind::Arrow(a, b) => syntax::Kind::mk_arrow(
-                self.zonk_kind(close_unsolved, *a),
-                self.zonk_kind(close_unsolved, *b),
+                self.zonk_kind(close_unsolved, a),
+                self.zonk_kind(close_unsolved, b),
             ),
-            syntax::Kind::Meta(m) => match self.kind_solutions[m].clone() {
+            syntax::Kind::Meta(m) => match &self.kind_solutions[*m] {
                 None => {
                     if close_unsolved {
                         syntax::Kind::Type
                     } else {
-                        syntax::Kind::Meta(m)
+                        syntax::Kind::Meta(*m)
                     }
                 }
                 Some(kind) => self.zonk_kind(close_unsolved, kind),
@@ -1351,12 +1351,12 @@ impl<'modules> Typechecker<'modules> {
     fn kind_mismatch<A>(
         &self,
         context: &UnifyKindContext<usize>,
-        expected: syntax::Kind,
-        actual: syntax::Kind,
+        expected: &syntax::Kind,
+        actual: &syntax::Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
             ty: self.fill_ty_names(self.zonk_type(&context.ty)),
-            has_kind: self.zonk_kind(false, context.has_kind.clone()),
+            has_kind: self.zonk_kind(false, &context.has_kind),
             unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_type(&x.expected)),
                 actual: self.fill_ty_names(self.zonk_type(&x.actual)),
@@ -1366,50 +1366,52 @@ impl<'modules> Typechecker<'modules> {
             location: self.location(),
             pos: self.current_position(),
             context,
-            expected,
-            actual,
+            expected: expected.clone(),
+            actual: actual.clone(),
         })
     }
 
     fn unify_kind(
         &mut self,
         context: &UnifyKindContext<usize>,
-        expected: syntax::Kind,
-        actual: syntax::Kind,
+        expected: &syntax::Kind,
+        actual: &syntax::Kind,
     ) -> Result<(), TypeError> {
         match expected {
             syntax::Kind::Type => match actual {
                 syntax::Kind::Type => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, *m),
                 _ => self.kind_mismatch(context, expected, actual),
             },
             syntax::Kind::Row => match actual {
                 syntax::Kind::Row => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, *m),
                 _ => self.kind_mismatch(context, expected, actual),
             },
             syntax::Kind::Constraint => match actual {
                 syntax::Kind::Constraint => Ok(()),
-                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, m),
+                syntax::Kind::Meta(m) => self.solve_kindvar_right(context, expected, *m),
                 _ => self.kind_mismatch(context, expected, actual),
             },
             syntax::Kind::Arrow(expected_a, expected_b) => match actual {
                 syntax::Kind::Arrow(actual_a, actual_b) => {
-                    self.unify_kind(context, *expected_a, *actual_a)?;
-                    self.unify_kind(context, *expected_b, *actual_b)
+                    self.unify_kind(context, expected_a, actual_a)?;
+                    self.unify_kind(context, expected_b, actual_b)
                 }
                 syntax::Kind::Meta(m) => self.solve_kindvar_right(
                     context,
-                    syntax::Kind::Arrow(expected_a, expected_b),
-                    m,
+                    &syntax::Kind::Arrow((*expected_a).clone(), (*expected_b).clone()),
+                    *m,
                 ),
-                _ => {
-                    self.kind_mismatch(context, syntax::Kind::Arrow(expected_a, expected_b), actual)
-                }
+                _ => self.kind_mismatch(
+                    context,
+                    &syntax::Kind::Arrow((*expected_a).clone(), (*expected_b).clone()),
+                    actual,
+                ),
             },
             syntax::Kind::Meta(expected_m) => match actual {
                 syntax::Kind::Meta(actual_m) if expected_m == actual_m => Ok(()),
-                actual => self.solve_kindvar_left(context, expected_m, actual),
+                actual => self.solve_kindvar_left(context, *expected_m, actual),
             },
         }
     }
@@ -1427,7 +1429,7 @@ impl<'modules> Typechecker<'modules> {
                 location: self.location(),
                 pos: self.current_position(),
                 meta,
-                kind: self.zonk_kind(false, kind.clone()),
+                kind: self.zonk_kind(false, kind),
             }),
         }
     }
@@ -1435,16 +1437,16 @@ impl<'modules> Typechecker<'modules> {
     fn solve_kindvar_right(
         &mut self,
         context: &UnifyKindContext<usize>,
-        expected: syntax::Kind,
+        expected: &syntax::Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
         match self.kind_solutions[meta].clone() {
             None => {
-                let _ = self.occurs_kind(meta, &expected)?;
-                self.kind_solutions[meta] = Some(expected);
+                let _ = self.occurs_kind(meta, expected)?;
+                self.kind_solutions[meta] = Some(expected.clone());
                 Ok(())
             }
-            Some(actual) => self.unify_kind(context, expected, actual),
+            Some(actual) => self.unify_kind(context, expected, &actual),
         }
     }
 
@@ -1452,15 +1454,15 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         context: &UnifyKindContext<usize>,
         meta: usize,
-        actual: syntax::Kind,
+        actual: &syntax::Kind,
     ) -> Result<(), TypeError> {
         match self.kind_solutions[meta].clone() {
             None => {
-                let _ = self.occurs_kind(meta, &actual)?;
-                self.kind_solutions[meta] = Some(actual);
+                let _ = self.occurs_kind(meta, actual)?;
+                self.kind_solutions[meta] = Some(actual.clone());
                 Ok(())
             }
-            Some(expected) => self.unify_kind(context, expected, actual),
+            Some(expected) => self.unify_kind(context, &expected, actual),
         }
     }
 

@@ -1025,7 +1025,7 @@ pub enum Kind {
     Type,
     Row,
     Constraint,
-    Arrow(Box<Kind>, Box<Kind>),
+    Arrow(Rc<Kind>, Rc<Kind>),
     Meta(usize),
 }
 
@@ -1078,7 +1078,7 @@ impl Kind {
     }
 
     pub fn mk_arrow(a: Kind, b: Kind) -> Kind {
-        Kind::Arrow(Box::new(a), Box::new(b))
+        Kind::Arrow(Rc::new(a), Rc::new(b))
     }
 
     pub fn render(&self) -> String {
