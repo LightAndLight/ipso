@@ -4,16 +4,14 @@ use typed_arena::Arena;
 use crate::{
     core,
     diagnostic::{self, Diagnostic},
-    lex::Lexer,
-    parse::{self, Parser},
+    parse::{self},
     rope::Rope,
     syntax::{self, ModuleName},
     typecheck::{self, Typechecker},
 };
 use std::{
     collections::HashMap,
-    fs::File,
-    io::{self, Read},
+    io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -353,22 +351,7 @@ impl<'a> Modules<'a> {
                     let input_location = InputLocation::File {
                         path: PathBuf::from(path),
                     };
-                    let mut module = {
-                        let content = {
-                            let mut file = File::open(path)?;
-                            let mut content = String::new();
-                            file.read_to_string(&mut content)?;
-                            content
-                        };
-
-                        let tokens = Lexer::new(&content).tokenize();
-                        let mut parser = Parser::new(input_location.clone(), tokens);
-
-                        parser
-                            .module()
-                            .and_then(|module| parser.eof().map(|_| module))
-                            .result
-                    }?;
+                    let mut module = parse::parse_file(path)?;
 
                     for import_info in calculate_imports(path, &mut module).into_iter() {
                         if let Err(err) = self.import(

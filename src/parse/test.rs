@@ -30,7 +30,8 @@ macro_rules! parse_test {
                     },
                     tokens,
                 );
-                keep_left!(parser.$function(), parser.eof()).result
+                let result = keep_left!(parser.$function(), parser.eof());
+                parser.into_parse_error(result.result)
             },
             $output
         )
@@ -52,7 +53,7 @@ fn parse_ident_2() {
                 label: String::from("(parser)"),
             },
             pos: 0,
-            expecting: Rc::new(vec![TokenType::Ident(Rc::from(""))].into_iter().collect())
+            expecting: vec![TokenType::Ident(Rc::from(""))].into_iter().collect()
         })
     )
 }
@@ -122,15 +123,13 @@ fn parse_import_as_3() {
                 label: String::from("(parser)"),
             },
             pos: 10,
-            expecting: Rc::new(
-                vec![
-                    TokenType::Space,
-                    TokenType::Ident(Rc::from("as")),
-                    TokenType::Comment { length: 0 }
-                ]
-                .into_iter()
-                .collect()
-            )
+            expecting: vec![
+                TokenType::Space,
+                TokenType::Ident(Rc::from("as")),
+                TokenType::Comment { length: 0 }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
@@ -184,31 +183,29 @@ fn parse_definition_3() {
                 label: String::from("(parser)"),
             },
             pos: 11,
-            expecting: Rc::new(
-                vec![
-                    TokenType::Int {
-                        value: 0,
-                        length: 0
-                    },
-                    TokenType::Ident(Rc::from("")),
-                    TokenType::Ident(Rc::from("case")),
-                    TokenType::Ident(Rc::from("true")),
-                    TokenType::Ident(Rc::from("false")),
-                    TokenType::Ident(Rc::from("if")),
-                    TokenType::Ctor,
-                    TokenType::Space,
-                    TokenType::LAngle,
-                    TokenType::LParen,
-                    TokenType::LBrace,
-                    TokenType::LBracket,
-                    TokenType::DoubleQuote,
-                    TokenType::SingleQuote,
-                    TokenType::Backslash,
-                    TokenType::Comment { length: 0 },
-                ]
-                .into_iter()
-                .collect()
-            )
+            expecting: vec![
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                },
+                TokenType::Ident(Rc::from("")),
+                TokenType::Ident(Rc::from("case")),
+                TokenType::Ident(Rc::from("true")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("if")),
+                TokenType::Ctor,
+                TokenType::Space,
+                TokenType::LAngle,
+                TokenType::LParen,
+                TokenType::LBrace,
+                TokenType::LBracket,
+                TokenType::DoubleQuote,
+                TokenType::SingleQuote,
+                TokenType::Backslash,
+                TokenType::Comment { length: 0 },
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
@@ -589,31 +586,29 @@ fn parse_case_4() {
                 label: String::from("(parser)"),
             },
             pos: 24,
-            expecting: Rc::new(
-                vec![
-                    TokenType::Space,
-                    TokenType::Indent(2),
-                    TokenType::Dedent,
-                    TokenType::LAngle,
-                    TokenType::LParen,
-                    TokenType::LBrace,
-                    TokenType::LBracket,
-                    TokenType::Dot,
-                    TokenType::Ctor,
-                    TokenType::Ident(Rc::from("true")),
-                    TokenType::Ident(Rc::from("false")),
-                    TokenType::Ident(Rc::from("")),
-                    TokenType::DoubleQuote,
-                    TokenType::SingleQuote,
-                    TokenType::Int {
-                        value: 0,
-                        length: 0
-                    },
-                    TokenType::Comment { length: 0 }
-                ]
-                .into_iter()
-                .collect()
-            )
+            expecting: vec![
+                TokenType::Space,
+                TokenType::Indent(2),
+                TokenType::Dedent,
+                TokenType::LAngle,
+                TokenType::LParen,
+                TokenType::LBrace,
+                TokenType::LBracket,
+                TokenType::Dot,
+                TokenType::Ctor,
+                TokenType::Ident(Rc::from("true")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("")),
+                TokenType::DoubleQuote,
+                TokenType::SingleQuote,
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                },
+                TokenType::Comment { length: 0 }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }
@@ -633,31 +628,29 @@ fn parse_case_5() {
                 label: String::from("(parser)"),
             },
             pos: 18,
-            expecting: Rc::new(
-                vec![
-                    TokenType::Ctor,
-                    TokenType::Ident(Rc::from("")),
-                    TokenType::Ident(Rc::from("false")),
-                    TokenType::Ident(Rc::from("true")),
-                    TokenType::Int {
-                        value: 0,
-                        length: 0
-                    },
-                    TokenType::DoubleQuote,
-                    TokenType::SingleQuote,
-                    TokenType::LBrace,
-                    TokenType::LParen,
-                    TokenType::LBracket,
-                    TokenType::LAngle,
-                    TokenType::Dot,
-                    TokenType::Indent(2),
-                    TokenType::Dedent,
-                    TokenType::Space,
-                    TokenType::Comment { length: 0 }
-                ]
-                .into_iter()
-                .collect()
-            )
+            expecting: vec![
+                TokenType::Ctor,
+                TokenType::Ident(Rc::from("")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("true")),
+                TokenType::Int {
+                    value: 0,
+                    length: 0
+                },
+                TokenType::DoubleQuote,
+                TokenType::SingleQuote,
+                TokenType::LBrace,
+                TokenType::LParen,
+                TokenType::LBracket,
+                TokenType::LAngle,
+                TokenType::Dot,
+                TokenType::Indent(2),
+                TokenType::Dedent,
+                TokenType::Space,
+                TokenType::Comment { length: 0 }
+            ]
+            .into_iter()
+            .collect()
         })
     )
 }

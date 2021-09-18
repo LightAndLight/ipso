@@ -7,14 +7,22 @@ use crate::{
         self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
     },
 };
-use std::{cmp, collections::BTreeSet, fs::File, io::Read, rc::Rc, vec::IntoIter};
+use std::{
+    cmp,
+    collections::BTreeSet,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    rc::Rc,
+    vec::IntoIter,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     Unexpected {
         location: InputLocation,
         pos: usize,
-        expecting: Rc<BTreeSet<TokenType>>,
+        expecting: BTreeSet<TokenType>,
     },
 }
 
@@ -64,7 +72,7 @@ impl ParseError {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseResult<A> {
     pub consumed: bool,
-    pub result: Result<A, ParseError>,
+    pub result: Option<A>,
 }
 
 impl<A> ParseResult<A> {
@@ -73,11 +81,11 @@ impl<A> ParseResult<A> {
         F: FnOnce(A) -> ParseResult<B>,
     {
         match self.result {
-            Err(err) => ParseResult {
+            None => ParseResult {
                 consumed: self.consumed,
-                result: Err(err),
+                result: None,
             },
-            Ok(a) => {
+            Some(a) => {
                 let mut next = f(a);
                 next.consumed = next.consumed || self.consumed;
                 next
@@ -91,17 +99,14 @@ impl<A> ParseResult<A> {
     {
         ParseResult {
             consumed: self.consumed,
-            result: match self.result {
-                Err(err) => Err(err),
-                Ok(a) => Ok(f(a)),
-            },
+            result: self.result.map(f),
         }
     }
 
     fn pure(x: A) -> Self {
         ParseResult {
             consumed: false,
-            result: Ok(x),
+            result: Some(x),
         }
     }
 }
@@ -124,10 +129,7 @@ macro_rules! map0 {
         let b = $b;
         ParseResult {
             consumed: b.consumed,
-            result: match b.result {
-                Err(err) => Err(err),
-                Ok(_) => Ok($a),
-            },
+            result: b.result.map(|_| $a),
         }
     }};
 }
@@ -137,18 +139,15 @@ macro_rules! map2 {
     ($f:expr, $a:expr, $b:expr) => {{
         let a = $a;
         match a.result {
-            Err(err) => ParseResult {
+            None => ParseResult {
                 consumed: a.consumed,
-                result: Err(err),
+                result: None,
             },
-            Ok(val1) => {
+            Some(val1) => {
                 let b = $b;
                 ParseResult {
                     consumed: a.consumed || b.consumed,
-                    result: match b.result {
-                        Err(err) => Err(err),
-                        Ok(val2) => Ok($f(val1, val2)),
-                    },
+                    result: b.result.map(|val2| $f(val1, val2)),
                 }
             }
         }
@@ -195,7 +194,8 @@ macro_rules! parse_string {
             },
             tokens,
         );
-        keep_left!(parser.$p(), parser.eof()).result
+        let result = keep_left!(parser.$p(), parser.eof());
+        parser.into_parse_error(result.result)
     }};
 }
 
@@ -208,54 +208,60 @@ macro_rules! parse_str {
     }};
 }
 
-pub fn parse_string(input: String) -> Result<Module, ParseError> {
+pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module, ParseError> {
     let tokens: Vec<Token> = {
         let lexer = Lexer::new(&input);
         lexer.tokenize()
     };
-    let mut parser: Parser = Parser::new(
-        InputLocation::Interactive {
-            label: String::from("(string)"),
-        },
-        tokens,
-    );
-    keep_left!(parser.module(), parser.eof()).result
+    let mut parser: Parser = Parser::new(location, tokens);
+    let result = keep_left!(parser.module(), parser.eof());
+    parser.into_parse_error(result.result)
 }
 
-pub fn parse_file(filename: &str) -> Result<Module, ParseError> {
+pub fn parse_string(input: String) -> Result<Module, ParseError> {
+    let location = InputLocation::Interactive {
+        label: String::from("(string)"),
+    };
+    parse_string_at(location, input)
+}
+
+pub fn parse_file(filename: &Path) -> Result<Module, ParseError> {
     let input: String = {
         let mut content = String::new();
         let mut file: File = File::open(filename).unwrap();
         file.read_to_string(&mut content).unwrap();
         content
     };
-    parse_string(input)
+    let location = InputLocation::File {
+        path: PathBuf::from(filename),
+    };
+    parse_string_at(location, input)
 }
 
 pub struct Parser {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
-    expecting: Rc<BTreeSet<TokenType>>,
+    expecting: BTreeSet<TokenType>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
 
 macro_rules! many_with {
     ($vec:expr, $self:expr, $x:expr) => {{
-        let mut error: Option<ParseError> = None;
+        let mut error: bool = false;
         let mut acc: Vec<_> = $vec;
         let mut consumed = false;
         loop {
             let next = $x;
             match next.result {
-                Err(err) => {
+                None => {
                     if next.consumed {
-                        error = Some(err);
+                        error = true;
                     };
                     break;
                 }
-                Ok(val) => {
+                Some(val) => {
                     consumed = consumed || next.consumed;
                     acc.push(val)
                 }
@@ -264,8 +270,8 @@ macro_rules! many_with {
         ParseResult {
             consumed,
             result: match error {
-                None => Ok(acc),
-                Some(err) => Err(err),
+                false => Some(acc),
+                true => None,
             },
         }
     }};
@@ -279,18 +285,18 @@ macro_rules! many {
 
 macro_rules! many_ {
     ($self:expr, $x:expr) => {{
-        let mut error: Option<ParseError> = None;
+        let mut error: bool = false;
         let mut consumed = false;
         loop {
             let next = $x;
             match next.result {
-                Err(err) => {
+                None => {
                     if next.consumed {
-                        error = Some(err);
+                        error = true;
                     };
                     break;
                 }
-                Ok(_) => {
+                Some(_) => {
                     consumed = consumed || next.consumed;
                 }
             }
@@ -298,8 +304,8 @@ macro_rules! many_ {
         ParseResult {
             consumed,
             result: match error {
-                None => Ok(()),
-                Some(err) => Err(err),
+                false => Some(()),
+                true => None,
             },
         }
     }};
@@ -328,16 +334,16 @@ macro_rules! choices {
     ($self:expr, $x:expr $(, $y:expr)*) => {{
         let first = $x;
         match first.result {
-            Err(err) => {
+            None => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: Err(err) }
+                    ParseResult{ consumed: true, result: None }
                 } else {
                     let mut rest = choices!($self $(, $y)*);
                     rest.consumed = first.consumed || rest.consumed ;
                     rest
                 }
             }
-            Ok(val) => ParseResult{consumed:first.consumed, result:Ok(val)},
+            Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
         }
     }}
 }
@@ -346,19 +352,19 @@ macro_rules! optional {
     ($self:expr, $a:expr) => {{
         let first = $a;
         match first.result {
-            Err(err) => {
+            None => {
                 if first.consumed {
                     ParseResult {
                         consumed: true,
-                        result: Err(err),
+                        result: None,
                     }
                 } else {
                     ParseResult::pure(None)
                 }
             }
-            Ok(val) => ParseResult {
+            Some(val) => ParseResult {
                 consumed: first.consumed,
-                result: Ok(Some(val)),
+                result: Some(Some(val)),
             },
         }
     }};
@@ -379,28 +385,28 @@ impl Parser {
             location,
             pos: 0,
             indentation: vec![0],
-            expecting: Rc::new(BTreeSet::new()),
+            expecting: BTreeSet::new(),
             current,
             input,
         }
     }
 
-    fn fail<A>(&self, consumed: bool, err: ParseError) -> ParseResult<A> {
-        ParseResult {
-            consumed,
-            result: Err(err),
+    pub fn into_parse_error<A>(self, result: Option<A>) -> Result<A, ParseError> {
+        match result {
+            Some(a) => Ok(a),
+            None => Err(ParseError::Unexpected {
+                location: self.location,
+                pos: self.pos,
+                expecting: self.expecting,
+            }),
         }
     }
 
     fn unexpected<A>(&self, consumed: bool) -> ParseResult<A> {
-        self.fail(
+        ParseResult {
             consumed,
-            ParseError::Unexpected {
-                location: self.location.clone(),
-                pos: self.pos,
-                expecting: self.expecting.clone(),
-            },
-        )
+            result: None,
+        }
     }
 
     pub fn eof(&self) -> ParseResult<()> {
@@ -416,10 +422,10 @@ impl Parser {
             Some(ref token) => {
                 self.pos += token.token_type.length();
                 self.current = self.input.next();
-                *Rc::make_mut(&mut self.expecting) = BTreeSet::new();
+                self.expecting.clear();
                 ParseResult {
                     consumed: true,
-                    result: Ok(()),
+                    result: Some(()),
                 }
             }
         }
@@ -430,7 +436,7 @@ impl Parser {
     }
 
     fn space(&mut self) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Space);
+        self.expecting.insert(TokenType::Space);
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n > self.current_indentation() => {
@@ -446,7 +452,7 @@ impl Parser {
     }
 
     fn indent(&mut self) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Indent(0));
+        self.expecting.insert(TokenType::Indent(0));
         let current_indentation = self.current_indentation();
         match self.current {
             Some(ref token) => match token.token_type {
@@ -461,7 +467,7 @@ impl Parser {
     }
 
     fn dedent(&mut self) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Dedent);
+        self.expecting.insert(TokenType::Dedent);
         let dedent_to = match &self.current {
             Some(token) => match token.token_type {
                 TokenType::Indent(n) => Some(n),
@@ -492,7 +498,7 @@ impl Parser {
     }
 
     fn comment(&mut self) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Comment { length: 0 });
+        self.expecting.insert(TokenType::Comment { length: 0 });
         match self.current {
             None => self.unexpected(false),
             Some(ref token) => match token.token_type {
@@ -507,7 +513,8 @@ impl Parser {
     }
 
     fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Ident(Rc::from(expected.to_string())));
+        self.expecting
+            .insert(TokenType::Ident(Rc::from(expected.to_string())));
         match self.current {
             None => self.unexpected(false),
             Some(ref actual) => match actual.token_type {
@@ -524,7 +531,7 @@ impl Parser {
     }
 
     fn token(&mut self, expected: &TokenType) -> ParseResult<()> {
-        Rc::make_mut(&mut self.expecting).insert(expected.clone());
+        self.expecting.insert(expected.clone());
         match self.current {
             Some(ref actual) if actual.token_type == *expected => {
                 map0!((), self.consume())
@@ -534,7 +541,7 @@ impl Parser {
     }
 
     fn ident(&mut self) -> ParseResult<Rc<str>> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Ident(Rc::from("")));
+        self.expecting.insert(TokenType::Ident(Rc::from("")));
         match self.current {
             Some(ref token) => match &token.token_type {
                 TokenType::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
@@ -555,7 +562,7 @@ impl Parser {
     }
 
     fn ctor(&mut self) -> ParseResult<Rc<str>> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Ctor);
+        self.expecting.insert(TokenType::Ctor);
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().next() {
@@ -576,7 +583,7 @@ impl Parser {
     }
 
     fn int(&mut self) -> ParseResult<u32> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::Int {
+        self.expecting.insert(TokenType::Int {
             value: 0,
             length: 0,
         });
@@ -604,19 +611,19 @@ impl Parser {
     /// assert_eq!(parse_str!(char, "\'\\\'"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 3,
-    ///     expecting: Rc::new(vec![TokenType::SingleQuote].into_iter().collect()),
+    ///     expecting: vec![TokenType::SingleQuote].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: Rc::new(vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect()),
+    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: Rc::new(vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect()),
+    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
     /// }));
     /// ```
     pub fn char(&mut self) -> ParseResult<char> {
@@ -624,7 +631,7 @@ impl Parser {
             self.token(&TokenType::SingleQuote),
             self.token(&TokenType::SingleQuote),
             {
-                Rc::make_mut(&mut self.expecting).insert(TokenType::Char {
+                self.expecting.insert(TokenType::Char {
                     value: '\0',
                     length: 0,
                 });
@@ -822,7 +829,7 @@ impl Parser {
     fn newline(&mut self) -> ParseResult<()> {
         keep_right!(optional!(self, self.comment()), {
             let current = self.current_indentation();
-            Rc::make_mut(&mut self.expecting).insert(TokenType::Indent(current));
+            self.expecting.insert(TokenType::Indent(current));
             match self.current {
                 None => self.unexpected(false),
                 Some(ref token) => match token.token_type {
@@ -926,7 +933,7 @@ impl Parser {
     }
 
     fn string_part_string(&mut self) -> ParseResult<StringPart> {
-        Rc::make_mut(&mut self.expecting).insert(TokenType::String {
+        self.expecting.insert(TokenType::String {
             value: String::new(),
             length: 0,
         });
