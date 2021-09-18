@@ -1,11 +1,14 @@
 #[cfg(test)]
+use std::rc::Rc;
+
+#[cfg(test)]
 use super::{Lexer, Token, TokenType};
 
 #[test]
 fn lex_int_1() {
     assert_eq!(
         {
-            let input = String::from("923");
+            let input = Rc::from("923");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
@@ -23,7 +26,7 @@ fn lex_int_1() {
 fn lex_int_2() {
     assert_eq!(
         {
-            let input = String::from("00923");
+            let input = Rc::from("00923");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
@@ -41,13 +44,13 @@ fn lex_int_2() {
 fn lex_import() {
     assert_eq!(
         {
-            let input = String::from("import yes as no");
+            let input = Rc::from("import yes as no");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![
             Token {
-                token_type: TokenType::Ident(String::from("import")),
+                token_type: TokenType::Ident(Rc::from("import")),
                 pos: 0
             },
             Token {
@@ -55,7 +58,7 @@ fn lex_import() {
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(String::from("yes")),
+                token_type: TokenType::Ident(Rc::from("yes")),
                 pos: 7
             },
             Token {
@@ -63,7 +66,7 @@ fn lex_import() {
                 pos: 10
             },
             Token {
-                token_type: TokenType::Ident(String::from("as")),
+                token_type: TokenType::Ident(Rc::from("as")),
                 pos: 11
             },
             Token {
@@ -71,7 +74,7 @@ fn lex_import() {
                 pos: 13
             },
             Token {
-                token_type: TokenType::Ident(String::from("no")),
+                token_type: TokenType::Ident(Rc::from("no")),
                 pos: 14
             }
         ]
@@ -82,13 +85,13 @@ fn lex_import() {
 fn lex_definition_1() {
     assert_eq!(
         {
-            let input = String::from("x : Int\nx = 1");
+            let input = Rc::from("x : Int\nx = 1");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![
             Token {
-                token_type: TokenType::Ident(String::from("x")),
+                token_type: TokenType::Ident(Rc::from("x")),
                 pos: 0
             },
             Token {
@@ -104,7 +107,7 @@ fn lex_definition_1() {
                 pos: 3
             },
             Token {
-                token_type: TokenType::Ident(String::from("Int")),
+                token_type: TokenType::Ident(Rc::from("Int")),
                 pos: 4
             },
             Token {
@@ -112,7 +115,7 @@ fn lex_definition_1() {
                 pos: 7
             },
             Token {
-                token_type: TokenType::Ident(String::from("x")),
+                token_type: TokenType::Ident(Rc::from("x")),
                 pos: 8
             },
             Token {
@@ -142,13 +145,13 @@ fn lex_definition_1() {
 fn lex_definition_2() {
     assert_eq!(
         {
-            let input = String::from("x : Int\nx = ~");
+            let input = Rc::from("x : Int\nx = ~");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![
             Token {
-                token_type: TokenType::Ident(String::from("x")),
+                token_type: TokenType::Ident(Rc::from("x")),
                 pos: 0
             },
             Token {
@@ -164,7 +167,7 @@ fn lex_definition_2() {
                 pos: 3
             },
             Token {
-                token_type: TokenType::Ident(String::from("Int")),
+                token_type: TokenType::Ident(Rc::from("Int")),
                 pos: 4
             },
             Token {
@@ -172,7 +175,7 @@ fn lex_definition_2() {
                 pos: 7
             },
             Token {
-                token_type: TokenType::Ident(String::from("x")),
+                token_type: TokenType::Ident(Rc::from("x")),
                 pos: 8
             },
             Token {
@@ -199,13 +202,13 @@ fn lex_definition_2() {
 fn lex_case_1() {
     assert_eq!(
         {
-            let input = String::from("case x of\n  a -> b");
+            let input = Rc::from("case x of\n  a -> b");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![
             Token {
-                token_type: TokenType::Ident(String::from("case")),
+                token_type: TokenType::Ident(Rc::from("case")),
                 pos: 0
             },
             Token {
@@ -213,7 +216,7 @@ fn lex_case_1() {
                 pos: 4
             },
             Token {
-                token_type: TokenType::Ident(String::from("x")),
+                token_type: TokenType::Ident(Rc::from("x")),
                 pos: 5
             },
             Token {
@@ -221,7 +224,7 @@ fn lex_case_1() {
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(String::from("of")),
+                token_type: TokenType::Ident(Rc::from("of")),
                 pos: 7
             },
             Token {
@@ -229,7 +232,7 @@ fn lex_case_1() {
                 pos: 9
             },
             Token {
-                token_type: TokenType::Ident(String::from("a")),
+                token_type: TokenType::Ident(Rc::from("a")),
                 pos: 12
             },
             Token {
@@ -245,7 +248,7 @@ fn lex_case_1() {
                 pos: 16
             },
             Token {
-                token_type: TokenType::Ident(String::from("b")),
+                token_type: TokenType::Ident(Rc::from("b")),
                 pos: 17
             },
         ]
@@ -256,13 +259,13 @@ fn lex_case_1() {
 fn lex_ann_1() {
     assert_eq!(
         {
-            let input = String::from("main : IO ~");
+            let input = Rc::from("main : IO ~");
             let lexer = Lexer::new(&input);
             lexer.tokenize()
         },
         vec![
             Token {
-                token_type: TokenType::Ident(String::from("main")),
+                token_type: TokenType::Ident(Rc::from("main")),
                 pos: 0
             },
             Token {
@@ -278,7 +281,7 @@ fn lex_ann_1() {
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(String::from("IO")),
+                token_type: TokenType::Ident(Rc::from("IO")),
                 pos: 7
             },
             Token {
@@ -295,7 +298,7 @@ fn lex_ann_1() {
 
 #[test]
 fn lex_string_1() {
-    let input = String::from("\"hello\"");
+    let input = Rc::from("\"hello\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -320,7 +323,7 @@ fn lex_string_1() {
 
 #[test]
 fn lex_string_2() {
-    let input = String::from("\"x $y z\"");
+    let input = Rc::from("\"x $y z\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -339,7 +342,7 @@ fn lex_string_2() {
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(String::from("y")),
+            token_type: TokenType::Ident(Rc::from("y")),
             pos: 4,
         },
         Token {
@@ -360,7 +363,7 @@ fn lex_string_2() {
 
 #[test]
 fn lex_string_3() {
-    let input = String::from("\"x $yy z\"");
+    let input = Rc::from("\"x $yy z\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -379,7 +382,7 @@ fn lex_string_3() {
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(String::from("yy")),
+            token_type: TokenType::Ident(Rc::from("yy")),
             pos: 4,
         },
         Token {
@@ -400,7 +403,7 @@ fn lex_string_3() {
 
 #[test]
 fn lex_string_4() {
-    let input = String::from("\"x ${yy} z\"");
+    let input = Rc::from("\"x ${yy} z\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -419,7 +422,7 @@ fn lex_string_4() {
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(String::from("yy")),
+            token_type: TokenType::Ident(Rc::from("yy")),
             pos: 5,
         },
         Token {
@@ -444,7 +447,7 @@ fn lex_string_4() {
 
 #[test]
 fn lex_string_5() {
-    let input = String::from("\"x ${a + b} z\"");
+    let input = Rc::from("\"x ${a + b} z\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -463,7 +466,7 @@ fn lex_string_5() {
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(String::from("a")),
+            token_type: TokenType::Ident(Rc::from("a")),
             pos: 5,
         },
         Token {
@@ -479,7 +482,7 @@ fn lex_string_5() {
             pos: 8,
         },
         Token {
-            token_type: TokenType::Ident(String::from("b")),
+            token_type: TokenType::Ident(Rc::from("b")),
             pos: 9,
         },
         Token {
@@ -504,7 +507,7 @@ fn lex_string_5() {
 
 #[test]
 fn lex_string_6() {
-    let input = String::from("\"hello $name\"");
+    let input = Rc::from("\"hello $name\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
@@ -523,7 +526,7 @@ fn lex_string_6() {
             pos: 7,
         },
         Token {
-            token_type: TokenType::Ident(String::from("name")),
+            token_type: TokenType::Ident(Rc::from("name")),
             pos: 8,
         },
         Token {
@@ -537,7 +540,7 @@ fn lex_string_6() {
 
 #[test]
 fn lex_string_7() {
-    let input = String::from("\"hello\\n\\n\\nworld\"");
+    let input = Rc::from("\"hello\\n\\n\\nworld\"");
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {

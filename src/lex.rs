@@ -1,6 +1,6 @@
 mod test;
 
-use std::str::Chars;
+use std::{rc::Rc, str::Chars};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum TokenType {
@@ -9,7 +9,7 @@ pub enum TokenType {
     Comment { length: usize },
 
     Ctor,
-    Ident(String),
+    Ident(Rc<str>),
     Int { value: usize, length: usize },
 
     DoubleQuote,
@@ -220,7 +220,7 @@ impl<'input> Lexer<'input> {
                         }
                         let _ = self.mode.pop().unwrap();
                         Some(Token {
-                            token_type: TokenType::Ident(ident),
+                            token_type: TokenType::Ident(Rc::from(ident)),
                             pos,
                         })
                     } else {
@@ -634,7 +634,7 @@ impl<'input> Lexer<'input> {
                             }
                         }
                         Some(Token {
-                            token_type: TokenType::Ident(ident),
+                            token_type: TokenType::Ident(Rc::from(ident)),
                             pos,
                         })
                     }

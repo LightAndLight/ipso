@@ -266,7 +266,7 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type<A> {
-    Name(String),
+    Name(Rc<str>),
     Var(A),
     Bool,
     Int,
@@ -282,8 +282,8 @@ pub enum Type<A> {
     IO,
     App(Rc<Type<A>>, Rc<Type<A>>),
     RowNil,
-    RowCons(String, Rc<Type<A>>, Rc<Type<A>>),
-    HasField(String, Rc<Type<A>>),
+    RowCons(Rc<str>, Rc<Type<A>>, Rc<Type<A>>),
+    HasField(Rc<str>, Rc<Type<A>>),
     Unit,
     Meta(usize),
 }
@@ -490,7 +490,7 @@ impl<A> Type<A> {
         constraints
     }
 
-    pub fn unwrap_name(&self) -> Option<&String> {
+    pub fn unwrap_name(&self) -> Option<&Rc<str>> {
         match self {
             Type::Name(n) => Some(n),
             _ => None,
@@ -709,7 +709,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_rows(&self) -> (Vec<(&String, &Type<A>)>, Option<&Type<A>>) {
+    pub fn unwrap_rows(&self) -> (Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>) {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
@@ -724,7 +724,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_record(&self) -> Option<(Vec<(&String, &Type<A>)>, Option<&Type<A>>)> {
+    pub fn unwrap_record(&self) -> Option<(Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Record => Some(b.unwrap_rows()),
@@ -734,7 +734,7 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn unwrap_variant(&self) -> Option<(Vec<(&String, &Type<A>)>, Option<&Type<A>>)> {
+    pub fn unwrap_variant(&self) -> Option<(Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>)> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Variant => Some(b.unwrap_rows()),
@@ -757,18 +757,18 @@ impl<A> Type<A> {
     }
 
     pub fn mk_name(s: &str) -> Type<A> {
-        Type::Name(String::from(s))
+        Type::Name(Rc::from(s))
     }
 
-    pub fn mk_rowcons(field: String, a: Type<A>, b: Type<A>) -> Type<A> {
+    pub fn mk_rowcons(field: Rc<str>, a: Type<A>, b: Type<A>) -> Type<A> {
         Type::RowCons(field, Rc::new(a), Rc::new(b))
     }
 
-    pub fn mk_hasfield(field: String, rest: Type<A>) -> Type<A> {
+    pub fn mk_hasfield(field: Rc<str>, rest: Type<A>) -> Type<A> {
         Type::HasField(field, Rc::new(rest))
     }
 
-    pub fn mk_rows(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
+    pub fn mk_rows(fields: Vec<(Rc<str>, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         let mut ty = rest.unwrap_or(Type::RowNil);
         for (field, a) in fields.into_iter().rev() {
             ty = Type::mk_rowcons(field, a, ty)
@@ -776,11 +776,11 @@ impl<A> Type<A> {
         ty
     }
 
-    pub fn mk_record(fields: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
+    pub fn mk_record(fields: Vec<(Rc<str>, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         Type::mk_app(Type::Record, Type::mk_rows(fields, rest))
     }
 
-    pub fn mk_variant(ctors: Vec<(String, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
+    pub fn mk_variant(ctors: Vec<(Rc<str>, Type<A>)>, rest: Option<Type<A>>) -> Type<A> {
         Type::mk_app(Type::Variant, Type::mk_rows(ctors, rest))
     }
 
@@ -797,12 +797,12 @@ impl<A> Type<A> {
                 None => {}
                 Some((first_field, first_ty)) => {
                     s.push(' ');
-                    s.push_str(first_field.as_str());
+                    s.push_str(first_field);
                     s.push_str(" : ");
                     s.push_str(first_ty.render().as_str());
                     for (field, ty) in fields_iter {
                         s.push_str(", ");
-                        s.push_str(field.as_str());
+                        s.push_str(field);
                         s.push_str(" : ");
                         s.push_str(ty.render().as_str());
                     }
@@ -833,12 +833,12 @@ impl<A> Type<A> {
                 None => {}
                 Some((first_field, first_ty)) => {
                     s.push(' ');
-                    s.push_str(first_field.as_str());
+                    s.push_str(first_field);
                     s.push_str(" : ");
                     s.push_str(first_ty.render().as_str());
                     for (field, ty) in fields_iter {
                         s.push_str(" | ");
-                        s.push_str(field.as_str());
+                        s.push_str(field);
                         s.push_str(" : ");
                         s.push_str(ty.render().as_str());
                     }
@@ -890,7 +890,7 @@ impl<A> Type<A> {
         }
 
         match self {
-            Type::Name(n) => s.push_str(n.clone().as_str()),
+            Type::Name(n) => s.push_str(n),
             Type::Var(n) => s.push_str(format!("{}", n).as_str()),
             Type::Bool => s.push_str("Bool"),
             Type::Int => s.push_str("Int"),
@@ -926,7 +926,7 @@ impl<A> Type<A> {
             Type::RowNil => s.push_str("()"),
             Type::RowCons(field, ty, rest) => {
                 s.push('(');
-                s.push_str(field.as_str());
+                s.push_str(field);
                 s.push_str(" : ");
                 s.push_str(ty.render().as_str());
                 s.push_str(" | ");
@@ -984,26 +984,26 @@ pub enum Names {
 pub enum Declaration {
     Definition {
         name: String,
-        ty: Type<String>,
+        ty: Type<Rc<str>>,
         args: Vec<Pattern>,
         body: Spanned<Expr>,
     },
     Class {
-        supers: Vec<Spanned<Type<String>>>,
-        name: String,
-        args: Vec<Spanned<String>>,
-        members: Vec<(String, Type<String>)>,
+        supers: Vec<Spanned<Type<Rc<str>>>>,
+        name: Rc<str>,
+        args: Vec<Spanned<Rc<str>>>,
+        members: Vec<(String, Type<Rc<str>>)>,
     },
     Instance {
-        assumes: Vec<Spanned<Type<String>>>,
-        name: Spanned<String>,
-        args: Vec<Type<String>>,
+        assumes: Vec<Spanned<Type<Rc<str>>>>,
+        name: Spanned<Rc<str>>,
+        args: Vec<Type<Rc<str>>>,
         members: Vec<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)>,
     },
     TypeAlias {
         name: String,
         args: Vec<String>,
-        body: Type<String>,
+        body: Type<Rc<str>>,
     },
     Import {
         module: Spanned<String>,

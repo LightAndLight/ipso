@@ -1,4 +1,7 @@
 #[cfg(test)]
+use std::rc::Rc;
+
+#[cfg(test)]
 use crate::{
     core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig},
     evidence::{solver::solve_constraint, Constraint, Evidence},
@@ -10,12 +13,9 @@ use crate::{
 fn solve_constraint_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
-            field: String::from("x"),
+            field: Rc::from("x"),
             rest: Type::mk_rows(
-                vec![
-                    (String::from("y"), Type::Int),
-                    (String::from("z"), Type::Bool),
-                ],
+                vec![(Rc::from("y"), Type::Int), (Rc::from("z"), Type::Bool)],
                 None,
             ),
         };
@@ -29,12 +29,9 @@ fn solve_constraint_1() {
 fn solve_constraint_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
-            field: String::from("y"),
+            field: Rc::from("y"),
             rest: Type::mk_rows(
-                vec![
-                    (String::from("x"), Type::Int),
-                    (String::from("z"), Type::Bool),
-                ],
+                vec![(Rc::from("x"), Type::Int), (Rc::from("z"), Type::Bool)],
                 None,
             ),
         };
@@ -51,18 +48,15 @@ fn solve_constraint_3() {
         tc.evidence.assume(
             None,
             Constraint::HasField {
-                field: String::from("z"),
+                field: Rc::from("z"),
                 rest: var.clone(),
             },
         );
         // HasField "z" (x : Int, y : Bool, ?0)
         let constraint = Constraint::HasField {
-            field: String::from("z"),
+            field: Rc::from("z"),
             rest: Type::mk_rows(
-                vec![
-                    (String::from("x"), Type::Int),
-                    (String::from("y"), Type::Bool),
-                ],
+                vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
                 Some(var.clone()),
             ),
         };
@@ -73,12 +67,12 @@ fn solve_constraint_3() {
 
         let expected_evidence = Evidence {
             evars: vec![Constraint::HasField {
-                field: String::from("z"),
+                field: Rc::from("z"),
                 rest: var.clone(),
             }],
             environment: vec![(
                 Constraint::HasField {
-                    field: String::from("z"),
+                    field: Rc::from("z"),
                     rest: var,
                 },
                 None,
@@ -95,8 +89,8 @@ fn solve_constraint_4() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         tc.register_class(&ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Eq"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Eq"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![ClassMember {
                 name: String::from("eq"),
                 sig: TypeSig {
@@ -110,7 +104,7 @@ fn solve_constraint_4() {
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+            &Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
@@ -118,11 +112,11 @@ fn solve_constraint_4() {
         );
 
         tc.register_instance(
-            &[(String::from("a"), Kind::Type)],
+            &[(Rc::from("a"), Kind::Type)],
             &Vec::new(),
-            &[Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+            &[Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0))],
             &Type::mk_app(
-                Type::Name(String::from("Eq")),
+                Type::Name(Rc::from("Eq")),
                 Type::mk_app(Type::Array, Type::Var(0)),
             ),
             &[InstanceMember {
@@ -145,7 +139,7 @@ fn solve_constraint_4() {
             &None,
             &mut tc,
             &Constraint::from_type(&Type::mk_app(
-                Type::Name(String::from("Eq")),
+                Type::Name(Rc::from("Eq")),
                 Type::mk_app(Type::Array, Type::Int),
             )),
         );

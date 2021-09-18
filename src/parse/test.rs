@@ -8,6 +8,8 @@ use crate::{
     map2,
     syntax::{Branch, Declaration, Expr, Names, Pattern, Type},
 };
+#[cfg(test)]
+use std::rc::Rc;
 
 #[cfg(test)]
 use super::{ParseError, ParseResult, Parser};
@@ -37,7 +39,7 @@ macro_rules! parse_test {
 
 #[test]
 fn parse_ident_1() {
-    parse_test!("hello", ident, Ok(String::from("hello")))
+    parse_test!("hello", ident, Ok(Rc::from("hello")))
 }
 
 #[test]
@@ -50,9 +52,7 @@ fn parse_ident_2() {
                 label: String::from("(parser)"),
             },
             pos: 0,
-            expecting: vec![TokenType::Ident(String::from(""))]
-                .into_iter()
-                .collect()
+            expecting: vec![TokenType::Ident(Rc::from(""))].into_iter().collect()
         })
     )
 }
@@ -124,7 +124,7 @@ fn parse_import_as_3() {
             pos: 10,
             expecting: vec![
                 TokenType::Space,
-                TokenType::Ident(String::from("as")),
+                TokenType::Ident(Rc::from("as")),
                 TokenType::Comment { length: 0 }
             ]
             .into_iter()
@@ -187,11 +187,11 @@ fn parse_definition_3() {
                     value: 0,
                     length: 0
                 },
-                TokenType::Ident(String::from("")),
-                TokenType::Ident(String::from("case")),
-                TokenType::Ident(String::from("true")),
-                TokenType::Ident(String::from("false")),
-                TokenType::Ident(String::from("if")),
+                TokenType::Ident(Rc::from("")),
+                TokenType::Ident(Rc::from("case")),
+                TokenType::Ident(Rc::from("true")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("if")),
                 TokenType::Ctor,
                 TokenType::Space,
                 TokenType::LAngle,
@@ -276,7 +276,7 @@ fn parse_type_alias_2() {
         Ok(Declaration::TypeAlias {
             name: String::from("Ap"),
             args: vec![String::from("a"), String::from("b")],
-            body: Type::mk_app(Type::Var(String::from("a")), Type::Var(String::from("b")))
+            body: Type::mk_app(Type::Var(Rc::from("a")), Type::Var(Rc::from("b")))
         })
     )
 }
@@ -392,10 +392,10 @@ fn parse_type_3() {
         "Eq a => a -> a -> Bool",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(Rc::from("a"))),
             Type::mk_arrow(
-                Type::Var(String::from("a")),
-                Type::mk_arrow(Type::Var(String::from("a")), Type::Bool)
+                Type::Var(Rc::from("a")),
+                Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool)
             ),
         ))
     )
@@ -407,8 +407,8 @@ fn parse_type_3_1() {
         "Eq a => a",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
-            Type::Var(String::from("a")),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(Rc::from("a"))),
+            Type::Var(Rc::from("a")),
         ))
     )
 }
@@ -419,10 +419,10 @@ fn parse_type_4() {
         "Eq a => F => a -> Bool",
         type_,
         Ok(Type::mk_fatarrow(
-            Type::mk_app(Type::mk_name("Eq"), Type::Var(String::from("a"))),
+            Type::mk_app(Type::mk_name("Eq"), Type::Var(Rc::from("a"))),
             Type::mk_fatarrow(
                 Type::mk_name("F"),
-                Type::mk_arrow(Type::Var(String::from("a")), Type::Bool)
+                Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool)
             )
         ))
     )
@@ -595,9 +595,9 @@ fn parse_case_4() {
                 TokenType::LBracket,
                 TokenType::Dot,
                 TokenType::Ctor,
-                TokenType::Ident(String::from("true")),
-                TokenType::Ident(String::from("false")),
-                TokenType::Ident(String::from("")),
+                TokenType::Ident(Rc::from("true")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("")),
                 TokenType::DoubleQuote,
                 TokenType::SingleQuote,
                 TokenType::Int {
@@ -629,9 +629,9 @@ fn parse_case_5() {
             pos: 18,
             expecting: vec![
                 TokenType::Ctor,
-                TokenType::Ident(String::from("")),
-                TokenType::Ident(String::from("false")),
-                TokenType::Ident(String::from("true")),
+                TokenType::Ident(Rc::from("")),
+                TokenType::Ident(Rc::from("false")),
+                TokenType::Ident(Rc::from("true")),
                 TokenType::Int {
                     value: 0,
                     length: 0

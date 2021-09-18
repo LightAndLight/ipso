@@ -1,6 +1,7 @@
 use crate::core::{Builtin, Declaration, Expr, Module, TypeSig};
 use crate::syntax::{Kind, Type};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub fn builtins() -> Module {
     Module {
@@ -12,9 +13,9 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        (String::from("a"), Kind::Type),
+                        (Rc::from("a"), Kind::Type),
                         // b : Type
-                        (String::from("b"), Kind::Type),
+                        (Rc::from("b"), Kind::Type),
                     ],
                     body: Type::mk_arrow(
                         Type::mk_arrow(Type::Var(1), Type::Var(0)),
@@ -32,7 +33,7 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        (String::from("a"), Kind::Type),
+                        (Rc::from("a"), Kind::Type),
                     ],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_app(Type::IO, Type::Var(0))),
                 },
@@ -44,9 +45,9 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        (String::from("a"), Kind::Type),
+                        (Rc::from("a"), Kind::Type),
                         // b : Type
-                        (String::from("b"), Kind::Type),
+                        (Rc::from("b"), Kind::Type),
                     ],
                     body: Type::mk_arrow(
                         Type::mk_app(Type::IO, Type::Var(1)),
@@ -64,9 +65,9 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![
                         // a : Type
-                        (String::from("a"), Kind::Type),
+                        (Rc::from("a"), Kind::Type),
                         // b : Type
-                        (String::from("b"), Kind::Type),
+                        (Rc::from("b"), Kind::Type),
                     ],
                     body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Var(0))),
                 },
@@ -91,7 +92,7 @@ pub fn builtins() -> Module {
                 name: String::from("stdout"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::Name(String::from("Stdout")),
+                    body: Type::Name(Rc::from("Stdout")),
                 },
                 body: Expr::Builtin(Builtin::Stdout),
             },
@@ -101,7 +102,7 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::mk_arrow(
-                        Type::Name(String::from("Stdout")),
+                        Type::Name(Rc::from("Stdout")),
                         Type::mk_arrow(Type::Bytes, Type::mk_app(Type::IO, Type::Unit)),
                     ),
                 },
@@ -113,7 +114,7 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::mk_arrow(
-                        Type::Name(String::from("Stdout")),
+                        Type::Name(Rc::from("Stdout")),
                         Type::mk_app(Type::IO, Type::Unit),
                     ),
                 },
@@ -129,7 +130,7 @@ pub fn builtins() -> Module {
                 name: String::from("stdin"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::Name(String::from("Stdin")),
+                    body: Type::Name(Rc::from("Stdin")),
                 },
                 body: Expr::Builtin(Builtin::Stdin),
             },
@@ -139,7 +140,7 @@ pub fn builtins() -> Module {
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::mk_arrow(
-                        Type::Name(String::from("Stdin")),
+                        Type::Name(Rc::from("Stdin")),
                         Type::mk_app(Type::IO, Type::String),
                     ),
                 },
@@ -212,7 +213,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("eqArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                         Type::mk_arrow(
@@ -227,7 +228,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("ltArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                         Type::mk_arrow(
@@ -242,10 +243,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("foldlArray"),
                 sig: TypeSig {
-                    ty_vars: vec![
-                        (String::from("b"), Kind::Type),
-                        (String::from("a"), Kind::Type),
-                    ],
+                    ty_vars: vec![(Rc::from("b"), Kind::Type), (Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Var(1))),
                         Type::mk_arrow(
@@ -260,7 +258,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("generateArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::Int,
                         Type::mk_arrow(
@@ -275,7 +273,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("lengthArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::mk_app(Type::Array, Type::Var(0)), Type::Int),
                 },
                 body: Expr::Builtin(Builtin::LengthArray),
@@ -284,7 +282,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("indexArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::Int,
                         Type::mk_arrow(Type::mk_app(Type::Array, Type::Var(0)), Type::Var(0)),
@@ -296,7 +294,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("sliceArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::Int,
                         Type::mk_arrow(
@@ -347,7 +345,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("foldlString"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Char, Type::Var(0))),
                         Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::String, Type::Var(0))),
@@ -359,7 +357,7 @@ pub fn builtins() -> Module {
             Declaration::Definition {
                 name: String::from("snocArray"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(
                         Type::mk_app(Type::Array, Type::Var(0)),
                         Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Array, Type::Var(0))),

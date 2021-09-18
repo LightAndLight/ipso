@@ -1,5 +1,7 @@
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::rc::Rc;
 
 #[cfg(test)]
 use crate::{
@@ -47,11 +49,7 @@ fn infer_kind_test_3() {
             expected: Kind::Type,
             actual: Kind::Row,
         });
-        let actual = tc.infer_kind(&Type::mk_rowcons(
-            String::from("x"),
-            Type::RowNil,
-            Type::RowNil,
-        ));
+        let actual = tc.infer_kind(&Type::mk_rowcons(Rc::from("x"), Type::RowNil, Type::RowNil));
         assert_eq!(expected, actual)
     })
 }
@@ -63,7 +61,7 @@ fn infer_kind_test_4() {
         let actual = tc
             .infer_kind(&Type::mk_app(
                 Type::Record,
-                Type::mk_rowcons(String::from("x"), Type::Bool, Type::RowNil),
+                Type::mk_rowcons(Rc::from("x"), Type::Bool, Type::RowNil),
             ))
             .map(|(_, kind)| tc.zonk_kind(false, &kind));
         assert_eq!(expected, actual)
@@ -74,24 +72,24 @@ fn infer_kind_test_4() {
 fn context_test_1() {
     let mut ctx = BoundVars::new();
     ctx.insert(&vec![
-        (String::from("a"), Type::Unit::<usize>),
-        (String::from("b"), Type::Bool),
-        (String::from("c"), Type::String),
+        (Rc::from("a"), Type::Unit::<usize>),
+        (Rc::from("b"), Type::Bool),
+        (Rc::from("c"), Type::String),
     ]);
     assert_eq!(
         ctx,
         BoundVars {
             indices: vec![
-                (String::from("a"), vec![2]),
-                (String::from("b"), vec![1]),
-                (String::from("c"), vec![0])
+                (Rc::from("a"), vec![2]),
+                (Rc::from("b"), vec![1]),
+                (Rc::from("c"), vec![0])
             ]
             .into_iter()
             .collect(),
             info: vec![
-                (String::from("a"), Type::Unit),
-                (String::from("b"), Type::Bool),
-                (String::from("c"), Type::String),
+                (Rc::from("a"), Type::Unit),
+                (Rc::from("b"), Type::Bool),
+                (Rc::from("c"), Type::String),
             ]
         }
     );
@@ -108,51 +106,48 @@ fn context_test_1() {
 fn context_test_2() {
     let mut ctx = BoundVars::new();
     ctx.insert(&vec![
-        (String::from("a"), Type::Unit::<usize>),
-        (String::from("a"), Type::Bool),
-        (String::from("c"), Type::String),
+        (Rc::from("a"), Type::Unit::<usize>),
+        (Rc::from("a"), Type::Bool),
+        (Rc::from("c"), Type::String),
     ]);
 }
 
 #[test]
 fn context_test_3() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(Rc::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
-            info: vec![(String::from("a"), Type::Unit),]
+            indices: vec![(Rc::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(Rc::from("a"), Type::Unit),]
         }
     );
-    ctx.insert(&[(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(Rc::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0]),]
+            indices: vec![(Rc::from("a"), vec![1]), (Rc::from("b"), vec![0]),]
                 .into_iter()
                 .collect(),
-            info: vec![
-                (String::from("a"), Type::Unit),
-                (String::from("b"), Type::Bool),
-            ]
+            info: vec![(Rc::from("a"), Type::Unit), (Rc::from("b"), Type::Bool),]
         }
     );
-    ctx.insert(&[(String::from("c"), Type::String)]);
+    ctx.insert(&[(Rc::from("c"), Type::String)]);
     assert_eq!(
         ctx,
         BoundVars {
             indices: vec![
-                (String::from("a"), vec![2]),
-                (String::from("b"), vec![1]),
-                (String::from("c"), vec![0])
+                (Rc::from("a"), vec![2]),
+                (Rc::from("b"), vec![1]),
+                (Rc::from("c"), vec![0])
             ]
             .into_iter()
             .collect(),
             info: vec![
-                (String::from("a"), Type::Unit),
-                (String::from("b"), Type::Bool),
-                (String::from("c"), Type::String),
+                (Rc::from("a"), Type::Unit),
+                (Rc::from("b"), Type::Bool),
+                (Rc::from("c"), Type::String),
             ]
         }
     );
@@ -161,12 +156,12 @@ fn context_test_3() {
 #[test]
 fn context_test_4() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(Rc::from("a"), Type::Unit::<usize>)]);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
-            info: vec![(String::from("a"), Type::Unit),]
+            indices: vec![(Rc::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(Rc::from("a"), Type::Unit),]
         }
     );
     ctx.delete(1);
@@ -176,26 +171,23 @@ fn context_test_4() {
 #[test]
 fn context_test_5() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&[(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(Rc::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(Rc::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0])]
+            indices: vec![(Rc::from("a"), vec![1]), (Rc::from("b"), vec![0])]
                 .into_iter()
                 .collect(),
-            info: vec![
-                (String::from("a"), Type::Unit),
-                (String::from("b"), Type::Bool)
-            ]
+            info: vec![(Rc::from("a"), Type::Unit), (Rc::from("b"), Type::Bool)]
         }
     );
     ctx.delete(1);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![0]),].into_iter().collect(),
-            info: vec![(String::from("a"), Type::Unit),]
+            indices: vec![(Rc::from("a"), vec![0]),].into_iter().collect(),
+            info: vec![(Rc::from("a"), Type::Unit),]
         }
     )
 }
@@ -203,18 +195,15 @@ fn context_test_5() {
 #[test]
 fn context_test_6() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&[(String::from("a"), Type::Unit::<usize>)]);
-    ctx.insert(&[(String::from("b"), Type::Bool)]);
+    ctx.insert(&[(Rc::from("a"), Type::Unit::<usize>)]);
+    ctx.insert(&[(Rc::from("b"), Type::Bool)]);
     assert_eq!(
         ctx,
         BoundVars {
-            indices: vec![(String::from("a"), vec![1]), (String::from("b"), vec![0])]
+            indices: vec![(Rc::from("a"), vec![1]), (Rc::from("b"), vec![0])]
                 .into_iter()
                 .collect(),
-            info: vec![
-                (String::from("a"), Type::Unit),
-                (String::from("b"), Type::Bool)
-            ]
+            info: vec![(Rc::from("a"), Type::Unit), (Rc::from("b"), Type::Bool)]
         }
     );
     ctx.delete(2);
@@ -233,7 +222,7 @@ fn infer_pattern_test_1() {
             (
                 core::Pattern::Name,
                 syntax::Type::Meta(0),
-                vec![(String::from("x"), syntax::Type::Meta(0))]
+                vec![(Rc::from("x"), syntax::Type::Meta(0))]
             )
         )
     })
@@ -272,16 +261,16 @@ fn infer_pattern_test_2() {
                 },
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Meta(0)),
-                        (String::from("y"), syntax::Type::Meta(1)),
-                        (String::from("z"), syntax::Type::Meta(2))
+                        (Rc::from("x"), syntax::Type::Meta(0)),
+                        (Rc::from("y"), syntax::Type::Meta(1)),
+                        (Rc::from("z"), syntax::Type::Meta(2))
                     ],
                     None
                 ),
                 vec![
-                    (String::from("x"), syntax::Type::Meta(0)),
-                    (String::from("y"), syntax::Type::Meta(1)),
-                    (String::from("z"), syntax::Type::Meta(2)),
+                    (Rc::from("x"), syntax::Type::Meta(0)),
+                    (Rc::from("y"), syntax::Type::Meta(1)),
+                    (Rc::from("z"), syntax::Type::Meta(2)),
                 ]
             )
         )
@@ -324,18 +313,18 @@ fn infer_pattern_test_3() {
                 },
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Meta(0)),
-                        (String::from("y"), syntax::Type::Meta(1)),
-                        (String::from("z"), syntax::Type::Meta(2))
+                        (Rc::from("x"), syntax::Type::Meta(0)),
+                        (Rc::from("y"), syntax::Type::Meta(1)),
+                        (Rc::from("z"), syntax::Type::Meta(2))
                     ],
                     Some(syntax::Type::Meta(3))
                 ),
                 vec![
-                    (String::from("x"), syntax::Type::Meta(0)),
-                    (String::from("y"), syntax::Type::Meta(1)),
-                    (String::from("z"), syntax::Type::Meta(2)),
+                    (Rc::from("x"), syntax::Type::Meta(0)),
+                    (Rc::from("y"), syntax::Type::Meta(1)),
+                    (Rc::from("z"), syntax::Type::Meta(2)),
                     (
-                        String::from("w"),
+                        Rc::from("w"),
                         syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(3)))
                     ),
                 ]
@@ -359,10 +348,10 @@ fn infer_pattern_test_4() {
             (
                 core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
                 syntax::Type::mk_variant(
-                    vec![(String::from("just"), syntax::Type::Meta(0))],
+                    vec![(Rc::from("just"), syntax::Type::Meta(0))],
                     Some(syntax::Type::Meta(1))
                 ),
-                vec![(String::from("x"), syntax::Type::Meta(0))]
+                vec![(Rc::from("x"), syntax::Type::Meta(0))]
             )
         )
     })
@@ -445,8 +434,8 @@ fn infer_lam_test_2() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Meta(4)),
-                        (String::from("y"), syntax::Type::Meta(5)),
+                        (Rc::from("x"), syntax::Type::Meta(4)),
+                        (Rc::from("y"), syntax::Type::Meta(5)),
                     ],
                     None,
                 ),
@@ -506,8 +495,8 @@ fn infer_lam_test_3() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Meta(4)),
-                        (String::from("y"), syntax::Type::Meta(5)),
+                        (Rc::from("x"), syntax::Type::Meta(4)),
+                        (Rc::from("y"), syntax::Type::Meta(5)),
                     ],
                     None,
                 ),
@@ -567,8 +556,8 @@ fn infer_lam_test_4() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Meta(4)),
-                        (String::from("y"), syntax::Type::Meta(5)),
+                        (Rc::from("x"), syntax::Type::Meta(4)),
+                        (Rc::from("y"), syntax::Type::Meta(5)),
                     ],
                     Some(syntax::Type::Meta(6)),
                 ),
@@ -716,17 +705,11 @@ fn unify_rows_test_1() {
                     actual: syntax::Type::Unit
                 },
                 &Type::mk_record(
-                    vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("y"), Type::Bool)
-                    ],
+                    vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
                     None
                 ),
                 &Type::mk_record(
-                    vec![
-                        (String::from("y"), Type::Bool),
-                        (String::from("x"), Type::Int)
-                    ],
+                    vec![(Rc::from("y"), Type::Bool), (Rc::from("x"), Type::Int)],
                     None
                 )
             ),
@@ -746,17 +729,17 @@ fn unify_rows_test_2() {
                 },
                 &Type::mk_record(
                     vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("x"), Type::Bool),
-                        (String::from("y"), Type::Bool)
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("x"), Type::Bool),
+                        (Rc::from("y"), Type::Bool)
                     ],
                     None
                 ),
                 &Type::mk_record(
                     vec![
-                        (String::from("y"), Type::Bool),
-                        (String::from("x"), Type::Int),
-                        (String::from("x"), Type::Bool)
+                        (Rc::from("y"), Type::Bool),
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("x"), Type::Bool)
                     ],
                     None
                 )
@@ -777,17 +760,17 @@ fn unify_rows_test_3() {
                 },
                 &Type::mk_record(
                     vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("x"), Type::Bool),
-                        (String::from("y"), Type::Bool)
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("x"), Type::Bool),
+                        (Rc::from("y"), Type::Bool)
                     ],
                     None
                 ),
                 &Type::mk_record(
                     vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("y"), Type::Bool),
-                        (String::from("x"), Type::Bool)
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("y"), Type::Bool),
+                        (Rc::from("x"), Type::Bool)
                     ],
                     None
                 )
@@ -808,17 +791,17 @@ fn unify_rows_test_4() {
                 },
                 &Type::mk_record(
                     vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("x"), Type::Bool),
-                        (String::from("y"), Type::Bool)
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("x"), Type::Bool),
+                        (Rc::from("y"), Type::Bool)
                     ],
                     None
                 ),
                 &Type::mk_record(
                     vec![
-                        (String::from("x"), Type::Int),
-                        (String::from("y"), Type::Bool),
-                        (String::from("x"), Type::Int)
+                        (Rc::from("x"), Type::Int),
+                        (Rc::from("y"), Type::Bool),
+                        (Rc::from("x"), Type::Int)
                     ],
                     None
                 )
@@ -891,8 +874,8 @@ fn infer_record_test_2() {
                 ),
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Int),
-                        (String::from("y"), syntax::Type::Bool)
+                        (Rc::from("x"), syntax::Type::Int),
+                        (Rc::from("y"), syntax::Type::Bool)
                     ],
                     None
                 )
@@ -952,9 +935,9 @@ fn infer_record_test_3() {
                 ),
                 syntax::Type::mk_record(
                     vec![
-                        (String::from("x"), syntax::Type::Int),
-                        (String::from("y"), syntax::Type::Bool),
-                        (String::from("z"), syntax::Type::Char)
+                        (Rc::from("x"), syntax::Type::Int),
+                        (Rc::from("y"), syntax::Type::Bool),
+                        (Rc::from("z"), syntax::Type::Char)
                     ],
                     None
                 )
@@ -1061,7 +1044,7 @@ fn infer_case_1() {
                 ),
             ),
             syntax::Type::mk_arrow(
-                syntax::Type::mk_variant(vec![(String::from("X"), syntax::Type::Meta(6))], None),
+                syntax::Type::mk_variant(vec![(Rc::from("X"), syntax::Type::Meta(6))], None),
                 syntax::Type::Meta(6),
             ),
         ));
@@ -1152,8 +1135,8 @@ fn infer_case_2() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_variant(
                     vec![
-                        (String::from("Left"), syntax::Type::Meta(8)),
-                        (String::from("Right"), syntax::Type::Meta(8)),
+                        (Rc::from("Left"), syntax::Type::Meta(8)),
+                        (Rc::from("Right"), syntax::Type::Meta(8)),
                     ],
                     None,
                 ),
@@ -1262,8 +1245,8 @@ fn infer_case_3() {
             syntax::Type::mk_arrow(
                 syntax::Type::mk_variant(
                     vec![
-                        (String::from("Left"), syntax::Type::Int),
-                        (String::from("Right"), syntax::Type::Int),
+                        (Rc::from("Left"), syntax::Type::Int),
+                        (Rc::from("Right"), syntax::Type::Int),
                     ],
                     Some(syntax::Type::Meta(9)),
                 ),
@@ -1377,9 +1360,9 @@ fn infer_record_1() {
         );
         let expected_ty = Type::mk_record(
             vec![
-                (String::from("z"), Type::Bool),
-                (String::from("y"), Type::String),
-                (String::from("x"), Type::Int),
+                (Rc::from("z"), Type::Bool),
+                (Rc::from("y"), Type::String),
+                (Rc::from("x"), Type::Int),
             ],
             None,
         );
@@ -1437,7 +1420,7 @@ fn infer_record_1() {
             Ok((
                 core::Expr::Int(0),
                 Constraint::HasField {
-                    field: String::from("x"),
+                    field: Rc::from("x"),
                     rest: Type::RowNil
                 }
             )),
@@ -1449,8 +1432,8 @@ fn infer_record_1() {
             Ok((
                 core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0)),
                 Constraint::HasField {
-                    field: String::from("y"),
-                    rest: Type::mk_rows(vec![(String::from("x"), Type::Int)], None)
+                    field: Rc::from("y"),
+                    rest: Type::mk_rows(vec![(Rc::from("x"), Type::Int)], None)
                 }
             )),
             solve_placeholder(&mut tc, *p1)
@@ -1465,12 +1448,9 @@ fn infer_record_1() {
                     core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0))
                 ),
                 Constraint::HasField {
-                    field: String::from("z"),
+                    field: Rc::from("z"),
                     rest: Type::mk_rows(
-                        vec![
-                            (String::from("y"), Type::String),
-                            (String::from("x"), Type::Int)
-                        ],
+                        vec![(Rc::from("y"), Type::String), (Rc::from("x"), Type::Int)],
                         None
                     )
                 }
@@ -1493,8 +1473,8 @@ fn check_definition_1() {
             item: syntax::Declaration::Definition {
                 name: String::from("id"),
                 ty: syntax::Type::mk_arrow(
-                    syntax::Type::Var(String::from("a")),
-                    syntax::Type::Var(String::from("a")),
+                    syntax::Type::Var(Rc::from("a")),
+                    syntax::Type::Var(Rc::from("a")),
                 ),
                 args: vec![syntax::Pattern::Name(syntax::Spanned {
                     pos: 14,
@@ -1511,7 +1491,7 @@ fn check_definition_1() {
             Ok(Some(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(String::from("a"), syntax::Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), syntax::Kind::Type)],
                     body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
                 },
                 body: core::Expr::mk_lam(true, core::Expr::Var(0))
@@ -1532,10 +1512,10 @@ fn check_definition_2() {
             item: syntax::Declaration::Definition {
                 name: String::from("thing"),
                 ty: syntax::Type::mk_arrow(
-                    syntax::Type::mk_record(Vec::new(), Some(Type::Var(String::from("r")))),
+                    syntax::Type::mk_record(Vec::new(), Some(Type::Var(Rc::from("r")))),
                     syntax::Type::mk_record(
-                        vec![(String::from("x"), Type::Int)],
-                        Some(syntax::Type::Var(String::from("r"))),
+                        vec![(Rc::from("x"), Type::Int)],
+                        Some(syntax::Type::Var(Rc::from("r"))),
                     ),
                 ),
                 args: vec![syntax::Pattern::Name(syntax::Spanned {
@@ -1563,13 +1543,13 @@ fn check_definition_2() {
         let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
-                ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
+                ty_vars: vec![(Rc::from("r"), syntax::Kind::Row)],
                 body: syntax::Type::mk_fatarrow(
-                    syntax::Type::mk_hasfield(String::from("x"), Type::Var(0)),
+                    syntax::Type::mk_hasfield(Rc::from("x"), Type::Var(0)),
                     syntax::Type::mk_arrow(
                         syntax::Type::mk_record(Vec::new(), Some(Type::Var(0))),
                         syntax::Type::mk_record(
-                            vec![(String::from("x"), Type::Int)],
+                            vec![(Rc::from("x"), Type::Int)],
                             Some(syntax::Type::Var(0)),
                         ),
                     ),
@@ -1605,9 +1585,9 @@ fn check_definition_3() {
                 name: String::from("thing"),
                 ty: syntax::Type::mk_record(
                     vec![
-                        (String::from("z"), Type::Bool),
-                        (String::from("y"), Type::String),
-                        (String::from("x"), Type::Int),
+                        (Rc::from("z"), Type::Bool),
+                        (Rc::from("y"), Type::String),
+                        (Rc::from("x"), Type::Int),
                     ],
                     None,
                 ),
@@ -1649,9 +1629,9 @@ fn check_definition_3() {
                 ty_vars: Vec::new(),
                 body: syntax::Type::mk_record(
                     vec![
-                        (String::from("z"), Type::Bool),
-                        (String::from("y"), Type::String),
-                        (String::from("x"), Type::Int),
+                        (Rc::from("z"), Type::Bool),
+                        (Rc::from("y"), Type::String),
+                        (Rc::from("x"), Type::Int),
                     ],
                     None,
                 ),
@@ -1683,8 +1663,8 @@ fn check_definition_4() {
                 name: String::from("getx"),
                 ty: syntax::Type::mk_arrow(
                     syntax::Type::mk_record(
-                        vec![(String::from("x"), Type::Int)],
-                        Some(syntax::Type::Var(String::from("r"))),
+                        vec![(Rc::from("x"), Type::Int)],
+                        Some(syntax::Type::Var(Rc::from("r"))),
                     ),
                     syntax::Type::Int,
                 ),
@@ -1707,12 +1687,12 @@ fn check_definition_4() {
         let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("getx"),
             sig: core::TypeSig {
-                ty_vars: vec![(String::from("r"), syntax::Kind::Row)],
+                ty_vars: vec![(Rc::from("r"), syntax::Kind::Row)],
                 body: syntax::Type::mk_fatarrow(
-                    syntax::Type::mk_hasfield(String::from("x"), syntax::Type::Var(0)),
+                    syntax::Type::mk_hasfield(Rc::from("x"), syntax::Type::Var(0)),
                     syntax::Type::mk_arrow(
                         syntax::Type::mk_record(
-                            vec![(String::from("x"), syntax::Type::Int)],
+                            vec![(Rc::from("x"), syntax::Type::Int)],
                             Some(syntax::Type::Var(0)),
                         ),
                         syntax::Type::Int,
@@ -1799,12 +1779,12 @@ fn check_class_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(Some(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Eq"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Eq"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![ClassMember {
                 name: String::from("eq"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
@@ -1819,16 +1799,16 @@ fn check_class_1() {
                 pos: 0,
                 item: syntax::Declaration::Class {
                     supers: Vec::new(),
-                    name: String::from("Eq"),
+                    name: Rc::from("Eq"),
                     args: vec![Spanned {
                         pos: 9,
-                        item: String::from("a"),
+                        item: Rc::from("a"),
                     }],
                     members: vec![(
                         String::from("eq"),
                         Type::mk_arrow(
-                            Type::Var(String::from("a")),
-                            Type::mk_arrow(Type::Var(String::from("a")), Type::Bool),
+                            Type::Var(Rc::from("a")),
+                            Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
                         ),
                     )],
                 },
@@ -1839,16 +1819,16 @@ fn check_class_1() {
         let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
-        let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
-            String::from("Eq"),
+        let expected_context: HashMap<Rc<str>, core::ClassDeclaration> = vec![(
+            Rc::from("Eq"),
             core::ClassDeclaration {
                 supers: Vec::new(),
-                args: vec![(String::from("a"), Kind::Type)],
-                name: String::from("Eq"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                name: Rc::from("Eq"),
                 members: vec![core::ClassMember {
                     name: String::from("eq"),
                     sig: core::TypeSig {
-                        ty_vars: vec![(String::from("a"), Kind::Type)],
+                        ty_vars: vec![(Rc::from("a"), Kind::Type)],
                         body: Type::mk_arrow(
                             Type::Var(0),
                             Type::mk_arrow(Type::Var(0), Type::Bool),
@@ -1864,9 +1844,9 @@ fn check_class_1() {
 
         let expected_member = (
             core::TypeSig {
-                ty_vars: vec![(String::from("a"), Kind::Type)],
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
                 body: Type::mk_fatarrow(
-                    Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0)),
+                    Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0)),
                     Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 ),
             },
@@ -1887,15 +1867,12 @@ fn check_class_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Ok(Some(core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Wut"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Wut"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![ClassMember {
                 name: String::from("wut"),
                 sig: TypeSig {
-                    ty_vars: vec![
-                        (String::from("a"), Kind::Type),
-                        (String::from("b"), Kind::Type),
-                    ],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
@@ -1910,16 +1887,16 @@ fn check_class_2() {
                 pos: 0,
                 item: syntax::Declaration::Class {
                     supers: Vec::new(),
-                    name: String::from("Wut"),
+                    name: Rc::from("Wut"),
                     args: vec![Spanned {
                         pos: 9,
-                        item: String::from("a"),
+                        item: Rc::from("a"),
                     }],
                     members: vec![(
                         String::from("wut"),
                         Type::mk_arrow(
-                            Type::Var(String::from("a")),
-                            Type::mk_arrow(Type::Var(String::from("b")), Type::Bool),
+                            Type::Var(Rc::from("a")),
+                            Type::mk_arrow(Type::Var(Rc::from("b")), Type::Bool),
                         ),
                     )],
                 },
@@ -1930,19 +1907,16 @@ fn check_class_2() {
         let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
-        let expected_context: HashMap<String, core::ClassDeclaration> = vec![(
-            String::from("Wut"),
+        let expected_context: HashMap<Rc<str>, core::ClassDeclaration> = vec![(
+            Rc::from("Wut"),
             core::ClassDeclaration {
                 supers: Vec::new(),
-                args: vec![(String::from("a"), Kind::Type)],
-                name: String::from("Wut"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                name: Rc::from("Wut"),
                 members: vec![core::ClassMember {
                     name: String::from("wut"),
                     sig: core::TypeSig {
-                        ty_vars: vec![
-                            (String::from("a"), Kind::Type),
-                            (String::from("b"), Kind::Type),
-                        ],
+                        ty_vars: vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
                         body: Type::mk_arrow(
                             Type::Var(1),
                             Type::mk_arrow(Type::Var(0), Type::Bool),
@@ -1958,12 +1932,9 @@ fn check_class_2() {
 
         let expected_member = (
             core::TypeSig {
-                ty_vars: vec![
-                    (String::from("a"), Kind::Type),
-                    (String::from("b"), Kind::Type),
-                ],
+                ty_vars: vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
                 body: Type::mk_fatarrow(
-                    Type::mk_app(Type::Name(String::from("Wut")), Type::Var(1)),
+                    Type::mk_app(Type::Name(Rc::from("Wut")), Type::Var(1)),
                     Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 ),
             },
@@ -1987,7 +1958,7 @@ fn check_instance_1() {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
-            head: Type::mk_app(Type::Name(String::from("Eq")), Type::Unit),
+            head: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Unit),
             members: vec![InstanceMember {
                 name: String::from("eq"),
                 body: core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
@@ -1995,12 +1966,12 @@ fn check_instance_1() {
         }));
         tc.register_declaration(&core::Declaration::Class(core::ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Eq"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Eq"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![ClassMember {
                 name: String::from("eq"),
                 sig: TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
@@ -2017,7 +1988,7 @@ fn check_instance_1() {
                     assumes: Vec::new(),
                     name: Spanned {
                         pos: 9,
-                        item: String::from("Eq"),
+                        item: Rc::from("Eq"),
                     },
                     args: vec![Type::Unit],
                     members: vec![(
@@ -2075,25 +2046,25 @@ fn class_and_instance_1() {
 
         tc.register_class(&core::ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Eq"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Eq"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![core::ClassMember {
                 name: String::from("eq"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
         });
 
         tc.register_class(&core::ClassDeclaration {
-            supers: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
-            name: String::from("Ord"),
-            args: vec![(String::from("a"), Kind::Type)],
+            supers: vec![Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0))],
+            name: Rc::from("Ord"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![core::ClassMember {
                 name: String::from("lt"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
@@ -2105,7 +2076,7 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Eq"),
+                    item: Rc::from("Eq"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
@@ -2128,7 +2099,7 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Ord"),
+                    item: Rc::from("Ord"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
@@ -2151,7 +2122,7 @@ fn class_and_instance_1() {
             },
             context: Some(SolveConstraintContext {
                 pos: 0,
-                constraint: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+                constraint: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
             }),
         });
         let actual_instance_ord_int_result =
@@ -2167,7 +2138,7 @@ fn class_and_instance_1() {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
-            head: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+            head: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
             members: vec![core::InstanceMember {
                 name: String::from("eq"),
                 body: core::Expr::Name(String::from("eqInt")),
@@ -2190,7 +2161,7 @@ fn class_and_instance_1() {
                 None,
             )],
             assumes: Vec::new(),
-            head: Type::mk_app(Type::Name(String::from("Ord")), Type::Int),
+            head: Type::mk_app(Type::Name(Rc::from("Ord")), Type::Int),
             members: vec![core::InstanceMember {
                 name: String::from("lt"),
                 body: core::Expr::Name(String::from("ltInt")),
@@ -2231,25 +2202,25 @@ fn class_and_instance_2() {
 
         tc.register_class(&core::ClassDeclaration {
             supers: Vec::new(),
-            name: String::from("Eq"),
-            args: vec![(String::from("a"), Kind::Type)],
+            name: Rc::from("Eq"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![core::ClassMember {
                 name: String::from("eq"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
         });
 
         tc.register_class(&core::ClassDeclaration {
-            supers: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
-            name: String::from("Ord"),
-            args: vec![(String::from("a"), Kind::Type)],
+            supers: vec![Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0))],
+            name: Rc::from("Ord"),
+            args: vec![(Rc::from("a"), Kind::Type)],
             members: vec![core::ClassMember {
                 name: String::from("lt"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(String::from("a"), Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 },
             }],
@@ -2261,7 +2232,7 @@ fn class_and_instance_2() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Eq"),
+                    item: Rc::from("Eq"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
@@ -2283,16 +2254,13 @@ fn class_and_instance_2() {
             item: syntax::Declaration::Instance {
                 assumes: vec![Spanned {
                     pos: 0,
-                    item: Type::mk_app(
-                        Type::Name(String::from("Eq")),
-                        Type::Var(String::from("a")),
-                    ),
+                    item: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(Rc::from("a"))),
                 }],
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Eq"),
+                    item: Rc::from("Eq"),
                 },
-                args: vec![Type::mk_app(Type::Array, Type::Var(String::from("a")))],
+                args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -2317,7 +2285,7 @@ fn class_and_instance_2() {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
-            head: Type::mk_app(Type::Name(String::from("Eq")), Type::Int),
+            head: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
             members: vec![core::InstanceMember {
                 name: String::from("eq"),
                 body: core::Expr::Name(String::from("eqInt")),
@@ -2334,11 +2302,11 @@ fn class_and_instance_2() {
         tc.register_declaration(&actual_instance_eq_int_result.unwrap().unwrap());
 
         let expected_instance_eq_array_result = Ok(Some(core::Declaration::Instance {
-            ty_vars: vec![(String::from("a"), Kind::Type)],
+            ty_vars: vec![(Rc::from("a"), Kind::Type)],
             superclass_constructors: Vec::new(),
-            assumes: vec![Type::mk_app(Type::Name(String::from("Eq")), Type::Var(0))],
+            assumes: vec![Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0))],
             head: Type::mk_app(
-                Type::Name(String::from("Eq")),
+                Type::Name(Rc::from("Eq")),
                 Type::mk_app(Type::Array, Type::Var(0)),
             ),
             members: vec![core::InstanceMember {
@@ -2370,16 +2338,13 @@ fn class_and_instance_2() {
             item: syntax::Declaration::Instance {
                 assumes: vec![Spanned {
                     pos: 0,
-                    item: Type::mk_app(
-                        Type::Name(String::from("Ord")),
-                        Type::Var(String::from("a")),
-                    ),
+                    item: Type::mk_app(Type::Name(Rc::from("Ord")), Type::Var(Rc::from("a"))),
                 }],
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Ord"),
+                    item: Rc::from("Ord"),
                 },
-                args: vec![Type::mk_app(Type::Array, Type::Var(String::from("a")))],
+                args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -2401,7 +2366,7 @@ fn class_and_instance_2() {
         };
 
         let expected_instance_ord_array_result = Ok(Some(core::Declaration::Instance {
-            ty_vars: vec![(String::from("a"), Kind::Type)],
+            ty_vars: vec![(Rc::from("a"), Kind::Type)],
             superclass_constructors: vec![core::Expr::mk_lam(
                 true, // dict : Ord a
                 core::Expr::mk_record(
@@ -2419,9 +2384,9 @@ fn class_and_instance_2() {
                     None,
                 ),
             )],
-            assumes: vec![Type::mk_app(Type::Name(String::from("Ord")), Type::Var(0))],
+            assumes: vec![Type::mk_app(Type::Name(Rc::from("Ord")), Type::Var(0))],
             head: Type::mk_app(
-                Type::Name(String::from("Ord")),
+                Type::Name(Rc::from("Ord")),
                 Type::mk_app(Type::Array, Type::Var(0)),
             ),
             members: vec![core::InstanceMember {
@@ -2454,7 +2419,7 @@ fn class_and_instance_2() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: String::from("Ord"),
+                    item: Rc::from("Ord"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
@@ -2586,13 +2551,13 @@ fn class_and_instance_2() {
 #[test]
 fn unify_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        tc.bound_tyvars.insert(&[(String::from("r"), Kind::Row)]);
+        tc.bound_tyvars.insert(&[(Rc::from("r"), Kind::Row)]);
         let real = Type::mk_app(
             Type::mk_app(
                 Type::Arrow,
                 Type::mk_app(
                     Type::Record,
-                    Type::mk_rowcons(String::from("x"), Type::Int, Type::Var(0)),
+                    Type::mk_rowcons(Rc::from("x"), Type::Int, Type::Var(0)),
                 ),
             ),
             Type::Int,

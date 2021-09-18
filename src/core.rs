@@ -847,7 +847,7 @@ impl<'a> Iterator for IterEVars<'a> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
-    pub ty_vars: Vec<(String, syntax::Kind)>,
+    pub ty_vars: Vec<(Rc<str>, syntax::Kind)>,
     pub body: syntax::Type<usize>,
 }
 
@@ -897,7 +897,7 @@ pub enum Declaration {
     },
     Class(ClassDeclaration),
     Instance {
-        ty_vars: Vec<(String, syntax::Kind)>,
+        ty_vars: Vec<(Rc<str>, syntax::Kind)>,
         superclass_constructors: Vec<Expr>,
         assumes: Vec<syntax::Type<usize>>,
         head: syntax::Type<usize>,
@@ -946,8 +946,8 @@ impl Declaration {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassDeclaration {
     pub supers: Vec<syntax::Type<usize>>,
-    pub name: String,
-    pub args: Vec<(String, syntax::Kind)>,
+    pub name: Rc<str>,
+    pub args: Vec<(Rc<str>, syntax::Kind)>,
     pub members: Vec<ClassMember>,
 }
 
