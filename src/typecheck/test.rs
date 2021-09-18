@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::rc::Rc;
 
+use crate::typecheck::UnifyKindContextRefs;
 #[cfg(test)]
 use crate::{
     core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
@@ -1728,9 +1729,9 @@ fn kind_occurs_1() {
         let v2 = tc.fresh_kindvar();
         assert_eq!(
             tc.unify_kind(
-                &UnifyKindContext {
-                    ty: Type::Unit,
-                    has_kind: Kind::Type,
+                &UnifyKindContextRefs {
+                    ty: &Type::Unit,
+                    has_kind: &Kind::Type,
                     unifying_types: None
                 },
                 &v1,

@@ -185,6 +185,13 @@ pub struct UnifyKindContext<A> {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
+pub struct UnifyKindContextRefs<'a, A> {
+    ty: &'a Type<A>,
+    has_kind: &'a syntax::Kind,
+    unifying_types: Option<&'a UnifyTypeContext<A>>,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyTypeContext<A> {
     pub expected: Type<A>,
     pub actual: Type<A>,
@@ -786,10 +793,10 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<Type<usize>, TypeError> {
         let expected = kind;
         let (ty, actual) = self.infer_kind(ty)?;
-        let context = UnifyKindContext {
-            ty: ty.clone(),
-            has_kind: expected.clone(),
-            unifying_types: context.cloned(),
+        let context = UnifyKindContextRefs {
+            ty: &ty,
+            has_kind: expected,
+            unifying_types: context,
         };
         self.unify_kind(&context, &expected, &actual)?;
         Ok(ty)
@@ -1356,7 +1363,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn kind_mismatch<A>(
         &self,
-        context: &UnifyKindContext<usize>,
+        context: &UnifyKindContextRefs<usize>,
         expected: &syntax::Kind,
         actual: &syntax::Kind,
     ) -> Result<A, TypeError> {
@@ -1379,7 +1386,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn unify_kind(
         &mut self,
-        context: &UnifyKindContext<usize>,
+        context: &UnifyKindContextRefs<usize>,
         expected: &syntax::Kind,
         actual: &syntax::Kind,
     ) -> Result<(), TypeError> {
@@ -1442,7 +1449,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_right(
         &mut self,
-        context: &UnifyKindContext<usize>,
+        context: &UnifyKindContextRefs<usize>,
         expected: &syntax::Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -1458,7 +1465,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_left(
         &mut self,
-        context: &UnifyKindContext<usize>,
+        context: &UnifyKindContextRefs<usize>,
         meta: usize,
         actual: &syntax::Kind,
     ) -> Result<(), TypeError> {
