@@ -312,10 +312,10 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::Record => Step::Skip,
                 Type::Variant => Step::Skip,
                 Type::IO => Step::Skip,
-                Type::App(a, b) => Step::Continue(vec![a, b]),
+                Type::App(a, b) => Step::Continue2(a, b),
                 Type::RowNil => Step::Skip,
-                Type::RowCons(_, a, b) => Step::Continue(vec![a, b]),
-                Type::HasField(_, a) => Step::Continue(vec![a]),
+                Type::RowCons(_, a, b) => Step::Continue2(a, b),
+                Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(n) => Step::Yield(*n),
             }
@@ -333,6 +333,21 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                         break;
                     }
                     Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.items.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.items.push(item2);
+                        self.items.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.items.push(item3);
+                        self.items.push(item2);
+                        self.items.push(item1);
                         continue;
                     }
                     Step::Continue(items) => {
@@ -371,10 +386,10 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 Type::Record => Step::Skip,
                 Type::Variant => Step::Skip,
                 Type::IO => Step::Skip,
-                Type::App(a, b) => Step::Continue(vec![&*a, &*b]),
+                Type::App(a, b) => Step::Continue2(a, b),
                 Type::RowNil => Step::Skip,
-                Type::RowCons(_, a, b) => Step::Continue(vec![&*a, &*b]),
-                Type::HasField(_, a) => Step::Continue(vec![&*a]),
+                Type::RowCons(_, a, b) => Step::Continue2(a, b),
+                Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(_) => Step::Skip,
             }
@@ -389,6 +404,21 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 }
                 Some(current) => match step_type(current) {
                     Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.items.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.items.push(item2);
+                        self.items.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.items.push(item3);
+                        self.items.push(item2);
+                        self.items.push(item1);
                         continue;
                     }
                     Step::Continue(tys) => {
@@ -1042,7 +1072,7 @@ impl<'a> Iterator for KindIterMetas<'a> {
                 Kind::Type => Step::Skip,
                 Kind::Row => Step::Skip,
                 Kind::Constraint => Step::Skip,
-                Kind::Arrow(a, b) => Step::Continue(vec![a, b]),
+                Kind::Arrow(a, b) => Step::Continue2(a, b),
                 Kind::Meta(n) => Step::Yield(*n),
             }
         }
@@ -1059,6 +1089,21 @@ impl<'a> Iterator for KindIterMetas<'a> {
                         break;
                     }
                     Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.items.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.items.push(item2);
+                        self.items.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.items.push(item3);
+                        self.items.push(item2);
+                        self.items.push(item1);
                         continue;
                     }
                     Step::Continue(items) => {

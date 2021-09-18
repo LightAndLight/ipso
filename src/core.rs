@@ -779,13 +779,13 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::Name(_) => Step::Skip,
                 Expr::Module(_, _) => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
-                Expr::App(a, b) => Step::Continue(vec![a, b]),
-                Expr::Lam { arg: _, body } => Step::Continue(vec![body]),
+                Expr::App(a, b) => Step::Continue2(a, b),
+                Expr::Lam { arg: _, body } => Step::Continue1(body),
                 Expr::True => Step::Skip,
                 Expr::False => Step::Skip,
-                Expr::IfThenElse(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::IfThenElse(a, b, c) => Step::Continue3(a, b, c),
                 Expr::Int(_) => Step::Skip,
-                Expr::Binop(_, a, b) => Step::Continue(vec![a, b]),
+                Expr::Binop(_, a, b) => Step::Continue2(a, b),
                 Expr::Char(_) => Step::Skip,
                 Expr::String(a) => Step::Continue(
                     a.iter()
@@ -796,15 +796,15 @@ impl<'a> Iterator for IterEVars<'a> {
                         .collect(),
                 ),
                 Expr::Array(xs) => Step::Continue(xs.iter().collect()),
-                Expr::Extend(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::Extend(a, b, c) => Step::Continue3(a, b, c),
                 Expr::Record(xs) => Step::Continue(
                     xs.iter()
                         .flat_map(|(a, b)| vec![a, b].into_iter())
                         .collect(),
                 ),
-                Expr::Project(a, b) => Step::Continue(vec![a, b]),
-                Expr::Variant(a) => Step::Continue(vec![a]),
-                Expr::Embed(a, b) => Step::Continue(vec![a, b]),
+                Expr::Project(a, b) => Step::Continue2(a, b),
+                Expr::Variant(a) => Step::Continue1(a),
+                Expr::Embed(a, b) => Step::Continue2(a, b),
                 Expr::Case(a, b) => Step::Continue({
                     let mut xs: Vec<&'a Expr> = vec![a];
                     xs.extend(b.iter().flat_map(|b| {
@@ -833,6 +833,21 @@ impl<'a> Iterator for IterEVars<'a> {
                         return Some(x);
                     }
                     Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.next.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.next.push(item2);
+                        self.next.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.next.push(item3);
+                        self.next.push(item2);
+                        self.next.push(item1);
                         continue;
                     }
                     Step::Continue(xs) => {
