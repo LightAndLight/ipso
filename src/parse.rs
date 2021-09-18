@@ -435,8 +435,7 @@ impl Parser {
         self.indentation[self.indentation.len() - 1]
     }
 
-    fn space(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Space);
+    fn space_body(&mut self) -> ParseResult<()> {
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n > self.current_indentation() => {
@@ -497,8 +496,7 @@ impl Parser {
         ParseResult::pure(())
     }
 
-    fn comment(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Comment { length: 0 });
+    fn comment_body(&mut self) -> ParseResult<()> {
         match self.current {
             None => self.unexpected(false),
             Some(ref token) => match token.token_type {
@@ -508,8 +506,15 @@ impl Parser {
         }
     }
 
+    fn comment(&mut self) -> ParseResult<()> {
+        self.expecting.insert(TokenType::Comment { length: 0 });
+        self.comment_body()
+    }
+
     fn spaces(&mut self) -> ParseResult<()> {
-        many_!(self, choices!(self, self.space(), self.comment()))
+        self.expecting.insert(TokenType::Space);
+        self.expecting.insert(TokenType::Comment { length: 0 });
+        many_!(self, choices!(self, self.space_body(), self.comment_body()))
     }
 
     fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
