@@ -611,7 +611,8 @@ impl<'modules> Typechecker<'modules> {
         // generate constraint's kind
         let mut constraint_kind = syntax::Kind::Constraint;
         for (_, kind) in decl.args.iter().rev() {
-            constraint_kind = syntax::Kind::mk_arrow(kind.clone(), constraint_kind);
+            constraint_kind =
+                syntax::Kind::mk_arrow(Rc::new(kind.clone()), Rc::new(constraint_kind));
         }
         self.type_context.insert(decl_name.clone(), constraint_kind);
 
@@ -1337,8 +1338,8 @@ impl<'modules> Typechecker<'modules> {
             syntax::Kind::Row => syntax::Kind::Row,
             syntax::Kind::Constraint => syntax::Kind::Constraint,
             syntax::Kind::Arrow(a, b) => syntax::Kind::mk_arrow(
-                self.zonk_kind(close_unsolved, a),
-                self.zonk_kind(close_unsolved, b),
+                Rc::new(self.zonk_kind(close_unsolved, a)),
+                Rc::new(self.zonk_kind(close_unsolved, b)),
             ),
             syntax::Kind::Meta(m) => match &self.kind_solutions[*m] {
                 None => {
@@ -1598,20 +1599,26 @@ impl<'modules> Typechecker<'modules> {
             Type::Char => Ok((Type::Char, syntax::Kind::Type)),
             Type::String => Ok((Type::String, syntax::Kind::Type)),
             Type::Bytes => Ok((Type::Bytes, syntax::Kind::Type)),
-            Type::Arrow => Ok((
-                Type::Arrow,
-                syntax::Kind::mk_arrow(
-                    syntax::Kind::Type,
-                    syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
-                ),
-            )),
-            Type::FatArrow => Ok((
-                Type::FatArrow,
-                syntax::Kind::mk_arrow(
-                    syntax::Kind::Constraint,
-                    syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
-                ),
-            )),
+            Type::Arrow => {
+                let k_type = Rc::new(syntax::Kind::Type);
+                Ok((
+                    Type::Arrow,
+                    syntax::Kind::mk_arrow(
+                        k_type.clone(),
+                        Rc::new(syntax::Kind::mk_arrow(k_type.clone(), k_type)),
+                    ),
+                ))
+            }
+            Type::FatArrow => {
+                let k_type = Rc::new(syntax::Kind::Type);
+                Ok((
+                    Type::FatArrow,
+                    syntax::Kind::mk_arrow(
+                        Rc::new(syntax::Kind::Constraint),
+                        Rc::new(syntax::Kind::mk_arrow(k_type.clone(), k_type)),
+                    ),
+                ))
+            }
             Type::Constraints(constraints) => {
                 let mut new_constraints = Vec::new();
                 for constraint in constraints {
@@ -1624,29 +1631,29 @@ impl<'modules> Typechecker<'modules> {
                 }
                 Ok((Type::Constraints(new_constraints), syntax::Kind::Constraint))
             }
-            Type::Array => Ok((
-                Type::Array,
-                syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
-            )),
+            Type::Array => {
+                let k_type = Rc::new(syntax::Kind::Type);
+                Ok((Type::Array, syntax::Kind::mk_arrow(k_type.clone(), k_type)))
+            }
             Type::Record => Ok((
                 Type::Record,
-                syntax::Kind::mk_arrow(syntax::Kind::Row, syntax::Kind::Type),
+                syntax::Kind::mk_arrow(Rc::new(syntax::Kind::Row), Rc::new(syntax::Kind::Type)),
             )),
             Type::Variant => Ok((
                 Type::Variant,
-                syntax::Kind::mk_arrow(syntax::Kind::Row, syntax::Kind::Type),
+                syntax::Kind::mk_arrow(Rc::new(syntax::Kind::Row), Rc::new(syntax::Kind::Type)),
             )),
-            Type::IO => Ok((
-                Type::IO,
-                syntax::Kind::mk_arrow(syntax::Kind::Type, syntax::Kind::Type),
-            )),
+            Type::IO => {
+                let k_type = Rc::new(syntax::Kind::Type);
+                Ok((Type::IO, syntax::Kind::mk_arrow(k_type.clone(), k_type)))
+            }
             Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
                 let a = self.check_kind(
                     None,
                     a,
-                    &syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
+                    &syntax::Kind::mk_arrow(Rc::new(in_kind.clone()), Rc::new(out_kind.clone())),
                 )?;
                 let b = self.check_kind(None, b, &in_kind)?;
                 Ok((Type::mk_app(a, b), out_kind))

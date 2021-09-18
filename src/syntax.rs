@@ -1077,8 +1077,8 @@ impl Kind {
         KindIterMetas { items: vec![self] }
     }
 
-    pub fn mk_arrow(a: Kind, b: Kind) -> Kind {
-        Kind::Arrow(Rc::new(a), Rc::new(b))
+    pub fn mk_arrow(a: Rc<Kind>, b: Rc<Kind>) -> Kind {
+        Kind::Arrow(a, b)
     }
 
     pub fn render(&self) -> String {
