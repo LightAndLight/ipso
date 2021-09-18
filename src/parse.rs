@@ -14,7 +14,7 @@ pub enum ParseError {
     Unexpected {
         location: InputLocation,
         pos: usize,
-        expecting: BTreeSet<TokenType>,
+        expecting: Rc<BTreeSet<TokenType>>,
     },
 }
 
@@ -236,7 +236,7 @@ pub struct Parser {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
-    expecting: BTreeSet<TokenType>,
+    expecting: Rc<BTreeSet<TokenType>>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
@@ -379,7 +379,7 @@ impl Parser {
             location,
             pos: 0,
             indentation: vec![0],
-            expecting: BTreeSet::new(),
+            expecting: Rc::new(BTreeSet::new()),
             current,
             input,
         }
@@ -416,7 +416,7 @@ impl Parser {
             Some(ref token) => {
                 self.pos += token.token_type.length();
                 self.current = self.input.next();
-                self.expecting = BTreeSet::new();
+                *Rc::make_mut(&mut self.expecting) = BTreeSet::new();
                 ParseResult {
                     consumed: true,
                     result: Ok(()),
@@ -430,7 +430,7 @@ impl Parser {
     }
 
     fn space(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Space);
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Space);
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Indent(n) if n > self.current_indentation() => {
@@ -446,7 +446,7 @@ impl Parser {
     }
 
     fn indent(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Indent(0));
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Indent(0));
         let current_indentation = self.current_indentation();
         match self.current {
             Some(ref token) => match token.token_type {
@@ -461,7 +461,7 @@ impl Parser {
     }
 
     fn dedent(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Dedent);
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Dedent);
         let dedent_to = match &self.current {
             Some(token) => match token.token_type {
                 TokenType::Indent(n) => Some(n),
@@ -492,7 +492,7 @@ impl Parser {
     }
 
     fn comment(&mut self) -> ParseResult<()> {
-        self.expecting.insert(TokenType::Comment { length: 0 });
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Comment { length: 0 });
         match self.current {
             None => self.unexpected(false),
             Some(ref token) => match token.token_type {
@@ -507,8 +507,7 @@ impl Parser {
     }
 
     fn keyword(&mut self, expected: Keyword) -> ParseResult<()> {
-        self.expecting
-            .insert(TokenType::Ident(Rc::from(expected.to_string())));
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Ident(Rc::from(expected.to_string())));
         match self.current {
             None => self.unexpected(false),
             Some(ref actual) => match actual.token_type {
@@ -525,7 +524,7 @@ impl Parser {
     }
 
     fn token(&mut self, expected: &TokenType) -> ParseResult<()> {
-        self.expecting.insert(expected.clone());
+        Rc::make_mut(&mut self.expecting).insert(expected.clone());
         match self.current {
             Some(ref actual) if actual.token_type == *expected => {
                 map0!((), self.consume())
@@ -535,7 +534,7 @@ impl Parser {
     }
 
     fn ident(&mut self) -> ParseResult<Rc<str>> {
-        self.expecting.insert(TokenType::Ident(Rc::from("")));
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Ident(Rc::from("")));
         match self.current {
             Some(ref token) => match &token.token_type {
                 TokenType::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
@@ -556,7 +555,7 @@ impl Parser {
     }
 
     fn ctor(&mut self) -> ParseResult<Rc<str>> {
-        self.expecting.insert(TokenType::Ctor);
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Ctor);
         match self.current {
             Some(ref token) => match token.token_type {
                 TokenType::Ident(ref s) if !syntax::is_keyword(s) => match s.chars().next() {
@@ -577,7 +576,7 @@ impl Parser {
     }
 
     fn int(&mut self) -> ParseResult<u32> {
-        self.expecting.insert(TokenType::Int {
+        Rc::make_mut(&mut self.expecting).insert(TokenType::Int {
             value: 0,
             length: 0,
         });
@@ -593,6 +592,7 @@ impl Parser {
     }
 
     /// ```
+    /// use std::rc::Rc;
     /// use ipso::{diagnostic::InputLocation, lex::TokenType, parse::ParseError, parse_str};
     ///
     /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
@@ -604,19 +604,19 @@ impl Parser {
     /// assert_eq!(parse_str!(char, "\'\\\'"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 3,
-    ///     expecting: vec![TokenType::SingleQuote].into_iter().collect(),
+    ///     expecting: Rc::new(vec![TokenType::SingleQuote].into_iter().collect()),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
+    ///     expecting: Rc::new(vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect()),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(ParseError::Unexpected {
     ///     location: InputLocation::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect(),
+    ///     expecting: Rc::new(vec![TokenType::Char{value: '\0', length: 0}].into_iter().collect()),
     /// }));
     /// ```
     pub fn char(&mut self) -> ParseResult<char> {
@@ -624,7 +624,7 @@ impl Parser {
             self.token(&TokenType::SingleQuote),
             self.token(&TokenType::SingleQuote),
             {
-                self.expecting.insert(TokenType::Char {
+                Rc::make_mut(&mut self.expecting).insert(TokenType::Char {
                     value: '\0',
                     length: 0,
                 });
@@ -822,7 +822,7 @@ impl Parser {
     fn newline(&mut self) -> ParseResult<()> {
         keep_right!(optional!(self, self.comment()), {
             let current = self.current_indentation();
-            self.expecting.insert(TokenType::Indent(current));
+            Rc::make_mut(&mut self.expecting).insert(TokenType::Indent(current));
             match self.current {
                 None => self.unexpected(false),
                 Some(ref token) => match token.token_type {
@@ -926,7 +926,7 @@ impl Parser {
     }
 
     fn string_part_string(&mut self) -> ParseResult<StringPart> {
-        self.expecting.insert(TokenType::String {
+        Rc::make_mut(&mut self.expecting).insert(TokenType::String {
             value: String::new(),
             length: 0,
         });
