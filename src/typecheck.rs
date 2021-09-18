@@ -798,7 +798,7 @@ impl<'modules> Typechecker<'modules> {
             has_kind: expected,
             unifying_types: context,
         };
-        self.unify_kind(&context, &expected, &actual)?;
+        self.unify_kind(&context, expected, &actual)?;
         Ok(ty)
     }
 
@@ -1368,9 +1368,9 @@ impl<'modules> Typechecker<'modules> {
         actual: &syntax::Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(&context.ty)),
-            has_kind: self.zonk_kind(false, &context.has_kind),
-            unifying_types: context.unifying_types.clone().map(|x| UnifyTypeContext {
+            ty: self.fill_ty_names(self.zonk_type(context.ty)),
+            has_kind: self.zonk_kind(false, context.has_kind),
+            unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_type(&x.expected)),
                 actual: self.fill_ty_names(self.zonk_type(&x.actual)),
             }),
@@ -2299,7 +2299,7 @@ impl<'modules> Typechecker<'modules> {
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
                         Type::mk_arrow(
                             arg_ty.clone(),
-                            Type::mk_variant(vec![(ctor.clone(), arg_ty)], Some(rest)),
+                            Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
                         ),
                     ))
                 }
@@ -2319,10 +2319,7 @@ impl<'modules> Typechecker<'modules> {
                     ));
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
-                        Type::mk_app(
-                            Type::Variant,
-                            Type::mk_rowcons(ctor.clone(), arg_ty, rest_rows),
-                        ),
+                        Type::mk_app(Type::Variant, Type::mk_rowcons(ctor, arg_ty, rest_rows)),
                     ))
                 }
                 syntax::Expr::Binop(op, left, right) => {

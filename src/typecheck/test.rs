@@ -72,7 +72,7 @@ fn infer_kind_test_4() {
 #[test]
 fn context_test_1() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![
+    ctx.insert(&[
         (Rc::from("a"), Type::Unit::<usize>),
         (Rc::from("b"), Type::Bool),
         (Rc::from("c"), Type::String),
@@ -106,7 +106,7 @@ fn context_test_1() {
 #[should_panic]
 fn context_test_2() {
     let mut ctx = BoundVars::new();
-    ctx.insert(&vec![
+    ctx.insert(&[
         (Rc::from("a"), Type::Unit::<usize>),
         (Rc::from("a"), Type::Bool),
         (Rc::from("c"), Type::String),
