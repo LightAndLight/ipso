@@ -782,7 +782,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         context: Option<&UnifyTypeContext<usize>>,
         ty: &Type<usize>,
-        kind: syntax::Kind,
+        kind: &syntax::Kind,
     ) -> Result<Type<usize>, TypeError> {
         let expected = kind;
         let (ty, actual) = self.infer_kind(ty)?;
@@ -956,7 +956,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
-        let checked_type = self.check_kind(None, &type_, syntax::Kind::Type)?;
+        let checked_type = self.check_kind(None, &type_, &syntax::Kind::Type)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
         let ty_vars = ty_var_kinds
@@ -1005,7 +1005,7 @@ impl<'modules> Typechecker<'modules> {
             let (s_item, _) = s.item.abstract_vars(&arg_names);
             with_position!(self, s.pos, {
                 self.bound_tyvars.insert(&args_kinds);
-                match self.check_kind(None, &s_item, syntax::Kind::Constraint) {
+                match self.check_kind(None, &s_item, &syntax::Kind::Constraint) {
                     Err(err) => {
                         return Err(err);
                     }
@@ -1128,7 +1128,7 @@ impl<'modules> Typechecker<'modules> {
         with_position!(
             self,
             name.pos,
-            self.check_kind(None, &head, syntax::Kind::Constraint)
+            self.check_kind(None, &head, &syntax::Kind::Constraint)
         )?;
 
         // type check members
@@ -1608,7 +1608,7 @@ impl<'modules> Typechecker<'modules> {
             Type::Constraints(constraints) => {
                 let mut new_constraints = Vec::new();
                 for constraint in constraints {
-                    match self.check_kind(None, constraint, syntax::Kind::Constraint) {
+                    match self.check_kind(None, constraint, &syntax::Kind::Constraint) {
                         Err(err) => return Err(err),
                         Ok(new_constraint) => {
                             new_constraints.push(new_constraint);
@@ -1639,19 +1639,19 @@ impl<'modules> Typechecker<'modules> {
                 let a = self.check_kind(
                     None,
                     a,
-                    syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
+                    &syntax::Kind::mk_arrow(in_kind.clone(), out_kind.clone()),
                 )?;
-                let b = self.check_kind(None, b, in_kind)?;
+                let b = self.check_kind(None, b, &in_kind)?;
                 Ok((Type::mk_app(a, b), out_kind))
             }
             Type::RowNil => Ok((Type::RowNil, syntax::Kind::Row)),
             Type::RowCons(field, ty, rest) => {
-                let ty = self.check_kind(None, ty, syntax::Kind::Type)?;
-                let rest = self.check_kind(None, rest, syntax::Kind::Row)?;
+                let ty = self.check_kind(None, ty, &syntax::Kind::Type)?;
+                let rest = self.check_kind(None, rest, &syntax::Kind::Row)?;
                 Ok((Type::mk_rowcons(field.clone(), ty, rest), syntax::Kind::Row))
             }
             Type::HasField(field, rest) => {
-                let rest = self.check_kind(None, rest, syntax::Kind::Row)?;
+                let rest = self.check_kind(None, rest, &syntax::Kind::Row)?;
                 Ok((
                     Type::mk_hasfield(field.clone(), rest),
                     syntax::Kind::Constraint,
@@ -1692,7 +1692,7 @@ impl<'modules> Typechecker<'modules> {
         let actual = self.walk(actual);
 
         let (_, expected_kind) = self.infer_kind(&expected)?;
-        let _ = self.check_kind(Some(context), &actual, expected_kind)?;
+        let _ = self.check_kind(Some(context), &actual, &expected_kind)?;
 
         match expected {
             Type::App(a1, b1) => match actual {

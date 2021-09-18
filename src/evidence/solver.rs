@@ -31,7 +31,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
+            let _ = tc.check_kind(None, constraint, &Kind::Constraint)?;
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -117,7 +117,7 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            let _ = tc.check_kind(None, rest, Kind::Row)?;
+            let _ = tc.check_kind(None, rest, &Kind::Row)?;
             let new_evidence = match rest {
                 syntax::Type::RowNil => Ok(core::Expr::Int(0)),
                 syntax::Type::RowCons(other_field, _, other_rest) => {
