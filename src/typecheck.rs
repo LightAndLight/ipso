@@ -22,14 +22,6 @@ pub mod substitution;
 #[cfg(test)]
 mod test;
 
-macro_rules! fresh_kindvar {
-    ($val:expr) => {{
-        let n = $val.len();
-        $val.push(None);
-        syntax::Kind::Meta(n)
-    }};
-}
-
 #[derive(Debug, PartialEq, Eq)]
 struct BoundVars<A> {
     indices: HashMap<Rc<str>, Vec<usize>>,
@@ -1101,13 +1093,10 @@ impl<'modules> Typechecker<'modules> {
             .map(|assume| assume.item.abstract_vars(&ty_vars).0)
             .collect();
 
-        let ty_var_kinds: Vec<(Rc<str>, syntax::Kind)> = {
-            let kind_solutions = &mut self.kind_solutions;
-            ty_vars
-                .into_iter()
-                .map(|var| (var, fresh_kindvar!(kind_solutions)))
-                .collect()
-        };
+        let ty_var_kinds: Vec<(Rc<str>, syntax::Kind)> = ty_vars
+            .into_iter()
+            .map(|var| (var, self.fresh_kindvar()))
+            .collect();
 
         let (_, args) = head.unwrap_app();
         let args: Vec<Type<usize>> = args.into_iter().cloned().collect();
@@ -1380,7 +1369,9 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn fresh_kindvar(&mut self) -> syntax::Kind {
-        fresh_kindvar!(self.kind_solutions)
+        let n = self.kind_solutions.len();
+        self.kind_solutions.push(None);
+        syntax::Kind::Meta(n)
     }
 
     pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<Rc<str>> {
