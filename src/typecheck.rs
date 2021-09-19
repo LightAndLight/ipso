@@ -810,16 +810,16 @@ impl<'modules> Typechecker<'modules> {
         context: Option<&UnifyTypeContext<usize>>,
         ty: &Type<usize>,
         kind: &syntax::Kind,
-    ) -> Result<Type<usize>, TypeError> {
+    ) -> Result<(), TypeError> {
         let expected = kind;
-        let (ty, actual) = self.infer_kind(ty)?;
+        let actual = self.infer_kind(ty)?;
         let context = UnifyKindContextRefs {
-            ty: &ty,
+            ty,
             has_kind: expected,
             unifying_types: context,
         };
         self.unify_kind(&context, expected, &actual)?;
-        Ok(ty)
+        Ok(())
     }
 
     fn abstract_evidence(
@@ -983,7 +983,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
-        let checked_type = self.check_kind(None, &type_, &syntax::Kind::Type)?;
+        self.check_kind(None, &type_, &syntax::Kind::Type)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
         let ty_vars = ty_var_kinds
@@ -992,7 +992,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let sig = core::TypeSig {
             ty_vars,
-            body: checked_type,
+            body: type_,
         };
         Ok(core::ClassMember {
             name: name.to_string(),
@@ -1036,7 +1036,7 @@ impl<'modules> Typechecker<'modules> {
                     Err(err) => {
                         return Err(err);
                     }
-                    Ok(s_item) => {
+                    Ok(()) => {
                         new_supers.push(s_item);
                         self.bound_tyvars.delete(args_len);
                     }
@@ -1601,105 +1601,87 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn infer_kind(&mut self, ty: &Type<usize>) -> Result<(Type<usize>, syntax::Kind), TypeError> {
+    fn infer_kind(&mut self, ty: &Type<usize>) -> Result<syntax::Kind, TypeError> {
         match ty {
             Type::Name(n) => match self.type_context.get(n) {
                 None => self.not_in_scope(n),
-                Some(kind) => Ok((Type::Name(n.clone()), kind.clone())),
+                Some(kind) => Ok(kind.clone()),
             },
             Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
                 None => {
                     panic!("missing tyvar {:?}", ix);
                 }
-                Some((_, kind)) => Ok((Type::Var(*ix), kind.clone())),
+                Some((_, kind)) => Ok(kind.clone()),
             },
-            Type::Bool => Ok((Type::Bool, syntax::Kind::Type)),
-            Type::Int => Ok((Type::Int, syntax::Kind::Type)),
-            Type::Char => Ok((Type::Char, syntax::Kind::Type)),
-            Type::String => Ok((Type::String, syntax::Kind::Type)),
-            Type::Bytes => Ok((Type::Bytes, syntax::Kind::Type)),
-            Type::Arrow => Ok((
-                Type::Arrow,
-                syntax::Kind::mk_arrow(
+            Type::Bool => Ok(syntax::Kind::Type),
+            Type::Int => Ok(syntax::Kind::Type),
+            Type::Char => Ok(syntax::Kind::Type),
+            Type::String => Ok(syntax::Kind::Type),
+            Type::Bytes => Ok(syntax::Kind::Type),
+            Type::Arrow => Ok(syntax::Kind::mk_arrow(
+                self.constants.r#type.clone(),
+                Rc::new(syntax::Kind::mk_arrow(
                     self.constants.r#type.clone(),
-                    Rc::new(syntax::Kind::mk_arrow(
-                        self.constants.r#type.clone(),
-                        self.constants.r#type.clone(),
-                    )),
-                ),
+                    self.constants.r#type.clone(),
+                )),
             )),
-            Type::FatArrow => Ok((
-                Type::FatArrow,
-                syntax::Kind::mk_arrow(
-                    self.constants.constraint.clone(),
-                    Rc::new(syntax::Kind::mk_arrow(
-                        self.constants.r#type.clone(),
-                        self.constants.r#type.clone(),
-                    )),
-                ),
+            Type::FatArrow => Ok(syntax::Kind::mk_arrow(
+                self.constants.constraint.clone(),
+                Rc::new(syntax::Kind::mk_arrow(
+                    self.constants.r#type.clone(),
+                    self.constants.r#type.clone(),
+                )),
             )),
             Type::Constraints(constraints) => {
-                let mut new_constraints = Vec::new();
                 for constraint in constraints {
                     match self.check_kind(None, constraint, &syntax::Kind::Constraint) {
                         Err(err) => return Err(err),
-                        Ok(new_constraint) => {
-                            new_constraints.push(new_constraint);
-                        }
+                        Ok(()) => {}
                     }
                 }
-                Ok((Type::Constraints(new_constraints), syntax::Kind::Constraint))
+                Ok(syntax::Kind::Constraint)
             }
-            Type::Array => Ok((
-                Type::Array,
-                syntax::Kind::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                ),
+            Type::Array => Ok(syntax::Kind::mk_arrow(
+                self.constants.r#type.clone(),
+                self.constants.r#type.clone(),
             )),
-            Type::Record => Ok((
-                Type::Record,
-                syntax::Kind::mk_arrow(self.constants.row.clone(), self.constants.r#type.clone()),
+            Type::Record => Ok(syntax::Kind::mk_arrow(
+                self.constants.row.clone(),
+                self.constants.r#type.clone(),
             )),
-            Type::Variant => Ok((
-                Type::Variant,
-                syntax::Kind::mk_arrow(self.constants.row.clone(), self.constants.r#type.clone()),
+            Type::Variant => Ok(syntax::Kind::mk_arrow(
+                self.constants.row.clone(),
+                self.constants.r#type.clone(),
             )),
-            Type::IO => Ok((
-                Type::IO,
-                syntax::Kind::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                ),
+            Type::IO => Ok(syntax::Kind::mk_arrow(
+                self.constants.r#type.clone(),
+                self.constants.r#type.clone(),
             )),
             Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
-                let a = self.check_kind(
+                self.check_kind(
                     None,
                     a,
                     &syntax::Kind::mk_arrow(Rc::new(in_kind.clone()), Rc::new(out_kind.clone())),
                 )?;
-                let b = self.check_kind(None, b, &in_kind)?;
-                Ok((Type::mk_app(a, b), out_kind))
+                self.check_kind(None, b, &in_kind)?;
+                Ok(out_kind)
             }
-            Type::RowNil => Ok((Type::RowNil, syntax::Kind::Row)),
-            Type::RowCons(field, ty, rest) => {
-                let ty = self.check_kind(None, ty, &syntax::Kind::Type)?;
-                let rest = self.check_kind(None, rest, &syntax::Kind::Row)?;
-                Ok((Type::mk_rowcons(field.clone(), ty, rest), syntax::Kind::Row))
+            Type::RowNil => Ok(syntax::Kind::Row),
+            Type::RowCons(_field, ty, rest) => {
+                self.check_kind(None, ty, &syntax::Kind::Type)?;
+                self.check_kind(None, rest, &syntax::Kind::Row)?;
+                Ok(syntax::Kind::Row)
             }
-            Type::HasField(field, rest) => {
-                let rest = self.check_kind(None, rest, &syntax::Kind::Row)?;
-                Ok((
-                    Type::mk_hasfield(field.clone(), rest),
-                    syntax::Kind::Constraint,
-                ))
+            Type::HasField(_field, rest) => {
+                self.check_kind(None, rest, &syntax::Kind::Row)?;
+                Ok(syntax::Kind::Constraint)
             }
-            Type::Unit => Ok((Type::Unit, syntax::Kind::Type)),
+            Type::Unit => Ok(syntax::Kind::Type),
             Type::Meta(n) => {
                 let kind = self.lookup_typevar(*n)?;
-                Ok((Type::Meta(*n), kind))
+                Ok(kind)
             }
         }
     }
@@ -1730,7 +1712,7 @@ impl<'modules> Typechecker<'modules> {
         let expected = self.walk(expected);
         let actual = self.walk(actual);
 
-        let (_, expected_kind) = self.infer_kind(&expected)?;
+        let expected_kind = self.infer_kind(&expected)?;
         let _ = self.check_kind(Some(context), &actual, &expected_kind)?;
 
         match expected {

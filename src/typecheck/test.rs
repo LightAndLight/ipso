@@ -19,7 +19,7 @@ use super::SolveConstraintContext;
 #[test]
 fn infer_kind_test_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok((Type::Bool, Kind::Type));
+        let expected = Ok(Kind::Type);
         let actual = tc.infer_kind(&Type::Bool);
         assert_eq!(expected, actual)
     })
@@ -28,7 +28,7 @@ fn infer_kind_test_1() {
 #[test]
 fn infer_kind_test_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok((Type::RowNil, Kind::Row));
+        let expected = Ok(Kind::Row);
         let actual = tc.infer_kind(&Type::RowNil);
         assert_eq!(expected, actual)
     })
@@ -64,7 +64,7 @@ fn infer_kind_test_4() {
                 Type::Record,
                 Type::mk_rowcons(Rc::from("x"), Type::Bool, Type::RowNil),
             ))
-            .map(|(_, kind)| tc.zonk_kind(false, &kind));
+            .map(|kind| tc.zonk_kind(false, &kind));
         assert_eq!(expected, actual)
     })
 }
