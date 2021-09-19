@@ -1,18 +1,18 @@
 #[cfg(test)]
+use super::{ParseError, ParseResult, Parser};
+#[cfg(test)]
 use crate::syntax::{Spanned, StringPart};
 #[cfg(test)]
 use crate::{
     diagnostic::InputLocation,
     keep_left,
-    lex::{Lexer, TokenType},
+    lex::Lexer,
     map2,
-    syntax::{Branch, Declaration, Expr, Names, Pattern, Type},
+    syntax::{Branch, Declaration, Expr, Keyword, Names, Pattern, Type},
+    token,
 };
 #[cfg(test)]
 use std::rc::Rc;
-
-#[cfg(test)]
-use super::{ParseError, ParseResult, Parser};
 
 #[cfg(test)]
 macro_rules! parse_test {
@@ -53,7 +53,7 @@ fn parse_ident_2() {
                 label: String::from("(parser)"),
             },
             pos: 0,
-            expecting: vec![TokenType::Ident(Rc::from(""))].into_iter().collect()
+            expecting: vec![token::Name::Ident].into_iter().collect()
         })
     )
 }
@@ -124,9 +124,9 @@ fn parse_import_as_3() {
             },
             pos: 10,
             expecting: vec![
-                TokenType::Space,
-                TokenType::Ident(Rc::from("as")),
-                TokenType::Comment { length: 0 }
+                token::Name::Space,
+                token::Name::Keyword(Keyword::As),
+                token::Name::Comment
             ]
             .into_iter()
             .collect()
@@ -184,25 +184,22 @@ fn parse_definition_3() {
             },
             pos: 11,
             expecting: vec![
-                TokenType::Int {
-                    value: 0,
-                    length: 0
-                },
-                TokenType::Ident(Rc::from("")),
-                TokenType::Ident(Rc::from("case")),
-                TokenType::Ident(Rc::from("true")),
-                TokenType::Ident(Rc::from("false")),
-                TokenType::Ident(Rc::from("if")),
-                TokenType::Ctor,
-                TokenType::Space,
-                TokenType::LAngle,
-                TokenType::LParen,
-                TokenType::LBrace,
-                TokenType::LBracket,
-                TokenType::DoubleQuote,
-                TokenType::SingleQuote,
-                TokenType::Backslash,
-                TokenType::Comment { length: 0 },
+                token::Name::Int,
+                token::Name::Ident,
+                token::Name::Keyword(Keyword::Case),
+                token::Name::Keyword(Keyword::True),
+                token::Name::Keyword(Keyword::False),
+                token::Name::Keyword(Keyword::If),
+                token::Name::Ctor,
+                token::Name::Space,
+                token::Name::LAngle,
+                token::Name::LParen,
+                token::Name::LBrace,
+                token::Name::LBracket,
+                token::Name::DoubleQuote,
+                token::Name::SingleQuote,
+                token::Name::Backslash,
+                token::Name::Comment,
             ]
             .into_iter()
             .collect()
@@ -587,25 +584,22 @@ fn parse_case_4() {
             },
             pos: 24,
             expecting: vec![
-                TokenType::Space,
-                TokenType::Indent(2),
-                TokenType::Dedent,
-                TokenType::LAngle,
-                TokenType::LParen,
-                TokenType::LBrace,
-                TokenType::LBracket,
-                TokenType::Dot,
-                TokenType::Ctor,
-                TokenType::Ident(Rc::from("true")),
-                TokenType::Ident(Rc::from("false")),
-                TokenType::Ident(Rc::from("")),
-                TokenType::DoubleQuote,
-                TokenType::SingleQuote,
-                TokenType::Int {
-                    value: 0,
-                    length: 0
-                },
-                TokenType::Comment { length: 0 }
+                token::Name::Space,
+                token::Name::Indent(2),
+                token::Name::Dedent,
+                token::Name::LAngle,
+                token::Name::LParen,
+                token::Name::LBrace,
+                token::Name::LBracket,
+                token::Name::Dot,
+                token::Name::Ctor,
+                token::Name::Keyword(Keyword::True),
+                token::Name::Keyword(Keyword::False),
+                token::Name::Ident,
+                token::Name::DoubleQuote,
+                token::Name::SingleQuote,
+                token::Name::Int,
+                token::Name::Comment
             ]
             .into_iter()
             .collect()
@@ -629,25 +623,22 @@ fn parse_case_5() {
             },
             pos: 18,
             expecting: vec![
-                TokenType::Ctor,
-                TokenType::Ident(Rc::from("")),
-                TokenType::Ident(Rc::from("false")),
-                TokenType::Ident(Rc::from("true")),
-                TokenType::Int {
-                    value: 0,
-                    length: 0
-                },
-                TokenType::DoubleQuote,
-                TokenType::SingleQuote,
-                TokenType::LBrace,
-                TokenType::LParen,
-                TokenType::LBracket,
-                TokenType::LAngle,
-                TokenType::Dot,
-                TokenType::Indent(2),
-                TokenType::Dedent,
-                TokenType::Space,
-                TokenType::Comment { length: 0 }
+                token::Name::Ctor,
+                token::Name::Ident,
+                token::Name::Keyword(Keyword::False),
+                token::Name::Keyword(Keyword::True),
+                token::Name::Int,
+                token::Name::DoubleQuote,
+                token::Name::SingleQuote,
+                token::Name::LBrace,
+                token::Name::LParen,
+                token::Name::LBracket,
+                token::Name::LAngle,
+                token::Name::Dot,
+                token::Name::Indent(2),
+                token::Name::Dedent,
+                token::Name::Space,
+                token::Name::Comment
             ]
             .into_iter()
             .collect()

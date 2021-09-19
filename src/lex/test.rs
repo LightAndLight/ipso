@@ -2,7 +2,10 @@
 use std::rc::Rc;
 
 #[cfg(test)]
-use super::{Lexer, Token, TokenType};
+use super::Lexer;
+
+#[cfg(test)]
+use crate::token::{self, Token};
 
 #[test]
 fn lex_int_1() {
@@ -13,7 +16,7 @@ fn lex_int_1() {
             lexer.tokenize()
         },
         vec![Token {
-            token_type: TokenType::Int {
+            data: token::Data::Int {
                 value: 923,
                 length: 3
             },
@@ -31,7 +34,7 @@ fn lex_int_2() {
             lexer.tokenize()
         },
         vec![Token {
-            token_type: TokenType::Int {
+            data: token::Data::Int {
                 value: 923,
                 length: 5
             },
@@ -50,31 +53,31 @@ fn lex_import() {
         },
         vec![
             Token {
-                token_type: TokenType::Ident(Rc::from("import")),
+                data: token::Data::Ident(Rc::from("import")),
                 pos: 0
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("yes")),
+                data: token::Data::Ident(Rc::from("yes")),
                 pos: 7
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 10
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("as")),
+                data: token::Data::Ident(Rc::from("as")),
                 pos: 11
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 13
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("no")),
+                data: token::Data::Ident(Rc::from("no")),
                 pos: 14
             }
         ]
@@ -91,47 +94,47 @@ fn lex_definition_1() {
         },
         vec![
             Token {
-                token_type: TokenType::Ident(Rc::from("x")),
+                data: token::Data::Ident(Rc::from("x")),
                 pos: 0
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 1
             },
             Token {
-                token_type: TokenType::Colon,
+                data: token::Data::Colon,
                 pos: 2
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 3
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("Int")),
+                data: token::Data::Ident(Rc::from("Int")),
                 pos: 4
             },
             Token {
-                token_type: TokenType::Indent(0),
+                data: token::Data::Indent(0),
                 pos: 7
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("x")),
+                data: token::Data::Ident(Rc::from("x")),
                 pos: 8
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 9
             },
             Token {
-                token_type: TokenType::Equals,
+                data: token::Data::Equals,
                 pos: 10
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 11
             },
             Token {
-                token_type: TokenType::Int {
+                data: token::Data::Int {
                     value: 1,
                     length: 1
                 },
@@ -151,47 +154,47 @@ fn lex_definition_2() {
         },
         vec![
             Token {
-                token_type: TokenType::Ident(Rc::from("x")),
+                data: token::Data::Ident(Rc::from("x")),
                 pos: 0
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 1
             },
             Token {
-                token_type: TokenType::Colon,
+                data: token::Data::Colon,
                 pos: 2
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 3
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("Int")),
+                data: token::Data::Ident(Rc::from("Int")),
                 pos: 4
             },
             Token {
-                token_type: TokenType::Indent(0),
+                data: token::Data::Indent(0),
                 pos: 7
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("x")),
+                data: token::Data::Ident(Rc::from("x")),
                 pos: 8
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 9
             },
             Token {
-                token_type: TokenType::Equals,
+                data: token::Data::Equals,
                 pos: 10
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 11
             },
             Token {
-                token_type: TokenType::Unexpected('~'),
+                data: token::Data::Unexpected('~'),
                 pos: 12
             }
         ]
@@ -208,47 +211,47 @@ fn lex_case_1() {
         },
         vec![
             Token {
-                token_type: TokenType::Ident(Rc::from("case")),
+                data: token::Data::Ident(Rc::from("case")),
                 pos: 0
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 4
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("x")),
+                data: token::Data::Ident(Rc::from("x")),
                 pos: 5
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("of")),
+                data: token::Data::Ident(Rc::from("of")),
                 pos: 7
             },
             Token {
-                token_type: TokenType::Indent(2),
+                data: token::Data::Indent(2),
                 pos: 9
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("a")),
+                data: token::Data::Ident(Rc::from("a")),
                 pos: 12
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 13
             },
             Token {
-                token_type: TokenType::Arrow,
+                data: token::Data::Arrow,
                 pos: 14
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 16
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("b")),
+                data: token::Data::Ident(Rc::from("b")),
                 pos: 17
             },
         ]
@@ -265,31 +268,31 @@ fn lex_ann_1() {
         },
         vec![
             Token {
-                token_type: TokenType::Ident(Rc::from("main")),
+                data: token::Data::Ident(Rc::from("main")),
                 pos: 0
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 4
             },
             Token {
-                token_type: TokenType::Colon,
+                data: token::Data::Colon,
                 pos: 5
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 6
             },
             Token {
-                token_type: TokenType::Ident(Rc::from("IO")),
+                data: token::Data::Ident(Rc::from("IO")),
                 pos: 7
             },
             Token {
-                token_type: TokenType::Space,
+                data: token::Data::Space,
                 pos: 9
             },
             Token {
-                token_type: TokenType::Unexpected('~'),
+                data: token::Data::Unexpected('~'),
                 pos: 10
             },
         ]
@@ -302,18 +305,18 @@ fn lex_string_1() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("hello"),
                 length: 5,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 6,
         },
     ];
@@ -327,33 +330,33 @@ fn lex_string_2() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("x "),
                 length: 2,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::Dollar,
+            data: token::Data::Dollar,
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("y")),
+            data: token::Data::Ident(Rc::from("y")),
             pos: 4,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from(" z"),
                 length: 2,
             },
             pos: 5,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 7,
         },
     ];
@@ -367,33 +370,33 @@ fn lex_string_3() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("x "),
                 length: 2,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::Dollar,
+            data: token::Data::Dollar,
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("yy")),
+            data: token::Data::Ident(Rc::from("yy")),
             pos: 4,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from(" z"),
                 length: 2,
             },
             pos: 6,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 8,
         },
     ];
@@ -407,37 +410,37 @@ fn lex_string_4() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("x "),
                 length: 2,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::DollarLBrace,
+            data: token::Data::DollarLBrace,
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("yy")),
+            data: token::Data::Ident(Rc::from("yy")),
             pos: 5,
         },
         Token {
-            token_type: TokenType::RBrace,
+            data: token::Data::RBrace,
             pos: 7,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from(" z"),
                 length: 2,
             },
             pos: 8,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 10,
         },
     ];
@@ -451,53 +454,53 @@ fn lex_string_5() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("x "),
                 length: 2,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::DollarLBrace,
+            data: token::Data::DollarLBrace,
             pos: 3,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("a")),
+            data: token::Data::Ident(Rc::from("a")),
             pos: 5,
         },
         Token {
-            token_type: TokenType::Space,
+            data: token::Data::Space,
             pos: 6,
         },
         Token {
-            token_type: TokenType::Plus,
+            data: token::Data::Plus,
             pos: 7,
         },
         Token {
-            token_type: TokenType::Space,
+            data: token::Data::Space,
             pos: 8,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("b")),
+            data: token::Data::Ident(Rc::from("b")),
             pos: 9,
         },
         Token {
-            token_type: TokenType::RBrace,
+            data: token::Data::RBrace,
             pos: 10,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from(" z"),
                 length: 2,
             },
             pos: 11,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 13,
         },
     ];
@@ -511,26 +514,26 @@ fn lex_string_6() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("hello "),
                 length: 6,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::Dollar,
+            data: token::Data::Dollar,
             pos: 7,
         },
         Token {
-            token_type: TokenType::Ident(Rc::from("name")),
+            data: token::Data::Ident(Rc::from("name")),
             pos: 8,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 12,
         },
     ];
@@ -544,18 +547,18 @@ fn lex_string_7() {
     let lexer = Lexer::new(&input);
     let expected = vec![
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 0,
         },
         Token {
-            token_type: TokenType::String {
+            data: token::Data::String {
                 value: String::from("hello\n\n\nworld"),
                 length: 16,
             },
             pos: 1,
         },
         Token {
-            token_type: TokenType::DoubleQuote,
+            data: token::Data::DoubleQuote,
             pos: 17,
         },
     ];

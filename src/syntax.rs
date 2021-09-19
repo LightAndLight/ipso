@@ -12,6 +12,7 @@ pub struct Spanned<A> {
     pub item: A,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
 pub enum Keyword {
     Case,
     Of,

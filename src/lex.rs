@@ -2,164 +2,7 @@ mod test;
 
 use std::{rc::Rc, str::Chars};
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
-pub enum TokenType {
-    Unexpected(char),
-
-    Comment { length: usize },
-
-    Ctor,
-    Ident(Rc<str>),
-    Int { value: usize, length: usize },
-
-    DoubleQuote,
-    Dollar,
-    DollarLBrace,
-    String { value: String, length: usize },
-
-    SingleQuote,
-    Char { value: char, length: usize },
-
-    LBrace,
-    RBrace,
-    LParen,
-    RParen,
-    LBracket,
-    RBracket,
-    LAngle,
-    RAngle,
-
-    Backslash,
-    Arrow,
-    FatArrow,
-
-    Dot,
-
-    Asterisk,
-
-    Equals,
-    Colon,
-
-    Comma,
-    Pipe,
-
-    Underscore,
-
-    Hyphen,
-    Plus,
-    Slash,
-
-    Indent(usize),
-    Dedent,
-    Space,
-}
-
-impl TokenType {
-    pub fn render(&self) -> String {
-        match self {
-            TokenType::Unexpected(_) => String::from("unexpected"),
-            TokenType::Ident(s) => {
-                if s.is_empty() {
-                    String::from("identifier")
-                } else {
-                    format!("\"{}\"", s)
-                }
-            }
-            TokenType::Int { value, length } => {
-                if *length == 0 {
-                    String::from("integer")
-                } else {
-                    format!("\"{}\"", value)
-                }
-            }
-            TokenType::Comment { .. } => String::from("comment"),
-            TokenType::DoubleQuote => String::from("'\"'"),
-            TokenType::Dollar => String::from("'$'"),
-            TokenType::DollarLBrace => String::from("'${'"),
-            TokenType::String { value, .. } => format!("{:?}", value),
-            TokenType::SingleQuote => String::from("'"),
-            TokenType::Char { value, .. } => format!("'{}'", value),
-            TokenType::LBrace => String::from("'{'"),
-            TokenType::RBrace => String::from("'}'"),
-            TokenType::LParen => String::from("'('"),
-            TokenType::RParen => String::from("')'"),
-            TokenType::LBracket => String::from("'['"),
-            TokenType::RBracket => String::from("']'"),
-            TokenType::Backslash => String::from("'\\'"),
-            TokenType::Arrow => String::from("'->'"),
-            TokenType::FatArrow => String::from("'=>'"),
-            TokenType::Dot => String::from("'.'"),
-            TokenType::Asterisk => String::from("'*'"),
-            TokenType::Equals => String::from("'='"),
-            TokenType::Colon => String::from("':'"),
-            TokenType::Comma => String::from("','"),
-            TokenType::Underscore => String::from("'_'"),
-            TokenType::Hyphen => String::from("'-'"),
-            TokenType::Plus => String::from("'+'"),
-            TokenType::Slash => String::from("'/'"),
-            TokenType::Indent(n) => {
-                if *n == 0 {
-                    String::from("newline")
-                } else {
-                    format!("indent ({})", n)
-                }
-            }
-            TokenType::Dedent => String::from("dedent"),
-            TokenType::Space => String::from("space"),
-            TokenType::Ctor => String::from("constructor"),
-            TokenType::Pipe => String::from("'|'"),
-            TokenType::LAngle => String::from("'<'"),
-            TokenType::RAngle => String::from("'>'"),
-        }
-    }
-
-    pub fn length(&self) -> usize {
-        match self {
-            TokenType::Unexpected(_) => 1,
-            TokenType::Comment { length } => *length,
-            TokenType::Ident(s) => s.len(),
-            TokenType::Int { value: _, length } => *length,
-            TokenType::LBrace => 1,
-            TokenType::RBrace => 1,
-            TokenType::LParen => 1,
-            TokenType::RParen => 1,
-            TokenType::LBracket => 1,
-            TokenType::RBracket => 1,
-            TokenType::Backslash => 1,
-            TokenType::Arrow => 2,
-            TokenType::FatArrow => 2,
-            TokenType::Dot => 1,
-            TokenType::Asterisk => 1,
-            TokenType::Equals => 1,
-            TokenType::Colon => 1,
-            TokenType::Comma => 1,
-            TokenType::Underscore => 1,
-            TokenType::Hyphen => 1,
-            TokenType::Plus => 1,
-            TokenType::Slash => 1,
-            TokenType::Indent(n) => n + 1,
-            TokenType::Space => 1,
-            TokenType::DoubleQuote => 1,
-            TokenType::SingleQuote => 1,
-            TokenType::Dollar => 1,
-            TokenType::DollarLBrace => 2,
-            TokenType::String { length, .. } => *length,
-            TokenType::Char { length, .. } => *length,
-            TokenType::Pipe => 1,
-            TokenType::LAngle => 1,
-            TokenType::RAngle => 1,
-
-            TokenType::Dedent => panic!("TokenType::Dedent.len()"),
-            TokenType::Ctor => panic!("TokenType::Ctor.len()"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub pos: usize,
-}
+use crate::token::{self, Token};
 
 enum Mode {
     String,
@@ -220,12 +63,12 @@ impl<'input> Lexer<'input> {
                         }
                         let _ = self.mode.pop().unwrap();
                         Some(Token {
-                            token_type: TokenType::Ident(Rc::from(ident)),
+                            data: token::Data::Ident(Rc::from(ident)),
                             pos,
                         })
                     } else {
                         Some(Token {
-                            token_type: TokenType::Unexpected(c),
+                            data: token::Data::Unexpected(c),
                             pos,
                         })
                     }
@@ -235,7 +78,7 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         let _ = self.mode.pop().unwrap();
                         Some(Token {
-                            token_type: TokenType::DoubleQuote,
+                            data: token::Data::DoubleQuote,
                             pos,
                         })
                     }
@@ -247,14 +90,14 @@ impl<'input> Lexer<'input> {
                                 self.consume();
                                 self.mode.push(Mode::Normal);
                                 Some(Token {
-                                    token_type: TokenType::DollarLBrace,
+                                    data: token::Data::DollarLBrace,
                                     pos,
                                 })
                             }
                             _ => {
                                 self.mode.push(Mode::Ident);
                                 Some(Token {
-                                    token_type: TokenType::Dollar,
+                                    data: token::Data::Dollar,
                                     pos,
                                 })
                             }
@@ -279,7 +122,7 @@ impl<'input> Lexer<'input> {
                                         match self.current {
                                             None => {
                                                 return Some(Token {
-                                                    token_type: TokenType::Unexpected('\\'),
+                                                    data: token::Data::Unexpected('\\'),
                                                     pos: self.pos,
                                                 })
                                             }
@@ -301,7 +144,7 @@ impl<'input> Lexer<'input> {
                                                 }
                                                 _ => {
                                                     return Some(Token {
-                                                        token_type: TokenType::Unexpected('\\'),
+                                                        data: token::Data::Unexpected('\\'),
                                                         pos: self.pos,
                                                     });
                                                 }
@@ -318,7 +161,7 @@ impl<'input> Lexer<'input> {
                         }
 
                         Some(Token {
-                            token_type: TokenType::String {
+                            data: token::Data::String {
                                 value: str,
                                 length: textual_len,
                             },
@@ -331,7 +174,7 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         let _ = self.mode.pop().unwrap();
                         Some(Token {
-                            token_type: TokenType::SingleQuote,
+                            data: token::Data::SingleQuote,
                             pos,
                         })
                     }
@@ -350,7 +193,7 @@ impl<'input> Lexer<'input> {
                                     match self.current {
                                         None => {
                                             return Some(Token {
-                                                token_type: TokenType::Unexpected('\\'),
+                                                data: token::Data::Unexpected('\\'),
                                                 pos: self.pos,
                                             })
                                         }
@@ -372,7 +215,7 @@ impl<'input> Lexer<'input> {
                                             }
                                             _ => {
                                                 return Some(Token {
-                                                    token_type: TokenType::Unexpected('\\'),
+                                                    data: token::Data::Unexpected('\\'),
                                                     pos: self.pos,
                                                 });
                                             }
@@ -388,7 +231,7 @@ impl<'input> Lexer<'input> {
                         }
 
                         char.map(|value| Token {
-                            token_type: TokenType::Char {
+                            data: token::Data::Char {
                                 value,
                                 length: textual_len,
                             },
@@ -410,7 +253,7 @@ impl<'input> Lexer<'input> {
                             }
                         }
                         Some(Token {
-                            token_type: TokenType::Indent(depth),
+                            data: token::Data::Indent(depth),
                             pos,
                         })
                     }
@@ -436,7 +279,7 @@ impl<'input> Lexer<'input> {
                         }
 
                         Some(Token {
-                            token_type: TokenType::Comment {
+                            data: token::Data::Comment {
                                 length: textual_length,
                             },
                             pos,
@@ -446,7 +289,7 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         self.mode.push(Mode::String);
                         Some(Token {
-                            token_type: TokenType::DoubleQuote,
+                            data: token::Data::DoubleQuote,
                             pos,
                         })
                     }
@@ -454,14 +297,14 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         self.mode.push(Mode::Char);
                         Some(Token {
-                            token_type: TokenType::SingleQuote,
+                            data: token::Data::SingleQuote,
                             pos,
                         })
                     }
                     ' ' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Space,
+                            data: token::Data::Space,
                             pos,
                         })
                     }
@@ -469,7 +312,7 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         self.mode.push(Mode::Normal);
                         Some(Token {
-                            token_type: TokenType::LBrace,
+                            data: token::Data::LBrace,
                             pos,
                         })
                     }
@@ -477,77 +320,77 @@ impl<'input> Lexer<'input> {
                         self.consume();
                         let _ = self.mode.pop().unwrap();
                         Some(Token {
-                            token_type: TokenType::RBrace,
+                            data: token::Data::RBrace,
                             pos,
                         })
                     }
                     '(' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::LParen,
+                            data: token::Data::LParen,
                             pos,
                         })
                     }
                     ')' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::RParen,
+                            data: token::Data::RParen,
                             pos,
                         })
                     }
                     '[' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::LBracket,
+                            data: token::Data::LBracket,
                             pos,
                         })
                     }
                     ']' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::RBracket,
+                            data: token::Data::RBracket,
                             pos,
                         })
                     }
                     '<' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::LAngle,
+                            data: token::Data::LAngle,
                             pos,
                         })
                     }
                     '>' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::RAngle,
+                            data: token::Data::RAngle,
                             pos,
                         })
                     }
                     '|' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Pipe,
+                            data: token::Data::Pipe,
                             pos,
                         })
                     }
                     ',' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Comma,
+                            data: token::Data::Comma,
                             pos,
                         })
                     }
                     ':' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Colon,
+                            data: token::Data::Colon,
                             pos,
                         })
                     }
                     '.' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Dot,
+                            data: token::Data::Dot,
                             pos,
                         })
                     }
@@ -558,12 +401,12 @@ impl<'input> Lexer<'input> {
                                 self.consume();
 
                                 Some(Token {
-                                    token_type: TokenType::FatArrow,
+                                    data: token::Data::FatArrow,
                                     pos,
                                 })
                             }
                             _ => Some(Token {
-                                token_type: TokenType::Equals,
+                                data: token::Data::Equals,
                                 pos,
                             }),
                         }
@@ -575,12 +418,12 @@ impl<'input> Lexer<'input> {
                                 self.consume();
 
                                 Some(Token {
-                                    token_type: TokenType::Arrow,
+                                    data: token::Data::Arrow,
                                     pos,
                                 })
                             }
                             _ => Some(Token {
-                                token_type: TokenType::Hyphen,
+                                data: token::Data::Hyphen,
                                 pos,
                             }),
                         }
@@ -588,35 +431,35 @@ impl<'input> Lexer<'input> {
                     '+' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Plus,
+                            data: token::Data::Plus,
                             pos,
                         })
                     }
                     '/' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Slash,
+                            data: token::Data::Slash,
                             pos,
                         })
                     }
                     '\\' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Backslash,
+                            data: token::Data::Backslash,
                             pos,
                         })
                     }
                     '*' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Asterisk,
+                            data: token::Data::Asterisk,
                             pos,
                         })
                     }
                     '_' => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Underscore,
+                            data: token::Data::Underscore,
                             pos,
                         })
                     }
@@ -634,7 +477,7 @@ impl<'input> Lexer<'input> {
                             }
                         }
                         Some(Token {
-                            token_type: TokenType::Ident(Rc::from(ident)),
+                            data: token::Data::Ident(Rc::from(ident)),
                             pos,
                         })
                     }
@@ -649,14 +492,14 @@ impl<'input> Lexer<'input> {
                             length += 1;
                         }
                         Some(Token {
-                            token_type: TokenType::Int { value, length },
+                            data: token::Data::Int { value, length },
                             pos,
                         })
                     }
                     _ => {
                         self.consume();
                         Some(Token {
-                            token_type: TokenType::Unexpected(c),
+                            data: token::Data::Unexpected(c),
                             pos,
                         })
                     }

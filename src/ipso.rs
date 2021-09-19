@@ -10,5 +10,6 @@ pub mod parse;
 pub mod rope;
 pub mod run;
 pub mod syntax;
+pub mod token;
 pub mod typecheck;
 pub mod void;
