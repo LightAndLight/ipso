@@ -1,3 +1,5 @@
+use fnv::FnvHashSet;
+
 use crate::{
     builtins, core,
     diagnostic::{self, InputLocation},
@@ -1532,7 +1534,7 @@ impl<'modules> Typechecker<'modules> {
             "ty is a meta with a solution"
         );
 
-        fn metas_set(tc: &Typechecker, ty: &Type<usize>, set: &mut HashSet<usize>) {
+        fn metas_set(tc: &Typechecker, ty: &Type<usize>, set: &mut FnvHashSet<usize>) {
             for meta in ty.iter_metas() {
                 match &tc.type_solutions[meta].1 {
                     None => {
@@ -1544,7 +1546,7 @@ impl<'modules> Typechecker<'modules> {
         }
 
         let set = {
-            let mut set = HashSet::new();
+            let mut set = FnvHashSet::with_hasher(Default::default());
             metas_set(self, ty, &mut set);
             set
         };
