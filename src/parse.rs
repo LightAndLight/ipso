@@ -1,5 +1,7 @@
 mod test;
 
+use fnv::FnvHashSet;
+
 use crate::{
     diagnostic::{Diagnostic, InputLocation, Item},
     lex::{Lexer, Token, TokenType},
@@ -9,7 +11,7 @@ use crate::{
 };
 use std::{
     cmp,
-    collections::{BTreeSet, HashSet},
+    collections::BTreeSet,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -242,7 +244,7 @@ pub struct Parser {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
-    expecting: HashSet<TokenType>,
+    expecting: FnvHashSet<TokenType>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
@@ -385,7 +387,7 @@ impl Parser {
             location,
             pos: 0,
             indentation: vec![0],
-            expecting: HashSet::new(),
+            expecting: FnvHashSet::with_hasher(Default::default()),
             current,
             input,
         }
