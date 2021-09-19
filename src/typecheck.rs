@@ -152,14 +152,20 @@ struct Constants {
     r#type: Rc<syntax::Kind>,
     constraint: Rc<syntax::Kind>,
     row: Rc<syntax::Kind>,
+    type_to_type_to_type: syntax::Kind,
 }
 
 impl Constants {
     fn new() -> Self {
+        let r#type = Rc::new(syntax::Kind::Type);
         Constants {
-            r#type: Rc::new(syntax::Kind::Type),
+            r#type: r#type.clone(),
             constraint: Rc::new(syntax::Kind::Constraint),
             row: Rc::new(syntax::Kind::Row),
+            type_to_type_to_type: syntax::Kind::mk_arrow(
+                r#type.clone(),
+                Rc::new(syntax::Kind::mk_arrow(r#type.clone(), r#type)),
+            ),
         }
     }
 }
@@ -1618,13 +1624,7 @@ impl<'modules> Typechecker<'modules> {
             Type::Char => Ok(syntax::Kind::Type),
             Type::String => Ok(syntax::Kind::Type),
             Type::Bytes => Ok(syntax::Kind::Type),
-            Type::Arrow => Ok(syntax::Kind::mk_arrow(
-                self.constants.r#type.clone(),
-                Rc::new(syntax::Kind::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                )),
-            )),
+            Type::Arrow => Ok(self.constants.type_to_type_to_type.clone()),
             Type::FatArrow => Ok(syntax::Kind::mk_arrow(
                 self.constants.constraint.clone(),
                 Rc::new(syntax::Kind::mk_arrow(
