@@ -9,7 +9,7 @@ use crate::{
 };
 use std::{
     cmp,
-    collections::BTreeSet,
+    collections::{BTreeSet, HashSet},
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -242,7 +242,7 @@ pub struct Parser {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
-    expecting: BTreeSet<TokenType>,
+    expecting: HashSet<TokenType>,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
@@ -385,7 +385,7 @@ impl Parser {
             location,
             pos: 0,
             indentation: vec![0],
-            expecting: BTreeSet::new(),
+            expecting: HashSet::new(),
             current,
             input,
         }
@@ -397,7 +397,7 @@ impl Parser {
             None => Err(ParseError::Unexpected {
                 location: self.location,
                 pos: self.pos,
-                expecting: self.expecting,
+                expecting: self.expecting.into_iter().collect(),
             }),
         }
     }
