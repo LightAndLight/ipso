@@ -1059,8 +1059,39 @@ pub enum Kind {
     Meta(usize),
 }
 
-pub struct KindIterMetas<'a> {
-    items: Vec<&'a Kind>,
+pub enum KindIterMetas<'a> {
+    Zero,
+    One(&'a Kind),
+    Many { items: Vec<&'a Kind> },
+}
+
+impl<'a> KindIterMetas<'a> {
+    fn push(&mut self, item: &'a Kind) {
+        match self {
+            KindIterMetas::Zero => {
+                *self = KindIterMetas::One(item);
+            }
+            KindIterMetas::One(other_item) => {
+                let items: Vec<&'a Kind> = vec![other_item, item];
+                *self = KindIterMetas::Many { items };
+            }
+            KindIterMetas::Many { items } => {
+                items.push(item);
+            }
+        }
+    }
+
+    fn pop(&mut self) -> Option<&'a Kind> {
+        let (result, m_new_self): (Option<&'a Kind>, Option<KindIterMetas>) = match self {
+            KindIterMetas::Zero => (None, None),
+            KindIterMetas::One(item) => (Some(item), Some(KindIterMetas::Zero)),
+            KindIterMetas::Many { items } => (items.pop(), None),
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self;
+        }
+        result
+    }
 }
 
 impl<'a> Iterator for KindIterMetas<'a> {
@@ -1079,7 +1110,7 @@ impl<'a> Iterator for KindIterMetas<'a> {
 
         let mut res = None;
         loop {
-            match self.items.pop() {
+            match self.pop() {
                 None => {
                     break;
                 }
@@ -1092,22 +1123,24 @@ impl<'a> Iterator for KindIterMetas<'a> {
                         continue;
                     }
                     Step::Continue1(item) => {
-                        self.items.push(item);
+                        self.push(item);
                         continue;
                     }
                     Step::Continue2(item1, item2) => {
-                        self.items.push(item2);
-                        self.items.push(item1);
+                        self.push(item2);
+                        self.push(item1);
                         continue;
                     }
                     Step::Continue3(item1, item2, item3) => {
-                        self.items.push(item3);
-                        self.items.push(item2);
-                        self.items.push(item1);
+                        self.push(item3);
+                        self.push(item2);
+                        self.push(item1);
                         continue;
                     }
                     Step::Continue(items) => {
-                        self.items.extend(items.iter().rev());
+                        for item in items.iter().rev() {
+                            self.push(item);
+                        }
                         continue;
                     }
                 },
@@ -1119,7 +1152,7 @@ impl<'a> Iterator for KindIterMetas<'a> {
 
 impl Kind {
     pub fn iter_metas(&self) -> KindIterMetas {
-        KindIterMetas { items: vec![self] }
+        KindIterMetas::One(self)
     }
 
     pub fn mk_arrow(a: Rc<Kind>, b: Rc<Kind>) -> Kind {
