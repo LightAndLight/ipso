@@ -20,6 +20,6 @@ criterion = "0.3"
 name = "ipso"
 path = "./src/ipso.rs"
 
-# [[bench]]
-# name = "todolist_1"
-# harness = false
+[[bench]]
+name = "todolist_1"
+harness = false

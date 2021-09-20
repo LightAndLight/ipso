@@ -189,12 +189,16 @@ impl<'heap> Object<'heap> {
                 arg: use_arg,
                 body,
             } => {
-                let mut env = Vec::from(*env);
+                let new_env: &[Value];
                 if *use_arg {
-                    env.push(arg);
+                    let mut buffer = Vec::with_capacity(env.len() + 1);
+                    buffer.extend_from_slice(env);
+                    buffer.push(arg);
+                    new_env = interpreter.alloc_values(buffer);
+                } else {
+                    new_env = env;
                 }
-                let env = interpreter.alloc_values(env);
-                interpreter.eval(env, body.clone())
+                interpreter.eval(new_env, body.clone())
             }
             Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
             a => panic!("expected closure, got {:?}", a),
