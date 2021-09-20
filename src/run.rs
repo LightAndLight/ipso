@@ -6,7 +6,7 @@ use std::{
 use typed_arena::Arena;
 
 use crate::{
-    core,
+    builtins, core,
     diagnostic::InputLocation,
     eval::{self, Interpreter},
     import::{self, ModulePath},
@@ -71,7 +71,8 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let input_location = InputLocation::Interactive {
         label: main.clone(),
     };
-    let module = modules.import(&input_location, 0, &target_path)?;
+    let builtins = builtins::builtins();
+    let module = modules.import(&input_location, 0, &target_path, &builtins)?;
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,
@@ -79,8 +80,11 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc =
-            Typechecker::new_with_builtins(working_dir.as_path(), input_location, &modules);
+        let mut tc = {
+            let mut tc = Typechecker::new(working_dir.as_path(), input_location, &modules);
+            tc.register_from_import(&builtins, &syntax::Names::All);
+            tc
+        };
         let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(syntax::Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {

@@ -753,7 +753,7 @@ impl<'modules> Typechecker<'modules> {
         })
     }
 
-    fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
+    pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
         let should_import = |name: &String| -> bool {
             match names {
                 syntax::Names::All => true,

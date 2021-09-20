@@ -2,7 +2,7 @@ use diagnostic::InputLocation;
 use typed_arena::Arena;
 
 use crate::{
-    core,
+    core::{self, Module},
     diagnostic::{self, Diagnostic},
     parse::{self},
     rope::Rope,
@@ -343,6 +343,7 @@ impl<'a> Modules<'a> {
         location: &InputLocation,
         pos: usize,
         module_path: &ModulePath,
+        builtins: &Module,
     ) -> Result<&'a core::Module, ModuleError> {
         match self.index.get(module_path) {
             None => {
@@ -360,14 +361,18 @@ impl<'a> Modules<'a> {
                             },
                             import_info.pos,
                             &import_info.module_path,
+                            builtins,
                         ) {
                             return Err(err);
                         }
                     }
                     let module = {
                         let working_dir = path.parent().unwrap();
-                        let mut tc =
-                            Typechecker::new_with_builtins(working_dir, input_location, self);
+                        let mut tc = {
+                            let mut tc = Typechecker::new(working_dir, input_location, self);
+                            tc.register_from_import(builtins, &syntax::Names::All);
+                            tc
+                        };
                         tc.check_module(&module)
                     }?;
                     let module_ref: &core::Module = self.data.alloc(module);
