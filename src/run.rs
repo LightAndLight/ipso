@@ -1,7 +1,6 @@
 use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
-    rc::Rc,
 };
 
 use typed_arena::Arena;
@@ -91,7 +90,8 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let _ = tc.unify_type(&context, &expected, &actual)?;
     }
 
-    let heap = Arena::new();
+    let values = Arena::new();
+    let objects = Arena::new();
     let env = Vec::new();
     let _result = {
         let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
@@ -115,9 +115,16 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
                 )
             })
             .collect();
-        let mut interpreter =
-            Interpreter::new_with_builtins(&mut stdin, &mut stdout, context, eval_modules, &heap);
-        let action = interpreter.eval_from_module(Rc::new(env), &target_path, entrypoint);
+        let mut interpreter = Interpreter::new_with_builtins(
+            &mut stdin,
+            &mut stdout,
+            context,
+            eval_modules,
+            &values,
+            &objects,
+        );
+        let action =
+            interpreter.eval_from_module(interpreter.alloc_values(env), &target_path, entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

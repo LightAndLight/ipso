@@ -28,7 +28,7 @@ macro_rules! function1 {
                 $body(eval, env, arg)
             }
 
-            let env = Vec::new();
+            let env = $self.alloc_values(Vec::new());
 
             let closure = $self.alloc(Object::StaticClosure {
                 env,
@@ -53,11 +53,11 @@ macro_rules! function2 {
                     ) -> Value<'heap> {
                         $body(eval, env, arg)
                     }
-                    let env = {
+                    let env = eval.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     eval.alloc(Object::StaticClosure {
                         env,
                         body: StaticClosureBody([<$name _code_1>]),
@@ -82,11 +82,11 @@ macro_rules! function3 {
                     ) -> Value<'heap> {
                         $body(eval, env, arg)
                     }
-                    let env = {
+                    let env = eval.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     eval.alloc(Object::StaticClosure {
                         env,
                         body: StaticClosureBody([<$name _code_2>]),
@@ -122,19 +122,19 @@ pub enum Object<'heap> {
     String(Box<str>),
     Bytes(Box<[u8]>),
     Variant(usize, Value<'heap>),
-    Array(Box<[Value<'heap>]>),
-    Record(Box<[Value<'heap>]>),
+    Array(&'heap [Value<'heap>]),
+    Record(&'heap [Value<'heap>]),
     Closure {
-        env: Rc<Vec<Value<'heap>>>,
+        env: &'heap [Value<'heap>],
         arg: bool,
         body: Rc<Expr>,
     },
     StaticClosure {
-        env: Vec<Value<'heap>>,
+        env: &'heap [Value<'heap>],
         body: StaticClosureBody<'heap>,
     },
     IO {
-        env: Vec<Value<'heap>>,
+        env: &'heap [Value<'heap>],
         body: IOBody<'heap>,
     },
 }
@@ -189,11 +189,11 @@ impl<'heap> Object<'heap> {
                 arg: use_arg,
                 body,
             } => {
-                let mut env = env.clone();
+                let mut env = Vec::from(*env);
                 if *use_arg {
-                    Rc::make_mut(&mut env).push(arg);
+                    env.push(arg);
                 }
-                let env = env;
+                let env = interpreter.alloc_values(env);
                 interpreter.eval(env, body.clone())
             }
             Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
@@ -443,7 +443,8 @@ pub struct Module {
 pub struct Interpreter<'stdout, 'heap> {
     stdin: &'stdout mut dyn BufRead,
     stdout: &'stdout mut dyn Write,
-    heap: &'heap Arena<Object<'heap>>,
+    values: &'heap Arena<Value<'heap>>,
+    objects: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Rc<Expr>>,
     module_context: HashMap<ModulePath, Module>,
     module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
@@ -455,7 +456,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         stdout: &'stdout mut dyn Write,
         context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
-        heap: &'heap Arena<Object<'heap>>,
+        values: &'heap Arena<Value<'heap>>,
+        objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
         Interpreter {
             stdin,
@@ -466,7 +468,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 .collect(),
             module_context,
             module_unmapping: Vec::with_capacity(1),
-            heap,
+            values,
+            objects,
         }
     }
 
@@ -475,7 +478,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         stdout: &'stdout mut dyn Write,
         additional_context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
-        heap: &'heap Arena<Object<'heap>>,
+        values: &'heap Arena<Value<'heap>>,
+        objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
         let mut context: HashMap<String, Rc<Expr>> = builtins::builtins()
             .decls
@@ -498,12 +502,21 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             context,
             module_context,
             module_unmapping: Vec::with_capacity(1),
-            heap,
+            values,
+            objects,
         }
     }
 
     pub fn alloc(&self, obj: Object<'heap>) -> Value<'heap> {
-        Value::Object(self.heap.alloc(obj))
+        Value::Object(self.objects.alloc(obj))
+    }
+
+    pub fn alloc_values<I: IntoIterator<Item = Value<'heap>>>(
+        &self,
+        vals: I,
+    ) -> &'heap [Value<'heap>]
+where {
+        self.values.alloc_extend(vals)
     }
 
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
@@ -520,18 +533,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     ) -> Value<'heap> {
                         env[0]
                     }
-                    let env: Vec<Value> = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = Object::IO {
                         env,
                         body: IOBody(pure_io_1),
                     };
                     interpreter.alloc(closure)
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
                     env,
                     body: StaticClosureBody(pure_io_0),
@@ -558,29 +571,29 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             let a = io_a.perform_io(interpreter); // type: a
                             f.apply(interpreter, a) // type: b
                         }
-                        let env = {
+                        let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
-                        };
+                        });
                         let closure = Object::IO {
                             env,
                             body: IOBody(map_io_2),
                         };
                         interpreter.alloc(closure)
                     }
-                    let env = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = Object::StaticClosure {
                         env,
                         body: StaticClosureBody(map_io_1),
                     };
                     interpreter.alloc(closure)
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
                     env,
                     body: StaticClosureBody(map_io_0),
@@ -608,29 +621,29 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             let io_b = f.apply(interpreter, a); // type: IO b
                             io_b.perform_io(interpreter) // type: b
                         }
-                        let env = {
+                        let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
-                        };
+                        });
                         let closure = Object::IO {
                             env,
                             body: IOBody(bind_io_2),
                         };
                         interpreter.alloc(closure)
                     }
-                    let env = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = Object::StaticClosure {
                         env,
                         body: StaticClosureBody(bind_io_1),
                     };
                     interpreter.alloc(closure)
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
                     env,
                     body: StaticClosureBody(bind_io_0),
@@ -651,18 +664,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
-                    let env = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = Object::StaticClosure {
                         env,
                         body: StaticClosureBody(code_inner),
                     };
                     interpreter.alloc(closure)
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(code_outer),
@@ -678,7 +691,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     let a = arg.unpack_string();
                     interpreter.alloc(Object::Bytes(Box::from(a.as_bytes())))
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(to_utf8_0),
@@ -710,28 +723,28 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             Value::Unit
                         }
 
-                        let env = {
+                        let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
-                        };
+                        });
                         interpreter.alloc(Object::IO {
                             env,
                             body: IOBody(write_stdout_2),
                         })
                     }
-                    let env = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = interpreter.alloc(Object::StaticClosure {
                         env,
                         body: StaticClosureBody(write_stdout_1),
                     });
                     closure
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(write_stdout_0),
@@ -754,11 +767,11 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     |eval: &mut Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        let env = {
+                        let env = eval.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
-                        };
+                        });
                         eval.alloc(Object::IO {
                             env,
                             body: IOBody(flush_stdout),
@@ -782,18 +795,18 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let _ = interpreter.stdin.read_line(&mut str).unwrap();
                         interpreter.alloc(Object::String(Box::from(str)))
                     }
-                    let env = {
+                    let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
                         env.push(arg);
                         env
-                    };
+                    });
                     let closure = interpreter.alloc(Object::IO {
                         env,
                         body: IOBody(read_line_stdin_1),
                     });
                     closure
                 }
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(read_line_stdin_0),
@@ -836,7 +849,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             Value::False
                         }
                     }
-                    let env = vec![arg];
+                    let env = eval.alloc_values(vec![arg]);
                     let closure = eval.alloc(Object::StaticClosure {
                         env,
                         body: StaticClosureBody(eq_int_1),
@@ -844,7 +857,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     closure
                 }
 
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(eq_int_0),
@@ -953,14 +966,14 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             }
                             acc
                         }
-                        let env = vec![env[0], arg];
+                        let env = eval.alloc_values(vec![env[0], arg]);
                         let closure = eval.alloc(Object::StaticClosure {
                             env,
                             body: StaticClosureBody(eq_int_2),
                         });
                         closure
                     }
-                    let env = vec![arg];
+                    let env = eval.alloc_values(vec![arg]);
                     let closure = eval.alloc(Object::StaticClosure {
                         env,
                         body: StaticClosureBody(eq_int_1),
@@ -968,7 +981,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     closure
                 }
 
-                let env = Vec::new();
+                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
                     env,
                     body: StaticClosureBody(eq_int_0),
@@ -1049,7 +1062,9 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                             let ix = Value::Int(ix);
                             array.push(f.apply(eval, ix));
                         }
-                        eval.alloc(Object::Array(Box::from(array)))
+
+                        let array = eval.alloc_values(array);
+                        eval.alloc(Object::Array(array))
                     }
                 )
             }
@@ -1091,7 +1106,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let len = env[1].unpack_int() as usize;
                         let arr = arg.unpack_array();
 
-                        eval.alloc(Object::Array(Box::from(&arr[start..start + len])))
+                        eval.alloc(Object::Array(&arr[start..start + len]))
                     }
                 )
             }
@@ -1141,10 +1156,9 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                      arg: Value<'heap>| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
-                        let a = s
-                            .split(c)
-                            .map(|s| eval.alloc(Object::String(Box::from(s))))
-                            .collect();
+                        let a = eval.alloc_values(
+                            s.split(c).map(|s| eval.alloc(Object::String(Box::from(s)))),
+                        );
                         eval.alloc(Object::Array(a))
                     }
                 )
@@ -1175,12 +1189,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
                         let array = env[0].unpack_array();
-                        let new_array = {
+                        let new_array = eval.alloc_values({
                             let mut new_array = Vec::from(array);
                             new_array.push(arg);
                             new_array
-                        };
-                        eval.alloc(Object::Array(Box::from(new_array)))
+                        });
+                        eval.alloc(Object::Array(new_array))
                     }
                 )
             }
@@ -1189,7 +1203,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
     pub fn eval_from_module(
         &mut self,
-        env: Rc<Vec<Value<'heap>>>,
+        env: &'heap [Value<'heap>],
         path: &ModulePath,
         binding: &str,
     ) -> Value<'heap> {
@@ -1218,7 +1232,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         res
     }
 
-    pub fn eval(&mut self, env: Rc<Vec<Value<'heap>>>, expr: Rc<Expr>) -> Value<'heap> {
+    pub fn eval(&mut self, env: &'heap [Value<'heap>], expr: Rc<Expr>) -> Value<'heap> {
         let out = match expr.as_ref() {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
@@ -1244,7 +1258,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {
-                let a = self.eval(env.clone(), a.clone());
+                let a = self.eval(env, a.clone());
                 let b = self.eval(env, b.clone());
                 a.apply(self, b)
             }
@@ -1257,7 +1271,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::True => Value::True,
             Expr::False => Value::False,
             Expr::IfThenElse(cond, t, e) => {
-                let cond = self.eval(env.clone(), cond.clone());
+                let cond = self.eval(env, cond.clone());
                 match cond {
                     Value::True => self.eval(env, t.clone()),
                     Value::False => self.eval(env, e.clone()),
@@ -1268,7 +1282,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             Expr::Int(n) => Value::Int(*n),
 
             Expr::Binop(op, a, b) => {
-                let a = self.eval(env.clone(), a.clone());
+                let a = self.eval(env, a.clone());
                 let b = self.eval(env, b.clone());
                 match op {
                     Binop::Add => {
@@ -1299,9 +1313,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 for part in parts {
                     match part {
                         StringPart::Expr(expr) => {
-                            let s = self
-                                .eval(env.clone(), Rc::new(expr.clone()))
-                                .unpack_string();
+                            let s = self.eval(env, Rc::new(expr.clone())).unpack_string();
                             value.push_str(s);
                         }
                         StringPart::String(s) => value.push_str(s.as_str()),
@@ -1311,16 +1323,17 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             }
 
             Expr::Array(items) => {
-                let items = items
+                let items: Vec<Value> = items
                     .iter()
-                    .map(|item| self.eval(env.clone(), Rc::new(item.clone())))
+                    .map(|item| self.eval(env, Rc::new(item.clone())))
                     .collect();
+                let items = self.alloc_values(items);
                 self.alloc(Object::Array(items))
             }
 
             Expr::Extend(ev, value, rest) => {
-                let ix = self.eval(env.clone(), ev.clone()).unpack_int();
-                let value = self.eval(env.clone(), value.clone());
+                let ix = self.eval(env, ev.clone()).unpack_int();
+                let value = self.eval(env, value.clone());
                 let rest = self.eval(env, rest.clone());
                 match rest.unpack_object() {
                     Object::Record(fields) => {
@@ -1333,7 +1346,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
                         debug_assert!(record.len() == fields.len() + 1);
 
-                        self.alloc(Object::Record(Box::from(record)))
+                        let record = self.alloc_values(record);
+                        self.alloc(Object::Record(record))
                     }
                     rest => panic!("expected record, got {:?}", rest),
                 }
@@ -1344,8 +1358,8 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     .iter()
                     .map(|(ev, field)| {
                         (
-                            self.eval(env.clone(), Rc::new(ev.clone())).unpack_int(),
-                            self.eval(env.clone(), Rc::new(field.clone())),
+                            self.eval(env, Rc::new(ev.clone())).unpack_int(),
+                            self.eval(env, Rc::new(field.clone())),
                         )
                     })
                     .collect();
@@ -1353,10 +1367,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 for (_index, field) in fields.into_iter() {
                     record.push(field);
                 }
-                self.alloc(Object::Record(Box::from(record)))
+
+                let record = self.alloc_values(record);
+                self.alloc(Object::Record(record))
             }
             Expr::Project(expr, index) => {
-                let index = self.eval(env.clone(), index.clone()).unpack_int();
+                let index = self.eval(env, index.clone()).unpack_int();
                 let expr = self.eval(env, expr.clone());
                 match expr.unpack_object() {
                     Object::Record(fields) => fields[index as usize],
@@ -1366,7 +1382,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
             Expr::Variant(tag) => {
                 let tag = self.eval(env, tag.clone());
-                let env = vec![tag];
+                let env = self.alloc_values(vec![tag]);
                 fn code<'heap>(
                     interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
@@ -1382,7 +1398,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 self.alloc(closure)
             }
             Expr::Embed(tag, rest) => {
-                let tag = self.eval(env.clone(), tag.clone()).unpack_int() as usize;
+                let tag = self.eval(env, tag.clone()).unpack_int() as usize;
                 let rest = self.eval(env, rest.clone());
                 let (&old_tag, arg) = rest.unpack_variant();
                 self.alloc(Object::Variant(
@@ -1391,7 +1407,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 ))
             }
             Expr::Case(expr, branches) => {
-                let expr = self.eval(env.clone(), expr.clone());
+                let expr = self.eval(env, expr.clone());
                 match expr.unpack_object() {
                     Object::Record(fields) => {
                         // expect a record pattern
@@ -1399,13 +1415,12 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         let branch = &branches[0];
                         match &branch.pattern {
                             Pattern::Record { names, rest } => {
-                                let mut new_env = env.clone();
+                                let mut new_env = Vec::from(env);
                                 let mut extracted = Vec::new();
                                 for name in names {
                                     let ix =
-                                        self.eval(env.clone(), Rc::new(name.clone())).unpack_int()
-                                            as usize;
-                                    Rc::make_mut(&mut new_env).push(fields[ix]);
+                                        self.eval(env, Rc::new(name.clone())).unpack_int() as usize;
+                                    new_env.push(fields[ix]);
                                     extracted.push(ix);
                                 }
                                 if *rest {
@@ -1414,14 +1429,14 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                     for ix in extracted.iter().rev() {
                                         leftover_fields = leftover_fields.delete(*ix).unwrap();
                                     }
-                                    let leftover_fields: Box<[Value]> =
-                                        leftover_fields.iter().copied().collect();
+                                    let leftover_fields =
+                                        self.alloc_values(leftover_fields.iter().copied());
                                     let leftover_record =
                                         self.alloc(Object::Record(leftover_fields));
-                                    Rc::make_mut(&mut new_env).push(leftover_record);
+                                    new_env.push(leftover_record);
                                 }
 
-                                let new_env = new_env;
+                                let new_env = self.alloc_values(new_env);
                                 self.eval(new_env, Rc::new(branch.body.clone()))
                             }
                             Pattern::Name {} | Pattern::Wildcard {} => {
@@ -1435,7 +1450,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                     Object::Variant(tag, value) => {
                         // expect variant patterns
                         let mut target: Option<Expr> = None;
-                        let mut new_env = env.clone();
+                        let mut new_env = Vec::from(env);
                         for branch in branches {
                             match &branch.pattern {
                                 Pattern::Record { .. } => {
@@ -1443,16 +1458,15 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                                 }
                                 Pattern::Variant { tag: branch_tag } => {
                                     let branch_tag =
-                                        self.eval(env.clone(), branch_tag.clone()).unpack_int()
-                                            as usize;
+                                        self.eval(env, branch_tag.clone()).unpack_int() as usize;
                                     if *tag == branch_tag {
-                                        Rc::make_mut(&mut new_env).push(*value);
+                                        new_env.push(*value);
                                         target = Some(branch.body.clone());
                                         break;
                                     }
                                 }
                                 Pattern::Name => {
-                                    Rc::make_mut(&mut new_env).push(expr);
+                                    new_env.push(expr);
                                     target = Some(branch.body.clone());
                                     break;
                                 }
@@ -1465,7 +1479,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                         match target {
                             None => panic!("pattern match failure"),
                             Some(body) => {
-                                let env = new_env;
+                                let env = self.alloc_values(new_env);
                                 self.eval(env, Rc::new(body))
                             }
                         }

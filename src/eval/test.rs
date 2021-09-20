@@ -15,7 +15,8 @@ use typed_arena::Arena;
 fn eval_1() {
     let mut stdin = &mut std::io::empty();
     let mut stdout: Vec<u8> = Vec::new();
-    let heap = Arena::new();
+    let values = Arena::new();
+    let objects = Arena::new();
     let term = Expr::mk_app(
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
@@ -25,9 +26,10 @@ fn eval_1() {
         &mut stdout,
         HashMap::new(),
         HashMap::new(),
-        &heap,
+        &values,
+        &objects,
     );
-    let env = Rc::new(vec![]);
+    let env = interpreter.alloc_values(vec![]);
 
     let expected_value = Value::Int(1);
     let actual_value = interpreter.eval(env, Rc::new(term));
@@ -42,7 +44,8 @@ fn eval_1() {
 fn eval_2() {
     let mut stdin = &mut std::io::empty();
     let mut stdout: Vec<u8> = Vec::new();
-    let heap = Arena::new();
+    let values = Arena::new();
+    let objects = Arena::new();
     let str = String::from("hello");
     let term = Expr::mk_app(
         Expr::Builtin(Builtin::ToUtf8),
@@ -53,9 +56,10 @@ fn eval_2() {
         &mut stdout,
         HashMap::new(),
         HashMap::new(),
-        &heap,
+        &values,
+        &objects,
     );
-    let env = Rc::new(vec![]);
+    let env = interpreter.alloc_values(vec![]);
 
     let expected_value = interpreter.alloc(Object::Bytes(Box::from(str.as_bytes())));
     let actual_value = interpreter.eval(env, Rc::new(term));
