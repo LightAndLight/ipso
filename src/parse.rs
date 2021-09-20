@@ -1,5 +1,6 @@
 mod test;
 
+use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 
 use crate::{
@@ -242,11 +243,55 @@ pub fn parse_file(filename: &Path) -> Result<Module, ParseError> {
     parse_string_at(location, input)
 }
 
+struct Expecting {
+    bitset: FixedBitSet,
+    indents: FnvHashSet<usize>,
+}
+
+impl Expecting {
+    fn new() -> Self {
+        Expecting {
+            bitset: FixedBitSet::with_capacity(token::Name::num_variants()),
+            indents: FnvHashSet::with_hasher(Default::default()),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.bitset.clear();
+        self.indents.clear();
+    }
+
+    fn insert(&mut self, t: token::Name) {
+        self.bitset.insert(t.to_int());
+        if let token::Name::Indent(n) = t {
+            self.indents.insert(n);
+        }
+    }
+
+    fn into_btreeset(self) -> BTreeSet<token::Name> {
+        let mut set = BTreeSet::new();
+        let mut has_indents = false;
+        for ix in self.bitset.ones() {
+            if ix == token::Name::num_variants() - 3
+            /* Indent(_) */
+            {
+                has_indents = true;
+            } else {
+                set.insert(token::Name::from_int(ix).unwrap());
+            }
+        }
+        if has_indents {
+            set.extend(self.indents.into_iter().map(token::Name::Indent));
+        }
+        set
+    }
+}
+
 pub struct Parser {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
-    expecting: FnvHashSet<token::Name>,
+    expecting: Expecting,
     current: Option<Token>,
     input: IntoIter<Token>,
 }
@@ -389,7 +434,7 @@ impl Parser {
             location,
             pos: 0,
             indentation: vec![0],
-            expecting: FnvHashSet::with_hasher(Default::default()),
+            expecting: Expecting::new(),
             current,
             input,
         }
@@ -401,7 +446,7 @@ impl Parser {
             None => Err(ParseError::Unexpected {
                 location: self.location,
                 pos: self.pos,
-                expecting: self.expecting.into_iter().collect(),
+                expecting: self.expecting.into_btreeset(),
             }),
         }
     }

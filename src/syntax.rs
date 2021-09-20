@@ -31,6 +31,10 @@ pub enum Keyword {
 }
 
 impl Keyword {
+    pub fn num_variants() -> usize {
+        14
+    }
+
     pub fn matches(&self, actual: &str) -> bool {
         self.to_string() == actual
     }
