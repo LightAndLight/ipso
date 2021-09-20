@@ -1,6 +1,7 @@
 use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
+    rc::Rc,
 };
 
 use typed_arena::Arena;
@@ -116,7 +117,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             .collect();
         let mut interpreter =
             Interpreter::new_with_builtins(&mut stdin, &mut stdout, context, eval_modules, &heap);
-        let action = interpreter.eval_from_module(&env, &target_path, entrypoint);
+        let action = interpreter.eval_from_module(Rc::new(env), &target_path, entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

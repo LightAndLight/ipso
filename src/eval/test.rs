@@ -3,6 +3,8 @@ use super::{Interpreter, Value};
 #[cfg(test)]
 use crate::core::{Builtin, Expr, StringPart};
 #[cfg(test)]
+use crate::eval::Object;
+#[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
 use std::rc::Rc;
@@ -25,9 +27,9 @@ fn eval_1() {
         HashMap::new(),
         &heap,
     );
-    let env = interpreter.alloc_env(Vec::new());
+    let env = Rc::new(vec![]);
 
-    let expected_value = interpreter.alloc_value(Value::Int(1));
+    let expected_value = Value::Int(1);
     let actual_value = interpreter.eval(env, Rc::new(term));
     assert_eq!(expected_value, actual_value);
 
@@ -53,9 +55,9 @@ fn eval_2() {
         HashMap::new(),
         &heap,
     );
-    let env = interpreter.alloc_env(Vec::new());
+    let env = Rc::new(vec![]);
 
-    let expected_value = interpreter.alloc_value(Value::Bytes(str.as_bytes()));
+    let expected_value = interpreter.alloc(Object::Bytes(Box::from(str.as_bytes())));
     let actual_value = interpreter.eval(env, Rc::new(term));
     assert_eq!(expected_value, actual_value);
 }

@@ -499,6 +499,11 @@ impl Parser {
         }
     }
 
+    fn space(&mut self) -> ParseResult<()> {
+        self.expecting.insert(token::Name::Space);
+        self.space_body()
+    }
+
     fn indent(&mut self) -> ParseResult<()> {
         self.expecting.insert(token::Name::Indent(0));
         let current_indentation = self.current_indentation();
@@ -561,9 +566,7 @@ impl Parser {
     }
 
     fn spaces(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Space);
-        self.expecting.insert(token::Name::Comment);
-        many_!(self, choices!(self, self.space_body(), self.comment_body()))
+        many_!(self, choices!(self, self.space(), self.comment()))
     }
 
     fn keyword(&mut self, expected: &Keyword) -> ParseResult<()> {
