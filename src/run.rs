@@ -90,6 +90,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let _ = tc.unify_type(&context, &expected, &actual)?;
     }
 
+    let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
     let env = Vec::new();
@@ -120,6 +121,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &mut stdout,
             context,
             eval_modules,
+            &bytes,
             &values,
             &objects,
         );

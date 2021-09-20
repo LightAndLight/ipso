@@ -15,6 +15,7 @@ use typed_arena::Arena;
 fn eval_1() {
     let mut stdin = &mut std::io::empty();
     let mut stdout: Vec<u8> = Vec::new();
+    let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
     let term = Expr::mk_app(
@@ -26,6 +27,7 @@ fn eval_1() {
         &mut stdout,
         HashMap::new(),
         HashMap::new(),
+        &bytes,
         &values,
         &objects,
     );
@@ -44,6 +46,7 @@ fn eval_1() {
 fn eval_2() {
     let mut stdin = &mut std::io::empty();
     let mut stdout: Vec<u8> = Vec::new();
+    let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
     let str = String::from("hello");
@@ -56,12 +59,13 @@ fn eval_2() {
         &mut stdout,
         HashMap::new(),
         HashMap::new(),
+        &bytes,
         &values,
         &objects,
     );
     let env = interpreter.alloc_values(vec![]);
 
-    let expected_value = interpreter.alloc(Object::Bytes(Box::from(str.as_bytes())));
+    let expected_value = interpreter.alloc(Object::Bytes(str.as_bytes()));
     let actual_value = interpreter.eval(env, Rc::new(term));
     assert_eq!(expected_value, actual_value);
 }

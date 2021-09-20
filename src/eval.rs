@@ -119,8 +119,8 @@ impl<'heap> Debug for IOBody<'heap> {
 
 #[derive(Debug)]
 pub enum Object<'heap> {
-    String(Box<str>),
-    Bytes(Box<[u8]>),
+    String(&'heap str),
+    Bytes(&'heap [u8]),
     Variant(usize, Value<'heap>),
     Array(&'heap [Value<'heap>]),
     Record(&'heap [Value<'heap>]),
@@ -443,6 +443,7 @@ pub struct Module {
 pub struct Interpreter<'stdout, 'heap> {
     stdin: &'stdout mut dyn BufRead,
     stdout: &'stdout mut dyn Write,
+    bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
     context: HashMap<String, Rc<Expr>>,
@@ -456,6 +457,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         stdout: &'stdout mut dyn Write,
         context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
+        bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
@@ -468,6 +470,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
                 .collect(),
             module_context,
             module_unmapping: Vec::with_capacity(1),
+            bytes,
             values,
             objects,
         }
@@ -478,6 +481,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         stdout: &'stdout mut dyn Write,
         additional_context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
+        bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
@@ -502,6 +506,7 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
             context,
             module_context,
             module_unmapping: Vec::with_capacity(1),
+            bytes,
             values,
             objects,
         }
@@ -509,6 +514,14 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
 
     pub fn alloc(&self, obj: Object<'heap>) -> Value<'heap> {
         Value::Object(self.objects.alloc(obj))
+    }
+
+    pub fn alloc_str(&self, s: &str) -> &'heap str {
+        self.bytes.alloc_str(s)
+    }
+
+    pub fn alloc_bytes<I: IntoIterator<Item = u8>>(&self, s: I) -> &'heap [u8] {
+        self.bytes.alloc_extend(s)
     }
 
     pub fn alloc_values<I: IntoIterator<Item = Value<'heap>>>(
@@ -689,7 +702,7 @@ where {
                     arg: Value<'heap>,
                 ) -> Value<'heap> {
                     let a = arg.unpack_string();
-                    interpreter.alloc(Object::Bytes(Box::from(a.as_bytes())))
+                    interpreter.alloc(Object::Bytes(a.as_bytes()))
                 }
                 let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
@@ -793,7 +806,8 @@ where {
                         let () = env[0].unpack_stdin();
                         let mut str = String::new();
                         let _ = interpreter.stdin.read_line(&mut str).unwrap();
-                        interpreter.alloc(Object::String(Box::from(str)))
+                        let str = interpreter.alloc_str(&str);
+                        interpreter.alloc(Object::String(str))
                     }
                     let env = interpreter.alloc_values({
                         let mut env = Vec::from(env);
@@ -889,7 +903,8 @@ where {
                      _env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
                         let a = arg.unpack_int();
-                        eval.alloc(Object::String(Box::from(format!("{}", a))))
+                        let str = eval.alloc_str(&format!("{}", a));
+                        eval.alloc(Object::String(str))
                     }
                 )
             }
@@ -1126,7 +1141,8 @@ where {
                                 predicate.apply(eval, c_val).unpack_bool()
                             })
                             .collect();
-                        eval.alloc(Object::String(Box::from(new_string)))
+                        let str = eval.alloc_str(&new_string);
+                        eval.alloc(Object::String(str))
                     }
                 )
             }
@@ -1156,9 +1172,8 @@ where {
                      arg: Value<'heap>| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
-                        let a = eval.alloc_values(
-                            s.split(c).map(|s| eval.alloc(Object::String(Box::from(s)))),
-                        );
+                        let a =
+                            eval.alloc_values(s.split(c).map(|s| eval.alloc(Object::String(s))));
                         eval.alloc(Object::Array(a))
                     }
                 )
@@ -1319,7 +1334,8 @@ where {
                         StringPart::String(s) => value.push_str(s.as_str()),
                     }
                 }
-                self.alloc(Object::String(Box::from(value)))
+                let str = self.alloc_str(&value);
+                self.alloc(Object::String(str))
             }
 
             Expr::Array(items) => {
