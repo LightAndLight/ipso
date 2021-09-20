@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
@@ -103,11 +104,6 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let mut stdin = config
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
-        let context = module
-            .decls
-            .iter()
-            .flat_map(|decl| decl.get_bindings().into_iter())
-            .collect();
         let eval_modules = modules
             .iter()
             .map(|(module_path, module)| {
@@ -120,15 +116,17 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
                 )
             })
             .collect();
-        let mut interpreter = Interpreter::new_with_builtins(
+        let mut interpreter = Interpreter::new(
             &mut stdin,
             &mut stdout,
-            context,
+            HashMap::new(),
             eval_modules,
             &bytes,
             &values,
             &objects,
         );
+        interpreter.register_module(&builtins);
+        interpreter.register_module(module);
         let action =
             interpreter.eval_from_module(interpreter.alloc_values(env), &target_path, entrypoint);
         action.perform_io(&mut interpreter)

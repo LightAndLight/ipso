@@ -1,6 +1,5 @@
 use crate::{
-    builtins,
-    core::{Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart},
+    core::{self, Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart},
     import::ModulePath,
     rope::Rope,
     syntax::{Binop, ModuleName},
@@ -480,40 +479,14 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
         }
     }
 
-    pub fn new_with_builtins(
-        stdin: &'stdout mut dyn BufRead,
-        stdout: &'stdout mut dyn Write,
-        additional_context: HashMap<String, Expr>,
-        module_context: HashMap<ModulePath, Module>,
-        bytes: &'heap Arena<u8>,
-        values: &'heap Arena<Value<'heap>>,
-        objects: &'heap Arena<Object<'heap>>,
-    ) -> Self {
-        let mut context: HashMap<String, Rc<Expr>> = builtins::builtins()
-            .decls
-            .iter()
-            .filter_map(|x| match x {
-                Declaration::Definition { name, sig: _, body } => {
-                    Some((name.clone(), Rc::new(body.clone())))
-                }
-                _ => None,
-            })
-            .collect();
-        context.extend(
-            additional_context
-                .into_iter()
-                .map(|(name, expr)| (name, Rc::new(expr))),
-        );
-        Interpreter {
-            stdin,
-            stdout,
-            context,
-            module_context,
-            module_unmapping: Vec::with_capacity(1),
-            bytes,
-            values,
-            objects,
-        }
+    pub fn register_module(&mut self, module: &core::Module) {
+        let module_context = module.decls.iter().filter_map(|x| match x {
+            Declaration::Definition { name, sig: _, body } => {
+                Some((name.clone(), Rc::new(body.clone())))
+            }
+            _ => None,
+        });
+        self.context.extend(module_context);
     }
 
     pub fn alloc(&self, obj: Object<'heap>) -> Value<'heap> {
