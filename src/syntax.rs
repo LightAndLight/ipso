@@ -1056,12 +1056,17 @@ pub struct Module {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+pub enum KindCompound {
+    Arrow(Kind, Kind),
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Kind {
     Type,
     Row,
     Constraint,
-    Arrow(Rc<Kind>, Rc<Kind>),
     Meta(usize),
+    Ref(Rc<KindCompound>),
 }
 
 pub enum KindIterMetas<'a> {
@@ -1105,10 +1110,12 @@ impl<'a> Iterator for KindIterMetas<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         fn step_kind(kind: &Kind) -> Step<Kind, usize> {
             match kind {
+                Kind::Ref(kind) => match kind.as_ref() {
+                    KindCompound::Arrow(a, b) => Step::Continue2(a, b),
+                },
                 Kind::Type => Step::Skip,
                 Kind::Row => Step::Skip,
                 Kind::Constraint => Step::Skip,
-                Kind::Arrow(a, b) => Step::Continue2(a, b),
                 Kind::Meta(n) => Step::Yield(*n),
             }
         }
@@ -1155,34 +1162,49 @@ impl<'a> Iterator for KindIterMetas<'a> {
     }
 }
 
+impl KindCompound {
+    pub fn mk_arrow(a: Kind, b: Kind) -> Self {
+        KindCompound::Arrow(a, b)
+    }
+}
+
 impl Kind {
     pub fn iter_metas(&self) -> KindIterMetas {
         KindIterMetas::One(self)
     }
 
-    pub fn mk_arrow(a: Rc<Kind>, b: Rc<Kind>) -> Kind {
-        Kind::Arrow(a, b)
+    pub fn mk_arrow(a: Kind, b: Kind) -> Self {
+        Kind::Ref(Rc::new(KindCompound::Arrow(a, b)))
     }
 
     pub fn render(&self) -> String {
         match self {
-            Kind::Arrow(a, b) => {
-                let mut val = String::new();
-                if let Kind::Arrow(_, _) = **a {
-                    val.push('(')
+            Kind::Ref(kind) => match kind.as_ref() {
+                KindCompound::Arrow(a, b) => {
+                    let mut val = String::new();
+                    if a.is_arrow() {
+                        val.push('(')
+                    }
+                    val.push_str(a.render().as_str());
+                    if a.is_arrow() {
+                        val.push(')')
+                    }
+                    val.push_str(" -> ");
+                    val.push_str(b.render().as_str());
+                    val
                 }
-                val.push_str(a.render().as_str());
-                if let Kind::Arrow(_, _) = **a {
-                    val.push(')')
-                }
-                val.push_str(" -> ");
-                val.push_str(b.render().as_str());
-                val
-            }
+            },
             Kind::Type => String::from("Type"),
             Kind::Row => String::from("Row"),
             Kind::Constraint => String::from("Constraint"),
             Kind::Meta(n) => format!("?{}", n),
+        }
+    }
+
+    pub fn is_arrow(&self) -> bool {
+        match self {
+            Kind::Ref(kind) => matches!(kind.as_ref(), KindCompound::Arrow(_, _)),
+            _ => false,
         }
     }
 }

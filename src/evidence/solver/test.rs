@@ -1,13 +1,12 @@
 #[cfg(test)]
-use std::rc::Rc;
-
-#[cfg(test)]
 use crate::{
     core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig},
     evidence::{solver::solve_constraint, Constraint, Evidence},
     syntax::{Binop, Kind, Type},
     typecheck::Typechecker,
 };
+#[cfg(test)]
+use std::rc::Rc;
 
 #[test]
 fn solve_constraint_1() {

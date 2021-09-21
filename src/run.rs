@@ -11,7 +11,8 @@ use crate::{
     diagnostic::InputLocation,
     eval::{self, Interpreter},
     import::{self, ModulePath},
-    parse, syntax,
+    parse,
+    syntax::{self, Kind},
     typecheck::{self, Typechecker},
 };
 
@@ -86,7 +87,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(syntax::Kind::Type));
+        let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {
             expected: expected.clone(),

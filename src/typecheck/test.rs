@@ -1,18 +1,18 @@
 #[cfg(test)]
-use std::collections::{HashMap, HashSet};
-#[cfg(test)]
-use std::rc::Rc;
-
-use crate::typecheck::UnifyKindContextRefs;
-#[cfg(test)]
 use crate::{
     core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
     diagnostic::InputLocation,
     evidence::{solver::solve_placeholder, Constraint},
     syntax::{self, Binop, Kind, Spanned, Type},
-    typecheck::{BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyTypeContext},
+    typecheck::{
+        BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
+    },
     void::Void,
 };
+#[cfg(test)]
+use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::rc::Rc;
 
 use super::SolveConstraintContext;
 
@@ -1725,8 +1725,8 @@ fn check_definition_4() {
 #[test]
 fn kind_occurs_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let v1 = Rc::new(tc.fresh_kindvar());
-        let v2 = Rc::new(tc.fresh_kindvar());
+        let v1 = tc.fresh_kindvar();
+        let v2 = tc.fresh_kindvar();
         assert_eq!(
             tc.unify_kind(
                 &UnifyKindContextRefs {
