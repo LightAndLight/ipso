@@ -293,8 +293,10 @@ pub enum Type<A> {
     Meta(usize),
 }
 
-pub struct TypeIterMetas<'a, A> {
-    items: Vec<&'a Type<A>>,
+pub enum TypeIterMetas<'a, A> {
+    Zero,
+    One(&'a Type<A>),
+    Many { items: Vec<&'a Type<A>> },
 }
 
 impl<'a, A> Iterator for TypeIterMetas<'a, A> {
@@ -328,7 +330,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
 
         let mut res = None;
         loop {
-            match self.items.pop() {
+            match self.pop() {
                 None => {
                     break;
                 }
@@ -341,22 +343,24 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                         continue;
                     }
                     Step::Continue1(item) => {
-                        self.items.push(item);
+                        self.push(item);
                         continue;
                     }
                     Step::Continue2(item1, item2) => {
-                        self.items.push(item2);
-                        self.items.push(item1);
+                        self.push(item2);
+                        self.push(item1);
                         continue;
                     }
                     Step::Continue3(item1, item2, item3) => {
-                        self.items.push(item3);
-                        self.items.push(item2);
-                        self.items.push(item1);
+                        self.push(item3);
+                        self.push(item2);
+                        self.push(item1);
                         continue;
                     }
                     Step::Continue(items) => {
-                        self.items.extend(items.iter().rev());
+                        for item in items.iter().rev() {
+                            self.push(item)
+                        }
                         continue;
                     }
                 },
@@ -691,7 +695,7 @@ impl<A> Type<A> {
     }
 
     pub fn iter_metas(&self) -> TypeIterMetas<A> {
-        TypeIterMetas { items: vec![self] }
+        TypeIterMetas::One(self)
     }
 
     pub fn unwrap_constraints(&self) -> (Vec<&Type<A>>, &Type<A>) {
@@ -1205,6 +1209,39 @@ impl Kind {
         match self {
             Kind::Ref(kind) => matches!(kind.as_ref(), KindCompound::Arrow(_, _)),
             _ => false,
+        }
+    }
+}
+
+impl<'a, A> TypeIterMetas<'a, A> {
+    fn pop(&mut self) -> Option<&'a Type<A>> {
+        let (m_new_self, result) = match self {
+            TypeIterMetas::Zero => (None, None),
+            TypeIterMetas::One(a) => (Some(TypeIterMetas::Zero), Some(*a)),
+            TypeIterMetas::Many { items } => {
+                let result = items.pop();
+                (None, result)
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self
+        }
+        result
+    }
+
+    fn push(&mut self, item: &'a Type<A>) {
+        let m_new_self = match self {
+            TypeIterMetas::Zero => Some(TypeIterMetas::One(item)),
+            TypeIterMetas::One(a) => Some(TypeIterMetas::Many {
+                items: vec![a, item],
+            }),
+            TypeIterMetas::Many { items } => {
+                items.push(item);
+                None
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self;
         }
     }
 }
