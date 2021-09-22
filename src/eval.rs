@@ -27,10 +27,8 @@ macro_rules! function1 {
                 $body(eval, env, arg)
             }
 
-            let env = $self.alloc_values(Vec::new());
-
             let closure = $self.alloc(Object::StaticClosure {
-                env,
+                env: &[],
                 body: StaticClosureBody([<$name _code_0>]),
             });
             closure
@@ -534,9 +532,8 @@ where {
                     };
                     interpreter.alloc(closure)
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(pure_io_0),
                 };
                 self.alloc(closure)
@@ -583,9 +580,8 @@ where {
                     };
                     interpreter.alloc(closure)
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(map_io_0),
                 };
                 self.alloc(closure)
@@ -612,9 +608,10 @@ where {
                             io_b.perform_io(interpreter) // type: b
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
-                            env.push(arg);
-                            env
+                            let mut new_env = Vec::with_capacity(env.len() + 1);
+                            new_env.extend_from_slice(env);
+                            new_env.push(arg);
+                            new_env
                         });
                         let closure = Object::IO {
                             env,
@@ -623,9 +620,10 @@ where {
                         interpreter.alloc(closure)
                     }
                     let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
+                        let mut new_env = Vec::with_capacity(env.len() + 1);
+                        new_env.extend_from_slice(env);
+                        new_env.push(arg);
+                        new_env
                     });
                     let closure = Object::StaticClosure {
                         env,
@@ -633,9 +631,8 @@ where {
                     };
                     interpreter.alloc(closure)
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(bind_io_0),
                 };
                 self.alloc(closure)
@@ -665,9 +662,8 @@ where {
                     };
                     interpreter.alloc(closure)
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(code_outer),
                 });
                 closure
@@ -681,9 +677,8 @@ where {
                     let a = arg.unpack_string();
                     interpreter.alloc(Object::Bytes(a.as_bytes()))
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(to_utf8_0),
                 });
                 closure
@@ -734,9 +729,8 @@ where {
                     });
                     closure
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(write_stdout_0),
                 });
                 closure
@@ -797,9 +791,8 @@ where {
                     });
                     closure
                 }
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(read_line_stdin_0),
                 });
                 closure
@@ -848,9 +841,8 @@ where {
                     closure
                 }
 
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(eq_int_0),
                 });
                 closure
@@ -973,9 +965,8 @@ where {
                     closure
                 }
 
-                let env = self.alloc_values(Vec::new());
                 let closure = self.alloc(Object::StaticClosure {
-                    env,
+                    env: &[],
                     body: StaticClosureBody(eq_int_0),
                 });
                 closure
