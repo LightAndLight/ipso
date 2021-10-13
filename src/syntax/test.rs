@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[cfg(test)]
 use super::Type;
 
@@ -29,7 +31,7 @@ fn iter_vars_test_3() {
     assert_eq!(
         Type::mk_app(
             Type::mk_app(Type::Var(0), Type::Var(1)),
-            Type::mk_app(Type::Name(String::from("hi")), Type::Var(3))
+            Type::mk_app(Type::Name(Rc::from("hi")), Type::Var(3))
         )
         .iter_vars()
         .collect::<Vec<&usize>>(),
@@ -39,12 +41,9 @@ fn iter_vars_test_3() {
 
 #[test]
 fn unwrap_constraints_1() {
-    let expected_constraint = Type::mk_hasfield(String::from("x"), Type::Var(0));
+    let expected_constraint = Type::mk_hasfield(Rc::from("x"), Type::Var(0));
     let expected = (vec![&expected_constraint], &Type::Var(1));
-    let ty = Type::mk_fatarrow(
-        Type::mk_hasfield(String::from("x"), Type::Var(0)),
-        Type::Var(1),
-    );
+    let ty = Type::mk_fatarrow(Type::mk_hasfield(Rc::from("x"), Type::Var(0)), Type::Var(1));
     let actual = ty.unwrap_constraints();
     assert_eq!(expected, actual)
 }

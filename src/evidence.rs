@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     core::{EVar, Expr, Placeholder},
     syntax::{self, Type},
@@ -14,7 +16,7 @@ pub struct Evidence {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
     HasField {
-        field: String,
+        field: Rc<str>,
         rest: syntax::Type<usize>,
     },
     Type(Type<usize>),

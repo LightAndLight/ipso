@@ -1,20 +1,18 @@
-use std::collections::HashMap;
-
-use crate::syntax::Type;
-
 use super::{TypeError, Typechecker, UnifyTypeContext};
+use crate::syntax::Type;
+use fnv::FnvHashMap;
 
 mod test;
 
-pub struct Substitution(HashMap<usize, Type<usize>>);
+pub struct Substitution(FnvHashMap<usize, Type<usize>>);
 
 impl Substitution {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Substitution(HashMap::new())
+        Substitution(FnvHashMap::with_hasher(Default::default()))
     }
 
-    pub fn into_hashmap(self) -> HashMap<usize, Type<usize>> {
+    pub fn into_hashmap(self) -> FnvHashMap<usize, Type<usize>> {
         self.0
     }
 
@@ -53,7 +51,7 @@ impl Substitution {
                 self.0.insert(expected, actual);
                 Ok(())
             }
-            Some(expected_ty) => tc.unify_type_subst(self, context, expected_ty, actual),
+            Some(expected_ty) => tc.unify_type_subst(self, context, &expected_ty, &actual),
         }?;
         Ok(())
     }
@@ -98,7 +96,7 @@ impl Substitution {
                 self.0.insert(actual, expected);
                 Ok(())
             }
-            Some(actual_ty) => tc.unify_type_subst(self, context, expected, actual_ty),
+            Some(actual_ty) => tc.unify_type_subst(self, context, &expected, &actual_ty),
         }?;
         Ok(())
     }

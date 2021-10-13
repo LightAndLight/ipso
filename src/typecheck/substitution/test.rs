@@ -1,4 +1,7 @@
 #[cfg(test)]
+use std::rc::Rc;
+
+#[cfg(test)]
 use crate::{
     syntax::{Kind, Type},
     typecheck::{substitution::Substitution, Typechecker, UnifyTypeContext},
@@ -7,7 +10,7 @@ use crate::{
 #[test]
 fn subst_left_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        tc.bound_tyvars.insert(&[(String::from("r"), Kind::Row)]);
+        tc.bound_tyvars.insert(&[(Rc::from("r"), Kind::Row)]);
         tc.type_solutions = vec![
             (Kind::Type, None),
             (Kind::Type, Some(Type::mk_app(Type::Record, Type::Var(0)))),

@@ -31,7 +31,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            let _ = tc.check_kind(None, constraint, Kind::Constraint)?;
+            let _ = tc.check_kind(None, constraint, &Kind::Constraint)?;
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -61,8 +61,8 @@ pub fn solve_constraint(
                 match tc.unify_type_subst(
                     &mut subst,
                     &unify_context,
-                    constraint.clone(),
-                    implication.consequent.clone(),
+                    constraint,
+                    &implication.consequent,
                 ) {
                     Err(_) => {
                         continue;
@@ -74,9 +74,9 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.zonk_type(x))
+                                .map(|x| tc.zonk_type(&x))
                                 .collect(),
-                            consequent: tc.zonk_type(implication.consequent),
+                            consequent: tc.zonk_type(&implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -117,7 +117,7 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            let _ = tc.check_kind(None, rest, Kind::Row)?;
+            let _ = tc.check_kind(None, rest, &Kind::Row)?;
             let new_evidence = match rest {
                 syntax::Type::RowNil => Ok(core::Expr::Int(0)),
                 syntax::Type::RowCons(other_field, _, other_rest) => {
@@ -176,7 +176,7 @@ pub fn solve_constraint(
                     // will never recieve solutions
                     match sol.clone() {
                         None => {
-                            match tc.zonk_kind(false, kind.clone()) {
+                            match tc.zonk_kind(false, kind) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
@@ -184,7 +184,7 @@ pub fn solve_constraint(
                                         expected: Type::Meta(*n),
                                         actual: Type::RowNil,
                                     };
-                                    tc.solve_typevar_left(&unify_type_context, *n, Type::RowNil)?;
+                                    tc.solve_typevar_left(&unify_type_context, *n, &Type::RowNil)?;
                                     solve_constraint(context, tc, constraint)
                                 }
                                 _ => {
@@ -242,7 +242,7 @@ pub fn solve_placeholder(
             let expr = solve_constraint(
                 &Some(SolveConstraintContext {
                     pos: pos.unwrap_or(0),
-                    constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type())),
+                    constraint: tc.fill_ty_names(tc.zonk_type(&constraint.to_type())),
                 }),
                 tc,
                 &constraint,

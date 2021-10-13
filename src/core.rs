@@ -1,4 +1,4 @@
-use std::{cmp, collections::HashMap};
+use std::{cmp, collections::HashMap, rc::Rc};
 
 use crate::{
     import::ModulePath,
@@ -13,7 +13,7 @@ mod test;
 pub enum Pattern {
     Name,
     Record { names: Vec<Expr>, rest: bool },
-    Variant { tag: Box<Expr> },
+    Variant { tag: Rc<Expr> },
     Wildcard,
 }
 
@@ -31,7 +31,7 @@ impl Pattern {
     }
 
     pub fn mk_variant(tag: Expr) -> Pattern {
-        Pattern::Variant { tag: Box::new(tag) }
+        Pattern::Variant { tag: Rc::new(tag) }
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
@@ -236,16 +236,16 @@ pub enum Expr {
     Module(ModuleName, String),
     Builtin(Builtin),
 
-    App(Box<Expr>, Box<Expr>),
-    Lam { arg: bool, body: Box<Expr> },
+    App(Rc<Expr>, Rc<Expr>),
+    Lam { arg: bool, body: Rc<Expr> },
 
     True,
     False,
-    IfThenElse(Box<Expr>, Box<Expr>, Box<Expr>),
+    IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
 
     Int(u32),
 
-    Binop(syntax::Binop, Box<Expr>, Box<Expr>),
+    Binop(syntax::Binop, Rc<Expr>, Rc<Expr>),
 
     Char(char),
 
@@ -253,13 +253,13 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
-    Extend(Box<Expr>, Box<Expr>, Box<Expr>),
+    Extend(Rc<Expr>, Rc<Expr>, Rc<Expr>),
     Record(Vec<(Expr, Expr)>),
-    Project(Box<Expr>, Box<Expr>),
+    Project(Rc<Expr>, Rc<Expr>),
 
-    Variant(Box<Expr>),
-    Embed(Box<Expr>, Box<Expr>),
-    Case(Box<Expr>, Vec<Branch>),
+    Variant(Rc<Expr>),
+    Embed(Rc<Expr>, Rc<Expr>),
+    Case(Rc<Expr>, Vec<Branch>),
     Unit,
 }
 
@@ -272,26 +272,26 @@ impl Expr {
                     // todo: bind the arg with a let?
                     body.instantiate(&b)
                 } else {
-                    *body
+                    (*body).clone()
                 }
             }
-            a => Expr::App(Box::new(a), Box::new(b)),
+            a => Expr::App(Rc::new(a), Rc::new(b)),
         }
     }
 
     pub fn mk_lam(arg: bool, body: Expr) -> Expr {
         Expr::Lam {
             arg,
-            body: Box::new(body),
+            body: Rc::new(body),
         }
     }
 
     pub fn mk_ifthenelse(x: Expr, y: Expr, z: Expr) -> Expr {
-        Expr::IfThenElse(Box::new(x), Box::new(y), Box::new(z))
+        Expr::IfThenElse(Rc::new(x), Rc::new(y), Rc::new(z))
     }
 
     pub fn mk_extend(ev: Expr, field: Expr, rest: Expr) -> Expr {
-        Expr::Extend(Box::new(ev), Box::new(field), Box::new(rest))
+        Expr::Extend(Rc::new(ev), Rc::new(field), Rc::new(rest))
     }
 
     pub fn mk_record(fields: Vec<(Expr, Expr)>, rest: Option<Expr>) -> Expr {
@@ -312,20 +312,20 @@ impl Expr {
                     _ => None,
                 }) {
                     Some(val) => val,
-                    None => Self::Project(Box::new(Expr::Record(fields)), Box::new(Expr::Int(ix))),
+                    None => Self::Project(Rc::new(Expr::Record(fields)), Rc::new(Expr::Int(ix))),
                 },
-                offset => Self::Project(Box::new(Expr::Record(fields)), Box::new(offset)),
+                offset => Self::Project(Rc::new(Expr::Record(fields)), Rc::new(offset)),
             },
-            expr => Self::Project(Box::new(expr), Box::new(offset)),
+            expr => Self::Project(Rc::new(expr), Rc::new(offset)),
         }
     }
 
     pub fn mk_variant(tag: Expr) -> Expr {
-        Expr::Variant(Box::new(tag))
+        Expr::Variant(Rc::new(tag))
     }
 
     pub fn mk_embed(tag: Expr, rest: Expr) -> Expr {
-        Expr::Embed(Box::new(tag), Box::new(rest))
+        Expr::Embed(Rc::new(tag), Rc::new(rest))
     }
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
@@ -338,11 +338,11 @@ impl Expr {
                 _ => {}
             }
         }
-        Expr::Binop(op, Box::new(a), Box::new(b))
+        Expr::Binop(op, Rc::new(a), Rc::new(b))
     }
 
     pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
-        Expr::Case(Box::new(expr), branches)
+        Expr::Case(Rc::new(expr), branches)
     }
 
     pub fn mk_placeholder(p: usize) -> Expr {
@@ -779,13 +779,13 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::Name(_) => Step::Skip,
                 Expr::Module(_, _) => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
-                Expr::App(a, b) => Step::Continue(vec![a, b]),
-                Expr::Lam { arg: _, body } => Step::Continue(vec![body]),
+                Expr::App(a, b) => Step::Continue2(a, b),
+                Expr::Lam { arg: _, body } => Step::Continue1(body),
                 Expr::True => Step::Skip,
                 Expr::False => Step::Skip,
-                Expr::IfThenElse(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::IfThenElse(a, b, c) => Step::Continue3(a, b, c),
                 Expr::Int(_) => Step::Skip,
-                Expr::Binop(_, a, b) => Step::Continue(vec![a, b]),
+                Expr::Binop(_, a, b) => Step::Continue2(a, b),
                 Expr::Char(_) => Step::Skip,
                 Expr::String(a) => Step::Continue(
                     a.iter()
@@ -796,15 +796,15 @@ impl<'a> Iterator for IterEVars<'a> {
                         .collect(),
                 ),
                 Expr::Array(xs) => Step::Continue(xs.iter().collect()),
-                Expr::Extend(a, b, c) => Step::Continue(vec![a, b, c]),
+                Expr::Extend(a, b, c) => Step::Continue3(a, b, c),
                 Expr::Record(xs) => Step::Continue(
                     xs.iter()
                         .flat_map(|(a, b)| vec![a, b].into_iter())
                         .collect(),
                 ),
-                Expr::Project(a, b) => Step::Continue(vec![a, b]),
-                Expr::Variant(a) => Step::Continue(vec![a]),
-                Expr::Embed(a, b) => Step::Continue(vec![a, b]),
+                Expr::Project(a, b) => Step::Continue2(a, b),
+                Expr::Variant(a) => Step::Continue1(a),
+                Expr::Embed(a, b) => Step::Continue2(a, b),
                 Expr::Case(a, b) => Step::Continue({
                     let mut xs: Vec<&'a Expr> = vec![a];
                     xs.extend(b.iter().flat_map(|b| {
@@ -835,6 +835,21 @@ impl<'a> Iterator for IterEVars<'a> {
                     Step::Skip => {
                         continue;
                     }
+                    Step::Continue1(item) => {
+                        self.next.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.next.push(item2);
+                        self.next.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.next.push(item3);
+                        self.next.push(item2);
+                        self.next.push(item1);
+                        continue;
+                    }
                     Step::Continue(xs) => {
                         self.next.extend(xs.into_iter().rev());
                         continue;
@@ -847,7 +862,7 @@ impl<'a> Iterator for IterEVars<'a> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
-    pub ty_vars: Vec<(String, syntax::Kind)>,
+    pub ty_vars: Vec<(Rc<str>, syntax::Kind)>,
     pub body: syntax::Type<usize>,
 }
 
@@ -897,7 +912,7 @@ pub enum Declaration {
     },
     Class(ClassDeclaration),
     Instance {
-        ty_vars: Vec<(String, syntax::Kind)>,
+        ty_vars: Vec<(Rc<str>, syntax::Kind)>,
         superclass_constructors: Vec<Expr>,
         assumes: Vec<syntax::Type<usize>>,
         head: syntax::Type<usize>,
@@ -946,8 +961,8 @@ impl Declaration {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassDeclaration {
     pub supers: Vec<syntax::Type<usize>>,
-    pub name: String,
-    pub args: Vec<(String, syntax::Kind)>,
+    pub name: Rc<str>,
+    pub args: Vec<(Rc<str>, syntax::Kind)>,
     pub members: Vec<ClassMember>,
 }
 
