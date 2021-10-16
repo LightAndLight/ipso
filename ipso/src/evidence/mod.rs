@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
+use core::{EVar, Expr, Placeholder};
 use crate::{
-    core::{EVar, Expr, Placeholder},
     typecheck::Typechecker,
 };
 use syntax::{self, Type};

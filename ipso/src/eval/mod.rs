@@ -1,6 +1,5 @@
+use core::{self, Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart, ModulePath};
 use crate::{
-    core::{self, Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart},
-    import::ModulePath,
     rope::Rope,
 };
 use syntax::{Binop, ModuleName};

@@ -1,5 +1,4 @@
 pub mod builtins;
-pub mod core;
 pub mod eval;
 pub mod evidence;
 pub mod import;

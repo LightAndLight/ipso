@@ -1,8 +1,5 @@
-use std::{cmp, collections::HashMap, rc::Rc};
+use std::{cmp, collections::HashMap, rc::Rc, path::{Path,PathBuf}};
 
-use crate::{
-    import::ModulePath,
-};
 use util::iter::Step;
 use syntax::{self, ModuleName, Type};
 
@@ -427,7 +424,7 @@ impl Expr {
     }
 
     /// ```
-    /// use ipso::core::Expr;
+    /// use core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Int(99)),
@@ -436,7 +433,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use ipso::core::Expr;
+    /// use core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Var(0)),
@@ -445,7 +442,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use ipso::core::Expr;
+    /// use core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(2)))).instantiate(&Expr::Int(99)),
@@ -703,7 +700,7 @@ impl Expr {
     }
 
     /// ```
-    /// use ipso::core::{EVar, Expr};
+    /// use core::{EVar, Expr};
     ///
     /// assert_eq!(
     ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
@@ -712,7 +709,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use ipso::core::{EVar, Expr};
+    /// use core::{EVar, Expr};
     ///
     /// assert_eq!(
     ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(1), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
@@ -724,21 +721,21 @@ impl Expr {
     }
 
     /// ```
-    /// use ipso::core::{EVar, Expr};
+    /// use core::{EVar, Expr};
     ///
     /// let expr = Expr::mk_app(Expr::mk_app(Expr::EVar(EVar(0)), Expr::EVar(EVar(1))), Expr::EVar(EVar(2)));
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
     /// ```
     ///
     /// ```
-    /// use ipso::core::{EVar, Expr};
+    /// use core::{EVar, Expr};
     ///
     /// let expr = Expr::mk_app(Expr::EVar(EVar(0)), Expr::mk_app(Expr::EVar(EVar(1)), Expr::EVar(EVar(2))));
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
     /// ```
     ///
     /// ```
-    /// use ipso::core::{Branch, EVar, Expr, Pattern};
+    /// use core::{Branch, EVar, Expr, Pattern};
     /// let expr = Expr::mk_lam (
     ///     true,
     ///     Expr::mk_case(
@@ -1024,6 +1021,55 @@ pub enum ModuleUsage {
     Items(Vec<String>),
     /// The entire contents of a module were imported
     All,
+}
+
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+pub enum ModulePath {
+    Module {
+        module_name: ModuleName,
+        path: PathBuf,
+    },
+    File {
+        path: PathBuf,
+    },
+}
+
+impl ModulePath {
+    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
+        let mut path = module_name
+            .iter()
+            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
+        path.set_extension("ipso");
+        ModulePath::Module {
+            module_name: module_name.clone(),
+            path,
+        }
+    }
+
+    pub fn from_file(file: &Path) -> Self {
+        ModulePath::File {
+            path: PathBuf::from(file),
+        }
+    }
+
+    pub fn as_path(&self) -> &Path {
+        let path = match self {
+            ModulePath::Module { path, .. } => path,
+            ModulePath::File { path, .. } => path,
+        };
+        path.as_path()
+    }
+
+    pub fn to_str(&self) -> &str {
+        self.as_path().to_str().unwrap()
+    }
+
+    pub fn get_module_name(&self) -> Option<&ModuleName> {
+        match self {
+            ModulePath::Module { module_name, .. } => Option::Some(module_name),
+            ModulePath::File { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

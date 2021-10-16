@@ -1,11 +1,12 @@
 use fnv::FnvHashSet;
 
 use diagnostic::{self, InputLocation};
+use core::{self, ModulePath};
 use crate::{
-    builtins, core,
+    builtins,
     evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
-    import::{ModulePath, Modules},
+    import::{Modules},
     rope::Rope,
 };
 use syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type};

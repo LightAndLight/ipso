@@ -1,5 +1,5 @@
+use core::{self, Expr, Placeholder};
 use crate::{
-    core::{self, Expr, Placeholder},
     typecheck::{
         substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
         UnifyTypeContext,

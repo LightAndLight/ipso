@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::{Interpreter, Value};
 #[cfg(test)]
-use crate::core::{Builtin, Expr, StringPart};
+use core::{Builtin, Expr, StringPart};
 #[cfg(test)]
 use crate::eval::Object;
 #[cfg(test)]

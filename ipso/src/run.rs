@@ -5,12 +5,12 @@ use std::{
 };
 
 use typed_arena::Arena;
-
+use core::{self, ModulePath};
 use diagnostic::InputLocation;
 use crate::{
-    builtins, core,
+    builtins,
     eval::{self, Interpreter},
-    import::{self, ModulePath},
+    import::{self},
     parse,
     typecheck::{self, Typechecker},
 };

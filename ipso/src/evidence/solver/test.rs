@@ -1,6 +1,7 @@
 #[cfg(test)]
+use core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
+#[cfg(test)]
 use crate::{
-    core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig},
     evidence::{solver::solve_constraint, Constraint, Evidence},
     typecheck::Typechecker,
 };

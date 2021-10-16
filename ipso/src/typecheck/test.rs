@@ -3,8 +3,9 @@ use syntax::{self, Binop, Kind, Spanned, Type};
 #[cfg(test)]
 use diagnostic::InputLocation;
 #[cfg(test)]
+use core::{self, ClassMember, InstanceMember, Placeholder, TypeSig};
+#[cfg(test)]
 use crate::{
-    core::{self, ClassMember, InstanceMember, Placeholder, TypeSig},
     evidence::{solver::solve_placeholder, Constraint},
     typecheck::{
         BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,

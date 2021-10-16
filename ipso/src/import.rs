@@ -1,8 +1,8 @@
 use diagnostic::{InputLocation, self, Diagnostic};
 use typed_arena::Arena;
 
+use core::{self, Module, ModulePath};
 use crate::{
-    core::{self, Module},
     parse::{self},
     rope::Rope,
     typecheck::{self, Typechecker},
@@ -14,55 +14,6 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub enum ModulePath {
-    Module {
-        module_name: ModuleName,
-        path: PathBuf,
-    },
-    File {
-        path: PathBuf,
-    },
-}
-
-impl ModulePath {
-    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
-        let mut path = module_name
-            .iter()
-            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
-        path.set_extension("ipso");
-        ModulePath::Module {
-            module_name: module_name.clone(),
-            path,
-        }
-    }
-
-    pub fn from_file(file: &Path) -> Self {
-        ModulePath::File {
-            path: PathBuf::from(file),
-        }
-    }
-
-    pub fn as_path(&self) -> &Path {
-        let path = match self {
-            ModulePath::Module { path, .. } => path,
-            ModulePath::File { path, .. } => path,
-        };
-        path.as_path()
-    }
-
-    pub fn to_str(&self) -> &str {
-        self.as_path().to_str().unwrap()
-    }
-
-    pub fn get_module_name(&self) -> Option<&ModuleName> {
-        match self {
-            ModulePath::Module { module_name, .. } => Option::Some(module_name),
-            ModulePath::File { .. } => None,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum ModuleError {

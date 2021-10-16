@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::{core::Expr};
+use crate::{Expr};
 #[cfg(test)]
 use syntax::Binop;
 
