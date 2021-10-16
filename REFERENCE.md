@@ -403,10 +403,21 @@ b : Bool
 
 ### Variants
 
+#### Construction
+
 ```ipso-repl
 > :t None
 forall r. < None | r >
 ```
+
+#### Extension
+
+```ipso-repl
+> :t \x -> < A | x >
+< r > -> < A : a | r >
+```
+
+#### Pattern Matching
 
 ```ipso-repl
 > x = None
@@ -435,11 +446,6 @@ x : < None >
 .   None -> 1
 .
 1
-```
-
-```ipso-repl
-> :t \x -> < A | x >
-< r > -> < A : a | r >
 ```
 
 ### IO
