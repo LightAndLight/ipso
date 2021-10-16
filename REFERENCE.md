@@ -331,11 +331,11 @@ Array Int
 ```ipso
 cons : a -> Array a -> Array a
 
-uncons : Array a -> < None, Some : { first : a, rest : Array a } >
+uncons : Array a -> < None | Some : { first : a, rest : Array a } >
 
 snocArray : Array a -> a -> Array a
 
-unsnoc : Array a -> < None, Some : { rest : Array a, last : a } >
+unsnoc : Array a -> < None | Some : { rest : Array a, last : a } >
 
 lengthArray : Array a -> Int
 
@@ -508,7 +508,7 @@ instance Fields Eq row => Eq (Variant row)
 
 ```ipso
 class Eq a => Ord a where
-  compare : a -> a -> < LT, EQ, GT >
+  compare : a -> a -> < LT | EQ | GT >
   
 (<=) : a -> a -> Bool
 
@@ -549,7 +549,7 @@ instance Fields ToJson row => ToJson (Record row)
 class FromJson a where
   decoder : Decoder a
   
-fromJson : FromJson a => String -> < Err : DecodeError, Ok : a >
+fromJson : FromJson a => String -> < Err : DecodeError | Ok : a >
 ```
 
 ```ipso
