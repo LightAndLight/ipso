@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use crate::{
     core::{EVar, Expr, Placeholder},
-    syntax::{self, Type},
     typecheck::Typechecker,
 };
+use syntax::{self, Type};
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]

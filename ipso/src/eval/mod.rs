@@ -2,8 +2,8 @@ use crate::{
     core::{self, Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart},
     import::ModulePath,
     rope::Rope,
-    syntax::{Binop, ModuleName},
 };
+use syntax::{Binop, ModuleName};
 use paste::paste;
 use std::{
     collections::HashMap,

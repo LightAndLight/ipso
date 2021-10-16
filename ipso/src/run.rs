@@ -12,9 +12,9 @@ use crate::{
     eval::{self, Interpreter},
     import::{self, ModulePath},
     parse,
-    syntax::{self, Kind},
     typecheck::{self, Typechecker},
 };
+use syntax::{self, Kind};
 
 pub struct Config {
     pub filename: String,

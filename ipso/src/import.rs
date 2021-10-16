@@ -6,9 +6,9 @@ use crate::{
     diagnostic::{self, Diagnostic},
     parse::{self},
     rope::Rope,
-    syntax::{self, ModuleName},
     typecheck::{self, Typechecker},
 };
+use syntax::{self, ModuleName};
 use std::{
     collections::HashMap,
     io::{self},

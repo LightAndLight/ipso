@@ -2,9 +2,10 @@
 use crate::{
     core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig},
     evidence::{solver::solve_constraint, Constraint, Evidence},
-    syntax::{Binop, Kind, Type},
     typecheck::Typechecker,
 };
+#[cfg(test)]
+use syntax::{Binop, Kind, Type};
 #[cfg(test)]
 use std::rc::Rc;
 

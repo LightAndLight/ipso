@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
-use crate::iter::Step;
+use util::iter::Step;
 use lazy_static::lazy_static;
 
 #[cfg(test)]
@@ -152,6 +152,31 @@ impl Pattern {
             items: Vec::new(),
             pattern: Some(self),
         }
+    }
+
+    pub fn get_arg_names(&self) -> Vec<&Spanned<String>> {
+        let mut arg_names = Vec::new();
+        match self {
+            Pattern::Name(n) => {
+                arg_names.push(n);
+            }
+            Pattern::Record { names, rest } => {
+                for name in names {
+                    arg_names.push(name);
+                }
+                match rest {
+                    None => {}
+                    Some(n) => {
+                        arg_names.push(n);
+                    }
+                }
+            }
+            Pattern::Variant { name: _, arg } => {
+                arg_names.push(arg);
+            }
+            Pattern::Wildcard => {}
+        }
+        arg_names
     }
 }
 
@@ -537,7 +562,7 @@ impl<A> Type<A> {
     }
 
     /// ```
-    /// use ipso::syntax::Type;
+    /// use syntax::Type;
     /// assert_eq!(
     ///     Type::mk_app(Type::mk_app(Type::mk_app(Type::Var(0), Type::Var(1)), Type::Var(2)), Type::Var(3)).unwrap_app(),
     ///     (&Type::Var(0), vec![&Type::Var(1), &Type::Var(2), &Type::Var(3)])
@@ -564,7 +589,7 @@ impl<A> Type<A> {
     /// i.e. `a -> f a` to `forall a f. a -> f a`
     ///
     /// ```
-    /// use ipso::syntax::Type;
+    /// use syntax::Type;
     /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
     /// assert_eq!(
     ///     input.abstract_vars(&Vec::new()),
@@ -578,7 +603,7 @@ impl<A> Type<A> {
     /// The `seen` vector can be used to influence the order of the binders.
     ///
     /// ```
-    /// use ipso::syntax::Type;
+    /// use syntax::Type;
     /// let input = Type::mk_arrow(
     ///     Type::Var(String::from("a")),
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a")))
@@ -593,7 +618,7 @@ impl<A> Type<A> {
     /// ```
     ///
     /// ```
-    /// use ipso::syntax::Type;
+    /// use syntax::Type;
     /// let input = Type::mk_arrow(
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))),
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("b")))

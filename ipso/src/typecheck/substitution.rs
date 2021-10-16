@@ -1,5 +1,5 @@
 use super::{TypeError, Typechecker, UnifyTypeContext};
-use crate::syntax::Type;
+use syntax::Type;
 use fnv::FnvHashMap;
 
 mod test;

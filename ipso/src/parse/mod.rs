@@ -6,9 +6,6 @@ use fnv::FnvHashSet;
 use crate::{
     diagnostic::{Diagnostic, InputLocation, Item},
     lex::Lexer,
-    syntax::{
-        self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
-    },
     token::{self, Token},
 };
 use std::{
@@ -19,6 +16,9 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     vec::IntoIter,
+};
+use syntax::{
+    self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
 };
 
 #[derive(Debug, PartialEq, Eq)]

@@ -2,9 +2,9 @@ use std::{cmp, collections::HashMap, rc::Rc};
 
 use crate::{
     import::ModulePath,
-    iter::Step,
-    syntax::{self, ModuleName, Type},
 };
+use util::iter::Step;
+use syntax::{self, ModuleName, Type};
 
 #[cfg(test)]
 mod test;

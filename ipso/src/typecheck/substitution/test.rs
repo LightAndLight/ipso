@@ -2,8 +2,9 @@
 use std::rc::Rc;
 
 #[cfg(test)]
+use syntax::{Kind, Type};
+#[cfg(test)]
 use crate::{
-    syntax::{Kind, Type},
     typecheck::{substitution::Substitution, Typechecker, UnifyTypeContext},
 };
 

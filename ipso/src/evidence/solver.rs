@@ -1,11 +1,11 @@
 use crate::{
     core::{self, Expr, Placeholder},
-    syntax::{self, Binop, Kind, Type},
     typecheck::{
         substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
         UnifyTypeContext,
     },
 };
+use syntax::{self, Binop, Kind, Type};
 
 use super::Constraint;
 

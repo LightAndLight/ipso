@@ -7,8 +7,8 @@ use crate::{
     evidence::{solver::solve_placeholder, Constraint, Evidence},
     import::{ModulePath, Modules},
     rope::Rope,
-    syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type},
 };
+use syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -288,33 +288,6 @@ pub enum TypeError {
         location: InputLocation,
         pos: usize,
     },
-}
-
-impl syntax::Pattern {
-    fn get_arg_names(&self) -> Vec<&Spanned<String>> {
-        let mut arg_names = Vec::new();
-        match self {
-            syntax::Pattern::Name(n) => {
-                arg_names.push(n);
-            }
-            syntax::Pattern::Record { names, rest } => {
-                for name in names {
-                    arg_names.push(name);
-                }
-                match rest {
-                    None => {}
-                    Some(n) => {
-                        arg_names.push(n);
-                    }
-                }
-            }
-            syntax::Pattern::Variant { name: _, arg } => {
-                arg_names.push(arg);
-            }
-            syntax::Pattern::Wildcard => {}
-        }
-        arg_names
-    }
 }
 
 impl TypeError {
@@ -872,7 +845,7 @@ impl<'modules> Typechecker<'modules> {
             ty = Type::mk_fatarrow(constraint, ty);
         }
 
-        let ty_vars = self
+        let ty_vars: Vec<(Rc<str>, Kind)> = self
             .bound_tyvars
             .info
             .iter()
@@ -988,7 +961,7 @@ impl<'modules> Typechecker<'modules> {
         self.check_kind(None, &type_, &Kind::Type)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
-        let ty_vars = ty_var_kinds
+        let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
             .iter()
             .map(|(a, b)| (a.clone(), self.zonk_kind(true, b)))
             .collect();
@@ -1062,7 +1035,7 @@ impl<'modules> Typechecker<'modules> {
             args: args_kinds
                 .into_iter()
                 .map(|(name, kind)| (name, self.zonk_kind(true, &kind)))
-                .collect(),
+                .collect::<Vec<(Rc<str>, Kind)>>(),
             members: checked_members,
         }))
     }

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::syntax::Keyword;
+use syntax::Keyword;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Name {
