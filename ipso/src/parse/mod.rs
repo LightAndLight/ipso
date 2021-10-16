@@ -4,10 +4,7 @@ use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 
 use diagnostic::{Diagnostic, InputLocation, Item};
-use crate::{
-    lex::Lexer,
-    token::{self, Token},
-};
+use lex::{Lexer, token::{self, Token}};
 use std::{
     cmp,
     collections::BTreeSet,
@@ -181,12 +178,11 @@ macro_rules! between {
 macro_rules! parse_string {
     ($p:ident, $s:expr) => {{
         use diagnostic::InputLocation;
+        use lex::{Lexer, token::Token};
         use ipso::{
             keep_left,
-            lex::Lexer,
             map2,
             parse::{ParseResult, Parser},
-            token::Token,
         };
 
         let tokens: Vec<Token> = {
@@ -654,7 +650,8 @@ impl Parser {
     /// ```
     /// use std::rc::Rc;
     /// use diagnostic::InputLocation;
-    /// use ipso::{lex, token, parse::ParseError, parse_str};
+    /// use lex::{self, token};
+    /// use ipso::{parse::ParseError, parse_str};
     ///
     /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
     ///

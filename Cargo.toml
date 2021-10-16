@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "diagnostic",
+    "lex",
     "syntax",
     "util",
     "ipso",

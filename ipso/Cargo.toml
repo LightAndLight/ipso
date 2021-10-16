@@ -11,6 +11,7 @@ diagnostic = { path = "../diagnostic" }
 fixedbitset = "0.4.0"
 fnv = "1.0.7"
 lazy_static = "1.4.0"
+lex = { path = "../lex" }
 paste = "1.0.5"
 syntax = { path = "../syntax" }
 typed-arena = "2.0.1"

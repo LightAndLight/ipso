@@ -1,8 +1,9 @@
 mod test;
 
-use std::{rc::Rc, str::Chars};
+pub mod token;
 
-use crate::token::{self, Token};
+use std::{rc::Rc, str::Chars};
+use token::{Token};
 
 enum Mode {
     String,

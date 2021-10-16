@@ -5,11 +5,11 @@ use syntax::{Spanned, StringPart, Branch, Declaration, Expr, Keyword, Names, Pat
 #[cfg(test)]
 use diagnostic::InputLocation;
 #[cfg(test)]
+use lex::{Lexer, token};
+#[cfg(test)]
 use crate::{
     keep_left,
-    lex::Lexer,
     map2,
-    token,
 };
 #[cfg(test)]
 use std::rc::Rc;
