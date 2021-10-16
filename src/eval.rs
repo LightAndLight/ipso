@@ -510,45 +510,38 @@ where {
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
         match name {
             Builtin::PureIO => {
-                fn pure_io_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                function1!(
+                    pure_io,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
-                    fn pure_io_1<'stdout, 'heap>(
-                        _: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                    ) -> Value<'heap> {
-                        env[0]
+                    arg: Value<'heap>| {
+                        fn pure_io_1<'stdout, 'heap>(
+                            _: &mut Interpreter<'stdout, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            env[0]
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env);
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(pure_io_1),
+                        };
+                        interpreter.alloc(closure)
                     }
-                    let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
-                    });
-                    let closure = Object::IO {
-                        env,
-                        body: IOBody(pure_io_1),
-                    };
-                    interpreter.alloc(closure)
-                }
-                let closure = Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(pure_io_0),
-                };
-                self.alloc(closure)
+                )
             }
             Builtin::MapIO => {
-                fn map_io_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                function2!(
+                    map_io,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
-                    arg: Value<'heap>, // a -> b
-                ) -> Value<'heap> {
-                    fn map_io_1<'stdout, 'heap>(
-                        interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>, // IO a
-                    ) -> Value<'heap> {
+                    arg: Value<'heap>| {
                         fn map_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -569,34 +562,15 @@ where {
                         };
                         interpreter.alloc(closure)
                     }
-                    let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
-                    });
-                    let closure = Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(map_io_1),
-                    };
-                    interpreter.alloc(closure)
-                }
-                let closure = Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(map_io_0),
-                };
-                self.alloc(closure)
+                )
             }
             Builtin::BindIO => {
-                fn bind_io_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                function2!(
+                    bind_io,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
-                    arg: Value<'heap>, // IO a
-                ) -> Value<'heap> {
-                    fn bind_io_1<'stdout, 'heap>(
-                        interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>, // a -> IO b
-                    ) -> Value<'heap> {
+                    arg: Value<'heap>| {
                         fn bind_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -619,83 +593,41 @@ where {
                         };
                         interpreter.alloc(closure)
                     }
-                    let env = interpreter.alloc_values({
-                        let mut new_env = Vec::with_capacity(env.len() + 1);
-                        new_env.extend_from_slice(env);
-                        new_env.push(arg);
-                        new_env
-                    });
-                    let closure = Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(bind_io_1),
-                    };
-                    interpreter.alloc(closure)
-                }
-                let closure = Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(bind_io_0),
-                };
-                self.alloc(closure)
+                )
             }
             Builtin::Trace => {
-                fn code_outer<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                function2!(
+                    trace,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
-                    fn code_inner<'stdout, 'heap>(
-                        interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>,
-                    ) -> Value<'heap> {
+                    arg: Value<'heap>| {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
-                    let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
-                    });
-                    let closure = Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(code_inner),
-                    };
-                    interpreter.alloc(closure)
-                }
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(code_outer),
-                });
-                closure
+                )
             }
             Builtin::ToUtf8 => {
-                fn to_utf8_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
-                    _env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
-                    let a = arg.unpack_string();
-                    interpreter.alloc(Object::Bytes(a.as_bytes()))
-                }
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(to_utf8_0),
-                });
-                closure
+                function1!(
+                    to_utf8,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
+                    _: &'heap [Value<'heap>],
+                    arg: Value<'heap>| {
+                        let a = arg.unpack_string();
+                        interpreter.alloc(Object::Bytes(a.as_bytes()))
+                    }
+                )
             }
             Builtin::Stdout => Value::Stdout,
             Builtin::Stdin => Value::Stdin,
             Builtin::WriteStdout => {
-                fn write_stdout_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
+                function2!(
+                    write_stdout,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
                     env: &'heap [Value<'heap>],
-                    arg: Value<'heap>, // Stdout
-                ) -> Value<'heap> {
-                    fn write_stdout_1<'stdout, 'heap>(
-                        interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>, // Bytes
-                    ) -> Value<'heap> {
+                    arg: Value<'heap>| {
                         fn write_stdout_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -718,22 +650,7 @@ where {
                             body: IOBody(write_stdout_2),
                         })
                     }
-                    let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
-                    });
-                    let closure = interpreter.alloc(Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(write_stdout_1),
-                    });
-                    closure
-                }
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(write_stdout_0),
-                });
-                closure
+                )
             }
             Builtin::FlushStdout => {
                 fn flush_stdout<'stdout, 'heap>(
@@ -764,38 +681,35 @@ where {
                 )
             }
             Builtin::ReadLineStdin => {
-                fn read_line_stdin_0<'stdout, 'heap>(
-                    interpreter: &mut Interpreter<'stdout, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>, // Stdout
-                ) -> Value<'heap> {
-                    fn read_line_stdin_1<'stdout, 'heap>(
-                        interpreter: &mut Interpreter<'stdout, 'heap>,
-                        env: &'heap [Value<'heap>],
-                    ) -> Value<'heap> {
-                        // env[0] : Stdin
-                        let () = env[0].unpack_stdin();
-                        let mut str = String::new();
-                        let _ = interpreter.stdin.read_line(&mut str).unwrap();
-                        let str = interpreter.alloc_str(&str);
-                        interpreter.alloc(Object::String(str))
+                function1!(
+                    readline_stdin,
+                    self,
+                    |interpreter: &mut Interpreter<'_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        fn read_line_stdin_1<'stdout, 'heap>(
+                            interpreter: &mut Interpreter<'stdout, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            // env[0] : Stdin
+                            let () = env[0].unpack_stdin();
+                            let mut str = String::new();
+                            let _ = interpreter.stdin.read_line(&mut str).unwrap();
+                            let str = interpreter.alloc_str(&str);
+                            interpreter.alloc(Object::String(str))
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env);
+                            env.push(arg);
+                            env
+                        });
+                        let closure = interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(read_line_stdin_1),
+                        });
+                        closure
                     }
-                    let env = interpreter.alloc_values({
-                        let mut env = Vec::from(env);
-                        env.push(arg);
-                        env
-                    });
-                    let closure = interpreter.alloc(Object::IO {
-                        env,
-                        body: IOBody(read_line_stdin_1),
-                    });
-                    closure
-                }
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(read_line_stdin_0),
-                });
-                closure
+                )
             }
             Builtin::EqString => {
                 function2!(
@@ -815,16 +729,12 @@ where {
                 )
             }
             Builtin::EqInt => {
-                fn eq_int_0<'heap>(
-                    eval: &mut Interpreter<'_, 'heap>,
-                    _env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
-                    fn eq_int_1<'heap>(
-                        _: &mut Interpreter<'_, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>,
-                    ) -> Value<'heap> {
+                function2!(
+                    eq_int,
+                    self,
+                    |_: &mut Interpreter<'_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         if a == b {
@@ -833,19 +743,7 @@ where {
                             Value::False
                         }
                     }
-                    let env = eval.alloc_values(vec![arg]);
-                    let closure = eval.alloc(Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(eq_int_1),
-                    });
-                    closure
-                }
-
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(eq_int_0),
-                });
-                closure
+                )
             }
             Builtin::LtInt => {
                 function2!(
@@ -917,59 +815,31 @@ where {
                 )
             }
             Builtin::EqArray => {
-                fn eq_int_0<'heap>(
-                    eval: &mut Interpreter<'_, 'heap>,
-                    _env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
-                    fn eq_int_1<'heap>(
-                        eval: &mut Interpreter<'_, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>,
-                    ) -> Value<'heap> {
-                        fn eq_int_2<'heap>(
-                            eval: &mut Interpreter<'_, 'heap>,
-                            env: &'heap [Value<'heap>],
-                            arg: Value<'heap>,
-                        ) -> Value<'heap> {
-                            let f = env[0];
-                            let a = env[1].unpack_array();
-                            let b = arg.unpack_array();
+                function3!(
+                    eq_array,
+                    self,
+                    |eval: &mut Interpreter<'_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let f = env[0];
+                        let a = env[1].unpack_array();
+                        let b = arg.unpack_array();
 
-                            let mut acc = Value::True;
-                            if a.len() == b.len() {
-                                for (a, b) in a.iter().zip(b.iter()) {
-                                    let res = f.apply(eval, *a).apply(eval, *b).unpack_bool();
-                                    if !res {
-                                        acc = Value::False;
-                                        break;
-                                    }
+                        let mut acc = Value::True;
+                        if a.len() == b.len() {
+                            for (a, b) in a.iter().zip(b.iter()) {
+                                let res = f.apply(eval, *a).apply(eval, *b).unpack_bool();
+                                if !res {
+                                    acc = Value::False;
+                                    break;
                                 }
-                            } else {
-                                acc = Value::False;
                             }
-                            acc
+                        } else {
+                            acc = Value::False;
                         }
-                        let env = eval.alloc_values(vec![env[0], arg]);
-                        let closure = eval.alloc(Object::StaticClosure {
-                            env,
-                            body: StaticClosureBody(eq_int_2),
-                        });
-                        closure
+                        acc
                     }
-                    let env = eval.alloc_values(vec![arg]);
-                    let closure = eval.alloc(Object::StaticClosure {
-                        env,
-                        body: StaticClosureBody(eq_int_1),
-                    });
-                    closure
-                }
-
-                let closure = self.alloc(Object::StaticClosure {
-                    env: &[],
-                    body: StaticClosureBody(eq_int_0),
-                });
-                closure
+                )
             }
             Builtin::LtArray => {
                 function3!(
