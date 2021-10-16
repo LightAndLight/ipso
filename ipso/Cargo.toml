@@ -1,0 +1,25 @@
+[package]
+name = "ipso"
+version = "0.1.0"
+authors = ["Isaac Elliott <isaace71295@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fixedbitset = "0.4.0"
+fnv = "1.0.7"
+lazy_static = "1.4.0"
+paste = "1.0.5"
+typed-arena = "2.0.1"
+
+[lib]
+name = "ipso"
+path = "./src/ipso.rs"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "todolist_1"
+harness = false
