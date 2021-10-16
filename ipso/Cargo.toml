@@ -2,7 +2,7 @@
 name = "ipso"
 version = "0.1.0"
 authors = ["Isaac Elliott <isaace71295@gmail.com>"]
-edition = "2021"
+edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -24,4 +24,5 @@ criterion = "0.3"
 
 [[bench]]
 name = "todolist_1"
+path = "benches/todolist_1.rs"
 harness = false
