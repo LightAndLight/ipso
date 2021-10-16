@@ -6,9 +6,9 @@ use std::{
 
 use typed_arena::Arena;
 
+use diagnostic::InputLocation;
 use crate::{
     builtins, core,
-    diagnostic::InputLocation,
     eval::{self, Interpreter},
     import::{self, ModulePath},
     parse,

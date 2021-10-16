@@ -1,9 +1,8 @@
-use diagnostic::InputLocation;
+use diagnostic::{InputLocation, self, Diagnostic};
 use typed_arena::Arena;
 
 use crate::{
     core::{self, Module},
-    diagnostic::{self, Diagnostic},
     parse::{self},
     rope::Rope,
     typecheck::{self, Typechecker},

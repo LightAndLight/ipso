@@ -1,6 +1,5 @@
-use diagnostic::InputLocation;
+use diagnostic::{InputLocation,self, Diagnostic};
 use ipso::{
-    diagnostic::{self, Diagnostic},
     run::{run_interpreter, Config, InterpreterError},
 };
 use std::{env, io, path::PathBuf};

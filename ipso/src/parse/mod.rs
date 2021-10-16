@@ -3,8 +3,8 @@ mod test;
 use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 
+use diagnostic::{Diagnostic, InputLocation, Item};
 use crate::{
-    diagnostic::{Diagnostic, InputLocation, Item},
     lex::Lexer,
     token::{self, Token},
 };
@@ -180,8 +180,8 @@ macro_rules! between {
 #[macro_export]
 macro_rules! parse_string {
     ($p:ident, $s:expr) => {{
+        use diagnostic::InputLocation;
         use ipso::{
-            diagnostic::InputLocation,
             keep_left,
             lex::Lexer,
             map2,
@@ -653,7 +653,8 @@ impl Parser {
 
     /// ```
     /// use std::rc::Rc;
-    /// use ipso::{diagnostic::InputLocation, lex, token, parse::ParseError, parse_str};
+    /// use diagnostic::InputLocation;
+    /// use ipso::{lex, token, parse::ParseError, parse_str};
     ///
     /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
     ///

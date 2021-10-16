@@ -1,8 +1,8 @@
 use fnv::FnvHashSet;
 
+use diagnostic::{self, InputLocation};
 use crate::{
     builtins, core,
-    diagnostic::{self, InputLocation},
     evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
     import::{ModulePath, Modules},
@@ -464,7 +464,7 @@ macro_rules! current_dir_with_tc {
         let path = std::env::current_dir().unwrap();
         crate::with_tc!(
             path.as_path(),
-            crate::diagnostic::InputLocation::Interactive {
+            diagnostic::InputLocation::Interactive {
                 label: String::from("(typechecker)")
             },
             $f

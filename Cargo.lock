@@ -172,6 +172,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "diagnostic"
+version = "0.1.0"
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -209,6 +213,7 @@ name = "ipso"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "diagnostic",
  "fixedbitset",
  "fnv",
  "lazy_static",

@@ -3,8 +3,9 @@ use super::{ParseError, ParseResult, Parser};
 #[cfg(test)]
 use syntax::{Spanned, StringPart, Branch, Declaration, Expr, Keyword, Names, Pattern, Type};
 #[cfg(test)]
+use diagnostic::InputLocation;
+#[cfg(test)]
 use crate::{
-    diagnostic::InputLocation,
     keep_left,
     lex::Lexer,
     map2,

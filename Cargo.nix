@@ -4,6 +4,7 @@
 args@{
   release ? true,
   rootFeatures ? [
+    "diagnostic/default"
     "syntax/default"
     "util/default"
     "ipso/default"
@@ -34,6 +35,7 @@ in
 {
   cargo2nixVersion = "0.9.0";
   workspace = {
+    diagnostic = rustPackages.unknown.diagnostic."0.1.0";
     syntax = rustPackages.unknown.syntax."0.1.0";
     util = rustPackages.unknown.util."0.1.0";
     ipso = rustPackages.unknown.ipso."0.1.0";
@@ -271,6 +273,13 @@ in
     };
   });
   
+  "unknown".diagnostic."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "diagnostic";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/diagnostic");
+  });
+  
   "registry+https://github.com/rust-lang/crates.io-index".either."1.6.1" = overridableMkRustCrate (profileName: rec {
     name = "either";
     version = "1.6.1";
@@ -326,6 +335,7 @@ in
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/ipso");
     dependencies = {
+      diagnostic = rustPackages."unknown".diagnostic."0.1.0" { inherit profileName; };
       fixedbitset = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fixedbitset."0.4.0" { inherit profileName; };
       fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       lazy_static = rustPackages."registry+https://github.com/rust-lang/crates.io-index".lazy_static."1.4.0" { inherit profileName; };
