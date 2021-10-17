@@ -9,10 +9,10 @@ edition = "2018"
 [dependencies]
 core = { path = "../core" }
 diagnostic = { path = "../diagnostic" }
-fixedbitset = "0.4.0"
 fnv = "1.0.7"
 lazy_static = "1.4.0"
 lex = { path = "../lex" }
+parse = { path = "../parse" }
 paste = "1.0.5"
 rope = { path = "../rope" }
 syntax = { path = "../syntax" }

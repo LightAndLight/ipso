@@ -1,11 +1,9 @@
 use diagnostic::{self, Diagnostic, InputLocation};
 use typed_arena::Arena;
 
-use crate::{
-    parse::{self},
-    typecheck::{self, Typechecker},
-};
+use crate::typecheck::{self, Typechecker};
 use core::{self, Module, ModulePath};
+use parse::{self};
 use rope::Rope;
 use std::{
     collections::HashMap,

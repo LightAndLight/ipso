@@ -4,17 +4,17 @@ use std::{
     path::PathBuf,
 };
 
-use typed_arena::Arena;
-use core::{self, ModulePath};
-use diagnostic::InputLocation;
 use crate::{
     builtins,
     eval::{self, Interpreter},
     import::{self},
-    parse,
     typecheck::{self, Typechecker},
 };
+use core::{self, ModulePath};
+use diagnostic::InputLocation;
+use parse;
 use syntax::{self, Kind};
+use typed_arena::Arena;
 
 pub struct Config {
     pub filename: String,

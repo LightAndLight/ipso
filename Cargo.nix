@@ -9,6 +9,7 @@ args@{
     "util/default"
     "diagnostic/default"
     "lex/default"
+    "parse/default"
     "rope/default"
     "ipso/default"
   ],
@@ -43,6 +44,7 @@ in
     util = rustPackages.unknown.util."0.1.0";
     diagnostic = rustPackages.unknown.diagnostic."0.1.0";
     lex = rustPackages.unknown.lex."0.1.0";
+    parse = rustPackages.unknown.parse."0.1.0";
     rope = rustPackages.unknown.rope."0.1.0";
     ipso = rustPackages.unknown.ipso."0.1.0";
   };
@@ -354,10 +356,10 @@ in
     dependencies = {
       core = rustPackages."unknown".core."0.1.0" { inherit profileName; };
       diagnostic = rustPackages."unknown".diagnostic."0.1.0" { inherit profileName; };
-      fixedbitset = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fixedbitset."0.4.0" { inherit profileName; };
       fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       lazy_static = rustPackages."registry+https://github.com/rust-lang/crates.io-index".lazy_static."1.4.0" { inherit profileName; };
       lex = rustPackages."unknown".lex."0.1.0" { inherit profileName; };
+      parse = rustPackages."unknown".parse."0.1.0" { inherit profileName; };
       paste = buildRustPackages."registry+https://github.com/rust-lang/crates.io-index".paste."1.0.5" { profileName = "__noProfile"; };
       rope = rustPackages."unknown".rope."0.1.0" { inherit profileName; };
       syntax = rustPackages."unknown".syntax."0.1.0" { inherit profileName; };
@@ -496,6 +498,20 @@ in
     version = "11.1.3";
     registry = "registry+https://github.com/rust-lang/crates.io-index";
     src = fetchCratesIo { inherit name version; sha256 = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"; };
+  });
+  
+  "unknown".parse."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "parse";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/parse");
+    dependencies = {
+      diagnostic = rustPackages."unknown".diagnostic."0.1.0" { inherit profileName; };
+      fixedbitset = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fixedbitset."0.4.0" { inherit profileName; };
+      fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
+      lex = rustPackages."unknown".lex."0.1.0" { inherit profileName; };
+      syntax = rustPackages."unknown".syntax."0.1.0" { inherit profileName; };
+    };
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".paste."1.0.5" = overridableMkRustCrate (profileName: rec {
