@@ -1,17 +1,17 @@
-use diagnostic::{self, Diagnostic, InputLocation};
+use ipso_diagnostic::{self as diagnostic, Diagnostic, InputLocation};
 use typed_arena::Arena;
 
 use crate::typecheck::{self, Typechecker};
-use core::{self, Module, ModulePath};
-use parse::{self};
-use rope::Rope;
+use ipso_core::{self as core, Module, ModulePath};
+use ipso_parse as parse;
+use ipso_rope::Rope;
+use ipso_syntax::{self as syntax, ModuleName};
 use std::{
     collections::HashMap,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{self, ModuleName};
 
 #[derive(Debug)]
 pub enum ModuleError {

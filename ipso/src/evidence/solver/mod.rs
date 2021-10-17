@@ -1,11 +1,9 @@
-use core::{self, Expr, Placeholder};
-use crate::{
-    typecheck::{
-        substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
-        UnifyTypeContext,
-    },
+use crate::typecheck::{
+    substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
+    UnifyTypeContext,
 };
-use syntax::{self, Binop, Kind, Type};
+use ipso_core::{self as core, Expr, Placeholder};
+use ipso_syntax::{self as syntax, Binop, Kind, Type};
 
 use super::Constraint;
 

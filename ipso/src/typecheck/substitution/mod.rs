@@ -1,6 +1,6 @@
 use super::{TypeError, Typechecker, UnifyTypeContext};
-use syntax::Type;
 use fnv::FnvHashMap;
+use ipso_syntax::Type;
 
 mod test;
 

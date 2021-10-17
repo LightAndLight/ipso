@@ -1,7 +1,12 @@
-use std::{cmp, collections::HashMap, rc::Rc, path::{Path,PathBuf}};
+use std::{
+    cmp,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
-use util::iter::Step;
-use syntax::{self, ModuleName, Type};
+use ipso_syntax::{self as syntax, ModuleName, Type};
+use ipso_util::iter::Step;
 
 #[cfg(test)]
 mod test;

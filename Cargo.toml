@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "core",
-    "diagnostic",
-    "lex",
-    "parse",
-    "rope",
-    "syntax",
-    "util",
     "ipso",
+    "ipso-core",
+    "ipso-diagnostic",
+    "ipso-lex",
+    "ipso-parse",
+    "ipso-rope",
+    "ipso-syntax",
+    "ipso-util",
 ]

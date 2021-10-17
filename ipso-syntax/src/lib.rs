@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
-use util::iter::Step;
+use ipso_util::iter::Step;
 use lazy_static::lazy_static;
 
 #[cfg(test)]

@@ -1,12 +1,12 @@
 #[cfg(test)]
-use core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
-#[cfg(test)]
 use crate::{
     evidence::{solver::solve_constraint, Constraint, Evidence},
     typecheck::Typechecker,
 };
 #[cfg(test)]
-use syntax::{Binop, Kind, Type};
+use ipso_core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
+#[cfg(test)]
+use ipso_syntax::{Binop, Kind, Type};
 #[cfg(test)]
 use std::rc::Rc;
 

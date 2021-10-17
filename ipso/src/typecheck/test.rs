@@ -1,10 +1,4 @@
 #[cfg(test)]
-use syntax::{self, Binop, Kind, Spanned, Type};
-#[cfg(test)]
-use diagnostic::InputLocation;
-#[cfg(test)]
-use core::{self, ClassMember, InstanceMember, Placeholder, TypeSig};
-#[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
     typecheck::{
@@ -12,6 +6,12 @@ use crate::{
     },
     void::Void,
 };
+#[cfg(test)]
+use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
+#[cfg(test)]
+use ipso_diagnostic::InputLocation;
+#[cfg(test)]
+use ipso_syntax::{self as syntax, Binop, Kind, Spanned, Type};
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]

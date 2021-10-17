@@ -1,9 +1,9 @@
 #[cfg(test)]
 use super::{Interpreter, Value};
 #[cfg(test)]
-use core::{Builtin, Expr, StringPart};
-#[cfg(test)]
 use crate::eval::Object;
+#[cfg(test)]
+use ipso_core::{Builtin, Expr, StringPart};
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]

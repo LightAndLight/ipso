@@ -1,16 +1,13 @@
 #[cfg(test)]
 use super::{ParseError, ParseResult, Parser};
 #[cfg(test)]
-use syntax::{Spanned, StringPart, Branch, Declaration, Expr, Keyword, Names, Pattern, Type};
+use crate::{keep_left, map2};
 #[cfg(test)]
-use diagnostic::InputLocation;
+use ipso_diagnostic::InputLocation;
 #[cfg(test)]
-use lex::{Lexer, token};
+use ipso_lex::{token, Lexer};
 #[cfg(test)]
-use crate::{
-    keep_left,
-    map2,
-};
+use ipso_syntax::{Branch, Declaration, Expr, Keyword, Names, Pattern, Spanned, StringPart, Type};
 #[cfg(test)]
 use std::rc::Rc;
 

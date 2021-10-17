@@ -5,9 +5,10 @@ use crate::{
     evidence::{solver::solve_placeholder, Constraint, Evidence},
     import::Modules,
 };
-use core::{self, ModulePath};
-use diagnostic::{self, InputLocation};
-use rope::Rope;
+use ipso_core::{self as core, ModulePath};
+use ipso_diagnostic::{self as diagnostic, InputLocation};
+use ipso_rope::Rope;
+use ipso_syntax::{self as syntax, Kind, KindCompound, ModuleName, Spanned, Type};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -15,7 +16,6 @@ use std::{
     rc::Rc,
     todo,
 };
-use syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type};
 
 use self::substitution::Substitution;
 
@@ -464,7 +464,7 @@ macro_rules! current_dir_with_tc {
         let path = std::env::current_dir().unwrap();
         crate::with_tc!(
             path.as_path(),
-            diagnostic::InputLocation::Interactive {
+            ipso_diagnostic::InputLocation::Interactive {
                 label: String::from("(typechecker)")
             },
             $f

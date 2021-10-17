@@ -10,10 +10,10 @@ use crate::{
     import::{self},
     typecheck::{self, Typechecker},
 };
-use core::{self, ModulePath};
-use diagnostic::InputLocation;
-use parse;
-use syntax::{self, Kind};
+use ipso_core::{self as core, ModulePath};
+use ipso_diagnostic::InputLocation;
+use ipso_parse as parse;
+use ipso_syntax::{self as syntax, Kind};
 use typed_arena::Arena;
 
 pub struct Config {

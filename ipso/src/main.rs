@@ -1,7 +1,5 @@
-use diagnostic::{InputLocation,self, Diagnostic};
-use ipso::{
-    run::{run_interpreter, Config, InterpreterError},
-};
+use ipso::run::{run_interpreter, Config, InterpreterError};
+use ipso_diagnostic::{self as diagnostic, Diagnostic, InputLocation};
 use std::{env, io, path::PathBuf};
 
 fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Result<()> {

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use syntax::Keyword;
+use ipso_syntax::Keyword;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Name {

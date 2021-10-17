@@ -1,10 +1,8 @@
 use std::rc::Rc;
 
-use core::{EVar, Expr, Placeholder};
-use crate::{
-    typecheck::Typechecker,
-};
-use syntax::{self, Type};
+use crate::typecheck::Typechecker;
+use ipso_core::{EVar, Expr, Placeholder};
+use ipso_syntax::{self as syntax, Type};
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -3,10 +3,14 @@ mod test;
 use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 
-use diagnostic::{Diagnostic, InputLocation, Item};
-use lex::{
+use ipso_diagnostic::{Diagnostic, InputLocation, Item};
+use ipso_lex::{
     token::{self, Token},
     Lexer,
+};
+use ipso_syntax::{
+    self as syntax, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned,
+    StringPart, Type,
 };
 use std::{
     cmp,
@@ -16,9 +20,6 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     vec::IntoIter,
-};
-use syntax::{
-    self, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, StringPart, Type,
 };
 
 #[derive(Debug, PartialEq, Eq)]

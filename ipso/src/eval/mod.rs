@@ -1,13 +1,15 @@
-use core::{self, Builtin, Declaration, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{
+    self as core, Builtin, Declaration, Expr, ModulePath, ModuleUsage, Pattern, StringPart,
+};
+use ipso_rope::Rope;
+use ipso_syntax::{Binop, ModuleName};
 use paste::paste;
-use rope::Rope;
 use std::{
     collections::HashMap,
     fmt::Debug,
     io::{BufRead, Write},
     rc::Rc,
 };
-use syntax::{Binop, ModuleName};
 use typed_arena::Arena;
 
 mod test;
