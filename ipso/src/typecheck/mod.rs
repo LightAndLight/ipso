@@ -1,7 +1,6 @@
 use crate::{
     evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
-    import::Modules,
 };
 use fnv::FnvHashSet;
 use ipso_builtins as builtins;
@@ -180,7 +179,7 @@ pub struct Typechecker<'modules> {
     bound_vars: BoundVars<Type<usize>>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
-    modules: &'modules Modules<'modules>,
+    modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     working_dir: &'modules Path,
 }
 
@@ -453,7 +452,7 @@ macro_rules! with_tc {
         use typed_arena::Arena;
         let modules_data = Arena::new();
         let modules = Modules::new(&modules_data);
-        let tc = Typechecker::new_with_builtins($path, $location, &modules);
+        let tc = Typechecker::new_with_builtins($path, $location, &modules.index);
         $f(tc)
     }};
 }
@@ -476,7 +475,7 @@ impl<'modules> Typechecker<'modules> {
     pub fn new(
         working_dir: &'modules Path,
         location: InputLocation,
-        modules: &'modules Modules,
+        modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
         let constants = Constants::new();
         Typechecker {
@@ -503,7 +502,7 @@ impl<'modules> Typechecker<'modules> {
     pub fn new_with_builtins(
         working_dir: &'modules Path,
         location: InputLocation,
-        modules: &'modules Modules,
+        modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
         let mut tc = Self::new(working_dir, location, modules);
         tc.register_from_import(&builtins::builtins(), &syntax::Names::All);
@@ -1207,7 +1206,7 @@ impl<'modules> Typechecker<'modules> {
 
         match module_mapping.get(&path) {
             None => {
-                let signatures = self.modules.lookup(&path).unwrap().get_signatures();
+                let signatures = self.modules.get(&path).unwrap().get_signatures();
                 self.module_context.insert(path.clone(), signatures);
                 self.module_unmapping
                     .insert(ModuleName(vec![actual_name.item.clone()]), path.clone());

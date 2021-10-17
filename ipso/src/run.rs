@@ -83,7 +83,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = {
-            let mut tc = Typechecker::new(working_dir.as_path(), input_location, &modules);
+            let mut tc = Typechecker::new(working_dir.as_path(), input_location, &modules.index);
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };

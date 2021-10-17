@@ -65,7 +65,7 @@ impl From<typecheck::TypeError> for ModuleError {
 
 pub struct Modules<'a> {
     data: &'a Arena<core::Module>,
-    index: HashMap<ModulePath, &'a core::Module>,
+    pub index: HashMap<ModulePath, &'a core::Module>,
 }
 
 fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax::Expr) {
@@ -317,7 +317,7 @@ impl<'a> Modules<'a> {
                     let module = {
                         let working_dir = path.parent().unwrap();
                         let mut tc = {
-                            let mut tc = Typechecker::new(working_dir, input_location, self);
+                            let mut tc = Typechecker::new(working_dir, input_location, &self.index);
                             tc.register_from_import(builtins, &syntax::Names::All);
                             tc
                         };
