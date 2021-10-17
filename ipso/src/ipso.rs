@@ -3,4 +3,3 @@ pub mod evidence;
 pub mod import;
 pub mod run;
 pub mod typecheck;
-pub mod void;

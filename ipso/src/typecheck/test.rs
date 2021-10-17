@@ -4,7 +4,6 @@ use crate::{
     typecheck::{
         BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
     },
-    void::Void,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -12,6 +11,8 @@ use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig}
 use ipso_diagnostic::InputLocation;
 #[cfg(test)]
 use ipso_syntax::{self as syntax, Binop, Kind, Spanned, Type};
+#[cfg(test)]
+use ipso_util::void::Void;
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
