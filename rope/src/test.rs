@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::rope::Rope;
+use crate::Rope;
 
 #[test]
 fn rope_test_1() {

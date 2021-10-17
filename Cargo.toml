@@ -3,6 +3,7 @@ members = [
     "core",
     "diagnostic",
     "lex",
+    "rope",
     "syntax",
     "util",
     "ipso",

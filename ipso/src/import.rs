@@ -1,19 +1,19 @@
-use diagnostic::{InputLocation, self, Diagnostic};
+use diagnostic::{self, Diagnostic, InputLocation};
 use typed_arena::Arena;
 
-use core::{self, Module, ModulePath};
 use crate::{
     parse::{self},
-    rope::Rope,
     typecheck::{self, Typechecker},
 };
-use syntax::{self, ModuleName};
+use core::{self, Module, ModulePath};
+use rope::Rope;
 use std::{
     collections::HashMap,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
+use syntax::{self, ModuleName};
 
 #[derive(Debug)]
 pub enum ModuleError {

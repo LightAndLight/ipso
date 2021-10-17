@@ -9,6 +9,7 @@ args@{
     "util/default"
     "diagnostic/default"
     "lex/default"
+    "rope/default"
     "ipso/default"
   ],
   rustPackages,
@@ -42,6 +43,7 @@ in
     util = rustPackages.unknown.util."0.1.0";
     diagnostic = rustPackages.unknown.diagnostic."0.1.0";
     lex = rustPackages.unknown.lex."0.1.0";
+    rope = rustPackages.unknown.rope."0.1.0";
     ipso = rustPackages.unknown.ipso."0.1.0";
   };
   "registry+https://github.com/rust-lang/crates.io-index".atty."0.2.14" = overridableMkRustCrate (profileName: rec {
@@ -357,6 +359,7 @@ in
       lazy_static = rustPackages."registry+https://github.com/rust-lang/crates.io-index".lazy_static."1.4.0" { inherit profileName; };
       lex = rustPackages."unknown".lex."0.1.0" { inherit profileName; };
       paste = buildRustPackages."registry+https://github.com/rust-lang/crates.io-index".paste."1.0.5" { profileName = "__noProfile"; };
+      rope = rustPackages."unknown".rope."0.1.0" { inherit profileName; };
       syntax = rustPackages."unknown".syntax."0.1.0" { inherit profileName; };
       typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
       util = rustPackages."unknown".util."0.1.0" { inherit profileName; };
@@ -621,6 +624,13 @@ in
     version = "0.6.25";
     registry = "registry+https://github.com/rust-lang/crates.io-index";
     src = fetchCratesIo { inherit name version; sha256 = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"; };
+  });
+  
+  "unknown".rope."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "rope";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/rope");
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".rustc_version."0.4.0" = overridableMkRustCrate (profileName: rec {

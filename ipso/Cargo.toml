@@ -14,6 +14,7 @@ fnv = "1.0.7"
 lazy_static = "1.4.0"
 lex = { path = "../lex" }
 paste = "1.0.5"
+rope = { path = "../rope" }
 syntax = { path = "../syntax" }
 typed-arena = "2.0.1"
 util = { path = "../util" }

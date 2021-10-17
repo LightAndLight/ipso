@@ -1,15 +1,13 @@
-use core::{self, Builtin, Declaration, Expr, ModuleUsage, Pattern, StringPart, ModulePath};
-use crate::{
-    rope::Rope,
-};
-use syntax::{Binop, ModuleName};
+use core::{self, Builtin, Declaration, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
 use paste::paste;
+use rope::Rope;
 use std::{
     collections::HashMap,
     fmt::Debug,
     io::{BufRead, Write},
     rc::Rc,
 };
+use syntax::{Binop, ModuleName};
 use typed_arena::Arena;
 
 mod test;
@@ -513,8 +511,8 @@ where {
                     pure_io,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         fn pure_io_1<'stdout, 'heap>(
                             _: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -539,8 +537,8 @@ where {
                     map_io,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         fn map_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -568,8 +566,8 @@ where {
                     bind_io,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         fn bind_io_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],
@@ -599,8 +597,8 @@ where {
                     trace,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
@@ -611,8 +609,8 @@ where {
                     to_utf8,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    _: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     _: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         let a = arg.unpack_string();
                         interpreter.alloc(Object::Bytes(a.as_bytes()))
                     }
@@ -625,8 +623,8 @@ where {
                     write_stdout,
                     self,
                     |interpreter: &mut Interpreter<'_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>| {
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
                         fn write_stdout_2<'stdout, 'heap>(
                             interpreter: &mut Interpreter<'stdout, 'heap>,
                             env: &'heap [Value<'heap>],

@@ -1,15 +1,13 @@
 use fnv::FnvHashSet;
 
-use diagnostic::{self, InputLocation};
-use core::{self, ModulePath};
 use crate::{
-    builtins,
-    evidence,
+    builtins, evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
-    import::{Modules},
-    rope::Rope,
+    import::Modules,
 };
-use syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type};
+use core::{self, ModulePath};
+use diagnostic::{self, InputLocation};
+use rope::Rope;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -17,6 +15,7 @@ use std::{
     rc::Rc,
     todo,
 };
+use syntax::{self, Kind, KindCompound, ModuleName, Spanned, Type};
 
 use self::substitution::Substitution;
 
