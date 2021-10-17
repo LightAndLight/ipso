@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "ipso",
+    "ipso-builtins",
     "ipso-core",
     "ipso-diagnostic",
     "ipso-lex",

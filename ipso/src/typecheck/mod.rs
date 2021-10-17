@@ -1,10 +1,10 @@
-use fnv::FnvHashSet;
-
 use crate::{
-    builtins, evidence,
+    evidence,
     evidence::{solver::solve_placeholder, Constraint, Evidence},
     import::Modules,
 };
+use fnv::FnvHashSet;
+use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::{self as diagnostic, InputLocation};
 use ipso_rope::Rope;

@@ -210,6 +210,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "fnv",
+ "ipso-builtins",
  "ipso-core",
  "ipso-diagnostic",
  "ipso-lex",
@@ -220,6 +221,14 @@ dependencies = [
  "lazy_static",
  "paste",
  "typed-arena",
+]
+
+[[package]]
+name = "ipso-builtins"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-syntax",
 ]
 
 [[package]]

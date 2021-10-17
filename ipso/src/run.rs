@@ -5,11 +5,11 @@ use std::{
 };
 
 use crate::{
-    builtins,
     eval::{self, Interpreter},
     import::{self},
     typecheck::{self, Typechecker},
 };
+use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::InputLocation;
 use ipso_parse as parse;
