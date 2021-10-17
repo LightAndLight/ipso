@@ -205,7 +205,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipso"
+name = "ipso-builtins"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-syntax",
+]
+
+[[package]]
+name = "ipso-cli"
 version = "0.1.0"
 dependencies = [
  "criterion",
@@ -223,14 +231,6 @@ dependencies = [
  "ipso-util",
  "lazy_static",
  "typed-arena",
-]
-
-[[package]]
-name = "ipso-builtins"
-version = "0.1.0"
-dependencies = [
- "ipso-core",
- "ipso-syntax",
 ]
 
 [[package]]

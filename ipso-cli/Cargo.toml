@@ -1,5 +1,5 @@
 [package]
-name = "ipso"
+name = "ipso-cli"
 version = "0.1.0"
 authors = ["Isaac Elliott <isaace71295@gmail.com>"]
 edition = "2018"
@@ -21,10 +21,6 @@ ipso-typecheck = { path = "../ipso-typecheck" }
 ipso-util = { path = "../ipso-util" }
 lazy_static = "1.4.0"
 typed-arena = "2.0.1"
-
-[lib]
-name = "ipso"
-path = "./src/ipso.rs"
 
 [dev-dependencies]
 criterion = "0.3"

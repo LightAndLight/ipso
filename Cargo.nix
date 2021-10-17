@@ -4,11 +4,11 @@
 args@{
   release ? true,
   rootFeatures ? [
-    "ipso/default"
     "ipso-builtins/default"
     "ipso-core/default"
     "ipso-syntax/default"
     "ipso-util/default"
+    "ipso-cli/default"
     "ipso-diagnostic/default"
     "ipso-eval/default"
     "ipso-rope/default"
@@ -43,11 +43,11 @@ in
 {
   cargo2nixVersion = "0.9.0";
   workspace = {
-    ipso = rustPackages.unknown.ipso."0.1.0";
     ipso-builtins = rustPackages.unknown.ipso-builtins."0.1.0";
     ipso-core = rustPackages.unknown.ipso-core."0.1.0";
     ipso-syntax = rustPackages.unknown.ipso-syntax."0.1.0";
     ipso-util = rustPackages.unknown.ipso-util."0.1.0";
+    ipso-cli = rustPackages.unknown.ipso-cli."0.1.0";
     ipso-diagnostic = rustPackages.unknown.ipso-diagnostic."0.1.0";
     ipso-eval = rustPackages.unknown.ipso-eval."0.1.0";
     ipso-rope = rustPackages.unknown.ipso-rope."0.1.0";
@@ -338,11 +338,22 @@ in
     };
   });
   
-  "unknown".ipso."0.1.0" = overridableMkRustCrate (profileName: rec {
-    name = "ipso";
+  "unknown".ipso-builtins."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "ipso-builtins";
     version = "0.1.0";
     registry = "unknown";
-    src = fetchCrateLocal (workspaceSrc + "/ipso");
+    src = fetchCrateLocal (workspaceSrc + "/ipso-builtins");
+    dependencies = {
+      ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
+      ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
+    };
+  });
+  
+  "unknown".ipso-cli."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "ipso-cli";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/ipso-cli");
     dependencies = {
       fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       ipso_builtins = rustPackages."unknown".ipso-builtins."0.1.0" { inherit profileName; };
@@ -361,17 +372,6 @@ in
     };
     devDependencies = {
       criterion = rustPackages."registry+https://github.com/rust-lang/crates.io-index".criterion."0.3.5" { inherit profileName; };
-    };
-  });
-  
-  "unknown".ipso-builtins."0.1.0" = overridableMkRustCrate (profileName: rec {
-    name = "ipso-builtins";
-    version = "0.1.0";
-    registry = "unknown";
-    src = fetchCrateLocal (workspaceSrc + "/ipso-builtins");
-    dependencies = {
-      ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
-      ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
     };
   });
   
