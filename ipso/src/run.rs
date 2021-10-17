@@ -7,13 +7,13 @@ use std::{
 use crate::{
     eval::{self, Interpreter},
     import::{self},
-    typecheck::{self, Typechecker},
 };
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::InputLocation;
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax, Kind};
+use ipso_typecheck::{self as typecheck, Typechecker};
 use typed_arena::Arena;
 
 pub struct Config {

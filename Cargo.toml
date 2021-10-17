@@ -8,5 +8,6 @@ members = [
     "ipso-parse",
     "ipso-rope",
     "ipso-syntax",
+    "ipso-typecheck",
     "ipso-util",
 ]

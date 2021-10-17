@@ -217,6 +217,7 @@ dependencies = [
  "ipso-parse",
  "ipso-rope",
  "ipso-syntax",
+ "ipso-typecheck",
  "ipso-util",
  "lazy_static",
  "paste",
@@ -271,6 +272,19 @@ version = "0.1.0"
 dependencies = [
  "ipso-util",
  "lazy_static",
+]
+
+[[package]]
+name = "ipso-typecheck"
+version = "0.1.0"
+dependencies = [
+ "fnv",
+ "ipso-builtins",
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-rope",
+ "ipso-syntax",
+ "ipso-util",
 ]
 
 [[package]]

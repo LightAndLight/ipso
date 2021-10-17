@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::typecheck::Typechecker;
+use crate::Typechecker;
 use ipso_core::{EVar, Expr, Placeholder};
 use ipso_syntax::{self as syntax, Type};
 pub mod solver;

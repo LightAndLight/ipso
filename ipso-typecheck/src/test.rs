@@ -1,9 +1,7 @@
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    typecheck::{
-        BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
-    },
+    BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -14,7 +12,7 @@ use ipso_syntax::{self as syntax, Binop, Kind, Spanned, Type};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 #[cfg(test)]
 use std::rc::Rc;
 

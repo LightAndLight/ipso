@@ -1,4 +1,4 @@
-use crate::typecheck::{
+use crate::{
     substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
     UnifyTypeContext,
 };

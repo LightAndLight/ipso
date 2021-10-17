@@ -1,10 +1,9 @@
 #[cfg(test)]
-use std::rc::Rc;
-
-#[cfg(test)]
-use crate::typecheck::{substitution::Substitution, Typechecker, UnifyTypeContext};
+use crate::{substitution::Substitution, Typechecker, UnifyTypeContext};
 #[cfg(test)]
 use ipso_syntax::{Kind, Type};
+#[cfg(test)]
+use std::rc::Rc;
 
 #[test]
 fn subst_left_1() {

@@ -1,7 +1,5 @@
-use crate::{
-    evidence,
-    evidence::{solver::solve_placeholder, Constraint, Evidence},
-};
+pub mod evidence;
+use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use fnv::FnvHashSet;
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
@@ -448,11 +446,9 @@ impl TypeError {
 #[macro_export]
 macro_rules! with_tc {
     ($path:expr, $location:expr, $f:expr) => {{
-        use crate::import::Modules;
-        use typed_arena::Arena;
-        let modules_data = Arena::new();
-        let modules = Modules::new(&modules_data);
-        let tc = Typechecker::new_with_builtins($path, $location, &modules.index);
+        use std::collections::HashMap;
+        let modules = HashMap::new();
+        let tc = Typechecker::new_with_builtins($path, $location, &modules);
         $f(tc)
     }};
 }

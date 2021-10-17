@@ -1,11 +1,11 @@
 use ipso_diagnostic::{self as diagnostic, Diagnostic, InputLocation};
 use typed_arena::Arena;
 
-use crate::typecheck::{self, Typechecker};
 use ipso_core::{self as core, Module, ModulePath};
 use ipso_parse as parse;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, ModuleName};
+use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     collections::HashMap,
     io::{self},

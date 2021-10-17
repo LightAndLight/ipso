@@ -1,7 +1,7 @@
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_constraint, Constraint, Evidence},
-    typecheck::Typechecker,
+    Typechecker,
 };
 #[cfg(test)]
 use ipso_core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
