@@ -181,9 +181,9 @@ macro_rules! between {
 #[macro_export]
 macro_rules! parse_string {
     ($p:ident, $s:expr) => {{
-        use diagnostic::InputLocation;
-        use lex::{token::Token, Lexer};
-        use parse::{keep_left, map2, ParseResult, Parser};
+        use ipso_diagnostic::InputLocation;
+        use ipso_lex::{token::Token, Lexer};
+        use ipso_parse::{keep_left, map2, ParseResult, Parser};
 
         let tokens: Vec<Token> = {
             let lexer = Lexer::new(&$s);
@@ -203,7 +203,7 @@ macro_rules! parse_string {
 #[macro_export]
 macro_rules! parse_str {
     ($p:ident, $s:expr) => {{
-        use parse::parse_string;
+        use ipso_parse::parse_string;
         let s = String::from($s);
         parse_string!($p, s)
     }};
@@ -649,9 +649,9 @@ impl Parser {
 
     /// ```
     /// use std::rc::Rc;
-    /// use diagnostic::InputLocation;
-    /// use lex::{self, token};
-    /// use parse::{ParseError, parse_str};
+    /// use ipso_diagnostic::InputLocation;
+    /// use ipso_lex::{self, token};
+    /// use ipso_parse::{ParseError, parse_str};
     ///
     /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
     ///

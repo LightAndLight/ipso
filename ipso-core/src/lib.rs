@@ -429,7 +429,7 @@ impl Expr {
     }
 
     /// ```
-    /// use core::Expr;
+    /// use ipso_core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Int(99)),
@@ -438,7 +438,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use core::Expr;
+    /// use ipso_core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(1)))).instantiate(&Expr::Var(0)),
@@ -447,7 +447,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use core::Expr;
+    /// use ipso_core::Expr;
     ///
     /// assert_eq!(
     ///     Expr::mk_app(Expr::Var(0), Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::Var(2)))).instantiate(&Expr::Int(99)),
@@ -705,7 +705,7 @@ impl Expr {
     }
 
     /// ```
-    /// use core::{EVar, Expr};
+    /// use ipso_core::{EVar, Expr};
     ///
     /// assert_eq!(
     ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(0), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
@@ -714,7 +714,7 @@ impl Expr {
     /// ```
     ///
     /// ```
-    /// use core::{EVar, Expr};
+    /// use ipso_core::{EVar, Expr};
     ///
     /// assert_eq!(
     ///     Expr::mk_lam(true, Expr::mk_app(Expr::Var(1), Expr::EVar(EVar(0)))).abstract_evar(EVar(0)),
@@ -726,21 +726,21 @@ impl Expr {
     }
 
     /// ```
-    /// use core::{EVar, Expr};
+    /// use ipso_core::{EVar, Expr};
     ///
     /// let expr = Expr::mk_app(Expr::mk_app(Expr::EVar(EVar(0)), Expr::EVar(EVar(1))), Expr::EVar(EVar(2)));
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
     /// ```
     ///
     /// ```
-    /// use core::{EVar, Expr};
+    /// use ipso_core::{EVar, Expr};
     ///
     /// let expr = Expr::mk_app(Expr::EVar(EVar(0)), Expr::mk_app(Expr::EVar(EVar(1)), Expr::EVar(EVar(2))));
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0), &EVar(1), &EVar(2)]);
     /// ```
     ///
     /// ```
-    /// use core::{Branch, EVar, Expr, Pattern};
+    /// use ipso_core::{Branch, EVar, Expr, Pattern};
     /// let expr = Expr::mk_lam (
     ///     true,
     ///     Expr::mk_case(

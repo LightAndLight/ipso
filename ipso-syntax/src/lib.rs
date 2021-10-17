@@ -562,7 +562,7 @@ impl<A> Type<A> {
     }
 
     /// ```
-    /// use syntax::Type;
+    /// use ipso_syntax::Type;
     /// assert_eq!(
     ///     Type::mk_app(Type::mk_app(Type::mk_app(Type::Var(0), Type::Var(1)), Type::Var(2)), Type::Var(3)).unwrap_app(),
     ///     (&Type::Var(0), vec![&Type::Var(1), &Type::Var(2), &Type::Var(3)])
@@ -589,7 +589,7 @@ impl<A> Type<A> {
     /// i.e. `a -> f a` to `forall a f. a -> f a`
     ///
     /// ```
-    /// use syntax::Type;
+    /// use ipso_syntax::Type;
     /// let input = Type::mk_arrow(Type::Var(String::from("a")), Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))));
     /// assert_eq!(
     ///     input.abstract_vars(&Vec::new()),
@@ -603,7 +603,7 @@ impl<A> Type<A> {
     /// The `seen` vector can be used to influence the order of the binders.
     ///
     /// ```
-    /// use syntax::Type;
+    /// use ipso_syntax::Type;
     /// let input = Type::mk_arrow(
     ///     Type::Var(String::from("a")),
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a")))
@@ -618,7 +618,7 @@ impl<A> Type<A> {
     /// ```
     ///
     /// ```
-    /// use syntax::Type;
+    /// use ipso_syntax::Type;
     /// let input = Type::mk_arrow(
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("a"))),
     ///     Type::mk_app(Type::Var(String::from("f")), Type::Var(String::from("b")))
