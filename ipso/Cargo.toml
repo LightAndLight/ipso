@@ -11,6 +11,7 @@ fnv = "1.0.7"
 ipso-builtins = { path = "../ipso-builtins" }
 ipso-core = { path = "../ipso-core" }
 ipso-diagnostic = { path = "../ipso-diagnostic" }
+ipso-eval = { path = "../ipso-eval" }
 ipso-lex = { path = "../ipso-lex" }
 ipso-parse = { path = "../ipso-parse" }
 ipso-rope = { path = "../ipso-rope" }
@@ -18,7 +19,6 @@ ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
 ipso-util = { path = "../ipso-util" }
 lazy_static = "1.4.0"
-paste = "1.0.5"
 typed-arena = "2.0.1"
 
 [lib]

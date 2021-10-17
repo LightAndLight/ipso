@@ -213,6 +213,7 @@ dependencies = [
  "ipso-builtins",
  "ipso-core",
  "ipso-diagnostic",
+ "ipso-eval",
  "ipso-lex",
  "ipso-parse",
  "ipso-rope",
@@ -220,7 +221,6 @@ dependencies = [
  "ipso-typecheck",
  "ipso-util",
  "lazy_static",
- "paste",
  "typed-arena",
 ]
 
@@ -243,6 +243,17 @@ dependencies = [
 [[package]]
 name = "ipso-diagnostic"
 version = "0.1.0"
+
+[[package]]
+name = "ipso-eval"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-rope",
+ "ipso-syntax",
+ "paste",
+ "typed-arena",
+]
 
 [[package]]
 name = "ipso-lex"

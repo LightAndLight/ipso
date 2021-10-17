@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::{Interpreter, Value};
 #[cfg(test)]
-use crate::eval::Object;
+use crate::Object;
 #[cfg(test)]
 use ipso_core::{Builtin, Expr, StringPart};
 #[cfg(test)]

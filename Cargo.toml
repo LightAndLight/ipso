@@ -4,6 +4,7 @@ members = [
     "ipso-builtins",
     "ipso-core",
     "ipso-diagnostic",
+    "ipso-eval",
     "ipso-lex",
     "ipso-parse",
     "ipso-rope",
