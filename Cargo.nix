@@ -12,8 +12,9 @@ args@{
     "ipso-diagnostic/default"
     "ipso-eval/default"
     "ipso-rope/default"
-    "ipso-lex/default"
+    "ipso-import/default"
     "ipso-parse/default"
+    "ipso-lex/default"
     "ipso-typecheck/default"
   ],
   rustPackages,
@@ -50,8 +51,9 @@ in
     ipso-diagnostic = rustPackages.unknown.ipso-diagnostic."0.1.0";
     ipso-eval = rustPackages.unknown.ipso-eval."0.1.0";
     ipso-rope = rustPackages.unknown.ipso-rope."0.1.0";
-    ipso-lex = rustPackages.unknown.ipso-lex."0.1.0";
+    ipso-import = rustPackages.unknown.ipso-import."0.1.0";
     ipso-parse = rustPackages.unknown.ipso-parse."0.1.0";
+    ipso-lex = rustPackages.unknown.ipso-lex."0.1.0";
     ipso-typecheck = rustPackages.unknown.ipso-typecheck."0.1.0";
   };
   "registry+https://github.com/rust-lang/crates.io-index".atty."0.2.14" = overridableMkRustCrate (profileName: rec {
@@ -347,6 +349,7 @@ in
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
       ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
       ipso_eval = rustPackages."unknown".ipso-eval."0.1.0" { inherit profileName; };
+      ipso_import = rustPackages."unknown".ipso-import."0.1.0" { inherit profileName; };
       ipso_lex = rustPackages."unknown".ipso-lex."0.1.0" { inherit profileName; };
       ipso_parse = rustPackages."unknown".ipso-parse."0.1.0" { inherit profileName; };
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
@@ -400,6 +403,22 @@ in
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       paste = buildRustPackages."registry+https://github.com/rust-lang/crates.io-index".paste."1.0.5" { profileName = "__noProfile"; };
+      typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
+    };
+  });
+  
+  "unknown".ipso-import."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "ipso-import";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/ipso-import");
+    dependencies = {
+      ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
+      ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
+      ipso_parse = rustPackages."unknown".ipso-parse."0.1.0" { inherit profileName; };
+      ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
+      ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
+      ipso_typecheck = rustPackages."unknown".ipso-typecheck."0.1.0" { inherit profileName; };
       typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
     };
   });

@@ -12,6 +12,7 @@ ipso-builtins = { path = "../ipso-builtins" }
 ipso-core = { path = "../ipso-core" }
 ipso-diagnostic = { path = "../ipso-diagnostic" }
 ipso-eval = { path = "../ipso-eval" }
+ipso-import = { path = "../ipso-import" }
 ipso-lex = { path = "../ipso-lex" }
 ipso-parse = { path = "../ipso-parse" }
 ipso-rope = { path = "../ipso-rope" }

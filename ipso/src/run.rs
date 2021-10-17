@@ -4,11 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use crate::import;
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::InputLocation;
 use ipso_eval::{self as eval, Interpreter};
+use ipso_import as import;
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax, Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};

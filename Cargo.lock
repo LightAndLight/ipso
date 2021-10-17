@@ -214,6 +214,7 @@ dependencies = [
  "ipso-core",
  "ipso-diagnostic",
  "ipso-eval",
+ "ipso-import",
  "ipso-lex",
  "ipso-parse",
  "ipso-rope",
@@ -252,6 +253,19 @@ dependencies = [
  "ipso-rope",
  "ipso-syntax",
  "paste",
+ "typed-arena",
+]
+
+[[package]]
+name = "ipso-import"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-parse",
+ "ipso-rope",
+ "ipso-syntax",
+ "ipso-typecheck",
  "typed-arena",
 ]
 
