@@ -37,7 +37,7 @@ let
     inherit (args) release;
   };
 
-  ipso = rustPkgsArgs: args: (rustPkgs rustPkgsArgs).workspace.ipso args;
+  ipso = rustPkgsArgs: args: (rustPkgs rustPkgsArgs).workspace.ipso-cli args;
   ipsoTests = pkgs.rustBuilder.runTests (ipso { release = false; }) {};
 
   mkDerivation = rustPkgsArgs:

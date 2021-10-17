@@ -27,9 +27,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bstr"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90682c8d613ad3373e66de8c6411e0ae2ab2571e879d2efbf73558cc66f21279"
+checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
 dependencies = [
  "lazy_static",
  "memchr",
@@ -39,9 +39,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.7.0"
+version = "3.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c59e7af012c713f529e7a3ee57ce9b31ddd858d4b512923602f74608b009631"
+checksum = "d9df67f7bf9ef8498769f994239c45613ef0c5899415fb58e9add412d2c1a538"
 
 [[package]]
 name = "cast"
@@ -191,9 +191,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "half"
-version = "1.7.1"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
+checksum = "ac5956d4e63858efaec57e0d6c1c2f6a41e1487f830314a324ccd7e2223a7ca0"
 
 [[package]]
 name = "hermit-abi"
@@ -205,16 +205,116 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipso"
+name = "ipso-builtins"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-syntax",
+]
+
+[[package]]
+name = "ipso-cli"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "fixedbitset",
  "fnv",
+ "ipso-builtins",
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-eval",
+ "ipso-import",
+ "ipso-lex",
+ "ipso-parse",
+ "ipso-rope",
+ "ipso-syntax",
+ "ipso-typecheck",
+ "ipso-util",
  "lazy_static",
+ "typed-arena",
+]
+
+[[package]]
+name = "ipso-core"
+version = "0.1.0"
+dependencies = [
+ "ipso-syntax",
+ "ipso-util",
+]
+
+[[package]]
+name = "ipso-diagnostic"
+version = "0.1.0"
+
+[[package]]
+name = "ipso-eval"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-rope",
+ "ipso-syntax",
  "paste",
  "typed-arena",
 ]
+
+[[package]]
+name = "ipso-import"
+version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-parse",
+ "ipso-rope",
+ "ipso-syntax",
+ "ipso-typecheck",
+ "typed-arena",
+]
+
+[[package]]
+name = "ipso-lex"
+version = "0.1.0"
+dependencies = [
+ "ipso-syntax",
+]
+
+[[package]]
+name = "ipso-parse"
+version = "0.1.0"
+dependencies = [
+ "fixedbitset",
+ "fnv",
+ "ipso-diagnostic",
+ "ipso-lex",
+ "ipso-syntax",
+]
+
+[[package]]
+name = "ipso-rope"
+version = "0.1.0"
+
+[[package]]
+name = "ipso-syntax"
+version = "0.1.0"
+dependencies = [
+ "ipso-util",
+ "lazy_static",
+]
+
+[[package]]
+name = "ipso-typecheck"
+version = "0.1.0"
+dependencies = [
+ "fnv",
+ "ipso-builtins",
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-rope",
+ "ipso-syntax",
+ "ipso-util",
+]
+
+[[package]]
+name = "ipso-util"
+version = "0.1.0"
 
 [[package]]
 name = "itertools"
@@ -248,9 +348,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.102"
+version = "0.2.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2a5ac8f984bfcf3a823267e5fde638acc3325f6496633a5da6bb6eb2171e103"
+checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "log"
@@ -337,18 +437,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.29"
+version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9f5105d4fdaab20335ca9565e106a5d9b82b6219b5ba735731124ac6711d23d"
+checksum = "edc3358ebc67bc8b7fa0c007f945b0b18226f78437d61bec735a9eb96b61ee70"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d0b9745dc2debf507c8422de05d7226cc1f0644216dfdfead988f9b1ab32a7"
+checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
 dependencies = [
  "proc-macro2",
 ]
@@ -475,9 +575,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.76"
+version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6f107db402c2c2055242dbf4d2af0e69197202e9faacbef9571bbe47f5a1b84"
+checksum = "d010a1623fbd906d51d650a9916aaefc05ffa0e4053ff7fe601167f3e715d194"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -511,9 +611,9 @@ checksum = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
+checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
 
 [[package]]
 name = "unicode-xid"

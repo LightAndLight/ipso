@@ -1,0 +1,31 @@
+[package]
+name = "ipso-cli"
+version = "0.1.0"
+authors = ["Isaac Elliott <isaace71295@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fnv = "1.0.7"
+ipso-builtins = { path = "../ipso-builtins" }
+ipso-core = { path = "../ipso-core" }
+ipso-diagnostic = { path = "../ipso-diagnostic" }
+ipso-eval = { path = "../ipso-eval" }
+ipso-import = { path = "../ipso-import" }
+ipso-lex = { path = "../ipso-lex" }
+ipso-parse = { path = "../ipso-parse" }
+ipso-rope = { path = "../ipso-rope" }
+ipso-syntax = { path = "../ipso-syntax" }
+ipso-typecheck = { path = "../ipso-typecheck" }
+ipso-util = { path = "../ipso-util" }
+lazy_static = "1.4.0"
+typed-arena = "2.0.1"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "todolist_1"
+path = "benches/todolist_1.rs"
+harness = false

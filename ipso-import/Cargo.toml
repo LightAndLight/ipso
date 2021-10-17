@@ -1,0 +1,15 @@
+[package]
+name = "ipso-import"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ipso-core = { path = "../ipso-core" }
+ipso-diagnostic = { path = "../ipso-diagnostic" }
+ipso-parse = { path = "../ipso-parse" }
+ipso-rope = { path = "../ipso-rope" }
+ipso-syntax = { path = "../ipso-syntax" }
+ipso-typecheck = { path = "../ipso-typecheck" }
+typed-arena = "2.0.1"
