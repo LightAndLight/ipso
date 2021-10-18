@@ -25,7 +25,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::MapIO),
+                body: Expr::alloc_builtin(Builtin::MapIO),
             },
             // pureIO : a -> IO a
             Declaration::Definition {
@@ -37,7 +37,7 @@ pub fn builtins() -> Module {
                     ],
                     body: Type::mk_arrow(Type::Var(0), Type::mk_app(Type::IO, Type::Var(0))),
                 },
-                body: Expr::Builtin(Builtin::PureIO),
+                body: Expr::alloc_builtin(Builtin::PureIO),
             },
             // bindIO : IO a -> (a -> IO b) -> IO b
             Declaration::Definition {
@@ -57,7 +57,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::BindIO),
+                body: Expr::alloc_builtin(Builtin::BindIO),
             },
             // trace : a -> b -> b
             Declaration::Definition {
@@ -71,7 +71,7 @@ pub fn builtins() -> Module {
                     ],
                     body: Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Var(0))),
                 },
-                body: Expr::Builtin(Builtin::Trace),
+                body: Expr::alloc_builtin(Builtin::Trace),
             },
             // toUtf8 : String -> Bytes
             Declaration::Definition {
@@ -80,7 +80,7 @@ pub fn builtins() -> Module {
                     ty_vars: vec![],
                     body: Type::mk_arrow(Type::String, Type::Bytes),
                 },
-                body: Expr::Builtin(Builtin::ToUtf8),
+                body: Expr::alloc_builtin(Builtin::ToUtf8),
             },
             // Stdout : Type
             Declaration::BuiltinType {
@@ -94,7 +94,7 @@ pub fn builtins() -> Module {
                     ty_vars: vec![],
                     body: Type::Name(Rc::from("Stdout")),
                 },
-                body: Expr::Builtin(Builtin::Stdout),
+                body: Expr::alloc_builtin(Builtin::Stdout),
             },
             // writeStdout : Stdout -> Bytes -> IO ()
             Declaration::Definition {
@@ -106,7 +106,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::Bytes, Type::mk_app(Type::IO, Type::Unit)),
                     ),
                 },
-                body: Expr::Builtin(Builtin::WriteStdout),
+                body: Expr::alloc_builtin(Builtin::WriteStdout),
             },
             // flushStdout : Stdout -> IO ()
             Declaration::Definition {
@@ -118,7 +118,7 @@ pub fn builtins() -> Module {
                         Type::mk_app(Type::IO, Type::Unit),
                     ),
                 },
-                body: Expr::Builtin(Builtin::FlushStdout),
+                body: Expr::alloc_builtin(Builtin::FlushStdout),
             },
             // Stdin : Type
             Declaration::BuiltinType {
@@ -132,7 +132,7 @@ pub fn builtins() -> Module {
                     ty_vars: vec![],
                     body: Type::Name(Rc::from("Stdin")),
                 },
-                body: Expr::Builtin(Builtin::Stdin),
+                body: Expr::alloc_builtin(Builtin::Stdin),
             },
             // readLineStdin : Stdin -> IO String
             Declaration::Definition {
@@ -144,7 +144,7 @@ pub fn builtins() -> Module {
                         Type::mk_app(Type::IO, Type::String),
                     ),
                 },
-                body: Expr::Builtin(Builtin::ReadLineStdin),
+                body: Expr::alloc_builtin(Builtin::ReadLineStdin),
             },
             // eqString : String -> String -> Bool
             Declaration::Definition {
@@ -153,7 +153,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::String, Type::mk_arrow(Type::String, Type::Bool)),
                 },
-                body: Expr::Builtin(Builtin::EqString),
+                body: Expr::alloc_builtin(Builtin::EqString),
             },
             // add : Int -> Int -> Int
             Declaration::Definition {
@@ -162,7 +162,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int)),
                 },
-                body: Expr::Builtin(Builtin::Add),
+                body: Expr::alloc_builtin(Builtin::Add),
             },
             // subtract : Int -> Int -> Int
             Declaration::Definition {
@@ -171,7 +171,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int)),
                 },
-                body: Expr::Builtin(Builtin::Subtract),
+                body: Expr::alloc_builtin(Builtin::Subtract),
             },
             // multiply : Int -> Int -> Int
             Declaration::Definition {
@@ -180,7 +180,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Int)),
                 },
-                body: Expr::Builtin(Builtin::Multiply),
+                body: Expr::alloc_builtin(Builtin::Multiply),
             },
             // eqInt : Int -> Int -> Bool
             Declaration::Definition {
@@ -189,7 +189,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Bool)),
                 },
-                body: Expr::Builtin(Builtin::EqInt),
+                body: Expr::alloc_builtin(Builtin::EqInt),
             },
             // ltInt : Int -> Int -> Bool
             Declaration::Definition {
@@ -198,7 +198,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::mk_arrow(Type::Int, Type::Bool)),
                 },
-                body: Expr::Builtin(Builtin::LtInt),
+                body: Expr::alloc_builtin(Builtin::LtInt),
             },
             // showInt : Int -> String
             Declaration::Definition {
@@ -207,7 +207,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Int, Type::String),
                 },
-                body: Expr::Builtin(Builtin::ShowInt),
+                body: Expr::alloc_builtin(Builtin::ShowInt),
             },
             // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
             Declaration::Definition {
@@ -222,7 +222,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::EqArray),
+                body: Expr::alloc_builtin(Builtin::EqArray),
             },
             // ltArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
             Declaration::Definition {
@@ -237,7 +237,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::LtArray),
+                body: Expr::alloc_builtin(Builtin::LtArray),
             },
             // foldlArray : (b -> a -> b) -> b -> Array a -> b
             Declaration::Definition {
@@ -252,7 +252,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::FoldlArray),
+                body: Expr::alloc_builtin(Builtin::FoldlArray),
             },
             // generateArray : Int -> (Int -> a) -> Array a
             Declaration::Definition {
@@ -267,7 +267,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::GenerateArray),
+                body: Expr::alloc_builtin(Builtin::GenerateArray),
             },
             // lengthArray : Array a -> Int
             Declaration::Definition {
@@ -276,7 +276,7 @@ pub fn builtins() -> Module {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::mk_app(Type::Array, Type::Var(0)), Type::Int),
                 },
-                body: Expr::Builtin(Builtin::LengthArray),
+                body: Expr::alloc_builtin(Builtin::LengthArray),
             },
             // indexArray : Int -> Array a -> a
             Declaration::Definition {
@@ -288,7 +288,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::mk_app(Type::Array, Type::Var(0)), Type::Var(0)),
                     ),
                 },
-                body: Expr::Builtin(Builtin::IndexArray),
+                body: Expr::alloc_builtin(Builtin::IndexArray),
             },
             // sliceArray : Int -> Int -> Array a -> Array a
             Declaration::Definition {
@@ -306,7 +306,7 @@ pub fn builtins() -> Module {
                         ),
                     ),
                 },
-                body: Expr::Builtin(Builtin::SliceArray),
+                body: Expr::alloc_builtin(Builtin::SliceArray),
             },
             // filterString : (Char -> Bool) -> String -> String
             Declaration::Definition {
@@ -318,7 +318,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::String, Type::String),
                     ),
                 },
-                body: Expr::Builtin(Builtin::FilterString),
+                body: Expr::alloc_builtin(Builtin::FilterString),
             },
             // eqChar : Char -> Char -> Bool
             Declaration::Definition {
@@ -327,7 +327,7 @@ pub fn builtins() -> Module {
                     ty_vars: Vec::new(),
                     body: Type::mk_arrow(Type::Char, Type::mk_arrow(Type::Char, Type::Bool)),
                 },
-                body: Expr::Builtin(Builtin::EqChar),
+                body: Expr::alloc_builtin(Builtin::EqChar),
             },
             // splitString : Char -> String -> Array String
             Declaration::Definition {
@@ -339,7 +339,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::String, Type::mk_app(Type::Array, Type::String)),
                     ),
                 },
-                body: Expr::Builtin(Builtin::SplitString),
+                body: Expr::alloc_builtin(Builtin::SplitString),
             },
             // foldlString : (a -> Char -> a) -> a -> String -> a
             Declaration::Definition {
@@ -351,7 +351,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::String, Type::Var(0))),
                     ),
                 },
-                body: Expr::Builtin(Builtin::FoldlString),
+                body: Expr::alloc_builtin(Builtin::FoldlString),
             },
             // snocArray : Array a -> a -> Array a
             Declaration::Definition {
@@ -363,7 +363,7 @@ pub fn builtins() -> Module {
                         Type::mk_arrow(Type::Var(0), Type::mk_app(Type::Array, Type::Var(0))),
                     ),
                 },
-                body: Expr::Builtin(Builtin::SnocArray),
+                body: Expr::alloc_builtin(Builtin::SnocArray),
             },
         ],
     }

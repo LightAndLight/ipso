@@ -266,6 +266,10 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn alloc_builtin(b: Builtin) -> Rc<Expr> {
+        Rc::new(Expr::Builtin(b))
+    }
+
     pub fn mk_app(a: Expr, b: Expr) -> Expr {
         match a {
             Expr::Lam { arg, body } => {
@@ -905,7 +909,7 @@ pub enum Declaration {
     Definition {
         name: String,
         sig: TypeSig,
-        body: Expr,
+        body: Rc<Expr>,
     },
     TypeAlias {
         name: String,
@@ -923,7 +927,7 @@ pub enum Declaration {
 }
 
 impl Declaration {
-    pub fn get_bindings(&self) -> HashMap<String, Expr> {
+    pub fn get_bindings(&self) -> HashMap<String, Rc<Expr>> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig: _, body } => {
@@ -969,7 +973,7 @@ pub struct ClassDeclaration {
 }
 
 impl ClassDeclaration {
-    pub fn get_bindings(&self) -> HashMap<String, (TypeSig, Expr)> {
+    pub fn get_bindings(&self) -> HashMap<String, (TypeSig, Rc<Expr>)> {
         let supers_len = self.supers.len();
 
         self.members
@@ -1007,10 +1011,10 @@ impl ClassDeclaration {
                         body,
                     }
                 };
-                let body = Expr::mk_lam(
+                let body: Rc<Expr> = Rc::new(Expr::mk_lam(
                     true,
                     Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as u32 + ix as u32)),
-                );
+                ));
 
                 (member.name.clone(), (sig, body))
             })
@@ -1085,8 +1089,8 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_bindings(&self) -> HashMap<String, Expr> {
-        let bindings: HashMap<String, Expr> = HashMap::new();
+    pub fn get_bindings(&self) -> HashMap<String, Rc<Expr>> {
+        let bindings: HashMap<String, Rc<Expr>> = HashMap::new();
         self.decls.iter().fold(bindings, |mut acc, decl| {
             acc.extend(decl.get_bindings().into_iter());
             acc
