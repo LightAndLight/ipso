@@ -1,6 +1,4 @@
-use ipso_core::{
-    self as core, Builtin, Declaration, Expr, ModulePath, ModuleUsage, Pattern, StringPart,
-};
+use ipso_core::{self as core, Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{Binop, ModuleName};
 use paste::paste;
@@ -477,11 +475,10 @@ impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
     }
 
     pub fn register_module(&mut self, module: &core::Module) {
-        let module_context = module.decls.iter().filter_map(|x| match x {
-            Declaration::Definition { name, sig: _, body } => {
-                Some((name.clone(), Rc::new(body.clone())))
-            }
-            _ => None,
+        let module_context = module.decls.iter().flat_map(|decl| {
+            decl.get_bindings()
+                .into_iter()
+                .map(|(a, b)| (a, Rc::new(b)))
         });
         self.context.extend(module_context);
     }
