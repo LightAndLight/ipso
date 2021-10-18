@@ -1497,7 +1497,7 @@ fn check_definition_1() {
                     ty_vars: vec![(Rc::from("a"), syntax::Kind::Type)],
                     body: syntax::Type::mk_arrow(syntax::Type::Var(0), syntax::Type::Var(0))
                 },
-                body: core::Expr::mk_lam(true, core::Expr::Var(0))
+                body: Rc::new(core::Expr::mk_lam(true, core::Expr::Var(0)))
             }))
         )
     })
@@ -1558,7 +1558,7 @@ fn check_definition_2() {
                     ),
                 ),
             },
-            body: core::Expr::mk_lam(
+            body: Rc::new(core::Expr::mk_lam(
                 true,
                 core::Expr::mk_lam(
                     true,
@@ -1568,7 +1568,7 @@ fn check_definition_2() {
                         core::Expr::Var(0),
                     ),
                 ),
-            ),
+            )),
         }));
         let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
@@ -1639,14 +1639,14 @@ fn check_definition_3() {
                     None,
                 ),
             },
-            body: core::Expr::mk_record(
+            body: Rc::new(core::Expr::mk_record(
                 vec![
                     (core::Expr::Int(2), core::Expr::False),
                     (core::Expr::Int(1), core::Expr::String(Vec::new())),
                     (core::Expr::Int(0), core::Expr::Int(0)),
                 ],
                 None,
-            ),
+            )),
         }));
         let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
@@ -1702,7 +1702,7 @@ fn check_definition_4() {
                     ),
                 ),
             },
-            body: core::Expr::mk_lam(
+            body: Rc::new(core::Expr::mk_lam(
                 true,
                 core::Expr::mk_lam(
                     true,
@@ -1717,7 +1717,7 @@ fn check_definition_4() {
                         }],
                     ),
                 ),
-            ),
+            )),
         }));
         let actual = tc.check_declaration(&mut HashMap::new(), &decl);
         assert_eq!(expected, actual)
@@ -1853,10 +1853,10 @@ fn check_class_1() {
                     Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 ),
             },
-            core::Expr::mk_lam(
+            Rc::new(core::Expr::mk_lam(
                 true,
                 core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
-            ),
+            )),
         );
         assert_eq!(
             Some(&expected_member),
@@ -1941,10 +1941,10 @@ fn check_class_2() {
                     Type::mk_arrow(Type::Var(1), Type::mk_arrow(Type::Var(0), Type::Bool)),
                 ),
             },
-            core::Expr::mk_lam(
+            Rc::new(core::Expr::mk_lam(
                 true,
                 core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
-            ),
+            )),
         );
         assert_eq!(
             Some(&expected_member),
@@ -2529,7 +2529,7 @@ fn class_and_instance_2() {
                 ty_vars: Vec::new(),
                 body: Type::Bool,
             },
-            body: core::Expr::mk_app(
+            body: Rc::new(core::Expr::mk_app(
                 core::Expr::mk_app(
                     core::Expr::mk_app(core::Expr::Name(String::from("lt")), ord_array_int_dict),
                     core::Expr::Array(vec![
@@ -2539,7 +2539,7 @@ fn class_and_instance_2() {
                     ]),
                 ),
                 core::Expr::Array(vec![core::Expr::Int(4), core::Expr::Int(5)]),
-            ),
+            )),
         }));
         let actual_array_int_lt_result =
             tc.check_declaration(&mut HashMap::new(), &array_int_lt_decl);
