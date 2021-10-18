@@ -170,7 +170,7 @@ pub struct Typechecker<'modules> {
     pub evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
-    pub registered_bindings: HashMap<String, (core::TypeSig, core::Expr)>,
+    pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
     module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
     module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
@@ -922,7 +922,7 @@ impl<'modules> Typechecker<'modules> {
         Ok(core::Declaration::Definition {
             name: name.to_string(),
             sig,
-            body,
+            body: Rc::new(body),
         })
     }
 

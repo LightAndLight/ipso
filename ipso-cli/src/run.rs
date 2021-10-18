@@ -1,9 +1,3 @@
-use std::{
-    collections::HashMap,
-    io::{self, BufRead, BufReader, Write},
-    path::PathBuf,
-};
-
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::InputLocation;
@@ -12,6 +6,11 @@ use ipso_import as import;
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax, Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};
+use std::{
+    collections::HashMap,
+    io::{self, BufRead, BufReader, Write},
+    path::PathBuf,
+};
 use typed_arena::Arena;
 
 pub struct Config {
