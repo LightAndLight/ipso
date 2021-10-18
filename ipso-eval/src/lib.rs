@@ -1,3 +1,5 @@
+mod test;
+
 use ipso_core::{
     self as core, Builtin, Declaration, Expr, ModulePath, ModuleUsage, Pattern, StringPart,
 };
@@ -11,8 +13,6 @@ use std::{
     rc::Rc,
 };
 use typed_arena::Arena;
-
-mod test;
 
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
@@ -171,6 +171,13 @@ impl<'heap> Object<'heap> {
         match self {
             Object::Variant(tag, rest) => (tag, rest),
             val => panic!("expected variant, got {:?}", val),
+        }
+    }
+
+    fn unpack_record(&'heap self) -> &'heap [Value] {
+        match self {
+            Object::Record(fields) => fields,
+            val => panic!("expected record,got {:?}", val),
         }
     }
 
@@ -395,6 +402,10 @@ impl<'heap> Value<'heap> {
             Value::Stdin => (),
             val => panic!("expected stdin, got {:?}", val),
         }
+    }
+
+    pub fn unpack_record(&self) -> &'heap [Value<'heap>] {
+        self.unpack_object().unpack_record()
     }
 
     pub fn render(&self) -> String {
@@ -1261,87 +1272,62 @@ where {
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, expr.clone());
-                match expr.unpack_object() {
-                    Object::Record(fields) => {
-                        // expect a record pattern
-                        debug_assert!(branches.len() == 1);
-                        let branch = &branches[0];
-                        match &branch.pattern {
-                            Pattern::Record { names, rest } => {
-                                let mut new_env = Vec::from(env);
-                                let mut extracted = Vec::new();
-                                for name in names {
-                                    let ix =
-                                        self.eval(env, Rc::new(name.clone())).unpack_int() as usize;
-                                    new_env.push(fields[ix]);
-                                    extracted.push(ix);
-                                }
-                                if *rest {
-                                    let mut leftover_fields = Rope::from_vec(fields);
-                                    extracted.sort_unstable();
-                                    for ix in extracted.iter().rev() {
-                                        leftover_fields = leftover_fields.delete(*ix).unwrap();
-                                    }
-                                    let leftover_fields =
-                                        self.alloc_values(leftover_fields.iter().copied());
-                                    let leftover_record =
-                                        self.alloc(Object::Record(leftover_fields));
-                                    new_env.push(leftover_record);
-                                }
+                let mut new_env = Vec::from(env);
+                let mut target: Option<&Expr> = None;
 
-                                let new_env = self.alloc_values(new_env);
-                                self.eval(new_env, Rc::new(branch.body.clone()))
+                for branch in branches {
+                    match &branch.pattern {
+                        Pattern::Name => {
+                            new_env.push(expr);
+                            target = Some(&branch.body);
+                            break;
+                        }
+                        Pattern::Record { names, rest } => {
+                            let fields = expr.unpack_record();
+                            let mut extracted = Vec::with_capacity(names.len());
+                            for name in names {
+                                let ix =
+                                    self.eval(env, Rc::new(name.clone())).unpack_int() as usize;
+                                new_env.push(fields[ix]);
+                                extracted.push(ix);
                             }
-                            Pattern::Name {} | Pattern::Wildcard {} => {
-                                todo!("allow name and wildcard patterns")
+                            if *rest {
+                                let mut leftover_fields = Rope::from_vec(fields);
+                                extracted.sort_unstable();
+                                for ix in extracted.iter().rev() {
+                                    leftover_fields = leftover_fields.delete(*ix).unwrap();
+                                }
+                                let leftover_fields =
+                                    self.alloc_values(leftover_fields.iter().copied());
+                                let leftover_record = self.alloc(Object::Record(leftover_fields));
+                                new_env.push(leftover_record);
                             }
-                            Pattern::Variant { .. } => {
-                                panic!("expected record pattern, but got {:?}", branch.pattern)
+                            target = Some(&branch.body);
+                            break;
+                        }
+                        Pattern::Variant { tag: branch_tag } => {
+                            let (tag, value) = expr.unpack_variant();
+                            let branch_tag =
+                                self.eval(env, branch_tag.clone()).unpack_int() as usize;
+                            if *tag == branch_tag {
+                                new_env.push(*value);
+                                target = Some(&branch.body);
+                                break;
                             }
                         }
-                    }
-                    Object::Variant(tag, value) => {
-                        // expect variant patterns
-                        let mut target: Option<Expr> = None;
-                        let mut new_env = Vec::from(env);
-                        for branch in branches {
-                            match &branch.pattern {
-                                Pattern::Record { .. } => {
-                                    panic!("expected variant pattern, got {:?}", branch.pattern)
-                                }
-                                Pattern::Variant { tag: branch_tag } => {
-                                    let branch_tag =
-                                        self.eval(env, branch_tag.clone()).unpack_int() as usize;
-                                    if *tag == branch_tag {
-                                        new_env.push(*value);
-                                        target = Some(branch.body.clone());
-                                        break;
-                                    }
-                                }
-                                Pattern::Name => {
-                                    new_env.push(expr);
-                                    target = Some(branch.body.clone());
-                                    break;
-                                }
-                                Pattern::Wildcard => {
-                                    target = Some(branch.body.clone());
-                                    break;
-                                }
-                            }
-                        }
-                        match target {
-                            None => panic!("pattern match failure"),
-                            Some(body) => {
-                                let env = self.alloc_values(new_env);
-                                self.eval(env, Rc::new(body))
-                            }
+                        Pattern::Wildcard => {
+                            target = Some(&branch.body);
+                            break;
                         }
                     }
-                    _ => {
-                        // expect a name or wildcard pattern
-                        debug_assert!(branches.len() == 1);
-                        todo!("case of name/wildcard")
+                }
+
+                match target {
+                    Some(target) => {
+                        let new_env = self.alloc_values(new_env);
+                        self.eval(new_env, Rc::new(target.clone()))
                     }
+                    None => panic!("incomplete pattern match"),
                 }
             }
             Expr::Unit => Value::Unit,
