@@ -94,7 +94,8 @@ examplesMain restParser exampleDecoder runExample = do
   let (failures, successes) = Either.partitionEithers results
   putStrLn $ show (length successes) <> " examples passed"
   putStrLn $ show (length failures) <> " examples failed"
-  traverse_ putStrLn failures
+  putStrLn ""
+  traverse_ putStr failures
   case failures of
     [] -> exitSuccess
     _ : _ -> exitFailure
