@@ -2,7 +2,6 @@ mod test;
 
 use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
-
 use ipso_diagnostic::{Diagnostic, InputLocation, Item};
 use ipso_lex::{
     token::{self, Token},

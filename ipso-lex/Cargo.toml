@@ -7,3 +7,7 @@ edition = "2018"
 
 [dependencies]
 ipso-syntax = { path = "../ipso-syntax" }
+quickcheck = { version = "1.0.3", default-features = false }
+
+[dev-dependencies]
+quickcheck_macros = "1"
