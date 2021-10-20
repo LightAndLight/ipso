@@ -1,18 +1,33 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Ipso.Common (eqExitCode, displayError, Config(..), configParser, examplesMain) where
+module Test.Ipso.Common (runDiff, eqExitCode, displayError, Config(..), configParser, examplesMain) where
 
 import qualified Data.Either as Either
 import Data.Foldable (traverse_)
 import qualified Data.List as List
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text.IO
 import Data.Traversable (for)
 import qualified Dhall
 import Options.Applicative (Parser, ReadM, execParser, fullDesc, help, info, long, metavar, option, str, strOption, value)
 import System.Directory (getCurrentDirectory, listDirectory, setCurrentDirectory)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
 import System.FilePath (takeBaseName, takeExtension, (</>))
+import qualified System.IO
+import qualified System.IO.Temp as Temp
+import System.Process (readProcessWithExitCode)
+
+runDiff :: Text -> Text -> IO (Maybe String)
+runDiff expected actual = 
+  Temp.withSystemTempFile "expected.txt" $ \expectedTmpPath expectedTmpHandle -> 
+    Temp.withSystemTempFile "actual.txt" $ \actualTmpPath actualTmpHandle -> do
+      Text.IO.hPutStrLn expectedTmpHandle expected <* System.IO.hClose expectedTmpHandle
+      Text.IO.hPutStrLn actualTmpHandle actual <* System.IO.hClose actualTmpHandle
+      (ec, out, _) <- readProcessWithExitCode "diff" ["-u", "--color=always", "--label", "expected", "--label", "actual", actualTmpPath, expectedTmpPath] ""
+      if ec == ExitSuccess 
+        then pure Nothing 
+        else pure $ Just out
 
 eqExitCode :: (Eq a, Num a) => a -> ExitCode -> Bool
 eqExitCode e1 e2 =
@@ -94,7 +109,8 @@ examplesMain restParser exampleDecoder runExample = do
   let (failures, successes) = Either.partitionEithers results
   putStrLn $ show (length successes) <> " examples passed"
   putStrLn $ show (length failures) <> " examples failed"
-  traverse_ putStrLn failures
+  putStrLn ""
+  traverse_ putStr failures
   case failures of
     [] -> exitSuccess
     _ : _ -> exitFailure
