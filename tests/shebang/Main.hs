@@ -2,8 +2,9 @@
 
 module Main where
 
-import Test.Ipso.Common (Config(..), displayError, eqExitCode, examplesMain)
+import Test.Ipso.Common (Config(..), displayError, eqExitCode, examplesMain, runDiff)
 import Control.Monad (unless)
+import Data.Foldable (for_)
 import Data.IORef (modifyIORef, newIORef, readIORef)
 import Data.Semigroup (Option (..))
 import Data.Text (Text)
@@ -43,11 +44,23 @@ runExample config example = do
 
   errorRef <- newIORef $ Option Nothing
 
-  unless (stdout == Text.unpack (exStdout example)) $ do
-    modifyIORef errorRef (<> pure (displayError "stdout" (exPath example) (exStdout example, id) (stdout, id)))
+  mStdoutDiff <- runDiff (exStdout example) (Text.pack stdout)
+  for_ mStdoutDiff $ \diff ->
+    modifyIORef errorRef (<> pure (
+      unlines
+        [ exPath example <> ": stdout mismatch"
+        , diff
+        ]
+    ))
 
-  unless (stderr == Text.unpack (exStderr example)) $ do
-    modifyIORef errorRef (<> pure (displayError "stderr" (exPath example) (exStderr example, id) (stderr, id)))
+  mStderrDiff <- runDiff (exStderr example) (Text.pack stderr)
+  for_ mStderrDiff $ \diff ->
+    modifyIORef errorRef (<> pure (
+      unlines
+        [ exPath example <> ": stderr mismatch"
+        , diff
+        ]
+    ))
 
   unless (eqExitCode (exExitCode example) exitCode) $ do
     modifyIORef errorRef (<> pure (displayError "exitcode" (exPath example) (exExitCode example, Text.pack . show) (exitCode, show)))
