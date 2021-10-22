@@ -236,6 +236,8 @@ pub enum Expr {
         body: Rc<Spanned<Expr>>,
     },
 
+    Let{name: Rc<str>, value: Rc<Spanned<Expr>>, rest: Rc<Spanned<Expr>>},
+
     True,
     False,
     IfThenElse(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),

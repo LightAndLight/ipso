@@ -1233,8 +1233,8 @@ impl Parser {
                     keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(|_|
                         self.expr().and_then(move |value|
                             keep_left!(self.keyword(&Keyword::In), self.spaces()).and_then(|_|
-                                self.expr().and_then(move |rest|
-                                    todo!("parsed {:?} {:?} {:?}", name, value, rest)
+                                self.expr().map(move |rest|
+                                    syntax::Expr::Let{name, value: Rc::new(value), rest: Rc::new(rest)}
                                 )
                             )
                         )

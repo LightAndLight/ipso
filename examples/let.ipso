@@ -26,4 +26,4 @@ main =
   bindIO (writeStdout stdout (toUtf8 (showInt b))) (\_ ->
   bindIO (writeStdout stdout (toUtf8 (showInt c))) (\_ ->
   writeStdout stdout (toUtf8 (showInt d))
-  ))))
+  )))

@@ -2146,6 +2146,15 @@ impl<'modules> Typechecker<'modules> {
                     )?;
                     Ok((expr_core, ty))
                 }
+                syntax::Expr::Let{name,value,rest} => {
+                    let (value_core, value_ty) = self.infer_expr(value)?;
+                    
+                    self.bound_vars.insert(&[(name.clone(), value_ty)]);
+                    let (rest_core, rest_ty) = self.infer_expr(rest)?;
+                    self.bound_vars.delete(1);
+                    
+                   todo!("finished typechecking let {:?} {:?} {:?} {:?}", name, value_core, rest_core, rest_ty)
+                }
                 syntax::Expr::True => Ok((core::Expr::True, Type::Bool)),
                 syntax::Expr::False => Ok((core::Expr::False, Type::Bool)),
                 syntax::Expr::IfThenElse(cond, then_, else_) => {
