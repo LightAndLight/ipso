@@ -1225,6 +1225,25 @@ impl Parser {
         )
     }
 
+    fn expr_let(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| 
+                keep_left!(self.ident(), self.spaces()).and_then(move |name| 
+                    keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(|_|
+                        self.expr().and_then(move |value|
+                            keep_left!(self.keyword(&Keyword::In), self.spaces()).and_then(|_|
+                                self.expr().and_then(move |rest|
+                                    todo!("parsed {:?} {:?} {:?}", name, value, rest)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    }
+
     fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
         keep_left!(
             choices!(
@@ -1232,7 +1251,8 @@ impl Parser {
                 self.expr_app(),
                 self.expr_case(),
                 self.expr_lam(),
-                self.expr_ifthenelse()
+                self.expr_ifthenelse(),
+                self.expr_let()
             ),
             self.spaces()
         )
