@@ -642,6 +642,7 @@ expr ::=
   lambda |
   case |
   ifthenelse |
+  let |
   binop
   
 lambda ::=
@@ -655,6 +656,9 @@ case_branch ::=
   
 ifthenelse ::=
   'if' expr 'then' expr 'else' expr
+
+let ::=
+  'let' ident '=' expr 'in' expr
   
 binop ::=
   app (operator app)*
