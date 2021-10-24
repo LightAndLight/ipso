@@ -1127,6 +1127,10 @@ where {
                 body: body.clone(),
             }),
 
+            Expr::Let { value, rest } => {
+                todo!("eval let {:?} {:?}", value, rest)
+            }
+
             Expr::True => Value::True,
             Expr::False => Value::False,
             Expr::IfThenElse(cond, t, e) => {

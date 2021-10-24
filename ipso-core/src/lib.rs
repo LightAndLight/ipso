@@ -241,6 +241,8 @@ pub enum Expr {
     App(Rc<Expr>, Rc<Expr>),
     Lam { arg: bool, body: Rc<Expr> },
 
+    Let { value: Rc<Expr>, rest: Rc<Expr> },
+
     True,
     False,
     IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
@@ -392,6 +394,10 @@ impl Expr {
                         Expr::mk_lam(*arg, go(body, f))
                     }
                 }
+                Expr::Let { value, rest } => Expr::Let {
+                    value: Rc::new(go(value, f)),
+                    rest: Rc::new(go(rest, &Function::Under(1, f))),
+                },
                 Expr::True => Expr::True,
                 Expr::False => Expr::False,
                 Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(go(a, f), go(b, f), go(c, f)),
@@ -481,6 +487,10 @@ impl Expr {
                 *arg,
                 body.__instantiate(if *arg { depth + 1 } else { depth }, val),
             ),
+            Expr::Let { value, rest } => Expr::Let {
+                value: Rc::new(value.__instantiate(depth, value)),
+                rest: Rc::new(rest.__instantiate(depth + 1, rest)),
+            },
             Expr::True => Expr::True,
             Expr::False => Expr::False,
             Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(
@@ -549,6 +559,12 @@ impl Expr {
             Expr::Lam { arg, body } => body
                 .subst_placeholder(f)
                 .map(|body| Expr::mk_lam(*arg, body)),
+            Expr::Let { value, rest } => value.subst_placeholder(f).and_then(|value| {
+                rest.subst_placeholder(f).map(|rest| Expr::Let {
+                    value: Rc::new(value),
+                    rest: Rc::new(rest),
+                })
+            }),
             Expr::True => Ok(Expr::True),
             Expr::False => Ok(Expr::False),
             Expr::IfThenElse(a, b, c) => a.subst_placeholder(f).and_then(|a| {
@@ -656,6 +672,10 @@ impl Expr {
                 *arg,
                 body.__abstract_evar(if *arg { depth + 1 } else { depth }, ev),
             ),
+            Expr::Let { value, rest } => Expr::Let {
+                value: Rc::new(value.__abstract_evar(depth, ev)),
+                rest: Rc::new(rest.__abstract_evar(depth + 1, ev)),
+            },
             Expr::True => Expr::True,
             Expr::False => Expr::False,
             Expr::IfThenElse(a, b, c) => Expr::mk_ifthenelse(
@@ -787,6 +807,7 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::Builtin(_) => Step::Skip,
                 Expr::App(a, b) => Step::Continue2(a, b),
                 Expr::Lam { arg: _, body } => Step::Continue1(body),
+                Expr::Let { value, rest, .. } => Step::Continue2(value, rest),
                 Expr::True => Step::Skip,
                 Expr::False => Step::Skip,
                 Expr::IfThenElse(a, b, c) => Step::Continue3(a, b, c),
