@@ -187,6 +187,7 @@ fn parse_definition_3() {
                 token::Name::Keyword(Keyword::True),
                 token::Name::Keyword(Keyword::False),
                 token::Name::Keyword(Keyword::If),
+                token::Name::Keyword(Keyword::Let),
                 token::Name::Ctor,
                 token::Name::Space,
                 token::Name::LAngle,

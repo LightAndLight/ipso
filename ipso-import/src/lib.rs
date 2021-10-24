@@ -88,6 +88,10 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
             };
             desugar_module_accessors_expr(&module_names, &mut Rc::make_mut(body).item)
         }
+        syntax::Expr::Let{value,rest, ..} => {
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(value).item);
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(rest).item);
+        }
         syntax::Expr::True => {}
         syntax::Expr::False => {}
         syntax::Expr::IfThenElse(a, b, c) => {

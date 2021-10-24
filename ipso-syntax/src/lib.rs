@@ -1,10 +1,10 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
+#[cfg(test)]
+mod test;
 
 use ipso_util::iter::Step;
 use lazy_static::lazy_static;
-
-#[cfg(test)]
-mod test;
+use quickcheck::Arbitrary;
+use std::{collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Spanned<A> {
@@ -28,11 +28,37 @@ pub enum Keyword {
     Class,
     Instance,
     Where,
+    Let,
+    In,
+}
+
+impl Arbitrary for Keyword {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        *g.choose(&[
+            Keyword::Case,
+            Keyword::Of,
+            Keyword::If,
+            Keyword::Then,
+            Keyword::Else,
+            Keyword::True,
+            Keyword::False,
+            Keyword::Import,
+            Keyword::As,
+            Keyword::From,
+            Keyword::Type,
+            Keyword::Class,
+            Keyword::Instance,
+            Keyword::Where,
+            Keyword::Let,
+            Keyword::In,
+        ])
+        .unwrap()
+    }
 }
 
 impl Keyword {
     pub fn num_variants() -> usize {
-        14
+        16
     }
 
     pub fn matches(&self, actual: &str) -> bool {
@@ -55,6 +81,8 @@ impl Keyword {
             Keyword::Class => "class",
             Keyword::Instance => "instance",
             Keyword::Where => "where",
+            Keyword::Let => "let",
+            Keyword::In => "in",
         }
     }
 }
@@ -62,7 +90,7 @@ impl Keyword {
 lazy_static! {
     static ref KEYWORDS: Vec<&'static str> = vec![
         "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where",
-        "class", "instance"
+        "class", "instance", "let", "in"
     ];
 }
 
@@ -207,6 +235,8 @@ pub enum Expr {
         args: Vec<Pattern>,
         body: Rc<Spanned<Expr>>,
     },
+
+    Let{name: Rc<str>, value: Rc<Spanned<Expr>>, rest: Rc<Spanned<Expr>>},
 
     True,
     False,

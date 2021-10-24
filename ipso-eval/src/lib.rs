@@ -1127,6 +1127,12 @@ where {
                 body: body.clone(),
             }),
 
+            Expr::Let { value, rest } => {
+                let value = self.eval(env, value.clone());
+                let env = self.alloc_values(env.iter().copied().chain(std::iter::once(value)));
+                self.eval(env, rest.clone())
+            }
+
             Expr::True => Value::True,
             Expr::False => Value::False,
             Expr::IfThenElse(cond, t, e) => {

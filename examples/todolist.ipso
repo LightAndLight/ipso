@@ -61,19 +61,17 @@ parseCommand :
   | Invalid : String
   >
 parseCommand line =
-  (\stripped ->
-    (\lines ->
-      if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "quit") then Quit ()
-      else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
-      else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "list") then List ()
-      else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
-      else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then
-        case readInt (indexArray 1 lines) of
-          Err err -> Invalid stripped
-          Ok n -> Delete n
-      else Invalid stripped
-    ) (splitString ' ' stripped)
-  ) (strip line)
+  let stripped = strip line in
+  let lines = splitString ' ' stripped in
+  if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "quit") then Quit ()
+  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
+  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "list") then List ()
+  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
+  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then
+    case readInt (indexArray 1 lines) of
+      Err err -> Invalid stripped
+      Ok n -> Delete n
+  else Invalid stripped
 
 writeTodos : Array String -> IO ()
 writeTodos todos =

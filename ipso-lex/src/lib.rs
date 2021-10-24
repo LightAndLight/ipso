@@ -1,9 +1,10 @@
+#[cfg(test)]
 mod test;
 
 pub mod token;
 
 use std::{rc::Rc, str::Chars};
-use token::{Token};
+use token::Token;
 
 enum Mode {
     String,
