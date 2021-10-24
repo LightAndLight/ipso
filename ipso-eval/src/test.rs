@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::{Interpreter, Value};
 #[cfg(test)]
-use crate::Object;
+use crate::{Env, Object};
 #[cfg(test)]
 use ipso_core::{Builtin, Expr, StringPart};
 #[cfg(test)]
@@ -30,10 +30,10 @@ fn eval_1() {
         &values,
         &objects,
     );
-    let env = interpreter.alloc_values(vec![]);
+    let mut env = Env::new();
 
     let expected_value = Value::Int(1);
-    let actual_value = interpreter.eval(env, &term);
+    let actual_value = interpreter.eval(&mut env, &term);
     assert_eq!(expected_value, actual_value);
 
     let actual_stdout = String::from_utf8(stdout).unwrap();
@@ -63,9 +63,9 @@ fn eval_2() {
         &values,
         &objects,
     );
-    let env = interpreter.alloc_values(vec![]);
+    let mut env = Env::new();
 
     let expected_value = interpreter.alloc(Object::Bytes(str.as_bytes()));
-    let actual_value = interpreter.eval(env, &term);
+    let actual_value = interpreter.eval(&mut env, &term);
     assert_eq!(expected_value, actual_value);
 }

@@ -8,6 +8,7 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     io::{BufRead, Write},
+    ops::Index,
     rc::Rc,
 };
 use typed_arena::Arena;
@@ -115,6 +116,57 @@ impl<'heap> Debug for IOBody<'heap> {
     }
 }
 
+/// Equivalent to `Cow<[Value<'heap>]>`, but `push` is faster when going from
+/// borrowed to owned.
+#[derive(Debug)]
+pub enum Env<'heap> {
+    Borrowed(&'heap [Value<'heap>]),
+    Owned(Vec<Value<'heap>>),
+}
+
+impl<'heap> Env<'heap> {
+    fn push(&mut self, value: Value<'heap>) {
+        match self {
+            Env::Borrowed(vs) => {
+                let mut new_vs = Vec::with_capacity(vs.len() + 1);
+                new_vs.extend_from_slice(vs);
+                new_vs.push(value);
+                *self = Env::Owned(new_vs);
+            }
+            Env::Owned(vs) => vs.push(value),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Env::Borrowed(vs) => vs.len(),
+            Env::Owned(vs) => vs.len(),
+        }
+    }
+
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Env::Owned(Vec::new())
+    }
+}
+
+impl<'heap> From<&'heap [Value<'heap>]> for Env<'heap> {
+    fn from(value: &'heap [Value<'heap>]) -> Self {
+        Env::Borrowed(value)
+    }
+}
+
+impl<'heap> Index<usize> for Env<'heap> {
+    type Output = Value<'heap>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match self {
+            Env::Borrowed(vs) => &vs[index],
+            Env::Owned(vs) => &vs[index],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Object<'heap> {
     String(&'heap str),
@@ -194,16 +246,11 @@ impl<'heap> Object<'heap> {
                 arg: use_arg,
                 body,
             } => {
-                let new_env: &[Value];
+                let mut env = Env::from(*env);
                 if *use_arg {
-                    let mut buffer = Vec::with_capacity(env.len() + 1);
-                    buffer.extend_from_slice(env);
-                    buffer.push(arg);
-                    new_env = interpreter.alloc_values(buffer);
-                } else {
-                    new_env = env;
+                    env.push(arg);
                 }
-                interpreter.eval(new_env, body)
+                interpreter.eval(&mut env, body)
             }
             Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
             a => panic!("expected closure, got {:?}", a),
@@ -1055,7 +1102,7 @@ where {
 
     pub fn eval_from_module(
         &mut self,
-        env: &'heap [Value<'heap>],
+        env: &mut Env<'heap>,
         path: &ModulePath,
         binding: &str,
     ) -> Value<'heap> {
@@ -1084,7 +1131,7 @@ where {
         res
     }
 
-    pub fn eval(&mut self, env: &'heap [Value<'heap>], expr: &Expr) -> Value<'heap> {
+    pub fn eval(&mut self, env: &mut Env<'heap>, expr: &Expr) -> Value<'heap> {
         let out = match expr {
             Expr::Var(ix) => env[env.len() - 1 - ix],
             Expr::EVar(n) => panic!("found EVar({:?})", n),
@@ -1113,15 +1160,21 @@ where {
                 let b = self.eval(env, b);
                 a.apply(self, b)
             }
-            Expr::Lam { arg, body } => self.alloc(Object::Closure {
-                env,
-                arg: *arg,
-                body: body.clone(),
-            }),
+            Expr::Lam { arg, body } => {
+                let env = match env {
+                    Env::Borrowed(env) => env,
+                    Env::Owned(env) => self.alloc_values(env.iter().copied()),
+                };
+                self.alloc(Object::Closure {
+                    env,
+                    arg: *arg,
+                    body: body.clone(),
+                })
+            }
 
             Expr::Let { value, rest } => {
                 let value = self.eval(env, value);
-                let env = self.alloc_values(env.iter().copied().chain(std::iter::once(value)));
+                env.push(value);
                 self.eval(env, rest)
             }
 
@@ -1258,13 +1311,12 @@ where {
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, expr);
-                let mut new_env = Vec::from(env);
                 let mut target: Option<&Expr> = None;
 
                 for branch in branches {
                     match &branch.pattern {
                         Pattern::Name => {
-                            new_env.push(expr);
+                            env.push(expr);
                             target = Some(&branch.body);
                             break;
                         }
@@ -1273,7 +1325,7 @@ where {
                             let mut extracted = Vec::with_capacity(names.len());
                             for name in names {
                                 let ix = self.eval(env, name).unpack_int() as usize;
-                                new_env.push(fields[ix]);
+                                env.push(fields[ix]);
                                 extracted.push(ix);
                             }
                             if *rest {
@@ -1285,7 +1337,7 @@ where {
                                 let leftover_fields =
                                     self.alloc_values(leftover_fields.iter().copied());
                                 let leftover_record = self.alloc(Object::Record(leftover_fields));
-                                new_env.push(leftover_record);
+                                env.push(leftover_record);
                             }
                             target = Some(&branch.body);
                             break;
@@ -1294,7 +1346,7 @@ where {
                             let (tag, value) = expr.unpack_variant();
                             let branch_tag = self.eval(env, branch_tag).unpack_int() as usize;
                             if *tag == branch_tag {
-                                new_env.push(*value);
+                                env.push(*value);
                                 target = Some(&branch.body);
                                 break;
                             }
@@ -1307,10 +1359,7 @@ where {
                 }
 
                 match target {
-                    Some(target) => {
-                        let new_env = self.alloc_values(new_env);
-                        self.eval(new_env, target)
-                    }
+                    Some(target) => self.eval(env, target),
                     None => panic!("incomplete pattern match"),
                 }
             }
