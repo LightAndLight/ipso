@@ -1,3 +1,4 @@
+use eval::Env;
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::InputLocation;
@@ -95,7 +96,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
-    let env = Vec::new();
+    let mut env = Env::new();
     let _result = {
         let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
         let mut stdin = config
@@ -133,8 +134,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action =
-            interpreter.eval_from_module(interpreter.alloc_values(env), &target_path, entrypoint);
+        let action = interpreter.eval_from_module(&mut env, &target_path, entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())
