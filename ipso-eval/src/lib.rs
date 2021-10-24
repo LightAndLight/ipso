@@ -1128,7 +1128,9 @@ where {
             }),
 
             Expr::Let { value, rest } => {
-                todo!("eval let {:?} {:?}", value, rest)
+                let value = self.eval(env, value.clone());
+                let env = self.alloc_values(env.iter().copied().chain(std::iter::once(value)));
+                self.eval(env, rest.clone())
             }
 
             Expr::True => Value::True,
