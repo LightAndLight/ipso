@@ -142,10 +142,7 @@ impl<'heap> Object<'heap> {
         }
     }
 
-    pub fn perform_io<'stdout>(
-        &'heap self,
-        interpreter: &Interpreter<'stdout, 'heap>,
-    ) -> Value<'heap> {
+    pub fn perform_io<'io>(&'heap self, interpreter: &Interpreter<'io, 'heap>) -> Value<'heap> {
         match self {
             Object::IO { env, body } => body.0(interpreter, env),
             val => panic!("expected io, got {:?}", val),
@@ -180,9 +177,9 @@ impl<'heap> Object<'heap> {
         }
     }
 
-    pub fn apply<'stdout>(
+    pub fn apply<'io>(
         &'heap self,
-        interpreter: &Interpreter<'stdout, 'heap>,
+        interpreter: &Interpreter<'io, 'heap>,
         arg: Value<'heap>,
     ) -> Value<'heap> {
         match self {
@@ -329,15 +326,15 @@ pub enum Value<'heap> {
 }
 
 impl<'heap> Value<'heap> {
-    pub fn apply<'stdout>(
+    pub fn apply<'io>(
         &self,
-        interpreter: &Interpreter<'stdout, 'heap>,
+        interpreter: &Interpreter<'io, 'heap>,
         arg: Value<'heap>,
     ) -> Value<'heap> {
         self.unpack_object().apply(interpreter, arg)
     }
 
-    pub fn perform_io<'stdout>(&self, interpreter: &Interpreter<'stdout, 'heap>) -> Value<'heap> {
+    pub fn perform_io<'io>(&self, interpreter: &Interpreter<'io, 'heap>) -> Value<'heap> {
         self.unpack_object().perform_io(interpreter)
     }
 
@@ -447,9 +444,9 @@ pub struct Module {
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 
-pub struct Interpreter<'stdout, 'heap> {
-    stdin: &'stdout RefCell<dyn BufRead>,
-    stdout: &'stdout RefCell<dyn Write>,
+pub struct Interpreter<'io, 'heap> {
+    stdin: &'io RefCell<dyn BufRead>,
+    stdout: &'io RefCell<dyn Write>,
     bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
@@ -458,10 +455,10 @@ pub struct Interpreter<'stdout, 'heap> {
     module_unmapping: RefCell<Vec<HashMap<ModuleName, ModulePath>>>,
 }
 
-impl<'stdout, 'heap> Interpreter<'stdout, 'heap> {
+impl<'io, 'heap> Interpreter<'io, 'heap> {
     pub fn new(
-        stdin: &'stdout RefCell<dyn BufRead>,
-        stdout: &'stdout RefCell<dyn Write>,
+        stdin: &'io RefCell<dyn BufRead>,
+        stdout: &'io RefCell<dyn Write>,
         context: HashMap<String, Expr>,
         module_context: HashMap<ModulePath, Module>,
         bytes: &'heap Arena<u8>,
@@ -520,8 +517,8 @@ where {
                     |interpreter: &Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn pure_io_1<'stdout, 'heap>(
-                            _: &Interpreter<'stdout, 'heap>,
+                        fn pure_io_1<'io, 'heap>(
+                            _: &Interpreter<'io, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             env[0]
@@ -546,8 +543,8 @@ where {
                     |interpreter: &Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn map_io_2<'stdout, 'heap>(
-                            interpreter: &Interpreter<'stdout, 'heap>,
+                        fn map_io_2<'io, 'heap>(
+                            interpreter: &Interpreter<'io, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             let f = env[0];
@@ -575,8 +572,8 @@ where {
                     |interpreter: &Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn bind_io_2<'stdout, 'heap>(
-                            interpreter: &Interpreter<'stdout, 'heap>,
+                        fn bind_io_2<'io, 'heap>(
+                            interpreter: &Interpreter<'io, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             let io_a = env[0];
@@ -637,8 +634,8 @@ where {
                     |interpreter: &Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn write_stdout_2<'stdout, 'heap>(
-                            interpreter: &Interpreter<'stdout, 'heap>,
+                        fn write_stdout_2<'io, 'heap>(
+                            interpreter: &Interpreter<'io, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             // env[0] : Stdout
@@ -662,8 +659,8 @@ where {
                 )
             }
             Builtin::FlushStdout => {
-                fn flush_stdout<'stdout, 'heap>(
-                    interpreter: &Interpreter<'stdout, 'heap>,
+                fn flush_stdout<'io, 'heap>(
+                    interpreter: &Interpreter<'io, 'heap>,
                     env: &'heap [Value<'heap>],
                 ) -> Value<'heap> {
                     // env[0] : Stdout
@@ -696,8 +693,8 @@ where {
                     |interpreter: &Interpreter<'_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn read_line_stdin_1<'stdout, 'heap>(
-                            interpreter: &Interpreter<'stdout, 'heap>,
+                        fn read_line_stdin_1<'io, 'heap>(
+                            interpreter: &Interpreter<'io, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             // env[0] : Stdin
