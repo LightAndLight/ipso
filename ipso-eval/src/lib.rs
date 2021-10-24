@@ -116,6 +116,8 @@ impl<'heap> Debug for IOBody<'heap> {
     }
 }
 
+/// Equivalent to `Cow<[Value<'heap>]>`, but `push` is faster when going from
+/// borrowed to owned.
 #[derive(Debug)]
 pub enum Env<'heap> {
     Borrowed(&'heap [Value<'heap>]),
