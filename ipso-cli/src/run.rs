@@ -7,8 +7,6 @@ use ipso_parse as parse;
 use ipso_syntax::{self as syntax, Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
-    cell::RefCell,
-    collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
@@ -99,12 +97,10 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let objects = Arena::new();
     let env = Vec::new();
     let _result = {
-        let stdout = RefCell::new(config.stdout.unwrap_or_else(|| Box::new(io::stdout())));
-        let stdin = RefCell::new(
-            config
-                .stdin
-                .unwrap_or_else(|| Box::new(BufReader::new(io::stdin()))),
-        );
+        let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
+        let mut stdin = config
+            .stdin
+            .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
         let eval_modules = modules
             .iter()
             .map(|(module_path, module)| {
@@ -117,20 +113,29 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
                 )
             })
             .collect();
+        let context = builtins
+            .decls
+            .iter()
+            .flat_map(|decl| decl.get_bindings().into_iter())
+            .chain(
+                module
+                    .decls
+                    .iter()
+                    .flat_map(|decl| decl.get_bindings().into_iter()),
+            )
+            .collect();
         let mut interpreter = Interpreter::new(
-            &stdin,
-            &stdout,
-            HashMap::new(),
+            &mut stdin,
+            &mut stdout,
+            &context,
             eval_modules,
             &bytes,
             &values,
             &objects,
         );
-        interpreter.register_module(&builtins);
-        interpreter.register_module(module);
         let action =
             interpreter.eval_from_module(interpreter.alloc_values(env), &target_path, entrypoint);
-        action.perform_io(&interpreter)
+        action.perform_io(&mut interpreter)
     };
     Ok(())
 }

@@ -5,16 +5,14 @@ use crate::Object;
 #[cfg(test)]
 use ipso_core::{Builtin, Expr, StringPart};
 #[cfg(test)]
-use std::cell::RefCell;
-#[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
 use typed_arena::Arena;
 
 #[test]
 fn eval_1() {
-    let stdin = RefCell::new(std::io::empty());
-    let stdout = RefCell::new(Vec::new());
+    let mut stdin = std::io::empty();
+    let mut stdout = Vec::new();
     let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
@@ -22,10 +20,11 @@ fn eval_1() {
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
     );
-    let interpreter = Interpreter::new(
-        &stdin,
-        &stdout,
-        HashMap::new(),
+    let context = HashMap::new();
+    let mut interpreter = Interpreter::new(
+        &mut stdin,
+        &mut stdout,
+        &context,
         HashMap::new(),
         &bytes,
         &values,
@@ -37,15 +36,15 @@ fn eval_1() {
     let actual_value = interpreter.eval(env, &term);
     assert_eq!(expected_value, actual_value);
 
-    let actual_stdout = String::from_utf8(stdout.into_inner()).unwrap();
+    let actual_stdout = String::from_utf8(stdout).unwrap();
     let expected_stdout = String::from("trace: 0\n");
     assert_eq!(expected_stdout, actual_stdout);
 }
 
 #[test]
 fn eval_2() {
-    let stdin = RefCell::new(std::io::empty());
-    let stdout = RefCell::new(Vec::new());
+    let mut stdin = std::io::empty();
+    let mut stdout = Vec::new();
     let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
@@ -54,10 +53,11 @@ fn eval_2() {
         Expr::Builtin(Builtin::ToUtf8),
         Expr::String(vec![StringPart::String(str.clone())]),
     );
-    let interpreter = Interpreter::new(
-        &stdin,
-        &stdout,
-        HashMap::new(),
+    let context = HashMap::new();
+    let mut interpreter = Interpreter::new(
+        &mut stdin,
+        &mut stdout,
+        &context,
         HashMap::new(),
         &bytes,
         &values,
