@@ -7,14 +7,12 @@ use ipso_core::{Builtin, Expr, StringPart};
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
-use std::rc::Rc;
-#[cfg(test)]
 use typed_arena::Arena;
 
 #[test]
 fn eval_1() {
-    let mut stdin = &mut std::io::empty();
-    let mut stdout: Vec<u8> = Vec::new();
+    let mut stdin = std::io::empty();
+    let mut stdout = Vec::new();
     let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
@@ -22,10 +20,11 @@ fn eval_1() {
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
     );
+    let context = HashMap::new();
     let mut interpreter = Interpreter::new(
         &mut stdin,
         &mut stdout,
-        HashMap::new(),
+        &context,
         HashMap::new(),
         &bytes,
         &values,
@@ -34,7 +33,7 @@ fn eval_1() {
     let env = interpreter.alloc_values(vec![]);
 
     let expected_value = Value::Int(1);
-    let actual_value = interpreter.eval(env, Rc::new(term));
+    let actual_value = interpreter.eval(env, &term);
     assert_eq!(expected_value, actual_value);
 
     let actual_stdout = String::from_utf8(stdout).unwrap();
@@ -44,8 +43,8 @@ fn eval_1() {
 
 #[test]
 fn eval_2() {
-    let mut stdin = &mut std::io::empty();
-    let mut stdout: Vec<u8> = Vec::new();
+    let mut stdin = std::io::empty();
+    let mut stdout = Vec::new();
     let bytes = Arena::new();
     let values = Arena::new();
     let objects = Arena::new();
@@ -54,10 +53,11 @@ fn eval_2() {
         Expr::Builtin(Builtin::ToUtf8),
         Expr::String(vec![StringPart::String(str.clone())]),
     );
+    let context = HashMap::new();
     let mut interpreter = Interpreter::new(
         &mut stdin,
         &mut stdout,
-        HashMap::new(),
+        &context,
         HashMap::new(),
         &bytes,
         &values,
@@ -66,6 +66,6 @@ fn eval_2() {
     let env = interpreter.alloc_values(vec![]);
 
     let expected_value = interpreter.alloc(Object::Bytes(str.as_bytes()));
-    let actual_value = interpreter.eval(env, Rc::new(term));
+    let actual_value = interpreter.eval(env, &term);
     assert_eq!(expected_value, actual_value);
 }
