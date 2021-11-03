@@ -18,7 +18,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     rc::Rc,
-    vec::IntoIter,
+    vec,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -192,7 +192,7 @@ macro_rules! parse_string {
             InputLocation::Interactive {
                 label: String::from("(string)"),
             },
-            tokens,
+            tokens.into_iter(),
         );
         let result = keep_left!(parser.$p(), parser.eof());
         parser.into_parse_error(result.result)
@@ -213,7 +213,7 @@ pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module,
         let lexer = Lexer::new(&input);
         lexer.tokenize()
     };
-    let mut parser: Parser = Parser::new(location, tokens);
+    let mut parser: Parser = Parser::new(location, tokens.into_iter());
     let result = keep_left!(parser.module(), parser.eof());
     parser.into_parse_error(result.result)
 }
@@ -288,7 +288,7 @@ pub struct Parser {
     indentation: Vec<usize>,
     expecting: Expecting,
     current: Option<Token>,
-    input: IntoIter<Token>,
+    input: vec::IntoIter<Token>,
 }
 
 macro_rules! many_with {
@@ -422,8 +422,7 @@ macro_rules! spanned {
 }
 
 impl Parser {
-    pub fn new(location: InputLocation, input: Vec<Token>) -> Self {
-        let mut input = input.into_iter();
+    pub fn new(location: InputLocation, mut input: vec::IntoIter<Token>) -> Self {
         let current = input.next();
         Parser {
             location,
@@ -1228,19 +1227,23 @@ impl Parser {
     fn expr_let(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| 
-                keep_left!(self.ident(), self.spaces()).and_then(move |name| 
-                    keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(|_|
-                        self.expr().and_then(move |value|
-                            keep_left!(self.keyword(&Keyword::In), self.spaces()).and_then(|_|
-                                self.expr().map(move |rest|
-                                    syntax::Expr::Let{name, value: Rc::new(value), rest: Rc::new(rest)}
-                                )
-                            )
-                        )
-                    )
-                )
+            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| keep_left!(
+                self.ident(),
+                self.spaces()
             )
+            .and_then(
+                move |name| keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(
+                    |_| self.expr().and_then(move |value| keep_left!(
+                        self.keyword(&Keyword::In),
+                        self.spaces()
+                    )
+                    .and_then(|_| self.expr().map(move |rest| syntax::Expr::Let {
+                        name,
+                        value: Rc::new(value),
+                        rest: Rc::new(rest)
+                    })))
+                )
+            ))
         )
     }
 

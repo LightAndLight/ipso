@@ -25,7 +25,7 @@ macro_rules! parse_test {
                     InputLocation::Interactive {
                         label: String::from("(parser)"),
                     },
-                    tokens,
+                    tokens.into_iter(),
                 );
                 let result = keep_left!(parser.$function(), parser.eof());
                 parser.into_parse_error(result.result)
