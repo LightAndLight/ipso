@@ -19,17 +19,20 @@
 }:
 let
   nixpkgs = <nixos-unstable>;
-  pkgs = import nixpkgs {
-    overlays = overlays ++ [
-      (import "${cargo2nixSrc}/overlay")
-      (import rust-overlaySrc)
-    ];
-  };
 
   cargo2nix = (import cargo2nixSrc {
     inherit nixpkgs;
     rust-overlay = rust-overlaySrc;
   }).package;
+  
+  pkgs = import nixpkgs {
+    overlays = overlays ++ [
+      (import "${cargo2nixSrc}/overlay")
+      (import rust-overlaySrc)
+    ];
+  } // {
+    inherit cargo2nix;
+  };
 
   rustPkgs = args: pkgs.rustBuilder.makePackageSet' {
     rustChannel = "stable";
@@ -61,20 +64,6 @@ let
 in
   {
     inherit pkgs;
-    shell = pkgs.mkShell {
-      buildInputs = with pkgs; [
-        cargo2nix
-        (rust-bin.nightly.latest.default.override {
-          extensions = [
-            "cargo"
-            "clippy"
-            "rustc"
-            "rust-src"
-            "rustfmt"
-          ];
-        })
-      ];
-    };
     dev = mkDerivation { release = false; };
     release = mkDerivation { release = true; };
   }
