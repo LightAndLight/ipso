@@ -13,7 +13,7 @@ fn lex_int_1() {
         {
             let input = Rc::from("923");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![Token {
             data: token::Data::Int {
@@ -31,7 +31,7 @@ fn lex_int_2() {
         {
             let input = Rc::from("00923");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![Token {
             data: token::Data::Int {
@@ -49,7 +49,7 @@ fn lex_import() {
         {
             let input = Rc::from("import yes as no");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![
             Token {
@@ -90,7 +90,7 @@ fn lex_definition_1() {
         {
             let input = Rc::from("x : Int\nx = 1");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![
             Token {
@@ -150,7 +150,7 @@ fn lex_definition_2() {
         {
             let input = Rc::from("x : Int\nx = ~");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![
             Token {
@@ -207,7 +207,7 @@ fn lex_case_1() {
         {
             let input = Rc::from("case x of\n  a -> b");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![
             Token {
@@ -264,7 +264,7 @@ fn lex_ann_1() {
         {
             let input = Rc::from("main : IO ~");
             let lexer = Lexer::new(&input);
-            lexer.tokenize()
+            lexer.collect::<Vec<Token>>()
         },
         vec![
             Token {
@@ -320,7 +320,7 @@ fn lex_string_1() {
             pos: 6,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -360,7 +360,7 @@ fn lex_string_2() {
             pos: 7,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -400,7 +400,7 @@ fn lex_string_3() {
             pos: 8,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -444,7 +444,7 @@ fn lex_string_4() {
             pos: 10,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -504,7 +504,7 @@ fn lex_string_5() {
             pos: 13,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -537,7 +537,7 @@ fn lex_string_6() {
             pos: 12,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
 
@@ -562,6 +562,6 @@ fn lex_string_7() {
             pos: 17,
         },
     ];
-    let actual = lexer.tokenize();
+    let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }

@@ -13,13 +13,15 @@ use std::rc::Rc;
 
 #[cfg(test)]
 macro_rules! parse_test {
-    ($input:expr, $function:ident, $output:expr) => {
+    ($input:expr, $function:ident, $output:expr) => {{
+        use ipso_lex::token::Token;
+
         assert_eq!(
             {
-                let tokens = {
+                let tokens: Vec<Token> = {
                     let input = String::from($input);
                     let lexer = Lexer::new(&input);
-                    lexer.tokenize()
+                    lexer.collect()
                 };
                 let mut parser = Parser::new(
                     InputLocation::Interactive {
@@ -32,7 +34,7 @@ macro_rules! parse_test {
             },
             $output
         )
-    };
+    }};
 }
 
 #[test]

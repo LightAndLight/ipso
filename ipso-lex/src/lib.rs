@@ -43,14 +43,6 @@ impl<'input> Lexer<'input> {
         self.current = self.input.next();
         self.pos += 1;
     }
-
-    pub fn tokenize(self) -> Vec<Token> {
-        let mut tokens = Vec::new();
-        for token in self {
-            tokens.push(token);
-        }
-        tokens
-    }
 }
 
 impl<'input> Iterator for Lexer<'input> {

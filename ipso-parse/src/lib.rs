@@ -186,7 +186,7 @@ macro_rules! parse_string {
 
         let tokens: Vec<Token> = {
             let lexer = Lexer::new(&$s);
-            lexer.tokenize()
+            lexer.collect()
         };
         let mut parser: Parser = Parser::new(
             InputLocation::Interactive {
@@ -211,7 +211,7 @@ macro_rules! parse_str {
 pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module, ParseError> {
     let tokens: Vec<Token> = {
         let lexer = Lexer::new(&input);
-        lexer.tokenize()
+        lexer.collect()
     };
     let mut parser: Parser = Parser::new(location, tokens.into_iter());
     let result = keep_left!(parser.module(), parser.eof());
