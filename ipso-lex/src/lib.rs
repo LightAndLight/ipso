@@ -44,6 +44,18 @@ impl<'input> Lexer<'input> {
         self.pos += 1;
     }
 
+    pub fn tokenize(self) -> Vec<Token> {
+        let mut tokens = Vec::new();
+        for token in self {
+            tokens.push(token);
+        }
+        tokens
+    }
+}
+
+impl<'input> Iterator for Lexer<'input> {
+    type Item = Token;
+
     fn next(&mut self) -> Option<Token> {
         let pos = self.pos;
         match self.current {
@@ -508,13 +520,5 @@ impl<'input> Lexer<'input> {
                 },
             },
         }
-    }
-
-    pub fn tokenize(mut self) -> Vec<Token> {
-        let mut tokens = Vec::new();
-        while let Some(token) = self.next() {
-            tokens.push(token);
-        }
-        tokens
     }
 }
