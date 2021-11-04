@@ -184,15 +184,11 @@ macro_rules! parse_string {
         use ipso_lex::{token::Token, Lexer};
         use ipso_parse::{keep_left, map2, ParseResult, Parser};
 
-        let tokens: Vec<Token> = {
-            let lexer = Lexer::new(&$s);
-            lexer.collect()
-        };
         let mut parser: Parser = Parser::new(
             InputLocation::Interactive {
                 label: String::from("(string)"),
             },
-            tokens.into_iter(),
+            Lexer::new(&$s),
         );
         let result = keep_left!(parser.$p(), parser.eof());
         parser.into_parse_error(result.result)
@@ -209,11 +205,7 @@ macro_rules! parse_str {
 }
 
 pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module, ParseError> {
-    let tokens: Vec<Token> = {
-        let lexer = Lexer::new(&input);
-        lexer.collect()
-    };
-    let mut parser: Parser = Parser::new(location, tokens.into_iter());
+    let mut parser: Parser = Parser::new(location, Lexer::new(&input));
     let result = keep_left!(parser.module(), parser.eof());
     parser.into_parse_error(result.result)
 }
@@ -282,13 +274,13 @@ impl Expecting {
     }
 }
 
-pub struct Parser {
+pub struct Parser<'input> {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
     expecting: Expecting,
     current: Option<Token>,
-    input: vec::IntoIter<Token>,
+    input: Lexer<'input>,
 }
 
 macro_rules! many_with {
@@ -421,8 +413,8 @@ macro_rules! spanned {
     }};
 }
 
-impl Parser {
-    pub fn new(location: InputLocation, mut input: vec::IntoIter<Token>) -> Self {
+impl<'input> Parser<'input> {
+    pub fn new(location: InputLocation, mut input: Lexer<'input>) -> Self {
         let current = input.next();
         Parser {
             location,
