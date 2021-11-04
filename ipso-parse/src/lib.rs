@@ -18,7 +18,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     rc::Rc,
-    vec::IntoIter,
+    vec,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -184,15 +184,11 @@ macro_rules! parse_string {
         use ipso_lex::{token::Token, Lexer};
         use ipso_parse::{keep_left, map2, ParseResult, Parser};
 
-        let tokens: Vec<Token> = {
-            let lexer = Lexer::new(&$s);
-            lexer.tokenize()
-        };
         let mut parser: Parser = Parser::new(
             InputLocation::Interactive {
                 label: String::from("(string)"),
             },
-            tokens,
+            Lexer::new(&$s),
         );
         let result = keep_left!(parser.$p(), parser.eof());
         parser.into_parse_error(result.result)
@@ -209,11 +205,7 @@ macro_rules! parse_str {
 }
 
 pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module, ParseError> {
-    let tokens: Vec<Token> = {
-        let lexer = Lexer::new(&input);
-        lexer.tokenize()
-    };
-    let mut parser: Parser = Parser::new(location, tokens);
+    let mut parser: Parser = Parser::new(location, Lexer::new(&input));
     let result = keep_left!(parser.module(), parser.eof());
     parser.into_parse_error(result.result)
 }
@@ -282,13 +274,13 @@ impl Expecting {
     }
 }
 
-pub struct Parser {
+pub struct Parser<'input> {
     location: InputLocation,
     pos: usize,
     indentation: Vec<usize>,
     expecting: Expecting,
     current: Option<Token>,
-    input: IntoIter<Token>,
+    input: Lexer<'input>,
 }
 
 macro_rules! many_with {
@@ -421,9 +413,8 @@ macro_rules! spanned {
     }};
 }
 
-impl Parser {
-    pub fn new(location: InputLocation, input: Vec<Token>) -> Self {
-        let mut input = input.into_iter();
+impl<'input> Parser<'input> {
+    pub fn new(location: InputLocation, mut input: Lexer<'input>) -> Self {
         let current = input.next();
         Parser {
             location,
@@ -1228,19 +1219,23 @@ impl Parser {
     fn expr_let(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| 
-                keep_left!(self.ident(), self.spaces()).and_then(move |name| 
-                    keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(|_|
-                        self.expr().and_then(move |value|
-                            keep_left!(self.keyword(&Keyword::In), self.spaces()).and_then(|_|
-                                self.expr().map(move |rest|
-                                    syntax::Expr::Let{name, value: Rc::new(value), rest: Rc::new(rest)}
-                                )
-                            )
-                        )
-                    )
-                )
+            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| keep_left!(
+                self.ident(),
+                self.spaces()
             )
+            .and_then(
+                move |name| keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(
+                    |_| self.expr().and_then(move |value| keep_left!(
+                        self.keyword(&Keyword::In),
+                        self.spaces()
+                    )
+                    .and_then(|_| self.expr().map(move |rest| syntax::Expr::Let {
+                        name,
+                        value: Rc::new(value),
+                        rest: Rc::new(rest)
+                    })))
+                )
+            ))
         )
     }
 
