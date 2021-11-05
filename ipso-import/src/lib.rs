@@ -1,7 +1,6 @@
-use ipso_diagnostic::{self as diagnostic, Diagnostic, InputLocation};
-use typed_arena::Arena;
-
+use diagnostic::{Location, Message};
 use ipso_core::{self as core, Module, ModulePath};
+use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, ModuleName};
@@ -12,11 +11,12 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
+use typed_arena::Arena;
 
 #[derive(Debug)]
 pub enum ModuleError {
     NotFound {
-        location: InputLocation,
+        source: Source,
         pos: usize,
         module_path: ModulePath,
     },
@@ -29,15 +29,19 @@ impl ModuleError {
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         match self {
             ModuleError::NotFound {
-                location,
+                source,
                 pos,
                 module_path,
-            } => diagnostic.item(diagnostic::Item {
-                location: location.clone(),
-                offset: *pos,
-                message: String::from("module not found"),
-                addendum: Some(format!("file {} does not exist", module_path.to_str())),
-            }),
+            } => diagnostic.item(
+                Some(Location {
+                    source: source.clone(),
+                    offset: *pos,
+                }),
+                Message {
+                    content: String::from("module not found"),
+                    addendum: Some(format!("file {} does not exist", module_path.to_str())),
+                },
+            ),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
             ModuleError::Check(err) => err.report(diagnostic),
@@ -88,7 +92,7 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
             };
             desugar_module_accessors_expr(&module_names, &mut Rc::make_mut(body).item)
         }
-        syntax::Expr::Let{value,rest, ..} => {
+        syntax::Expr::Let { value, rest, .. } => {
             desugar_module_accessors_expr(module_names, &mut Rc::make_mut(value).item);
             desugar_module_accessors_expr(module_names, &mut Rc::make_mut(rest).item);
         }
@@ -292,7 +296,7 @@ impl<'a> Modules<'a> {
     /// * `pos` - source file offset for error reporting
     pub fn import(
         &mut self,
-        location: &InputLocation,
+        source: &Source,
         pos: usize,
         module_path: &ModulePath,
         builtins: &Module,
@@ -301,14 +305,14 @@ impl<'a> Modules<'a> {
             None => {
                 let path = module_path.as_path();
                 if path.exists() {
-                    let input_location = InputLocation::File {
+                    let input_location = Source::File {
                         path: PathBuf::from(path),
                     };
                     let mut module = parse::parse_file(path)?;
 
                     for import_info in calculate_imports(path, &mut module).into_iter() {
                         if let Err(err) = self.import(
-                            &InputLocation::File {
+                            &Source::File {
                                 path: PathBuf::from(path),
                             },
                             import_info.pos,
@@ -332,7 +336,7 @@ impl<'a> Modules<'a> {
                     Ok(module_ref)
                 } else {
                     Err(ModuleError::NotFound {
-                        location: location.clone(),
+                        source: source.clone(),
                         pos,
                         module_path: module_path.clone(),
                     })

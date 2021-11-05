@@ -9,42 +9,58 @@ use std::{fs::File, io};
 mod test;
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub enum InputLocation {
+pub enum Source {
     File { path: PathBuf },
     Interactive { label: String },
 }
 
-impl InputLocation {
+impl Source {
     pub fn to_str(&self) -> &str {
         match self {
-            InputLocation::File { path } => path.to_str().unwrap(),
-            InputLocation::Interactive { label } => label,
+            Source::File { path } => path.to_str().unwrap(),
+            Source::Interactive { label } => label,
         }
     }
 }
 
-#[derive(Debug)]
-pub struct Item {
-    pub location: InputLocation,
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+pub struct Location {
+    pub source: Source,
     pub offset: usize,
-    pub message: String,
+}
+
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+pub struct Message {
+    pub content: String,
     pub addendum: Option<String>,
 }
 
 pub struct Diagnostic {
-    items: Vec<Item>,
+    items: Vec<Message>,
+    located_items: Vec<(Location, Message)>,
 }
 
 impl Diagnostic {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Diagnostic { items: Vec::new() }
+        Diagnostic {
+            items: Vec::new(),
+            located_items: Vec::new(),
+        }
     }
 
-    pub fn item(&mut self, item: Item) {
-        match self.items.binary_search_by_key(&item.offset, |i| i.offset) {
-            Err(ix) => self.items.insert(ix, item),
-            Ok(ix) => self.items.insert(ix + 1, item),
+    pub fn item(&mut self, location: Option<Location>, message: Message) {
+        match location {
+            None => self.items.push(message),
+            Some(location) => {
+                match self
+                    .located_items
+                    .binary_search_by_key(&location.offset, |i| i.0.offset)
+                {
+                    Err(ix) => self.located_items.insert(ix, (location, message)),
+                    Ok(ix) => self.located_items.insert(ix + 1, (location, message)),
+                }
+            }
         }
     }
 
@@ -52,13 +68,12 @@ impl Diagnostic {
         format!("{}:{}:{}: error: {}", path, line, col, message)
     }
 
-    pub fn report_string(
+    pub fn report_located_message(
         line: usize,
         col: usize,
         path: &str,
         line_str: &str,
-        message: &str,
-        addendum: &Option<String>,
+        message: &Message,
     ) -> String {
         let mut result = String::new();
         let caret: String = {
@@ -66,7 +81,7 @@ impl Diagnostic {
             caret.push('^');
             caret
         };
-        let line1 = Self::report_error_heading(path, line, col, message);
+        let line1 = Self::report_error_heading(path, line, col, &message.content);
         let pad_amount = ((line as f32).log(10.0).floor() as usize) + 1;
         let padding: String = " ".repeat(pad_amount);
 
@@ -81,7 +96,7 @@ impl Diagnostic {
         result.push_str(&line3);
         result.push('\n');
         result.push_str(&line4);
-        match addendum {
+        match &message.addendum {
             None => {}
             Some(addendum) => {
                 result.push('\n');
@@ -104,16 +119,16 @@ impl Diagnostic {
         }
 
         fn get_entry(
-            files: &mut HashMap<InputLocation, LocationEntry>,
-            location: InputLocation,
+            files: &mut HashMap<Source, LocationEntry>,
+            source: Source,
         ) -> io::Result<&mut LocationEntry> {
             Ok(files
-                .entry(location)
+                .entry(source)
                 .or_insert_with_key(|location| match location {
-                    InputLocation::Interactive { label } => LocationEntry::InteractiveEntry {
+                    Source::Interactive { label } => LocationEntry::InteractiveEntry {
                         label: label.clone(),
                     },
-                    InputLocation::File { path } => {
+                    Source::File { path } => {
                         let file = File::open(path).unwrap();
                         let file = BufReader::new(file);
                         let line_str = String::new();
@@ -128,17 +143,31 @@ impl Diagnostic {
                     }
                 }))
         }
-        let mut locations: HashMap<InputLocation, LocationEntry> = HashMap::new();
-        for item in self.items.into_iter() {
-            let result = match get_entry(&mut locations, item.location.clone()) {
+
+        for message in self.items {
+            let result = format!("error: {}", message.content);
+
+            match io::stderr().write(result.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
+            match io::stderr().write(b"\n") {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
+        }
+
+        let mut source_map: HashMap<Source, LocationEntry> = HashMap::new();
+        for (location, message) in self.located_items.into_iter() {
+            let result = match get_entry(&mut source_map, location.source.clone()) {
                 Err(err) => return Err(err),
                 Ok(location_entry) => match location_entry {
                     LocationEntry::InteractiveEntry { label } => {
-                        Self::report_error_heading(label, 1, item.offset, &item.message)
+                        Self::report_error_heading(label, 1, location.offset, &message.content)
                     }
                     LocationEntry::FileEntry(file_entry) => {
-                        let mut pos = item.offset;
-                        while item.offset >= file_entry.offset {
+                        let mut pos = location.offset;
+                        while location.offset >= file_entry.offset {
                             pos -= file_entry.line_str.len();
                             file_entry.line_str.clear();
                             match file_entry.file.read_line(&mut file_entry.line_str) {
@@ -157,13 +186,12 @@ impl Diagnostic {
                             let item_bytes = &(file_entry.line_str.as_bytes())[0..pos];
                             from_utf8(item_bytes).unwrap().chars().count() + 1
                         };
-                        Diagnostic::report_string(
+                        Diagnostic::report_located_message(
                             file_entry.line,
                             col,
-                            item.location.to_str(),
+                            location.source.to_str(),
                             file_entry.line_str.trim_end_matches('\n'),
-                            &item.message,
-                            &item.addendum,
+                            &message,
                         )
                     }
                 },

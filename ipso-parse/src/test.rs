@@ -3,7 +3,7 @@ use super::{ParseError, ParseResult, Parser};
 #[cfg(test)]
 use crate::{keep_left, map2};
 #[cfg(test)]
-use ipso_diagnostic::InputLocation;
+use ipso_diagnostic::Source;
 #[cfg(test)]
 use ipso_lex::{token, Lexer};
 #[cfg(test)]
@@ -18,7 +18,7 @@ macro_rules! parse_test {
             {
                 let input = String::from($input);
                 let mut parser = Parser::new(
-                    InputLocation::Interactive {
+                    Source::Interactive {
                         label: String::from("(parser)"),
                     },
                     Lexer::new(&input),
@@ -42,7 +42,7 @@ fn parse_ident_2() {
         "import",
         ident,
         Err(ParseError::Unexpected {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 0,
@@ -112,7 +112,7 @@ fn parse_import_as_3() {
         "import yes\nas no",
         import,
         Err(ParseError::Unexpected {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 10,
@@ -172,7 +172,7 @@ fn parse_definition_3() {
         "x : Int\nx =\n1",
         definition,
         Err(ParseError::Unexpected {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 11,
@@ -573,7 +573,7 @@ fn parse_case_4() {
         "case x of\n  a -> b\n   c -> d",
         expr_case,
         Err(ParseError::Unexpected {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 24,
@@ -612,7 +612,7 @@ fn parse_case_5() {
         "case x of\n  a -> b\n c -> d",
         expr_case,
         Err(ParseError::Unexpected {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 18,

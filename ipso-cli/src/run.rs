@@ -1,7 +1,7 @@
 use eval::Env;
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
-use ipso_diagnostic::InputLocation;
+use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
@@ -67,7 +67,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let main = String::from("main");
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let input_location = InputLocation::Interactive {
+    let input_location = Source::Interactive {
         label: main.clone(),
     };
     let builtins = builtins::builtins();
