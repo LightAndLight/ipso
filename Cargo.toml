@@ -13,3 +13,6 @@ members = [
     "ipso-typecheck",
     "ipso-util",
 ]
+
+[profile.release]
+lto = true
