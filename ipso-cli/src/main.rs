@@ -22,6 +22,13 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
                 addendum: None,
             },
         ),
+        InterpreterError::FileDoesNotExist(path) => diagnostic.item(
+            None,
+            Message {
+                content: format!("file {} does not exist", path.to_str().unwrap()),
+                addendum: None,
+            },
+        ),
     }
     diagnostic.report_all()
 }
