@@ -2,7 +2,7 @@ mod test;
 
 use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
-use ipso_diagnostic::{Diagnostic, InputLocation, Item};
+use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use ipso_lex::{
     token::{self, Token},
     Lexer,
@@ -24,16 +24,16 @@ use std::{
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     Unexpected {
-        location: InputLocation,
+        source: Source,
         pos: usize,
         expecting: BTreeSet<token::Name>,
     },
 }
 
 impl ParseError {
-    fn location(&self) -> InputLocation {
+    fn source(&self) -> Source {
         match self {
-            ParseError::Unexpected { location, .. } => location.clone(),
+            ParseError::Unexpected { source, .. } => source.clone(),
         }
     }
 
@@ -64,12 +64,16 @@ impl ParseError {
     }
 
     pub fn report(&self, diagnostic: &mut Diagnostic) {
-        diagnostic.item(Item {
-            location: self.location(),
-            offset: self.position(),
-            message: self.message(),
-            addendum: None,
-        })
+        diagnostic.item(
+            Some(Location {
+                source: self.source(),
+                offset: self.position(),
+            }),
+            Message {
+                content: self.message(),
+                addendum: None,
+            },
+        )
     }
 }
 
@@ -180,12 +184,12 @@ macro_rules! between {
 #[macro_export]
 macro_rules! parse_string {
     ($p:ident, $s:expr) => {{
-        use ipso_diagnostic::InputLocation;
+        use ipso_diagnostic::Source;
         use ipso_lex::{token::Token, Lexer};
         use ipso_parse::{keep_left, map2, ParseResult, Parser};
 
         let mut parser: Parser = Parser::new(
-            InputLocation::Interactive {
+            Source::Interactive {
                 label: String::from("(string)"),
             },
             Lexer::new(&$s),
@@ -204,17 +208,17 @@ macro_rules! parse_str {
     }};
 }
 
-pub fn parse_string_at(location: InputLocation, input: String) -> Result<Module, ParseError> {
-    let mut parser: Parser = Parser::new(location, Lexer::new(&input));
+pub fn parse_string_at(source: Source, input: String) -> Result<Module, ParseError> {
+    let mut parser: Parser = Parser::new(source, Lexer::new(&input));
     let result = keep_left!(parser.module(), parser.eof());
     parser.into_parse_error(result.result)
 }
 
 pub fn parse_string(input: String) -> Result<Module, ParseError> {
-    let location = InputLocation::Interactive {
+    let source = Source::Interactive {
         label: String::from("(string)"),
     };
-    parse_string_at(location, input)
+    parse_string_at(source, input)
 }
 
 pub fn parse_file(filename: &Path) -> Result<Module, ParseError> {
@@ -224,10 +228,10 @@ pub fn parse_file(filename: &Path) -> Result<Module, ParseError> {
         file.read_to_string(&mut content).unwrap();
         content
     };
-    let location = InputLocation::File {
+    let source = Source::File {
         path: PathBuf::from(filename),
     };
-    parse_string_at(location, input)
+    parse_string_at(source, input)
 }
 
 struct Expecting {
@@ -275,7 +279,7 @@ impl Expecting {
 }
 
 pub struct Parser<'input> {
-    location: InputLocation,
+    source: Source,
     pos: usize,
     indentation: Vec<usize>,
     expecting: Expecting,
@@ -414,10 +418,10 @@ macro_rules! spanned {
 }
 
 impl<'input> Parser<'input> {
-    pub fn new(location: InputLocation, mut input: Lexer<'input>) -> Self {
+    pub fn new(source: Source, mut input: Lexer<'input>) -> Self {
         let current = input.next();
         Parser {
-            location,
+            source,
             pos: 0,
             indentation: vec![0],
             expecting: Expecting::new(),
@@ -430,7 +434,7 @@ impl<'input> Parser<'input> {
         match result {
             Some(a) => Ok(a),
             None => Err(ParseError::Unexpected {
-                location: self.location,
+                source: self.source,
                 pos: self.pos,
                 expecting: self.expecting.into_btreeset(),
             }),
@@ -639,7 +643,7 @@ impl<'input> Parser<'input> {
 
     /// ```
     /// use std::rc::Rc;
-    /// use ipso_diagnostic::InputLocation;
+    /// use ipso_diagnostic::Source;
     /// use ipso_lex::{self, token};
     /// use ipso_parse::{ParseError, parse_str};
     ///
@@ -650,19 +654,19 @@ impl<'input> Parser<'input> {
     /// assert_eq!(parse_str!(char, "\'\\n\'"), Ok('\n'));
     ///
     /// assert_eq!(parse_str!(char, "\'\\\'"), Err(ParseError::Unexpected {
-    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 3,
     ///     expecting: vec![token::Name::SingleQuote].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\"), Err(ParseError::Unexpected {
-    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
     ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(ParseError::Unexpected {
-    ///     location: InputLocation::Interactive{label: String::from("(string)")},
+    ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
     ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));

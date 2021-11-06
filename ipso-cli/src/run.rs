@@ -1,7 +1,7 @@
 use eval::Env;
 use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
-use ipso_diagnostic::InputLocation;
+use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
@@ -26,6 +26,7 @@ pub enum InterpreterError {
     TypeError(typecheck::TypeError),
     ModuleError(import::ModuleError),
     MissingEntrypoint(String),
+    FileDoesNotExist(PathBuf),
 }
 
 impl From<parse::ParseError> for InterpreterError {
@@ -63,15 +64,21 @@ fn find_entrypoint_signature(
 
 pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let working_dir = std::env::current_dir().unwrap();
-    let target_path: ModulePath = ModulePath::from_file(&PathBuf::from(config.filename.as_str()));
+
     let main = String::from("main");
+
     let modules_data = Arena::new();
     let mut modules = import::Modules::new(&modules_data);
-    let input_location = InputLocation::Interactive {
+    let source = Source::Interactive {
         label: main.clone(),
     };
+    let target_path = PathBuf::from(config.filename.as_str());
+    if !target_path.exists() {
+        return Err(InterpreterError::FileDoesNotExist(target_path));
+    }
+    let target_module_path: ModulePath = ModulePath::from_file(&target_path);
     let builtins = builtins::builtins();
-    let module = modules.import(&input_location, 0, &target_path, &builtins)?;
+    let module = modules.import(&source, 0, &target_module_path, &builtins)?;
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,
@@ -80,7 +87,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = {
-            let mut tc = Typechecker::new(working_dir.as_path(), input_location, &modules.index);
+            let mut tc = Typechecker::new(working_dir.as_path(), source, &modules.index);
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
@@ -134,7 +141,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action = interpreter.eval_from_module(&mut env, &target_path, entrypoint);
+        let action = interpreter.eval_from_module(&mut env, &target_module_path, entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

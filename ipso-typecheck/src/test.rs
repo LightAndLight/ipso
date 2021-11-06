@@ -6,7 +6,7 @@ use crate::{
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
 #[cfg(test)]
-use ipso_diagnostic::InputLocation;
+use ipso_diagnostic::Source;
 #[cfg(test)]
 use ipso_syntax::{self as syntax, Binop, Kind, Spanned, Type};
 #[cfg(test)]
@@ -40,7 +40,7 @@ fn infer_kind_test_2() {
 fn infer_kind_test_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = Err(TypeError::KindMismatch {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(typechecker)"),
             },
             pos: 0,
@@ -683,7 +683,7 @@ fn infer_array_test_2() {
         assert_eq!(
             tc.infer_expr(&term),
             Err(TypeError::TypeMismatch {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 4,
@@ -810,7 +810,7 @@ fn unify_rows_test_4() {
                 )
             ),
             Err(TypeError::TypeMismatch {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 0,
@@ -979,7 +979,7 @@ fn infer_record_test_4() {
             tc.infer_expr(&syntax::Spanned { pos: 0, item: term })
                 .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Err(TypeError::TypeMismatch {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 22,
@@ -1338,7 +1338,7 @@ fn infer_case_4() {
             tc.infer_expr(&term)
                 .map(|(expr, ty)| (expr, tc.zonk_type(&ty))),
             Err(TypeError::RedundantPattern {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 32
@@ -1740,7 +1740,7 @@ fn kind_occurs_1() {
                 &Kind::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::KindOccurs {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 0,
@@ -1766,7 +1766,7 @@ fn type_occurs_1() {
                 &Type::mk_arrow(v1.clone(), v2.clone())
             ),
             Err(TypeError::TypeOccurs {
-                location: InputLocation::Interactive {
+                source: Source::Interactive {
                     label: String::from("(typechecker)"),
                 },
                 pos: 0,
@@ -2120,7 +2120,7 @@ fn class_and_instance_1() {
         };
 
         let expected_instance_ord_int_result = Err(TypeError::CannotDeduce {
-            location: InputLocation::Interactive {
+            source: Source::Interactive {
                 label: String::from("(typechecker)"),
             },
             context: Some(SolveConstraintContext {

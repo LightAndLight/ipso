@@ -1,6 +1,6 @@
 mod run;
 
-use ipso_diagnostic::{self as diagnostic, Diagnostic, InputLocation};
+use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use run::{run_interpreter, Config, InterpreterError};
 use std::{env, io, path::PathBuf};
 
@@ -10,14 +10,25 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
         InterpreterError::ParseError(err) => err.report(&mut diagnostic),
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
         InterpreterError::ModuleError(err) => err.report(&mut diagnostic),
-        InterpreterError::MissingEntrypoint(name) => diagnostic.item(diagnostic::Item {
-            location: InputLocation::File {
-                path: PathBuf::from(filename),
+        InterpreterError::MissingEntrypoint(name) => diagnostic.item(
+            Some(Location {
+                source: Source::File {
+                    path: PathBuf::from(filename),
+                },
+                offset: 0,
+            }),
+            Message {
+                content: format!("missing entrypoint {:?}", name),
+                addendum: None,
             },
-            offset: 0,
-            message: format!("missing entrypoint {:?}", name),
-            addendum: None,
-        }),
+        ),
+        InterpreterError::FileDoesNotExist(path) => diagnostic.item(
+            None,
+            Message {
+                content: format!("file {} does not exist", path.to_str().unwrap()),
+                addendum: None,
+            },
+        ),
     }
     diagnostic.report_all()
 }

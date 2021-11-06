@@ -1,0 +1,4 @@
+import missing_module
+
+main : IO ()
+main = pureIO ()
