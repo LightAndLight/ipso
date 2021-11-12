@@ -8,8 +8,8 @@ use ipso_lex::{
     Lexer,
 };
 use ipso_syntax::{
-    self as syntax, Branch, Declaration, Expr, Keyword, Module, Names, Pattern, Spanned,
-    StringPart, Type,
+    self as syntax, r#type::Type, Branch, Declaration, Expr, Keyword, Module, Names, Pattern,
+    Spanned, StringPart,
 };
 use std::{
     cmp,

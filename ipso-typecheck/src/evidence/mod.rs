@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::Typechecker;
 use ipso_core::{EVar, Expr, Placeholder};
-use ipso_syntax::{self as syntax, Type};
+use ipso_syntax::r#type::Type;
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -13,10 +13,7 @@ pub struct Evidence {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
-    HasField {
-        field: Rc<str>,
-        rest: syntax::Type<usize>,
-    },
+    HasField { field: Rc<str>, rest: Type<usize> },
     Type(Type<usize>),
 }
 

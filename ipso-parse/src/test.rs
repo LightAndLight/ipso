@@ -7,7 +7,9 @@ use ipso_diagnostic::Source;
 #[cfg(test)]
 use ipso_lex::{token, Lexer};
 #[cfg(test)]
-use ipso_syntax::{Branch, Declaration, Expr, Keyword, Names, Pattern, Spanned, StringPart, Type};
+use ipso_syntax::{
+    r#type::Type, Branch, Declaration, Expr, Keyword, Names, Pattern, Spanned, StringPart,
+};
 #[cfg(test)]
 use std::rc::Rc;
 

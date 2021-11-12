@@ -3,7 +3,7 @@ use crate::{
     UnifyTypeContext,
 };
 use ipso_core::{self as core, Expr, Placeholder};
-use ipso_syntax::{self as syntax, Binop, Kind, Type};
+use ipso_syntax::{r#type::Type, Binop, Kind};
 
 use super::Constraint;
 
@@ -117,8 +117,8 @@ pub fn solve_constraint(
         Constraint::HasField { field, rest } => {
             let _ = tc.check_kind(None, rest, &Kind::Row)?;
             let new_evidence = match rest {
-                syntax::Type::RowNil => Ok(core::Expr::Int(0)),
-                syntax::Type::RowCons(other_field, _, other_rest) => {
+                Type::RowNil => Ok(core::Expr::Int(0)),
+                Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
                             context,
@@ -141,9 +141,9 @@ pub fn solve_constraint(
                     }
                 }
 
-                syntax::Type::Name(n) => todo!("deduce HasField for Name({})", n),
+                Type::Name(n) => todo!("deduce HasField for Name({})", n),
 
-                syntax::Type::Var(_) => {
+                Type::Var(_) => {
                     let evidence = lookup_evidence(tc, constraint);
                     match evidence {
                         None => {
@@ -156,7 +156,7 @@ pub fn solve_constraint(
                         Some(evidence) => Ok(evidence),
                     }
                 }
-                syntax::Type::App(_, _) => {
+                Type::App(_, _) => {
                     let evidence = lookup_evidence(tc, constraint);
                     match evidence {
                         None => {
@@ -168,7 +168,7 @@ pub fn solve_constraint(
                         Some(evidence) => Ok(evidence),
                     }
                 }
-                syntax::Type::Meta(n) => {
+                Type::Meta(n) => {
                     let (kind, sol) = &tc.type_solutions[*n];
                     // we assume solving is done after unification, so any unsolved variables
                     // will never recieve solutions
@@ -210,20 +210,20 @@ pub fn solve_constraint(
                     }
                 }
 
-                syntax::Type::Bool
-                | syntax::Type::Int
-                | syntax::Type::Char
-                | syntax::Type::String
-                | syntax::Type::Bytes
-                | syntax::Type::Arrow
-                | syntax::Type::FatArrow
-                | syntax::Type::Constraints(_)
-                | syntax::Type::HasField(_, _)
-                | syntax::Type::Array
-                | syntax::Type::Record
-                | syntax::Type::Variant
-                | syntax::Type::IO
-                | syntax::Type::Unit => panic!("impossible"),
+                Type::Bool
+                | Type::Int
+                | Type::Char
+                | Type::String
+                | Type::Bytes
+                | Type::Arrow
+                | Type::FatArrow
+                | Type::Constraints(_)
+                | Type::HasField(_, _)
+                | Type::Array
+                | Type::Record
+                | Type::Variant
+                | Type::IO
+                | Type::Unit => panic!("impossible"),
             }?;
             Ok(new_evidence)
         }

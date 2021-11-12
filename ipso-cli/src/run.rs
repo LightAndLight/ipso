@@ -5,7 +5,7 @@ use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, Kind};
+use ipso_syntax::{self as syntax, r#type::Type, Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     io::{self, BufRead, BufReader, Write},
@@ -91,7 +91,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected = syntax::Type::mk_app(syntax::Type::IO, tc.fresh_typevar(Kind::Type));
+        let expected = Type::mk_app(Type::IO, tc.fresh_typevar(Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {
             expected: expected.clone(),

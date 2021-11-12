@@ -1,7 +1,7 @@
 #[cfg(test)]
 use crate::{substitution::Substitution, Typechecker, UnifyTypeContext};
 #[cfg(test)]
-use ipso_syntax::{Kind, Type};
+use ipso_syntax::{r#type::Type, Kind};
 #[cfg(test)]
 use std::rc::Rc;
 

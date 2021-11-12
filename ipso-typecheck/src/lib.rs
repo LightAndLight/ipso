@@ -1,4 +1,5 @@
 pub mod evidence;
+
 use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use fnv::FnvHashSet;
@@ -6,7 +7,7 @@ use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_rope::Rope;
-use ipso_syntax::{self as syntax, Kind, KindCompound, ModuleName, Spanned, Type};
+use ipso_syntax::{self as syntax, r#type::Type, Kind, KindCompound, ModuleName, Spanned};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,

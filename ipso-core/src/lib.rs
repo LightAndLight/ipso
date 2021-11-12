@@ -1,15 +1,14 @@
+#[cfg(test)]
+mod test;
+
+use ipso_syntax::{self as syntax, r#type::Type, ModuleName};
+use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
 };
-
-use ipso_syntax::{self as syntax, ModuleName, Type};
-use ipso_util::iter::Step;
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
@@ -873,11 +872,11 @@ impl<'a> Iterator for IterEVars<'a> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
     pub ty_vars: Vec<(Rc<str>, syntax::Kind)>,
-    pub body: syntax::Type<usize>,
+    pub body: Type<usize>,
 }
 
 impl TypeSig {
-    pub fn instantiate_many(&self, tys: &[syntax::Type<usize>]) -> TypeSig {
+    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> TypeSig {
         let mut ty_vars = self.ty_vars.clone();
         for _ty in tys.iter().rev() {
             match ty_vars.pop() {
@@ -918,14 +917,14 @@ pub enum Declaration {
     TypeAlias {
         name: String,
         args: Vec<syntax::Kind>,
-        body: syntax::Type<usize>,
+        body: Type<usize>,
     },
     Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(Rc<str>, syntax::Kind)>,
         superclass_constructors: Vec<Expr>,
-        assumes: Vec<syntax::Type<usize>>,
-        head: syntax::Type<usize>,
+        assumes: Vec<Type<usize>>,
+        head: Type<usize>,
         members: Vec<InstanceMember>,
     },
 }
@@ -970,7 +969,7 @@ impl Declaration {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassDeclaration {
-    pub supers: Vec<syntax::Type<usize>>,
+    pub supers: Vec<Type<usize>>,
     pub name: Rc<str>,
     pub args: Vec<(Rc<str>, syntax::Kind)>,
     pub members: Vec<ClassMember>,
@@ -1008,7 +1007,7 @@ impl ClassDeclaration {
                     });
                 let sig = {
                     let mut body = member.sig.body.clone();
-                    body = syntax::Type::mk_fatarrow(applied_type, body);
+                    body = Type::mk_fatarrow(applied_type, body);
 
                     TypeSig {
                         ty_vars: member.sig.ty_vars.clone(),
