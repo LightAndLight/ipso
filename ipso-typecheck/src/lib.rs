@@ -7,7 +7,12 @@ use ipso_builtins as builtins;
 use ipso_core::{self as core, ModulePath};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_rope::Rope;
-use ipso_syntax::{self as syntax, r#type::Type, Kind, KindCompound, ModuleName, Spanned};
+use ipso_syntax::{
+    self as syntax,
+    kind::{Kind, KindCompound},
+    r#type::Type,
+    ModuleName, Spanned,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,

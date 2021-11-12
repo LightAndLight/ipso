@@ -8,7 +8,7 @@ use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig}
 #[cfg(test)]
 use ipso_diagnostic::Source;
 #[cfg(test)]
-use ipso_syntax::{self as syntax, r#type::Type, Binop, Kind, Spanned};
+use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, Binop, Spanned};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
@@ -1485,7 +1485,7 @@ fn check_definition_1() {
             Ok(Some(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(Rc::from("a"), syntax::Kind::Type)],
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     body: Type::mk_arrow(Type::Var(0), Type::Var(0))
                 },
                 body: Rc::new(core::Expr::mk_lam(true, core::Expr::Var(0)))
@@ -1537,7 +1537,7 @@ fn check_definition_2() {
         let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
-                ty_vars: vec![(Rc::from("r"), syntax::Kind::Row)],
+                ty_vars: vec![(Rc::from("r"), Kind::Row)],
                 body: Type::mk_fatarrow(
                     Type::mk_hasfield(Rc::from("x"), Type::Var(0)),
                     Type::mk_arrow(
@@ -1678,7 +1678,7 @@ fn check_definition_4() {
         let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("getx"),
             sig: core::TypeSig {
-                ty_vars: vec![(Rc::from("r"), syntax::Kind::Row)],
+                ty_vars: vec![(Rc::from("r"), Kind::Row)],
                 body: Type::mk_fatarrow(
                     Type::mk_hasfield(Rc::from("x"), Type::Var(0)),
                     Type::mk_arrow(

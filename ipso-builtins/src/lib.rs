@@ -1,5 +1,5 @@
 use ipso_core::{Builtin, Declaration, Expr, Module, TypeSig};
-use ipso_syntax::{r#type::Type, Kind};
+use ipso_syntax::{kind::Kind, r#type::Type};
 use std::collections::HashMap;
 use std::rc::Rc;
 

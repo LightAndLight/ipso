@@ -5,7 +5,7 @@ use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, r#type::Type, Kind};
+use ipso_syntax::{self as syntax, kind::Kind, r#type::Type};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     io::{self, BufRead, BufReader, Write},

@@ -3,7 +3,7 @@ use crate::{
     UnifyTypeContext,
 };
 use ipso_core::{self as core, Expr, Placeholder};
-use ipso_syntax::{r#type::Type, Binop, Kind};
+use ipso_syntax::{kind::Kind, r#type::Type, Binop};
 
 use super::Constraint;
 

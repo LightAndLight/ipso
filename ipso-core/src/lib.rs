@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, r#type::Type, ModuleName};
+use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, ModuleName};
 use ipso_util::iter::Step;
 use std::{
     cmp,
@@ -871,7 +871,7 @@ impl<'a> Iterator for IterEVars<'a> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
-    pub ty_vars: Vec<(Rc<str>, syntax::Kind)>,
+    pub ty_vars: Vec<(Rc<str>, Kind)>,
     pub body: Type<usize>,
 }
 
@@ -907,7 +907,7 @@ pub struct InstanceMember {
 pub enum Declaration {
     BuiltinType {
         name: String,
-        kind: syntax::Kind,
+        kind: Kind,
     },
     Definition {
         name: String,
@@ -916,12 +916,12 @@ pub enum Declaration {
     },
     TypeAlias {
         name: String,
-        args: Vec<syntax::Kind>,
+        args: Vec<Kind>,
         body: Type<usize>,
     },
     Class(ClassDeclaration),
     Instance {
-        ty_vars: Vec<(Rc<str>, syntax::Kind)>,
+        ty_vars: Vec<(Rc<str>, Kind)>,
         superclass_constructors: Vec<Expr>,
         assumes: Vec<Type<usize>>,
         head: Type<usize>,
@@ -971,7 +971,7 @@ impl Declaration {
 pub struct ClassDeclaration {
     pub supers: Vec<Type<usize>>,
     pub name: Rc<str>,
-    pub args: Vec<(Rc<str>, syntax::Kind)>,
+    pub args: Vec<(Rc<str>, Kind)>,
     pub members: Vec<ClassMember>,
 }
 

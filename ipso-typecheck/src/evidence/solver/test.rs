@@ -6,7 +6,7 @@ use crate::{
 #[cfg(test)]
 use ipso_core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
 #[cfg(test)]
-use ipso_syntax::{r#type::Type, Binop, Kind};
+use ipso_syntax::{kind::Kind, r#type::Type, Binop};
 #[cfg(test)]
 use std::rc::Rc;
 
