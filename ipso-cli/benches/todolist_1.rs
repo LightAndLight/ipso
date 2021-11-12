@@ -1,22 +1,28 @@
-use std::{fs::File, io::BufReader};
+use std::{
+    fs,
+    io::{BufReader, Cursor},
+    rc::Rc,
+};
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 fn one(c: &mut Criterion) {
+    let contents: Rc<str> =
+        Rc::from(fs::read_to_string("benches/todolist_1_input.txt").expect("failed to read file"));
     c.bench_function("one", |b| {
         b.iter_batched(
             || {
-                let input =
-                    File::open("benches/todolist_1_input.txt").expect("File::open() failed");
                 let output = Vec::new();
-                ipso::run::Config {
-                    filename: String::from("examples/todolist.ipso"),
+                ipso_cli::run::Config {
+                    filename: String::from("../examples/todolist.ipso"),
                     entrypoint: None,
-                    stdin: Some(Box::new(BufReader::new(input))),
+                    stdin: Some(Box::new(BufReader::new(Cursor::new(String::from(
+                        contents.as_ref(),
+                    ))))),
                     stdout: Some(Box::new(output)),
                 }
             },
-            ipso::run::run_interpreter,
+            ipso_cli::run::run_interpreter,
             BatchSize::SmallInput,
         )
     });
