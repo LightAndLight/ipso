@@ -37,28 +37,22 @@ impl Pattern {
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
-        &self,
+        &mut self,
         f: &mut F,
-    ) -> Result<Self, E> {
+    ) -> Result<(), E> {
         match self {
-            Pattern::Name => Ok(Pattern::Name),
-            Pattern::Record { names, rest } => {
-                let names = {
-                    let mut new_names = Vec::new();
-                    for name in names {
-                        match name.subst_placeholder(f) {
-                            Err(err) => return Err(err),
-                            Ok(new_name) => {
-                                new_names.push(new_name);
-                            }
-                        }
+            Pattern::Name => Ok(()),
+            Pattern::Record { names, .. } => {
+                for name in names {
+                    match name.subst_placeholder(f) {
+                        Err(err) => return Err(err),
+                        Ok(()) => {}
                     }
-                    new_names
-                };
-                Ok(Pattern::Record { names, rest: *rest })
+                }
+                Ok(())
             }
-            Pattern::Variant { tag } => tag.subst_placeholder(f).map(Pattern::mk_variant),
-            Pattern::Wildcard => Ok(Pattern::Wildcard),
+            Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
+            Pattern::Wildcard => Ok(()),
         }
     }
 
@@ -108,14 +102,11 @@ impl Branch {
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
-        &self,
+        &mut self,
         f: &mut F,
-    ) -> Result<Self, E> {
-        self.body.subst_placeholder(f).and_then(|body| {
-            self.pattern
-                .subst_placeholder(f)
-                .map(|pattern| Branch { pattern, body })
-        })
+    ) -> Result<(), E> {
+        self.body.subst_placeholder(f)?;
+        self.pattern.subst_placeholder(f)
     }
 
     pub fn __instantiate(&self, depth: usize, val: &Expr) -> Self {
@@ -166,12 +157,12 @@ impl StringPart {
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
-        &self,
+        &mut self,
         f: &mut F,
-    ) -> Result<Self, E> {
+    ) -> Result<(), E> {
         match self {
-            StringPart::String(s) => Ok(StringPart::String(s.clone())),
-            StringPart::Expr(e) => e.subst_placeholder(f).map(StringPart::Expr),
+            StringPart::String(_) => Ok(()),
+            StringPart::Expr(e) => e.subst_placeholder(f),
         }
     }
 
@@ -543,111 +534,103 @@ impl Expr {
     }
 
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
-        &self,
+        &mut self,
         f: &mut F,
-    ) -> Result<Expr, E> {
+    ) -> Result<(), E> {
         match self {
-            Expr::Var(n) => Ok(Expr::Var(*n)),
-            Expr::EVar(n) => Ok(Expr::EVar(*n)),
-            Expr::Module(n, f) => Ok(Expr::Module(n.clone(), f.clone())),
-            Expr::Placeholder(v) => f(v),
-            Expr::Name(n) => Ok(Expr::Name(n.clone())),
-            Expr::Builtin(b) => Ok(Expr::Builtin(*b)),
-            Expr::App(a, b) => a
-                .subst_placeholder(f)
-                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_app(a, b))),
-            Expr::Lam { arg, body } => body
-                .subst_placeholder(f)
-                .map(|body| Expr::mk_lam(*arg, body)),
-            Expr::Let { value, rest } => value.subst_placeholder(f).and_then(|value| {
-                rest.subst_placeholder(f).map(|rest| Expr::Let {
-                    value: Rc::new(value),
-                    rest: Rc::new(rest),
-                })
-            }),
-            Expr::True => Ok(Expr::True),
-            Expr::False => Ok(Expr::False),
-            Expr::IfThenElse(a, b, c) => a.subst_placeholder(f).and_then(|a| {
-                b.subst_placeholder(f)
-                    .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_ifthenelse(a, b, c)))
-            }),
-            Expr::Int(n) => Ok(Expr::Int(*n)),
-            Expr::Binop(a, b, c) => b
-                .subst_placeholder(f)
-                .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_binop(*a, b, c))),
-            Expr::Char(c) => Ok(Expr::Char(*c)),
+            Expr::Var(_) => Ok(()),
+            Expr::EVar(_) => Ok(()),
+            Expr::Module(_, _) => Ok(()),
+            Expr::Placeholder(v) => {
+                let new_value = f(v)?;
+                *self = new_value;
+                Ok(())
+            }
+            Expr::Name(_) => Ok(()),
+            Expr::Builtin(_) => Ok(()),
+            Expr::App(a, b) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
+                Rc::make_mut(b).subst_placeholder(f)
+            }
+            Expr::Lam { body, .. } => Rc::make_mut(body).subst_placeholder(f),
+            Expr::Let { value, rest } => {
+                Rc::make_mut(value).subst_placeholder(f)?;
+                Rc::make_mut(rest).subst_placeholder(f)
+            }
+            Expr::True => Ok(()),
+            Expr::False => Ok(()),
+            Expr::IfThenElse(a, b, c) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
+                Rc::make_mut(b).subst_placeholder(f)?;
+                Rc::make_mut(c).subst_placeholder(f)
+            }
+            Expr::Int(_) => Ok(()),
+            Expr::Binop(_, b, c) => {
+                Rc::make_mut(b).subst_placeholder(f)?;
+                Rc::make_mut(c).subst_placeholder(f)
+            }
+            Expr::Char(_) => Ok(()),
             Expr::String(parts) => {
-                let mut new_parts = Vec::new();
                 for part in parts {
                     match part.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
-                        Ok(new_part) => {
-                            new_parts.push(new_part);
-                        }
+                        Ok(()) => {}
                     }
                 }
-                Ok(Expr::String(new_parts))
+                Ok(())
             }
             Expr::Array(items) => {
-                let mut new_items = Vec::new();
                 for item in items {
                     match item.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
-                        Ok(new_item) => {
-                            new_items.push(new_item);
-                        }
+                        Ok(()) => {}
                     }
                 }
-                Ok(Expr::Array(new_items))
+                Ok(())
             }
-            Expr::Extend(a, b, c) => a.subst_placeholder(f).and_then(|a| {
-                b.subst_placeholder(f)
-                    .and_then(|b| c.subst_placeholder(f).map(|c| Expr::mk_extend(a, b, c)))
-            }),
+            Expr::Extend(a, b, c) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
+                Rc::make_mut(b).subst_placeholder(f)?;
+                Rc::make_mut(c).subst_placeholder(f)
+            }
             Expr::Record(items) => {
-                let mut new_items = Vec::new();
                 for (a, b) in items {
-                    match a
-                        .subst_placeholder(f)
-                        .and_then(|a| b.subst_placeholder(f).map(|b| (a, b)))
-                    {
+                    match a.subst_placeholder(f).and_then(|()| b.subst_placeholder(f)) {
                         Err(err) => {
                             return Err(err);
                         }
-                        Ok(new_item) => {
-                            new_items.push(new_item);
-                        }
+                        Ok(()) => {}
                     }
                 }
-                Ok(Expr::Record(new_items))
+                Ok(())
             }
-            Expr::Project(a, b) => a
-                .subst_placeholder(f)
-                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_project(a, b))),
-            Expr::Variant(a) => a.subst_placeholder(f).map(Expr::mk_variant),
-            Expr::Embed(a, b) => a
-                .subst_placeholder(f)
-                .and_then(|a| b.subst_placeholder(f).map(|b| Expr::mk_embed(a, b))),
-            Expr::Case(a, bs) => a.subst_placeholder(f).and_then(|a| {
-                let mut new_bs = Vec::new();
+            Expr::Project(a, b) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
+                Rc::make_mut(b).subst_placeholder(f)
+            }
+            Expr::Variant(a) => Rc::make_mut(a).subst_placeholder(f),
+            Expr::Embed(a, b) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
+                Rc::make_mut(b).subst_placeholder(f)
+            }
+            Expr::Case(a, bs) => {
+                Rc::make_mut(a).subst_placeholder(f)?;
                 for b in bs {
                     match b.subst_placeholder(f) {
                         Err(err) => {
                             return Err(err);
                         }
-                        Ok(new_b) => {
-                            new_bs.push(new_b);
-                        }
+                        Ok(()) => {}
                     }
                 }
-                Ok(Expr::mk_case(a, new_bs))
-            }),
+                Ok(())
+            }
 
-            Expr::Unit => Ok(Expr::Unit),
+            Expr::Unit => Ok(()),
         }
     }
 

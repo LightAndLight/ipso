@@ -799,9 +799,9 @@ impl<'modules> Typechecker<'modules> {
 
     fn abstract_evidence(
         &mut self,
-        expr: core::Expr,
+        mut expr: core::Expr,
     ) -> Result<(core::Expr, Vec<Type<usize>>), TypeError> {
-        let expr = expr.subst_placeholder(&mut |p| {
+        expr.subst_placeholder(&mut |p| {
             let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
             Ok(expr)
         })?;

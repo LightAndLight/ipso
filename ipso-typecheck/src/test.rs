@@ -1405,10 +1405,10 @@ fn infer_record_1() {
             .map(|(expr, ty)| (expr, tc.zonk_type(&ty)));
         assert_eq!(expected_result, actual_result, "checking results");
 
-        let (actual_expr, _actual_ty) = actual_result.unwrap();
+        let (mut actual_expr, _actual_ty) = actual_result.unwrap();
 
         let mut placeholders: HashSet<Placeholder> = HashSet::new();
-        let _: Result<core::Expr, Void> = actual_expr.subst_placeholder(&mut |p| {
+        let _: Result<(), Void> = actual_expr.subst_placeholder(&mut |p| {
             placeholders.insert(*p);
             Ok(core::Expr::Placeholder(*p))
         });
