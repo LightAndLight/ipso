@@ -1,5 +1,9 @@
 pub mod evidence;
+pub mod substitution;
+#[cfg(test)]
+mod test;
 
+use self::substitution::Substitution;
 use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use fnv::FnvHashSet;
@@ -20,13 +24,6 @@ use std::{
     rc::Rc,
     todo,
 };
-
-use self::substitution::Substitution;
-
-pub mod substitution;
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug, PartialEq, Eq)]
 struct BoundVars<A> {
