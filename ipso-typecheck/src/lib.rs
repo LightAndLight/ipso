@@ -914,7 +914,7 @@ impl<'modules> Typechecker<'modules> {
                 pos,
                 item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
             },
-            ty.clone(),
+            ty,
         )?;
 
         let (body, sig) = self.generalise(body, ty.clone())?;
@@ -1156,7 +1156,7 @@ impl<'modules> Typechecker<'modules> {
                                     member_body.clone(),
                                 ),
                             },
-                            member_type.sig.body.clone(),
+                            &member_type.sig.body,
                         )
                         .and_then(|member_body| {
                             self.generalise(member_body, member_type.sig.body.clone())
@@ -2054,7 +2054,7 @@ impl<'modules> Typechecker<'modules> {
         match part {
             syntax::StringPart::String(s) => Ok(core::StringPart::String(s.clone())),
             syntax::StringPart::Expr(e) => {
-                let e_core = self.check_expr(e, Type::String)?;
+                let e_core = self.check_expr(e, &Type::String)?;
                 Ok(core::StringPart::Expr(e_core))
             }
         }
@@ -2132,7 +2132,7 @@ impl<'modules> Typechecker<'modules> {
                         actual: actual.clone(),
                     };
                     self.unify_type(&context, &expected, &actual)?;
-                    let x_core = self.check_expr(x, in_ty)?;
+                    let x_core = self.check_expr(x, &in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
                 syntax::Expr::Lam { args, body } => {
@@ -2147,7 +2147,7 @@ impl<'modules> Typechecker<'modules> {
                                 body: body.clone(),
                             },
                         },
-                        ty.clone(),
+                        &ty,
                     )?;
                     Ok((expr_core, ty))
                 }
@@ -2169,9 +2169,9 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::True => Ok((core::Expr::True, Type::Bool)),
                 syntax::Expr::False => Ok((core::Expr::False, Type::Bool)),
                 syntax::Expr::IfThenElse(cond, then_, else_) => {
-                    let cond_core = self.check_expr(cond, Type::Bool)?;
+                    let cond_core = self.check_expr(cond, &Type::Bool)?;
                     let (then_core, then_ty) = self.infer_expr(then_)?;
-                    let else_core = self.check_expr(else_, then_ty.clone())?;
+                    let else_core = self.check_expr(else_, &then_ty)?;
                     Ok((
                         core::Expr::mk_ifthenelse(cond_core, then_core, else_core),
                         then_ty,
@@ -2197,7 +2197,7 @@ impl<'modules> Typechecker<'modules> {
                             let (first_core, first_ty) = self.infer_expr(first)?;
                             let mut items_core = vec![first_core];
                             for item in items_iter {
-                                let item_core = self.check_expr(item, first_ty.clone())?;
+                                let item_core = self.check_expr(item, &first_ty)?;
                                 items_core.push(item_core);
                             }
                             Ok((
@@ -2255,7 +2255,7 @@ impl<'modules> Typechecker<'modules> {
                         Some(expr) => {
                             let expr_core = self.check_expr(
                                 expr,
-                                Type::mk_app(Type::Record, rest_row_var.clone()),
+                                &Type::mk_app(Type::Record, rest_row_var.clone()),
                             )?;
                             rest_core = Some(expr_core);
                             rest_row = Some(rest_row_var);
@@ -2274,7 +2274,7 @@ impl<'modules> Typechecker<'modules> {
                     let rest = self.fresh_typevar(Kind::Row);
                     let rows = Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
                     let expr_core =
-                        self.check_expr(expr, Type::mk_app(Type::Record, rows.clone()))?;
+                        self.check_expr(expr, &Type::mk_app(Type::Record, rows.clone()))?;
                     let offset = self
                         .evidence
                         .placeholder(None, evidence::Constraint::HasField { field, rest: rows });
@@ -2309,7 +2309,7 @@ impl<'modules> Typechecker<'modules> {
                     let arg_ty = self.fresh_typevar(Kind::Type);
                     let rest_rows = self.fresh_typevar(Kind::Row);
                     let rest_core =
-                        self.check_expr(rest, Type::mk_app(Type::Variant, rest_rows.clone()))?;
+                        self.check_expr(rest, &Type::mk_app(Type::Variant, rest_rows.clone()))?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
                         None,
                         evidence::Constraint::HasField {
@@ -2325,42 +2325,42 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Binop(op, left, right) => {
                     match op {
                         syntax::Binop::Add => {
-                            let left_core = self.check_expr(left, Type::Int)?;
-                            let right_core = self.check_expr(right, Type::Int)?;
+                            let left_core = self.check_expr(left, &Type::Int)?;
+                            let right_core = self.check_expr(right, &Type::Int)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
                         }
                         syntax::Binop::Multiply => {
-                            let left_core = self.check_expr(left, Type::Int)?;
-                            let right_core = self.check_expr(right, Type::Int)?;
+                            let left_core = self.check_expr(left, &Type::Int)?;
+                            let right_core = self.check_expr(right, &Type::Int)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
                         }
                         syntax::Binop::Subtract => {
-                            let left_core = self.check_expr(left, Type::Int)?;
-                            let right_core = self.check_expr(right, Type::Int)?;
+                            let left_core = self.check_expr(left, &Type::Int)?;
+                            let right_core = self.check_expr(right, &Type::Int)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
                         }
                         syntax::Binop::Divide => {
-                            let left_core = self.check_expr(left, Type::Int)?;
-                            let right_core = self.check_expr(right, Type::Int)?;
+                            let left_core = self.check_expr(left, &Type::Int)?;
+                            let right_core = self.check_expr(right, &Type::Int)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
                         }
 
                         syntax::Binop::Append => {
                             let item_ty = self.fresh_typevar(Kind::Type);
                             let expected = Type::mk_app(Type::Array, item_ty);
-                            let left_core = self.check_expr(left, expected.clone())?;
-                            let right_core = self.check_expr(right, expected.clone())?;
+                            let left_core = self.check_expr(left, &expected)?;
+                            let right_core = self.check_expr(right, &expected)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), expected))
                         }
 
                         syntax::Binop::Or => {
-                            let left_core = self.check_expr(left, Type::Bool)?;
-                            let right_core = self.check_expr(right, Type::Bool)?;
+                            let left_core = self.check_expr(left, &Type::Bool)?;
+                            let right_core = self.check_expr(right, &Type::Bool)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
                         }
                         syntax::Binop::And => {
-                            let left_core = self.check_expr(left, Type::Bool)?;
-                            let right_core = self.check_expr(right, Type::Bool)?;
+                            let left_core = self.check_expr(left, &Type::Bool)?;
+                            let right_core = self.check_expr(right, &Type::Bool)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
                         }
 
@@ -2505,7 +2505,7 @@ impl<'modules> Typechecker<'modules> {
                                 Ok((pattern_core, pattern_ty, pattern_binds))
                             })?;
                         self.bound_vars.insert(&pattern_binds);
-                        let body_core = self.check_expr(&branch.body, expected_body_ty.clone())?;
+                        let body_core = self.check_expr(&branch.body, &expected_body_ty)?;
                         self.bound_vars.delete(pattern_binds.len());
                         branches_core.push(core::Branch {
                             pattern: pattern_core,
@@ -2544,7 +2544,7 @@ impl<'modules> Typechecker<'modules> {
     fn check_expr(
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
-        ty: Type<usize>,
+        ty: &Type<usize>,
     ) -> Result<core::Expr, TypeError> {
         with_position!(
             self,
@@ -2568,7 +2568,7 @@ impl<'modules> Typechecker<'modules> {
                         expected: ty.clone(),
                         actual: actual.clone(),
                     };
-                    self.unify_type(&context, &ty, &actual)?;
+                    self.unify_type(&context, ty, &actual)?;
 
                     let mut args_core = Vec::new();
                     let mut args_binds = Vec::new();
@@ -2585,7 +2585,7 @@ impl<'modules> Typechecker<'modules> {
                     }
 
                     self.bound_vars.insert(&args_binds);
-                    let body_core = self.check_expr(body, out_ty)?;
+                    let body_core = self.check_expr(body, &out_ty)?;
                     self.bound_vars.delete(args_binds.len());
 
                     let mut expr_core = body_core;
@@ -2620,7 +2620,7 @@ impl<'modules> Typechecker<'modules> {
                         expected: expected.clone(),
                         actual: actual.clone(),
                     };
-                    self.unify_type(&context, &expected, &actual)?;
+                    self.unify_type(&context, expected, &actual)?;
                     Ok(expr)
                 }
             }
