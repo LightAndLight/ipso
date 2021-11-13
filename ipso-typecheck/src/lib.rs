@@ -2053,6 +2053,57 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    fn infer_variant_pattern_case(
+        &mut self,
+        m_expr_rows: &mut Option<Type<usize>>,
+        expected_pattern_ty: &mut Type<usize>,
+        seen_ctors: &mut HashSet<Rc<str>>,
+        name: &str,
+        arg: &Spanned<String>,
+    ) -> Result<(core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>), TypeError> {
+        let name: Rc<str> = Rc::from(name);
+
+        let arg_ty = self.fresh_typevar(Kind::Type);
+        let rest_row = self.fresh_typevar(Kind::Row);
+        let pattern_rows =
+            Type::mk_rows(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let expr_rows: Type<usize> = match &m_expr_rows {
+            None => {
+                *m_expr_rows = Some(pattern_rows.clone());
+                pattern_rows.clone()
+            }
+            Some(rows) => rows.clone(),
+        };
+
+        let tag = core::Expr::Placeholder(self.evidence.placeholder(
+            None,
+            evidence::Constraint::HasField {
+                field: name.clone(),
+                rest: expr_rows,
+            },
+        ));
+
+        let pattern_ty = Type::mk_app(Type::Variant, pattern_rows);
+        let context: UnifyTypeContext<usize> = UnifyTypeContext {
+            expected: expected_pattern_ty.clone(),
+            actual: pattern_ty.clone(),
+        };
+        match self.unify_type(&context, expected_pattern_ty, &pattern_ty) {
+            Err(err) => {
+                return Err(err);
+            }
+            Ok(()) => {}
+        }
+        *expected_pattern_ty = Type::mk_variant(Vec::new(), Some(rest_row));
+
+        seen_ctors.insert(name);
+
+        let pattern_core = core::Pattern::mk_variant(tag);
+        let pattern_binds: Vec<(Rc<str>, Type<usize>)> =
+            vec![(Rc::from(arg.item.as_ref()), arg_ty)];
+        Ok((pattern_core, pattern_ty, pattern_binds))
+    }
+
     fn check_pattern(
         &mut self,
         arg: &syntax::Pattern,
@@ -2417,7 +2468,7 @@ impl<'modules> Typechecker<'modules> {
                     let mut seen_fallthrough = false;
                     let mut matching_variant = false;
                     let mut seen_ctors: HashSet<Rc<str>> = HashSet::new();
-                    let mut expr_rows: Option<Type<usize>> = None;
+                    let mut expr_rows = None;
                     for branch in branches {
                         if seen_fallthrough
                             || match &branch.pattern.item {
@@ -2437,68 +2488,25 @@ impl<'modules> Typechecker<'modules> {
                                 let ((pattern_core, pattern_ty, pattern_binds), saw_variant) =
                                     match &branch.pattern.item {
                                         syntax::Pattern::Wildcard => {
-                                            (self.infer_wildcard_pattern(), false)
+                                            Ok((self.infer_wildcard_pattern(), false))
                                         }
                                         syntax::Pattern::Name(n) => {
-                                            (self.infer_name_pattern(n), false)
+                                            Ok((self.infer_name_pattern(n), false))
                                         }
                                         syntax::Pattern::Record { names, rest } => {
-                                            (self.infer_record_pattern(names, rest), false)
+                                            Ok((self.infer_record_pattern(names, rest), false))
                                         }
                                         syntax::Pattern::Variant { name, arg } => {
-                                            let name: Rc<str> = Rc::from(name.as_ref());
-
-                                            let arg_ty = self.fresh_typevar(Kind::Type);
-                                            let rest_row = self.fresh_typevar(Kind::Row);
-                                            let pattern_rows = Type::mk_rows(
-                                                vec![(name.clone(), arg_ty.clone())],
-                                                Some(rest_row.clone()),
-                                            );
-                                            let expr_rows: Type<usize> = match &expr_rows {
-                                                None => {
-                                                    expr_rows = Some(pattern_rows.clone());
-                                                    pattern_rows.clone()
-                                                }
-                                                Some(rows) => rows.clone(),
-                                            };
-
-                                            let tag =
-                                                core::Expr::Placeholder(self.evidence.placeholder(
-                                                    None,
-                                                    evidence::Constraint::HasField {
-                                                        field: name.clone(),
-                                                        rest: expr_rows,
-                                                    },
-                                                ));
-
-                                            let pattern_ty =
-                                                Type::mk_app(Type::Variant, pattern_rows);
-                                            let context: UnifyTypeContext<usize> =
-                                                UnifyTypeContext {
-                                                    expected: expected_pattern_ty.clone(),
-                                                    actual: pattern_ty.clone(),
-                                                };
-                                            match self.unify_type(
-                                                &context,
-                                                &expected_pattern_ty,
-                                                &pattern_ty,
-                                            ) {
-                                                Err(err) => {
-                                                    return Err(err);
-                                                }
-                                                Ok(()) => {}
-                                            }
-                                            expected_pattern_ty =
-                                                Type::mk_variant(Vec::new(), Some(rest_row));
-
-                                            seen_ctors.insert(name);
-
-                                            let pattern_core = core::Pattern::mk_variant(tag);
-                                            let pattern_binds: Vec<(Rc<str>, Type<usize>)> =
-                                                vec![(Rc::from(arg.item.as_ref()), arg_ty)];
-                                            ((pattern_core, pattern_ty, pattern_binds), true)
+                                            let res = self.infer_variant_pattern_case(
+                                                &mut expr_rows,
+                                                &mut expected_pattern_ty,
+                                                &mut seen_ctors,
+                                                name,
+                                                arg,
+                                            )?;
+                                            Ok((res, true))
                                         }
-                                    };
+                                    }?;
                                 if !saw_variant {
                                     let context: UnifyTypeContext<usize> = UnifyTypeContext {
                                         expected: expected_pattern_ty.clone(),
