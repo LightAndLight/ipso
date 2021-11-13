@@ -171,6 +171,16 @@ impl Type {
         }
     }
 
+    pub fn mk_rowcons(field: Rc<str>, a: Type, b: Type) -> Type {
+        debug_assert!(a.kind == Kind::Type, "{:?} is not Kind::Type", a);
+        debug_assert!(b.kind == Kind::Row, "{:?} is not Kind::Row", b);
+
+        Type {
+            value: r#type::Type::mk_rowcons(field, a.get_value().clone(), b.get_value().clone()),
+            kind: Kind::Row,
+        }
+    }
+
     pub fn mk_record(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
         debug_assert!(
             fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
