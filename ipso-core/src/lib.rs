@@ -84,6 +84,13 @@ impl Type {
         }
     }
 
+    pub fn mk_rownil() -> Self {
+        Type {
+            value: r#type::Type::RowNil,
+            kind: Kind::Row,
+        }
+    }
+
     pub fn mk_bool() -> Self {
         Type {
             value: r#type::Type::Bool,
