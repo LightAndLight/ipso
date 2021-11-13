@@ -27,73 +27,6 @@ pub enum Type<A> {
     Meta(usize),
 }
 
-impl Type<usize> {
-    pub fn subst_metas<F: Fn(usize) -> Type<usize>>(&self, f: &F) -> Type<usize> {
-        match self {
-            Type::Name(n) => Type::Name(n.clone()),
-            Type::Var(n) => Type::Var(*n),
-            Type::Bool => Type::Bool,
-            Type::Int => Type::Int,
-            Type::Char => Type::Char,
-            Type::String => Type::String,
-            Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
-            Type::Constraints(cs) => {
-                Type::Constraints(cs.iter().map(|c| c.subst_metas(f)).collect())
-            }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
-            Type::App(a, b) => Type::mk_app(a.subst_metas(f), b.subst_metas(f)),
-            Type::RowNil => Type::RowNil,
-            Type::RowCons(field, ty, rest) => {
-                Type::mk_rowcons(field.clone(), ty.subst_metas(f), rest.subst_metas(f))
-            }
-            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst_metas(f)),
-            Type::Unit => Type::Unit,
-            Type::Meta(n) => f(*n),
-        }
-    }
-
-    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> Self {
-        match self {
-            Type::Name(n) => Type::Name(n.clone()),
-            Type::Var(n) => {
-                let tys_len = tys.len();
-                if *n < tys_len {
-                    tys[tys_len - 1 - n].clone()
-                } else {
-                    Type::Var(*n - tys_len)
-                }
-            }
-            Type::Bool => Type::Bool,
-            Type::Int => Type::Int,
-            Type::Char => Type::Char,
-            Type::String => Type::String,
-            Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
-            Type::Constraints(cs) => {
-                Type::Constraints(cs.iter().map(|c| c.instantiate_many(tys)).collect())
-            }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::Variant,
-            Type::App(a, b) => Type::mk_app(a.instantiate_many(tys), b.instantiate_many(tys)),
-            Type::RowNil => Type::RowNil,
-            Type::RowCons(a, b, c) => {
-                Type::mk_rowcons(a.clone(), b.instantiate_many(tys), c.instantiate_many(tys))
-            }
-            Type::HasField(a, b) => Type::mk_hasfield(a.clone(), b.instantiate_many(tys)),
-            Type::Unit => Type::Unit,
-            Type::Meta(n) => Type::Meta(*n),
-        }
-    }
-}
-
 impl<A> Type<A> {
     pub fn flatten_constraints(&self) -> Vec<&Self> {
         fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) {
@@ -278,30 +211,6 @@ impl<A> Type<A> {
 
     pub fn iter_metas(&self) -> TypeIterMetas<A> {
         TypeIterMetas::One(self)
-    }
-
-    pub fn unwrap_constraints(&self) -> (Vec<&Type<A>>, &Type<A>) {
-        fn flatten_constraints<A>(ty: &Type<A>) -> Vec<&Type<A>> {
-            match ty {
-                Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
-                _ => vec![ty],
-            }
-        }
-
-        pub fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) -> &'a Type<A> {
-            match ty.unwrap_fatarrow() {
-                None => ty,
-                Some((c, ty)) => {
-                    let more_constraints = flatten_constraints(c);
-                    constraints.extend(more_constraints.iter());
-
-                    go(constraints, ty)
-                }
-            }
-        }
-        let mut constraints = Vec::new();
-        let ty = go(&mut constraints, self);
-        (constraints, ty)
     }
 
     fn unwrap_arrow(&self) -> Option<(&Type<A>, &Type<A>)> {
