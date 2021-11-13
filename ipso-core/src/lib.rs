@@ -18,255 +18,411 @@ When kind polymorphism isn't in play, the kind of a compound type is always know
 just well-formedness that needs to be checked.
 */
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Type {
-    value: r#type::Type<usize>,
-    kind: Kind,
+pub enum Type {
+    Bool,
+    Int,
+    Char,
+    String,
+    Bytes,
+    Arrow,
+    FatArrow,
+    Array,
+    Record,
+    Variant,
+    IO,
+    RowNil,
+    Unit,
+    Constraints(Vec<Type>),
+    RowCons(Rc<str>, Rc<Type>, Rc<Type>),
+    HasField(Rc<str>, Rc<Type>),
+    Name(Kind, Rc<str>),
+    Var(Kind, usize),
+    App(Kind, Rc<Type>, Rc<Type>),
+    Meta(Kind, usize),
 }
 
 impl Type {
-    pub fn get_value(&self) -> &r#type::Type<usize> {
-        &self.value
-    }
-
-    pub fn get_kind(&self) -> &Kind {
-        &self.kind
-    }
-
-    pub fn instantiate_many(&self, tys: &[r#type::Type<usize>]) -> Self {
-        Type {
-            value: self.value.instantiate_many(tys),
-            kind: self.kind.clone(),
+    pub fn get_value(&self) -> r#type::Type<usize> {
+        match self {
+            Type::Bool => r#type::Type::Bool,
+            Type::Int => r#type::Type::Int,
+            Type::Char => r#type::Type::Char,
+            Type::String => r#type::Type::String,
+            Type::Bytes => r#type::Type::Bytes,
+            Type::Arrow => r#type::Type::Arrow,
+            Type::FatArrow => r#type::Type::FatArrow,
+            Type::Array => r#type::Type::Array,
+            Type::Record => r#type::Type::Record,
+            Type::Variant => r#type::Type::Variant,
+            Type::IO => r#type::Type::IO,
+            Type::RowNil => r#type::Type::RowNil,
+            Type::Unit => r#type::Type::Unit,
+            Type::Name(_, n) => r#type::Type::Name(n.clone()),
+            Type::Var(_, v) => r#type::Type::Var(*v),
+            Type::Constraints(cs) => {
+                r#type::Type::Constraints(cs.iter().map(Type::get_value).collect())
+            }
+            Type::App(_, a, b) => {
+                r#type::Type::mk_app(a.as_ref().get_value(), b.as_ref().get_value())
+            }
+            Type::RowCons(field, a, b) => r#type::Type::mk_rowcons(
+                field.clone(),
+                a.as_ref().get_value(),
+                b.as_ref().get_value(),
+            ),
+            Type::HasField(field, ty) => {
+                r#type::Type::mk_hasfield(field.clone(), ty.as_ref().get_value())
+            }
+            Type::Meta(_, m) => r#type::Type::Meta(*m),
         }
     }
-    pub fn unsafe_new(value: r#type::Type<usize>, kind: Kind) -> Self {
-        Type { value, kind }
+
+    pub fn get_kind(&self) -> Kind {
+        match self {
+            Type::Bool => Kind::Type,
+            Type::Int => Kind::Type,
+            Type::Char => Kind::Type,
+            Type::String => Kind::Type,
+            Type::Bytes => Kind::Type,
+            Type::Unit => Kind::Type,
+            Type::RowNil => Kind::Row,
+            Type::RowCons(_, _, _) => Kind::Row,
+            Type::Constraints(_) => Kind::Constraint,
+            Type::HasField(_, _) => Kind::Constraint,
+            Type::Array => Kind::mk_arrow(Kind::Type, Kind::Type),
+            Type::IO => Kind::mk_arrow(Kind::Type, Kind::Type),
+            Type::Record => Kind::mk_arrow(Kind::Row, Kind::Type),
+            Type::Variant => Kind::mk_arrow(Kind::Row, Kind::Type),
+            Type::Arrow => Kind::mk_arrow(Kind::Type, Kind::mk_arrow(Kind::Type, Kind::Type)),
+            Type::FatArrow => {
+                Kind::mk_arrow(Kind::Constraint, Kind::mk_arrow(Kind::Type, Kind::Type))
+            }
+            Type::Name(k, _) => k.clone(),
+            Type::Var(k, _) => k.clone(),
+            Type::App(k, _, _) => k.clone(),
+            Type::Meta(k, _) => k.clone(),
+        }
     }
 
     pub fn unsafe_mk_name(name: Rc<str>, kind: Kind) -> Self {
-        Type {
-            value: r#type::Type::Name(name),
-            kind,
-        }
+        Type::Name(kind, name)
     }
 
     pub fn unsafe_mk_var(ix: usize, kind: Kind) -> Self {
-        Type {
-            value: r#type::Type::Var(ix),
-            kind,
-        }
-    }
-
-    pub fn mk_io() -> Self {
-        Type {
-            value: r#type::Type::IO,
-            kind: Kind::mk_arrow(Kind::Type, Kind::Type),
-        }
-    }
-
-    pub fn mk_array() -> Self {
-        Type {
-            value: r#type::Type::Array,
-            kind: Kind::mk_arrow(Kind::Type, Kind::Type),
-        }
-    }
-
-    pub fn mk_char() -> Self {
-        Type {
-            value: r#type::Type::Char,
-            kind: Kind::Type,
-        }
-    }
-
-    pub fn mk_unit() -> Self {
-        Type {
-            value: r#type::Type::Unit,
-            kind: Kind::Type,
-        }
-    }
-
-    pub fn mk_rownil() -> Self {
-        Type {
-            value: r#type::Type::RowNil,
-            kind: Kind::Row,
-        }
-    }
-
-    pub fn mk_bool() -> Self {
-        Type {
-            value: r#type::Type::Bool,
-            kind: Kind::Type,
-        }
-    }
-
-    pub fn mk_int() -> Self {
-        Type {
-            value: r#type::Type::Int,
-            kind: Kind::Type,
-        }
-    }
-
-    pub fn mk_string() -> Self {
-        Type {
-            value: r#type::Type::String,
-            kind: Kind::Type,
-        }
-    }
-
-    pub fn mk_bytes() -> Self {
-        Type {
-            value: r#type::Type::Bytes,
-            kind: Kind::Type,
-        }
+        Type::Var(kind, ix)
     }
 
     pub fn mk_app(a: Type, b: Type) -> Self {
-        debug_assert!(
-            {
-                match &a.kind {
-                    Kind::Ref(r) => match r.as_ref() {
-                        syntax::kind::KindCompound::Arrow(a, _) => a == &b.kind,
-                    },
-                    _ => false,
-                }
-            },
-            "mk_app({:?}, {:?}) invalid",
-            a,
-            b
-        );
-
-        Type {
-            value: r#type::Type::mk_app(a.value, b.value),
-            kind: match a.kind {
+        Type::App(
+            match a.get_kind() {
                 Kind::Ref(r) => match r.as_ref() {
                     syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
                 },
                 r => panic!("{:?} has no return kind", r),
             },
-        }
+            Rc::new(a),
+            Rc::new(b),
+        )
     }
 
     pub fn mk_arrow(a: Type, b: Type) -> Self {
-        debug_assert!(a.kind == Kind::Type, "{:?} is not Kind::Type", a,);
-        debug_assert!(b.kind == Kind::Type, "{:?} is not Kind::Type", b,);
-
-        Type {
-            value: r#type::Type::mk_arrow(a.value, b.value),
-            kind: Kind::Type,
-        }
+        Type::mk_app(Type::mk_app(Type::Arrow, a), b)
     }
 
     pub fn mk_fatarrow(a: Type, b: Type) -> Self {
-        debug_assert!(
-            a.kind == Kind::Constraint,
-            "{:?} is not Kind::Constraint",
-            a,
-        );
-        debug_assert!(b.kind == Kind::Type, "{:?} is not Kind::Type", b,);
-
-        Type {
-            value: r#type::Type::mk_fatarrow(a.value, b.value),
-            kind: Kind::Type,
-        }
+        Type::mk_app(Type::mk_app(Type::FatArrow, a), b)
     }
 
     pub fn mk_hasfield(name: Rc<str>, ty: Type) -> Self {
-        debug_assert!(ty.kind == Kind::Row, "{:?} is not Kind::Row", ty);
-
-        Type {
-            value: r#type::Type::mk_hasfield(name, ty.value),
-            kind: Kind::Constraint,
-        }
+        Type::HasField(name, Rc::new(ty))
     }
 
     pub fn mk_rowcons(field: Rc<str>, a: Type, b: Type) -> Type {
-        debug_assert!(a.kind == Kind::Type, "{:?} is not Kind::Type", a);
-        debug_assert!(b.kind == Kind::Row, "{:?} is not Kind::Row", b);
-
-        Type {
-            value: r#type::Type::mk_rowcons(field, a.get_value().clone(), b.get_value().clone()),
-            kind: Kind::Row,
-        }
+        Type::RowCons(field, Rc::new(a), Rc::new(b))
     }
 
     pub fn mk_rows(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
-        debug_assert!(
-            fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
-            "{:?} is not Kind::Type",
-            fields.iter().find(|x| x.1.kind != Kind::Type).unwrap()
-        );
-        debug_assert!(
-            match &rest {
-                Some(rest) => rest.kind == Kind::Row,
-                None => true,
+        fields.into_iter().rev().fold(
+            match rest {
+                None => Type::RowNil,
+                Some(rest) => rest,
             },
-            "{:?} is not Kind::Row",
-            rest
-        );
-
-        Type {
-            value: r#type::Type::mk_rows(
-                fields
-                    .into_iter()
-                    .map(|(name, ty)| (name, ty.value))
-                    .collect(),
-                rest.map(|x| x.get_value().clone()),
-            ),
-            kind: Kind::Row,
-        }
+            |acc, (field, ty)| Type::mk_rowcons(field, ty, acc),
+        )
     }
 
     pub fn mk_record(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
-        debug_assert!(
-            fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
-            "{:?} is not Kind::Type",
-            fields.iter().find(|x| x.1.kind != Kind::Type).unwrap()
-        );
-        debug_assert!(
-            match &rest {
-                Some(rest) => rest.kind == Kind::Row,
-                None => true,
-            },
-            "{:?} is not Kind::Row",
-            rest
-        );
-
-        Type {
-            value: r#type::Type::mk_record(
-                fields
-                    .into_iter()
-                    .map(|(name, ty)| (name, ty.value))
-                    .collect(),
-                rest.map(|x| x.get_value().clone()),
-            ),
-            kind: Kind::Type,
-        }
+        Type::mk_app(Type::Record, Type::mk_rows(fields, rest))
     }
 
     pub fn mk_variant(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
-        debug_assert!(
-            fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
-            "{:?} is not Kind::Type",
-            fields.iter().find(|x| x.1.kind != Kind::Type).unwrap()
-        );
-        debug_assert!(
-            match &rest {
-                Some(rest) => rest.kind == Kind::Row,
-                None => true,
-            },
-            "{:?} is not Kind::Row",
-            rest
-        );
+        Type::mk_app(Type::Variant, Type::mk_rows(fields, rest))
+    }
 
-        Type {
-            value: r#type::Type::mk_variant(
-                fields
-                    .into_iter()
-                    .map(|(name, ty)| (name, ty.value))
-                    .collect(),
-                rest.map(|x| x.get_value().clone()),
+    pub fn subst_metas<F: Fn(&Kind, usize) -> Type>(&self, f: &F) -> Self {
+        match self {
+            Type::Name(k, n) => Type::Name(k.clone(), n.clone()),
+            Type::Var(k, n) => Type::Var(k.clone(), *n),
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Bytes => Type::Bytes,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => {
+                Type::Constraints(cs.iter().map(|c| c.subst_metas(f)).collect())
+            }
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(k, a, b) => Type::App(
+                k.clone(),
+                Rc::new(a.subst_metas(f)),
+                Rc::new(b.subst_metas(f)),
             ),
-            kind: Kind::Type,
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(field, ty, rest) => {
+                Type::mk_rowcons(field.clone(), ty.subst_metas(f), rest.subst_metas(f))
+            }
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst_metas(f)),
+            Type::Unit => Type::Unit,
+            Type::Meta(k, n) => f(k, *n),
         }
+    }
+
+    pub fn subst<F: Fn(&usize) -> Type>(&self, f: &F) -> Self {
+        match self {
+            Type::Name(k, n) => Type::Name(k.clone(), n.clone()),
+            Type::Var(_, n) => f(n),
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Bytes => Type::Bytes,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.subst(f)).collect()),
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(k, a, b) => Type::App(k.clone(), Rc::new(a.subst(f)), Rc::new(b.subst(f))),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(field, ty, rest) => {
+                Type::mk_rowcons(field.clone(), ty.subst(f), rest.subst(f))
+            }
+            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst(f)),
+            Type::Unit => Type::Unit,
+            Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+        }
+    }
+
+    pub fn instantiate_many(&self, tys: &[Type]) -> Self {
+        match self {
+            Type::Name(k, n) => Type::Name(k.clone(), n.clone()),
+            Type::Var(k, n) => {
+                let tys_len = tys.len();
+                if *n < tys_len {
+                    tys[tys_len - 1 - n].clone()
+                } else {
+                    Type::Var(k.clone(), *n - tys_len)
+                }
+            }
+            Type::Bool => Type::Bool,
+            Type::Int => Type::Int,
+            Type::Char => Type::Char,
+            Type::String => Type::String,
+            Type::Bytes => Type::Bytes,
+            Type::Arrow => Type::Arrow,
+            Type::FatArrow => Type::FatArrow,
+            Type::Constraints(cs) => {
+                Type::Constraints(cs.iter().map(|c| c.instantiate_many(tys)).collect())
+            }
+            Type::Array => Type::Array,
+            Type::Record => Type::Record,
+            Type::Variant => Type::Variant,
+            Type::IO => Type::IO,
+            Type::App(k, a, b) => Type::App(
+                k.clone(),
+                Rc::new(a.instantiate_many(tys)),
+                Rc::new(b.instantiate_many(tys)),
+            ),
+            Type::RowNil => Type::RowNil,
+            Type::RowCons(a, b, c) => {
+                Type::mk_rowcons(a.clone(), b.instantiate_many(tys), c.instantiate_many(tys))
+            }
+            Type::HasField(a, b) => Type::mk_hasfield(a.clone(), b.instantiate_many(tys)),
+            Type::Unit => Type::Unit,
+            Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+        }
+    }
+
+    pub fn iter_metas(&self) -> TypeIterMetas {
+        TypeIterMetas::One(self)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn unwrap_rows(&self) -> (Vec<(&Rc<str>, &Type)>, Option<&Type>) {
+        let mut current = self;
+        let mut fields = Vec::new();
+        loop {
+            match current {
+                Type::RowNil => return (fields, None),
+                Type::RowCons(field, ty, rest) => {
+                    fields.push((field, ty));
+                    current = rest;
+                }
+                _ => return (fields, Some(current)),
+            }
+        }
+    }
+
+    pub fn unwrap_fatarrow(&self) -> Option<(&Type, &Type)> {
+        match self {
+            Type::App(_, a, out_ty) => match a.as_ref() {
+                Type::App(_, c, in_ty) => match c.as_ref() {
+                    Type::FatArrow => Some((in_ty, out_ty)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    pub fn unwrap_constraints(&self) -> (Vec<&Type>, &Type) {
+        fn flatten_constraints(ty: &Type) -> Vec<&Type> {
+            match ty {
+                Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
+                _ => vec![ty],
+            }
+        }
+
+        pub fn go<'a>(constraints: &mut Vec<&'a Type>, ty: &'a Type) -> &'a Type {
+            match ty.unwrap_fatarrow() {
+                None => ty,
+                Some((c, ty)) => {
+                    let more_constraints = flatten_constraints(c);
+                    constraints.extend(more_constraints.iter());
+
+                    go(constraints, ty)
+                }
+            }
+        }
+        let mut constraints = Vec::new();
+        let ty = go(&mut constraints, self);
+        (constraints, ty)
+    }
+}
+pub enum TypeIterMetas<'a> {
+    Zero,
+    One(&'a Type),
+    Many { items: Vec<&'a Type> },
+}
+
+impl<'a> TypeIterMetas<'a> {
+    fn pop(&mut self) -> Option<&'a Type> {
+        let (m_new_self, result) = match self {
+            TypeIterMetas::Zero => (None, None),
+            TypeIterMetas::One(a) => (Some(TypeIterMetas::Zero), Some(*a)),
+            TypeIterMetas::Many { items } => {
+                let result = items.pop();
+                (None, result)
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self
+        }
+        result
+    }
+
+    fn push(&mut self, item: &'a Type) {
+        let m_new_self = match self {
+            TypeIterMetas::Zero => Some(TypeIterMetas::One(item)),
+            TypeIterMetas::One(a) => Some(TypeIterMetas::Many {
+                items: vec![a, item],
+            }),
+            TypeIterMetas::Many { items } => {
+                items.push(item);
+                None
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self;
+        }
+    }
+}
+
+impl<'a> Iterator for TypeIterMetas<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn step_kind(ty: &Type) -> Step<Type, usize> {
+            match ty {
+                Type::Name(_, _) => Step::Skip,
+                Type::Var(_, _) => Step::Skip,
+                Type::Bool => Step::Skip,
+                Type::Int => Step::Skip,
+                Type::Char => Step::Skip,
+                Type::String => Step::Skip,
+                Type::Bytes => Step::Skip,
+                Type::Arrow => Step::Skip,
+                Type::FatArrow => Step::Skip,
+                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
+                Type::Array => Step::Skip,
+                Type::Record => Step::Skip,
+                Type::Variant => Step::Skip,
+                Type::IO => Step::Skip,
+                Type::App(_, a, b) => Step::Continue2(a, b),
+                Type::RowNil => Step::Skip,
+                Type::RowCons(_, a, b) => Step::Continue2(a, b),
+                Type::HasField(_, a) => Step::Continue1(a),
+                Type::Unit => Step::Skip,
+                Type::Meta(_, n) => Step::Yield(*n),
+            }
+        }
+
+        let mut res = None;
+        loop {
+            match self.pop() {
+                None => {
+                    break;
+                }
+                Some(kind) => match step_kind(kind) {
+                    Step::Yield(n) => {
+                        res = Some(n);
+                        break;
+                    }
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.push(item2);
+                        self.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.push(item3);
+                        self.push(item2);
+                        self.push(item1);
+                        continue;
+                    }
+                    Step::Continue(items) => {
+                        for item in items.iter().rev() {
+                            self.push(item)
+                        }
+                        continue;
+                    }
+                },
+            }
+        }
+        res
     }
 }
 
@@ -1136,7 +1292,7 @@ pub struct TypeSig {
 }
 
 impl TypeSig {
-    pub fn instantiate_many(&self, tys: &[r#type::Type<usize>]) -> TypeSig {
+    pub fn instantiate_many(&self, tys: &[Type]) -> TypeSig {
         let mut ty_vars = self.ty_vars.clone();
         for _ty in tys.iter().rev() {
             match ty_vars.pop() {
@@ -1246,10 +1402,7 @@ impl ClassDeclaration {
             .fold(Kind::Constraint, |acc, (_, arg_kind)| {
                 Kind::mk_arrow(arg_kind.clone(), acc)
             });
-        let name_ty = Type {
-            value: r#type::Type::Name(self.name.clone()),
-            kind: name_kind,
-        };
+        let name_ty = Type::unsafe_mk_name(self.name.clone(), name_kind);
 
         self.members
             .iter()
@@ -1277,10 +1430,7 @@ impl ClassDeclaration {
                     .iter()
                     .enumerate()
                     .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
-                        let arg_ty = Type {
-                            value: r#type::Type::Var(adjustment + arg_index),
-                            kind: arg_kind.clone(),
-                        };
+                        let arg_ty = Type::unsafe_mk_var(adjustment + arg_index, arg_kind.clone());
                         Type::mk_app(acc, arg_ty)
                     });
                 let sig = {
