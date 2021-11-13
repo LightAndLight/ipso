@@ -61,7 +61,7 @@ impl Default for CommonKinds {
 }
 
 impl Type {
-    pub fn get_value(&self) -> r#type::Type<usize> {
+    pub fn to_syntax(&self) -> r#type::Type<usize> {
         match self {
             Type::Bool => r#type::Type::Bool,
             Type::Int => r#type::Type::Int,
@@ -79,19 +79,13 @@ impl Type {
             Type::Name(_, n) => r#type::Type::Name(n.clone()),
             Type::Var(_, v) => r#type::Type::Var(*v),
             Type::Constraints(cs) => {
-                r#type::Type::Constraints(cs.iter().map(Type::get_value).collect())
+                r#type::Type::Constraints(cs.iter().map(Type::to_syntax).collect())
             }
-            Type::App(_, a, b) => {
-                r#type::Type::mk_app(a.as_ref().get_value(), b.as_ref().get_value())
+            Type::App(_, a, b) => r#type::Type::mk_app(a.to_syntax(), b.to_syntax()),
+            Type::RowCons(field, a, b) => {
+                r#type::Type::mk_rowcons(field.clone(), a.to_syntax(), b.to_syntax())
             }
-            Type::RowCons(field, a, b) => r#type::Type::mk_rowcons(
-                field.clone(),
-                a.as_ref().get_value(),
-                b.as_ref().get_value(),
-            ),
-            Type::HasField(field, ty) => {
-                r#type::Type::mk_hasfield(field.clone(), ty.as_ref().get_value())
-            }
+            Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
         }
     }

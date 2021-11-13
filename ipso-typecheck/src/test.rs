@@ -1849,8 +1849,8 @@ fn type_occurs_1() {
                 pos: 0,
                 meta: 0,
                 ty: Type::mk_arrow(
-                    tc.fill_ty_names(v1.get_value()),
-                    tc.fill_ty_names(v2.get_value())
+                    tc.fill_ty_names(v1.to_syntax()),
+                    tc.fill_ty_names(v2.to_syntax())
                 )
             })
         )

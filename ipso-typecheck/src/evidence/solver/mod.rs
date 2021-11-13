@@ -29,7 +29,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            let _ = tc.check_kind(None, constraint.get_value(), &Kind::Constraint)?;
+            let _ = tc.check_kind(None, constraint.to_syntax(), &Kind::Constraint)?;
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -253,7 +253,7 @@ pub fn solve_placeholder(
                 &Some(SolveConstraintContext {
                     pos: pos.unwrap_or(0),
                     constraint: tc
-                        .fill_ty_names(tc.zonk_core_type(&constraint.to_type()).get_value()),
+                        .fill_ty_names(tc.zonk_core_type(&constraint.to_type()).to_syntax()),
                 }),
                 tc,
                 &constraint,

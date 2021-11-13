@@ -14,7 +14,6 @@ use ipso_rope::Rope;
 use ipso_syntax::{
     self as syntax,
     kind::{Kind, KindCompound},
-    r#type::Type,
     ModuleName, Spanned,
 };
 use std::{
@@ -175,7 +174,7 @@ macro_rules! with_position {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyKindContext<A> {
-    ty: Type<A>,
+    ty: syntax::Type<A>,
     has_kind: Kind,
     unifying_types: Option<UnifyTypeContext>,
 }
@@ -189,8 +188,8 @@ pub struct UnifyKindContextRefs<'a> {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyTypeContext {
-    pub expected: Type<Rc<str>>,
-    pub actual: Type<Rc<str>>,
+    pub expected: syntax::Type<Rc<str>>,
+    pub actual: syntax::Type<Rc<str>>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -202,7 +201,7 @@ pub struct UnifyTypeContextRefs<'a> {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SolveConstraintContext {
     pub pos: usize,
-    pub constraint: Type<Rc<str>>,
+    pub constraint: syntax::Type<Rc<str>>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -237,8 +236,8 @@ pub enum TypeError {
         source: Source,
         pos: usize,
         context: UnifyTypeContext,
-        expected: Type<Rc<str>>,
-        actual: Type<Rc<str>>,
+        expected: syntax::Type<Rc<str>>,
+        actual: syntax::Type<Rc<str>>,
     },
     RedundantPattern {
         source: Source,
@@ -254,7 +253,7 @@ pub enum TypeError {
         source: Source,
         pos: usize,
         meta: usize,
-        ty: Type<Rc<str>>,
+        ty: syntax::Type<Rc<str>>,
     },
     NoSuchClass {
         source: Source,
@@ -786,7 +785,7 @@ impl<'modules> Typechecker<'modules> {
     pub fn check_kind(
         &mut self,
         context: Option<&UnifyTypeContextRefs>,
-        ty: Type<usize>,
+        ty: syntax::Type<usize>,
         kind: &Kind,
     ) -> Result<core::Type, TypeError> {
         let expected = kind;
@@ -863,7 +862,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         pos: usize,
         name: &str,
-        ty: &Type<Rc<str>>,
+        ty: &syntax::Type<Rc<str>>,
         args: &[syntax::Pattern],
         body: &Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
@@ -940,7 +939,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         class_args_kinds: &[(Rc<str>, Kind)],
         name: &str,
-        type_: &Type<Rc<str>>,
+        type_: &syntax::Type<Rc<str>>,
     ) -> Result<core::ClassMember, TypeError> {
         let class_args: Vec<Rc<str>> = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
         let (type_, ty_vars) = type_.abstract_vars(&class_args);
@@ -982,10 +981,10 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_class(
         &mut self,
-        supers: &[Spanned<Type<Rc<str>>>],
+        supers: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Rc<str>,
         args: &[Spanned<Rc<str>>],
-        members: &[(String, Type<Rc<str>>)],
+        members: &[(String, syntax::Type<Rc<str>>)],
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
         let arg_names: Vec<Rc<str>> = args.iter().map(|x| x.item.clone()).collect();
@@ -1047,9 +1046,9 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_instance(
         &mut self,
-        assumes: &[Spanned<Type<Rc<str>>>],
+        assumes: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Spanned<Rc<str>>,
-        args: &[Type<Rc<str>>],
+        args: &[syntax::Type<Rc<str>>],
         members: &[(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)],
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
@@ -1065,8 +1064,8 @@ impl<'modules> Typechecker<'modules> {
 
         let (head, ty_vars) = args
             .iter()
-            .fold(Type::Name(name_item), |acc, el| {
-                Type::mk_app(acc, el.clone())
+            .fold(syntax::Type::Name(name_item), |acc, el| {
+                syntax::Type::mk_app(acc, el.clone())
             })
             .abstract_vars(&Vec::new());
 
@@ -1111,7 +1110,7 @@ impl<'modules> Typechecker<'modules> {
                 match evidence::solver::solve_constraint(
                     &Some(SolveConstraintContext {
                         pos: name.pos,
-                        constraint: self.fill_ty_names(superclass.get_value().clone()),
+                        constraint: self.fill_ty_names(superclass.to_syntax()),
                     }),
                     self,
                     &evidence::Constraint::from_type(&superclass),
@@ -1352,34 +1351,36 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn zonk_type(&self, ty: &Type<usize>) -> Type<usize> {
+    pub fn zonk_type(&self, ty: &syntax::Type<usize>) -> syntax::Type<usize> {
         match ty {
-            Type::Name(n) => Type::Name(n.clone()),
-            Type::Var(n) => Type::Var(*n),
-            Type::Bool => Type::Bool,
-            Type::Int => Type::Int,
-            Type::Char => Type::Char,
-            Type::String => Type::String,
-            Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
-            Type::Constraints(cs) => {
-                Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
+            syntax::Type::Name(n) => syntax::Type::Name(n.clone()),
+            syntax::Type::Var(n) => syntax::Type::Var(*n),
+            syntax::Type::Bool => syntax::Type::Bool,
+            syntax::Type::Int => syntax::Type::Int,
+            syntax::Type::Char => syntax::Type::Char,
+            syntax::Type::String => syntax::Type::String,
+            syntax::Type::Bytes => syntax::Type::Bytes,
+            syntax::Type::Arrow => syntax::Type::Arrow,
+            syntax::Type::FatArrow => syntax::Type::FatArrow,
+            syntax::Type::Constraints(cs) => {
+                syntax::Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
             }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
-            Type::App(a, b) => Type::mk_app(self.zonk_type(a), self.zonk_type(b)),
-            Type::RowNil => Type::RowNil,
-            Type::Unit => Type::Unit,
-            Type::RowCons(field, ty, rest) => {
-                Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
+            syntax::Type::Array => syntax::Type::Array,
+            syntax::Type::Record => syntax::Type::Record,
+            syntax::Type::Variant => syntax::Type::Variant,
+            syntax::Type::IO => syntax::Type::IO,
+            syntax::Type::App(a, b) => syntax::Type::mk_app(self.zonk_type(a), self.zonk_type(b)),
+            syntax::Type::RowNil => syntax::Type::RowNil,
+            syntax::Type::Unit => syntax::Type::Unit,
+            syntax::Type::RowCons(field, ty, rest) => {
+                syntax::Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
             }
-            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), self.zonk_type(rest)),
-            Type::Meta(n) => match &self.type_solutions[*n].1 {
-                None => Type::Meta(*n),
-                Some(ty) => self.zonk_type(&ty.get_value()),
+            syntax::Type::HasField(field, rest) => {
+                syntax::Type::mk_hasfield(field.clone(), self.zonk_type(rest))
+            }
+            syntax::Type::Meta(n) => match &self.type_solutions[*n].1 {
+                None => syntax::Type::Meta(*n),
+                Some(ty) => self.zonk_type(&ty.to_syntax()),
             },
         }
     }
@@ -1414,7 +1415,7 @@ impl<'modules> Typechecker<'modules> {
         Kind::Meta(n)
     }
 
-    pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<Rc<str>> {
+    pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {
         ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
     }
 
@@ -1425,11 +1426,11 @@ impl<'modules> Typechecker<'modules> {
         actual: &Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(&context.ty.get_value())),
+            ty: self.fill_ty_names(self.zonk_type(&context.ty.to_syntax())),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
-                expected: self.fill_ty_names(self.zonk_core_type(x.expected).get_value()),
-                actual: self.fill_ty_names(self.zonk_core_type(x.actual).get_value()),
+                expected: self.fill_ty_names(self.zonk_core_type(x.expected).to_syntax()),
+                actual: self.fill_ty_names(self.zonk_core_type(x.actual).to_syntax()),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1549,15 +1550,15 @@ impl<'modules> Typechecker<'modules> {
         actual: core::Type,
     ) -> Result<A, TypeError> {
         let context = UnifyTypeContext {
-            expected: self.fill_ty_names(self.zonk_core_type(context.expected).get_value()),
-            actual: self.fill_ty_names(self.zonk_core_type(context.actual).get_value()),
+            expected: self.fill_ty_names(self.zonk_core_type(context.expected).to_syntax()),
+            actual: self.fill_ty_names(self.zonk_core_type(context.actual).to_syntax()),
         };
         Err(TypeError::TypeMismatch {
             source: self.source(),
             pos: self.current_position(),
             context,
-            expected: self.fill_ty_names(expected.get_value()),
-            actual: self.fill_ty_names(actual.get_value()),
+            expected: self.fill_ty_names(expected.to_syntax()),
+            actual: self.fill_ty_names(actual.to_syntax()),
         })
     }
 
@@ -1592,7 +1593,7 @@ impl<'modules> Typechecker<'modules> {
                 source: self.source(),
                 pos: self.current_position(),
                 meta,
-                ty: self.fill_ty_names(self.zonk_core_type(ty).get_value()),
+                ty: self.fill_ty_names(self.zonk_core_type(ty).to_syntax()),
             })
         } else {
             Ok(())
@@ -1636,43 +1637,45 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn infer_kind(&mut self, ty: Type<usize>) -> Result<(core::Type, Kind), TypeError> {
+    fn infer_kind(&mut self, ty: syntax::Type<usize>) -> Result<(core::Type, Kind), TypeError> {
         match ty {
-            Type::Name(n) => match self.type_context.get(n.as_ref()) {
+            syntax::Type::Name(n) => match self.type_context.get(n.as_ref()) {
                 None => self.not_in_scope(n.as_ref()),
                 Some(kind) => Ok((core::Type::Name(kind.clone(), n), kind.clone())),
             },
-            Type::Var(ix) => match self.bound_tyvars.lookup_index(ix) {
+            syntax::Type::Var(ix) => match self.bound_tyvars.lookup_index(ix) {
                 None => {
                     panic!("missing tyvar {:?}", ix);
                 }
                 Some((_, kind)) => Ok((core::Type::Var(kind.clone(), ix), kind.clone())),
             },
-            Type::Bool => Ok((core::Type::Bool, Kind::Type)),
-            Type::Int => Ok((core::Type::Int, Kind::Type)),
-            Type::Char => Ok((core::Type::Char, Kind::Type)),
-            Type::String => Ok((core::Type::String, Kind::Type)),
-            Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
-            Type::Arrow => Ok((
+            syntax::Type::Bool => Ok((core::Type::Bool, Kind::Type)),
+            syntax::Type::Int => Ok((core::Type::Int, Kind::Type)),
+            syntax::Type::Char => Ok((core::Type::Char, Kind::Type)),
+            syntax::Type::String => Ok((core::Type::String, Kind::Type)),
+            syntax::Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
+            syntax::Type::Arrow => Ok((
                 core::Type::Arrow,
                 self.common_kinds.type_to_type_to_type.clone(),
             )),
-            Type::FatArrow => Ok((
+            syntax::Type::FatArrow => Ok((
                 core::Type::FatArrow,
                 self.common_kinds.constraint_to_type_to_type.clone(),
             )),
-            Type::Constraints(constraints) => {
+            syntax::Type::Constraints(constraints) => {
                 let constraints = constraints
                     .into_iter()
                     .map(|constraint| self.check_kind(None, constraint, &Kind::Constraint))
                     .collect::<Result<_, TypeError>>()?;
                 Ok((core::Type::Constraints(constraints), Kind::Constraint))
             }
-            Type::Array => Ok((core::Type::Array, self.common_kinds.type_to_type.clone())),
-            Type::Record => Ok((core::Type::Record, self.common_kinds.row_to_type.clone())),
-            Type::Variant => Ok((core::Type::Variant, self.common_kinds.row_to_type.clone())),
-            Type::IO => Ok((core::Type::IO, self.common_kinds.type_to_type.clone())),
-            Type::App(a, b) => {
+            syntax::Type::Array => Ok((core::Type::Array, self.common_kinds.type_to_type.clone())),
+            syntax::Type::Record => Ok((core::Type::Record, self.common_kinds.row_to_type.clone())),
+            syntax::Type::Variant => {
+                Ok((core::Type::Variant, self.common_kinds.row_to_type.clone()))
+            }
+            syntax::Type::IO => Ok((core::Type::IO, self.common_kinds.type_to_type.clone())),
+            syntax::Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
                 let a = self.check_kind(
@@ -1689,18 +1692,18 @@ impl<'modules> Typechecker<'modules> {
                     out_kind,
                 ))
             }
-            Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
-            Type::RowCons(field, ty, rest) => {
+            syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
+            syntax::Type::RowCons(field, ty, rest) => {
                 let ty = self.check_kind(None, ty.as_ref().clone(), &Kind::Type)?;
                 let rest = self.check_kind(None, rest.as_ref().clone(), &Kind::Row)?;
                 Ok((core::Type::mk_rowcons(field, ty, rest), Kind::Row))
             }
-            Type::HasField(field, rest) => {
+            syntax::Type::HasField(field, rest) => {
                 let rest = self.check_kind(None, rest.as_ref().clone(), &Kind::Row)?;
                 Ok((core::Type::mk_hasfield(field, rest), Kind::Constraint))
             }
-            Type::Unit => Ok((core::Type::Unit, Kind::Type)),
-            Type::Meta(n) => {
+            syntax::Type::Unit => Ok((core::Type::Unit, Kind::Type)),
+            syntax::Type::Meta(n) => {
                 let kind = self.lookup_typevar(n)?;
                 Ok((core::Type::Meta(kind.clone(), n), kind))
             }

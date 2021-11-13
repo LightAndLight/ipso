@@ -3,9 +3,10 @@ pub mod kind;
 mod test;
 pub mod r#type;
 
+pub use r#type::Type;
+
 use lazy_static::lazy_static;
 use quickcheck::Arbitrary;
-use r#type::Type;
 use std::{hash::Hash, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
