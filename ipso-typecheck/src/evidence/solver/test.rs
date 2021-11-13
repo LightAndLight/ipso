@@ -4,7 +4,9 @@ use crate::{
     Typechecker,
 };
 #[cfg(test)]
-use ipso_core::{Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig};
+use ipso_core::{
+    self as core, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig,
+};
 #[cfg(test)]
 use ipso_syntax::{kind::Kind, r#type::Type, Binop};
 #[cfg(test)]
@@ -88,18 +90,26 @@ fn solve_constraint_3() {
 #[test]
 fn solve_constraint_4() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        tc.register_class(&ClassDeclaration {
-            supers: Vec::new(),
-            name: Rc::from("Eq"),
-            args: vec![(Rc::from("a"), Kind::Type)],
-            members: vec![ClassMember {
-                name: String::from("eq"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(Type::Var(0), Type::mk_arrow(Type::Var(0), Type::Bool)),
-                },
-            }],
-        });
+        {
+            let a = core::Type::unsafe_mk_var(0, Kind::Type);
+            tc.register_class(&ClassDeclaration {
+                supers: Vec::new(),
+                name: Rc::from("Eq"),
+                args: vec![(Rc::from("a"), a.get_kind().clone())],
+                members: vec![ClassMember {
+                    name: String::from("eq"),
+                    sig: {
+                        TypeSig {
+                            ty_vars: Vec::new(),
+                            body: core::Type::mk_arrow(
+                                a.clone(),
+                                core::Type::mk_arrow(a, core::Type::mk_bool()),
+                            ),
+                        }
+                    },
+                }],
+            });
+        }
 
         tc.register_instance(
             &Vec::new(),

@@ -627,7 +627,7 @@ impl<'modules> Typechecker<'modules> {
                     .map(|(pos, superclass)| Implication {
                         ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
                         antecedents: vec![applied_type.clone()],
-                        consequent: superclass.clone(),
+                        consequent: superclass.get_value().clone(),
                         evidence: core::Expr::mk_lam(
                             true,
                             core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
@@ -706,7 +706,17 @@ impl<'modules> Typechecker<'modules> {
                 assumes,
                 head,
                 members,
-            } => self.register_instance(ty_vars, superclass_constructors, assumes, head, members),
+            } => self.register_instance(
+                ty_vars,
+                superclass_constructors,
+                &assumes
+                    .iter()
+                    .map(core::Type::get_value)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                head.get_value(),
+                members,
+            ),
         }
     }
 
@@ -839,13 +849,13 @@ impl<'modules> Typechecker<'modules> {
     fn generalise(
         &mut self,
         expr: core::Expr,
-        ty: Type<usize>,
+        ty: core::Type,
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
 
         let mut ty = ty;
         for constraint in unsolved_constraints.into_iter().rev() {
-            ty = Type::mk_fatarrow(constraint, ty);
+            ty = core::Type::mk_fatarrow(core::Type::unsafe_new(constraint, Kind::Constraint), ty);
         }
 
         let ty_vars: Vec<(Rc<str>, Kind)> = self
@@ -896,6 +906,7 @@ impl<'modules> Typechecker<'modules> {
             (ty, kinds)
         };
 
+        let ty = core::Type::unsafe_new(ty, Kind::Type);
         let _ = self.context.insert(
             name.to_string(),
             core::TypeSig {
@@ -906,7 +917,7 @@ impl<'modules> Typechecker<'modules> {
 
         self.bound_tyvars.insert(&ty_var_kinds);
 
-        let (constraints, ty) = ty.unwrap_constraints();
+        let (constraints, ty) = ty.get_value().unwrap_constraints();
         for constraint in constraints {
             self.evidence
                 .assume(None, evidence::Constraint::from_type(constraint));
@@ -920,7 +931,7 @@ impl<'modules> Typechecker<'modules> {
             ty,
         )?;
 
-        let (body, sig) = self.generalise(body, ty.clone())?;
+        let (body, sig) = self.generalise(body, core::Type::unsafe_new(ty.clone(), Kind::Type))?;
         self.evidence = Evidence::new();
 
         self.bound_tyvars.delete(ty_var_kinds_len);
@@ -970,7 +981,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let sig = core::TypeSig {
             ty_vars,
-            body: type_,
+            body: core::Type::unsafe_new(type_, Kind::Type),
         };
         Ok(core::ClassMember {
             name: name.to_string(),
@@ -1033,7 +1044,10 @@ impl<'modules> Typechecker<'modules> {
         }
 
         Ok(core::Declaration::Class(core::ClassDeclaration {
-            supers: new_supers,
+            supers: new_supers
+                .into_iter()
+                .map(|new_super| core::Type::unsafe_new(new_super, Kind::Constraint))
+                .collect(),
             name: name.clone(),
             args: args_kinds
                 .into_iter()
@@ -1100,10 +1114,10 @@ impl<'modules> Typechecker<'modules> {
                 match evidence::solver::solve_constraint(
                     &Some(SolveConstraintContext {
                         pos: name.pos,
-                        constraint: self.fill_ty_names(superclass.clone()),
+                        constraint: self.fill_ty_names(superclass.get_value().clone()),
                     }),
                     self,
-                    &evidence::Constraint::from_type(&superclass),
+                    &evidence::Constraint::from_type(superclass.get_value()),
                 )
                 .and_then(|evidence| self.abstract_evidence(evidence))
                 {
@@ -1159,7 +1173,7 @@ impl<'modules> Typechecker<'modules> {
                                     member_body.clone(),
                                 ),
                             },
-                            &member_type.sig.body,
+                            member_type.sig.body.get_value(),
                         )
                         .and_then(|member_body| {
                             self.generalise(member_body, member_type.sig.body.clone())
@@ -1188,8 +1202,11 @@ impl<'modules> Typechecker<'modules> {
         Ok(core::Declaration::Instance {
             ty_vars,
             superclass_constructors,
-            assumes,
-            head,
+            assumes: assumes
+                .into_iter()
+                .map(|assume| core::Type::unsafe_new(assume, Kind::Constraint))
+                .collect(),
+            head: core::Type::unsafe_new(head, Kind::Constraint),
             members: new_members,
         })
     }
@@ -2069,7 +2086,10 @@ impl<'modules> Typechecker<'modules> {
             .into_iter()
             .map(|(_, kind)| self.fresh_typevar(kind))
             .collect();
-        let ty = sig.body.subst(&|&ix| metas[metas.len() - 1 - ix].clone());
+        let ty = sig
+            .body
+            .get_value()
+            .subst(&|&ix| metas[metas.len() - 1 - ix].clone());
         let (constraints, ty) = ty.unwrap_constraints();
         let mut expr = expr;
         for constraint in constraints {

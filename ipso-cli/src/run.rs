@@ -95,9 +95,9 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {
             expected: expected.clone(),
-            actual: actual.clone(),
+            actual: actual.get_value().clone(),
         };
-        let _ = tc.unify_type(&context, &expected, &actual)?;
+        let _ = tc.unify_type(&context, &expected, actual.get_value())?;
     }
 
     let bytes = Arena::new();
