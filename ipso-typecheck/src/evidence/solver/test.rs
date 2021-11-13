@@ -104,15 +104,16 @@ fn solve_constraint_4() {
             tc.register_class(&ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),
-                args: vec![(Rc::from("a"), a.get_kind())],
+                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
                 members: vec![ClassMember {
                     name: String::from("eq"),
                     sig: {
                         TypeSig {
                             ty_vars: Vec::new(),
                             body: core::Type::mk_arrow(
+                                tc.common_kinds,
                                 a.clone(),
-                                core::Type::mk_arrow(a, core::Type::Bool),
+                                core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
                             ),
                         }
                     },
@@ -128,7 +129,7 @@ fn solve_constraint_4() {
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &core::Type::mk_app(eq_ty.clone(), core::Type::Int),
+            &core::Type::mk_app(tc.common_kinds, eq_ty.clone(), core::Type::Int),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
@@ -137,10 +138,18 @@ fn solve_constraint_4() {
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
-            &[(Rc::from("a"), a.get_kind())],
+            &[(Rc::from("a"), a.get_kind(tc.common_kinds))],
             &Vec::new(),
-            &[core::Type::mk_app(eq_ty.clone(), a.clone())],
-            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_app(core::Type::Array, a)),
+            &[core::Type::mk_app(
+                tc.common_kinds,
+                eq_ty.clone(),
+                a.clone(),
+            )],
+            &core::Type::mk_app(
+                tc.common_kinds,
+                eq_ty.clone(),
+                core::Type::mk_app(tc.common_kinds, core::Type::Array, a),
+            ),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqArray),
@@ -157,14 +166,12 @@ fn solve_constraint_4() {
             )],
             None,
         ));
-        let actual = solve_constraint(
-            &None,
-            &mut tc,
-            &Constraint::from_type(&core::Type::mk_app(
-                eq_ty,
-                core::Type::mk_app(core::Type::Array, core::Type::Int),
-            )),
-        );
+        let constraint = &Constraint::from_type(&core::Type::mk_app(
+            tc.common_kinds,
+            eq_ty,
+            core::Type::mk_app(tc.common_kinds, core::Type::Array, core::Type::Int),
+        ));
+        let actual = solve_constraint(&None, &mut tc, constraint);
 
         assert_eq!(expected, actual)
     })

@@ -1,5 +1,5 @@
 use diagnostic::{Location, Message};
-use ipso_core::{self as core, Module, ModulePath};
+use ipso_core::{self as core, CommonKinds, Module, ModulePath};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_rope::Rope;
@@ -299,6 +299,7 @@ impl<'a> Modules<'a> {
         source: &Source,
         pos: usize,
         module_path: &ModulePath,
+        common_kinds: &CommonKinds,
         builtins: &Module,
     ) -> Result<&'a core::Module, ModuleError> {
         match self.index.get(module_path) {
@@ -317,6 +318,7 @@ impl<'a> Modules<'a> {
                             },
                             import_info.pos,
                             &import_info.module_path,
+                            common_kinds,
                             builtins,
                         ) {
                             return Err(err);
@@ -325,7 +327,12 @@ impl<'a> Modules<'a> {
                     let module = {
                         let working_dir = path.parent().unwrap();
                         let mut tc = {
-                            let mut tc = Typechecker::new(working_dir, input_location, &self.index);
+                            let mut tc = Typechecker::new(
+                                working_dir,
+                                input_location,
+                                common_kinds,
+                                &self.index,
+                            );
                             tc.register_from_import(builtins, &syntax::Names::All);
                             tc
                         };

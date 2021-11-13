@@ -1,6 +1,6 @@
 use eval::Env;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, ModulePath};
+use ipso_core::{self as core, CommonKinds, ModulePath};
 use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
@@ -77,8 +77,9 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
     let target_module_path: ModulePath = ModulePath::from_file(&target_path);
-    let builtins = builtins::builtins();
-    let module = modules.import(&source, 0, &target_module_path, &builtins)?;
+    let common_kinds = CommonKinds::default();
+    let builtins = builtins::builtins(&common_kinds);
+    let module = modules.import(&source, 0, &target_module_path, &common_kinds, &builtins)?;
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,
@@ -87,11 +88,13 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = {
-            let mut tc = Typechecker::new(working_dir.as_path(), source, &modules.index);
+            let mut tc =
+                Typechecker::new(working_dir.as_path(), source, &common_kinds, &modules.index);
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected = core::Type::mk_app(core::Type::IO, tc.fresh_typevar(Kind::Type));
+        let expected =
+            core::Type::mk_app(&common_kinds, core::Type::IO, tc.fresh_typevar(Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContextRefs {
             expected: &expected,
@@ -116,7 +119,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
                     module_path.clone(),
                     eval::Module {
                         module_mapping: module.module_mapping.clone(),
-                        bindings: module.get_bindings(),
+                        bindings: module.get_bindings(&common_kinds),
                     },
                 )
             })
@@ -124,12 +127,12 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let context = builtins
             .decls
             .iter()
-            .flat_map(|decl| decl.get_bindings().into_iter())
+            .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
             .chain(
                 module
                     .decls
                     .iter()
-                    .flat_map(|decl| decl.get_bindings().into_iter()),
+                    .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter()),
             )
             .collect();
         let mut interpreter = Interpreter::new(

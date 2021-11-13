@@ -8,7 +8,7 @@ use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use fnv::FnvHashSet;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, ModulePath};
+use ipso_core::{self as core, CommonKinds, ModulePath};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_rope::Rope;
 use ipso_syntax::{
@@ -143,30 +143,8 @@ impl Implication {
     }
 }
 
-struct Constants {
-    r#type: Kind,
-    constraint: Kind,
-    row: Kind,
-    type_to_type_to_type: Kind,
-}
-
-impl Constants {
-    fn new() -> Self {
-        let r#type = Kind::Type;
-        Constants {
-            r#type: r#type.clone(),
-            constraint: Kind::Constraint,
-            row: Kind::Row,
-            type_to_type_to_type: Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                r#type.clone(),
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(r#type.clone(), r#type))),
-            ))),
-        }
-    }
-}
-
 pub struct Typechecker<'modules> {
-    constants: Constants,
+    common_kinds: &'modules CommonKinds,
     source: Source,
     kind_solutions: Vec<Option<Kind>>,
     pub type_solutions: Vec<(Kind, Option<core::Type>)>,
@@ -460,9 +438,11 @@ impl TypeError {
 #[macro_export]
 macro_rules! with_tc {
     ($path:expr, $location:expr, $f:expr) => {{
+        use ipso_core::CommonKinds;
         use std::collections::HashMap;
+        let common_kinds = CommonKinds::default();
         let modules = HashMap::new();
-        let tc = Typechecker::new_with_builtins($path, $location, &modules);
+        let tc = Typechecker::new_with_builtins($path, $location, &common_kinds, &modules);
         $f(tc)
     }};
 }
@@ -485,11 +465,11 @@ impl<'modules> Typechecker<'modules> {
     pub fn new(
         working_dir: &'modules Path,
         source: Source,
+        common_kinds: &'modules CommonKinds,
         modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
-        let constants = Constants::new();
         Typechecker {
-            constants,
+            common_kinds,
             source,
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
@@ -512,10 +492,11 @@ impl<'modules> Typechecker<'modules> {
     pub fn new_with_builtins(
         working_dir: &'modules Path,
         location: Source,
+        common_kinds: &'modules CommonKinds,
         modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
-        let mut tc = Self::new(working_dir, location, modules);
-        tc.register_from_import(&builtins::builtins(), &syntax::Names::All);
+        let mut tc = Self::new(working_dir, location, common_kinds, modules);
+        tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
         tc
     }
 
@@ -620,12 +601,9 @@ impl<'modules> Typechecker<'modules> {
         let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
 
         // generate constraint's kind
-        let mut constraint_kind = self.constants.constraint.clone();
+        let mut constraint_kind = Kind::Constraint;
         for (_, kind) in decl.args.iter().rev() {
-            constraint_kind = Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                kind.clone(),
-                constraint_kind,
-            )));
+            constraint_kind = Kind::mk_arrow(kind.clone(), Kind::Constraint);
         }
         self.type_context.insert(decl_name.clone(), constraint_kind);
 
@@ -635,7 +613,11 @@ impl<'modules> Typechecker<'modules> {
                 .iter()
                 .enumerate()
                 .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
-                    core::Type::mk_app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
+                    core::Type::mk_app(
+                        self.common_kinds,
+                        acc,
+                        core::Type::unsafe_mk_var(arg_index, arg_kind.clone()),
+                    )
                 });
         self.implications
             .extend(
@@ -654,7 +636,7 @@ impl<'modules> Typechecker<'modules> {
             );
 
         // generate class members
-        let decl_bindings = decl.get_bindings();
+        let decl_bindings = decl.get_bindings(self.common_kinds);
         self.context.extend(
             decl_bindings
                 .iter()
@@ -863,7 +845,7 @@ impl<'modules> Typechecker<'modules> {
 
         let mut ty = self.zonk_core_type(&ty);
         for constraint in unsolved_constraints.into_iter().rev() {
-            ty = core::Type::mk_fatarrow(constraint, ty);
+            ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
         }
 
         let ty_vars: Vec<(Rc<str>, Kind)> = self
@@ -1242,7 +1224,11 @@ impl<'modules> Typechecker<'modules> {
 
         match module_mapping.get(&path) {
             None => {
-                let signatures = self.modules.get(&path).unwrap().get_signatures();
+                let signatures = self
+                    .modules
+                    .get(&path)
+                    .unwrap()
+                    .get_signatures(self.common_kinds);
                 self.module_context.insert(path.clone(), signatures);
                 self.module_unmapping
                     .insert(ModuleName(vec![actual_name.item.clone()]), path.clone());
@@ -1406,9 +1392,9 @@ impl<'modules> Typechecker<'modules> {
                     self.zonk_kind(close_unsolved, b),
                 ))),
             },
-            Kind::Type => self.constants.r#type.clone(),
-            Kind::Row => self.constants.row.clone(),
-            Kind::Constraint => self.constants.constraint.clone(),
+            Kind::Type => Kind::Type,
+            Kind::Row => Kind::Row,
+            Kind::Constraint => Kind::Constraint,
             Kind::Meta(m) => match &self.kind_solutions[*m] {
                 None => {
                     if close_unsolved {
@@ -1669,17 +1655,11 @@ impl<'modules> Typechecker<'modules> {
             Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
             Type::Arrow => Ok((
                 core::Type::Arrow,
-                self.constants.type_to_type_to_type.clone(),
+                self.common_kinds.type_to_type_to_type.clone(),
             )),
             Type::FatArrow => Ok((
                 core::Type::FatArrow,
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.constraint.clone(),
-                    Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                        self.constants.r#type.clone(),
-                        self.constants.r#type.clone(),
-                    ))),
-                ))),
+                self.common_kinds.constraint_to_type_to_type.clone(),
             )),
             Type::Constraints(constraints) => {
                 let constraints = constraints
@@ -1688,34 +1668,10 @@ impl<'modules> Typechecker<'modules> {
                     .collect::<Result<_, TypeError>>()?;
                 Ok((core::Type::Constraints(constraints), Kind::Constraint))
             }
-            Type::Array => Ok((
-                core::Type::Array,
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                ))),
-            )),
-            Type::Record => Ok((
-                core::Type::Record,
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.row.clone(),
-                    self.constants.r#type.clone(),
-                ))),
-            )),
-            Type::Variant => Ok((
-                core::Type::Variant,
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.row.clone(),
-                    self.constants.r#type.clone(),
-                ))),
-            )),
-            Type::IO => Ok((
-                core::Type::IO,
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                ))),
-            )),
+            Type::Array => Ok((core::Type::Array, self.common_kinds.type_to_type.clone())),
+            Type::Record => Ok((core::Type::Record, self.common_kinds.row_to_type.clone())),
+            Type::Variant => Ok((core::Type::Variant, self.common_kinds.row_to_type.clone())),
+            Type::IO => Ok((core::Type::IO, self.common_kinds.type_to_type.clone())),
             Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
@@ -1777,8 +1733,8 @@ impl<'modules> Typechecker<'modules> {
         let expected = self.walk(expected);
         let actual = self.walk(actual);
 
-        let expected_kind = expected.get_kind();
-        let actual_kind = actual.get_kind();
+        let expected_kind = expected.get_kind(self.common_kinds);
+        let actual_kind = actual.get_kind(self.common_kinds);
         self.unify_kind(
             &UnifyKindContextRefs {
                 ty: &actual,
@@ -2014,8 +1970,11 @@ impl<'modules> Typechecker<'modules> {
     ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
         let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row);
-        let ty =
-            core::Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let ty = core::Type::mk_variant(
+            self.common_kinds,
+            vec![(name.clone(), arg_ty.clone())],
+            Some(rest_row.clone()),
+        );
 
         let tag = self.evidence.placeholder(
             Some(self.current_position()),
@@ -2072,6 +2031,7 @@ impl<'modules> Typechecker<'modules> {
             .as_ref()
             .map(|name| (name.clone(), self.fresh_typevar(Kind::Row)));
         let ty = core::Type::mk_record(
+            self.common_kinds,
             names_tys
                 .iter()
                 .map(|(name, ty)| (name.item.clone(), ty.clone()))
@@ -2103,7 +2063,7 @@ impl<'modules> Typechecker<'modules> {
                     pos: rest_name.pos,
                     item: Rc::from(rest_name.item.as_ref()),
                 },
-                core::Type::mk_record(Vec::new(), Some(rest_row.clone())),
+                core::Type::mk_record(self.common_kinds, Vec::new(), Some(rest_row.clone())),
             ))
         });
 
@@ -2162,7 +2122,7 @@ impl<'modules> Typechecker<'modules> {
             },
         ));
 
-        let pattern_ty = core::Type::mk_app(core::Type::Variant, pattern_rows);
+        let pattern_ty = core::Type::mk_app(self.common_kinds, core::Type::Variant, pattern_rows);
         let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
             expected: expected_pattern_ty,
             actual: &pattern_ty,
@@ -2173,7 +2133,8 @@ impl<'modules> Typechecker<'modules> {
             }
             Ok(()) => {}
         }
-        *expected_pattern_ty = core::Type::mk_variant(Vec::new(), Some(rest_row));
+        *expected_pattern_ty =
+            core::Type::mk_variant(self.common_kinds, Vec::new(), Some(rest_row));
 
         seen_ctors.insert(name);
 
@@ -2275,7 +2236,8 @@ impl<'modules> Typechecker<'modules> {
                     let (f_core, f_ty) = self.infer_expr(f)?;
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let expected = core::Type::mk_arrow(in_ty.clone(), out_ty.clone());
+                    let expected =
+                        core::Type::mk_arrow(self.common_kinds, in_ty.clone(), out_ty.clone());
                     let actual = f_ty;
                     let context = UnifyTypeContextRefs {
                         expected: &expected,
@@ -2288,7 +2250,7 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Lam { args, body } => {
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let ty = core::Type::mk_arrow(in_ty, out_ty);
+                    let ty = core::Type::mk_arrow(self.common_kinds, in_ty, out_ty);
                     let expr_core = self.check_expr(
                         &Spanned {
                             pos: expr.pos,
@@ -2352,13 +2314,16 @@ impl<'modules> Typechecker<'modules> {
                             }
                             Ok((
                                 core::Expr::Array(items_core),
-                                core::Type::mk_app(core::Type::Array, first_ty),
+                                core::Type::mk_app(self.common_kinds, core::Type::Array, first_ty),
                             ))
                         }
-                        None => Ok((
-                            core::Expr::Array(Vec::new()),
-                            core::Type::mk_app(core::Type::Array, self.fresh_typevar(Kind::Type)),
-                        )),
+                        None => {
+                            let ty_var = self.fresh_typevar(Kind::Type);
+                            Ok((
+                                core::Expr::Array(Vec::new()),
+                                core::Type::mk_app(self.common_kinds, core::Type::Array, ty_var),
+                            ))
+                        }
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
@@ -2396,8 +2361,10 @@ impl<'modules> Typechecker<'modules> {
                     let mut rest_row = None;
                     let _ = match rest {
                         None => {
-                            let expected = core::Type::mk_record(fields_rows.clone(), None);
+                            let expected =
+                                core::Type::mk_record(self.common_kinds, fields_rows.clone(), None);
                             let actual = core::Type::mk_record(
+                                self.common_kinds,
                                 fields_rows.clone(),
                                 Some(rest_row_var.clone()),
                             );
@@ -2410,7 +2377,11 @@ impl<'modules> Typechecker<'modules> {
                         Some(expr) => {
                             let expr_core = self.check_expr(
                                 expr,
-                                &core::Type::mk_app(core::Type::Record, rest_row_var.clone()),
+                                &core::Type::mk_app(
+                                    self.common_kinds,
+                                    core::Type::Record,
+                                    rest_row_var.clone(),
+                                ),
                             )?;
                             rest_core = Some(expr_core);
                             rest_row = Some(rest_row_var);
@@ -2420,7 +2391,7 @@ impl<'modules> Typechecker<'modules> {
 
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),
-                        core::Type::mk_record(fields_rows, rest_row),
+                        core::Type::mk_record(self.common_kinds, fields_rows, rest_row),
                     ))
                 }
                 syntax::Expr::Project(expr, field) => {
@@ -2429,8 +2400,10 @@ impl<'modules> Typechecker<'modules> {
                     let rest = self.fresh_typevar(Kind::Row);
                     let rows =
                         core::Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
-                    let expr_core = self
-                        .check_expr(expr, &core::Type::mk_app(core::Type::Record, rows.clone()))?;
+                    let expr_core = self.check_expr(
+                        expr,
+                        &core::Type::mk_app(self.common_kinds, core::Type::Record, rows.clone()),
+                    )?;
                     let offset = self
                         .evidence
                         .placeholder(None, evidence::Constraint::HasField { field, rest: rows });
@@ -2454,8 +2427,13 @@ impl<'modules> Typechecker<'modules> {
                     Ok((
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
                         core::Type::mk_arrow(
+                            self.common_kinds,
                             arg_ty.clone(),
-                            core::Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
+                            core::Type::mk_variant(
+                                self.common_kinds,
+                                vec![(ctor, arg_ty)],
+                                Some(rest),
+                            ),
                         ),
                     ))
                 }
@@ -2466,7 +2444,11 @@ impl<'modules> Typechecker<'modules> {
                     let rest_rows = self.fresh_typevar(Kind::Row);
                     let rest_core = self.check_expr(
                         rest,
-                        &core::Type::mk_app(core::Type::Variant, rest_rows.clone()),
+                        &core::Type::mk_app(
+                            self.common_kinds,
+                            core::Type::Variant,
+                            rest_rows.clone(),
+                        ),
                     )?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
                         None,
@@ -2478,6 +2460,7 @@ impl<'modules> Typechecker<'modules> {
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
                         core::Type::mk_app(
+                            self.common_kinds,
                             core::Type::Variant,
                             core::Type::mk_rowcons(ctor, arg_ty, rest_rows),
                         ),
@@ -2520,7 +2503,8 @@ impl<'modules> Typechecker<'modules> {
 
                         syntax::Binop::Append => {
                             let item_ty = self.fresh_typevar(Kind::Type);
-                            let expected = core::Type::mk_app(core::Type::Array, item_ty);
+                            let expected =
+                                core::Type::mk_app(self.common_kinds, core::Type::Array, item_ty);
                             let left_core = self.check_expr(left, &expected)?;
                             let right_core = self.check_expr(right, &expected)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), expected))
@@ -2658,13 +2642,17 @@ impl<'modules> Typechecker<'modules> {
                             .collect();
                         let rest: Option<core::Type> = rest.cloned();
                         let context = UnifyTypeContextRefs {
-                            expected: &core::Type::mk_variant(ctors.clone(), None),
-                            actual: &core::Type::mk_variant(ctors, rest),
+                            expected: &core::Type::mk_variant(
+                                self.common_kinds,
+                                ctors.clone(),
+                                None,
+                            ),
+                            actual: &core::Type::mk_variant(self.common_kinds, ctors, rest),
                         };
                         let _ = self.unify_type(
                             &context,
                             &expected_pattern_ty,
-                            &core::Type::mk_variant(Vec::new(), None),
+                            &core::Type::mk_variant(self.common_kinds, Vec::new(), None),
                         )?;
                     }
 
@@ -2696,7 +2684,7 @@ impl<'modules> Typechecker<'modules> {
                     for _ in args.iter().rev() {
                         let arg_ty = self.fresh_typevar(Kind::Type);
                         arg_tys.push(arg_ty.clone());
-                        actual = core::Type::mk_arrow(arg_ty, actual);
+                        actual = core::Type::mk_arrow(self.common_kinds, arg_ty, actual);
                     }
                     arg_tys.reverse();
 
