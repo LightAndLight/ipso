@@ -1749,8 +1749,8 @@ fn kind_occurs_1() {
 #[test]
 fn type_occurs_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let v1 = tc.fresh_typevar(Kind::Type);
-        let v2 = tc.fresh_typevar(Kind::Type);
+        let v1 = tc.fresh_typevar(Kind::Type).get_value().clone();
+        let v2 = tc.fresh_typevar(Kind::Type).get_value().clone();
         assert_eq!(
             tc.unify_type(
                 &UnifyTypeContext {
@@ -2670,8 +2670,8 @@ fn unify_1() {
             ),
             Type::Int,
         );
-        let m_0 = tc.fresh_typevar(Kind::Type);
-        let m_1 = tc.fresh_typevar(Kind::Type);
+        let m_0 = tc.fresh_typevar(Kind::Type).get_value().clone();
+        let m_1 = tc.fresh_typevar(Kind::Type).get_value().clone();
         let holey = Type::mk_app(Type::mk_app(Type::Arrow, m_1), m_0);
         let expected = Ok(real.clone());
         let actual = {

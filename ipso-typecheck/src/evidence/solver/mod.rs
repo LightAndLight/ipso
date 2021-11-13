@@ -45,7 +45,7 @@ pub fn solve_constraint(
                 let metas: Vec<Type<usize>> = implication
                     .ty_vars
                     .iter()
-                    .map(|kind| tc.fresh_typevar(kind.clone()))
+                    .map(|kind| tc.fresh_typevar(kind.clone()).get_value().clone())
                     .collect();
 
                 let implication = implication.instantiate_many(&metas);

@@ -47,7 +47,7 @@ fn solve_constraint_2() {
 #[test]
 fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let var = tc.fresh_typevar(Kind::Row);
+        let var = tc.fresh_typevar(Kind::Row).get_value().clone();
         tc.evidence.assume(
             None,
             Constraint::HasField {

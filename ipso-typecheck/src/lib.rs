@@ -1677,10 +1677,10 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn fresh_typevar<A>(&mut self, kind: Kind) -> Type<A> {
+    pub fn fresh_typevar(&mut self, kind: Kind) -> core::Type {
         let n = self.type_solutions.len();
-        self.type_solutions.push((kind, None));
-        Type::Meta(n)
+        self.type_solutions.push((kind.clone(), None));
+        core::Type::unsafe_new(Type::Meta(n), kind)
     }
 
     fn walk(&self, ty: &Type<usize>) -> Type<usize> {
@@ -1845,7 +1845,7 @@ impl<'modules> Typechecker<'modules> {
                         }
                     }
 
-                    let rest3 = Some(self.fresh_typevar(Kind::Row));
+                    let rest3 = Some(self.fresh_typevar(Kind::Row).get_value().clone());
                     self.unify_type_subst(
                         subst,
                         context,
@@ -1935,8 +1935,8 @@ impl<'modules> Typechecker<'modules> {
         name: &Rc<str>,
         arg: &Spanned<String>,
     ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let arg_ty: Type<usize> = self.fresh_typevar(Kind::Type);
-        let rest_row = self.fresh_typevar(Kind::Row);
+        let arg_ty: Type<usize> = self.fresh_typevar(Kind::Type).get_value().clone();
+        let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
         let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
 
         let tag = self.evidence.placeholder(
@@ -1958,7 +1958,7 @@ impl<'modules> Typechecker<'modules> {
     ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
         (
             core::Pattern::Wildcard,
-            self.fresh_typevar(Kind::Type),
+            self.fresh_typevar(Kind::Type).get_value().clone(),
             Vec::new(),
         )
     }
@@ -1967,7 +1967,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         name: &Spanned<String>,
     ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let ty = self.fresh_typevar(Kind::Type);
+        let ty = self.fresh_typevar(Kind::Type).get_value().clone();
         (
             core::Pattern::Name,
             ty.clone(),
@@ -1987,12 +1987,15 @@ impl<'modules> Typechecker<'modules> {
                     pos: name.pos,
                     item: Rc::from(name.item.as_ref()),
                 };
-                (name, self.fresh_typevar(Kind::Type))
+                (name, self.fresh_typevar(Kind::Type).get_value().clone())
             })
             .collect();
-        let rest_row: Option<(Spanned<String>, Type<usize>)> = rest
-            .as_ref()
-            .map(|name| (name.clone(), self.fresh_typevar(Kind::Row)));
+        let rest_row: Option<(Spanned<String>, Type<usize>)> = rest.as_ref().map(|name| {
+            (
+                name.clone(),
+                self.fresh_typevar(Kind::Row).get_value().clone(),
+            )
+        });
         let ty = Type::mk_record(
             names_tys
                 .iter()
@@ -2063,8 +2066,8 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>), TypeError> {
         let name: Rc<str> = Rc::from(name);
 
-        let arg_ty = self.fresh_typevar(Kind::Type);
-        let rest_row = self.fresh_typevar(Kind::Row);
+        let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+        let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
         let pattern_rows =
             Type::mk_rows(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
         let expr_rows: Type<usize> = match &m_expr_rows {
@@ -2135,7 +2138,7 @@ impl<'modules> Typechecker<'modules> {
         let metas: Vec<Type<usize>> = sig
             .ty_vars
             .into_iter()
-            .map(|(_, kind)| self.fresh_typevar(kind))
+            .map(|(_, kind)| self.fresh_typevar(kind).get_value().clone())
             .collect();
         let ty = sig
             .body
@@ -2197,8 +2200,8 @@ impl<'modules> Typechecker<'modules> {
                 }
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(f)?;
-                    let in_ty = self.fresh_typevar(Kind::Type);
-                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let in_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                     let expected = Type::mk_arrow(in_ty.clone(), out_ty.clone());
                     let actual = f_ty;
                     let context = UnifyTypeContext {
@@ -2210,8 +2213,8 @@ impl<'modules> Typechecker<'modules> {
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
                 syntax::Expr::Lam { args, body } => {
-                    let in_ty = self.fresh_typevar(Kind::Type);
-                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let in_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                     let ty = Type::mk_arrow(in_ty, out_ty);
                     let expr_core = self.check_expr(
                         &Spanned {
@@ -2281,7 +2284,10 @@ impl<'modules> Typechecker<'modules> {
                         }
                         None => Ok((
                             core::Expr::Array(Vec::new()),
-                            Type::mk_app(Type::Array, self.fresh_typevar(Kind::Type)),
+                            Type::mk_app(
+                                Type::Array,
+                                self.fresh_typevar(Kind::Type).get_value().clone(),
+                            ),
                         )),
                     }
                 }
@@ -2299,7 +2305,7 @@ impl<'modules> Typechecker<'modules> {
                         }
                     }
 
-                    let rest_row_var = self.fresh_typevar(Kind::Row);
+                    let rest_row_var = self.fresh_typevar(Kind::Row).get_value().clone();
                     let mut extending_row = rest_row_var.clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
@@ -2344,8 +2350,8 @@ impl<'modules> Typechecker<'modules> {
                 }
                 syntax::Expr::Project(expr, field) => {
                     let field: Rc<str> = Rc::from(field.as_ref());
-                    let out_ty = self.fresh_typevar(Kind::Type);
-                    let rest = self.fresh_typevar(Kind::Row);
+                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let rest = self.fresh_typevar(Kind::Row).get_value().clone();
                     let rows = Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
                     let expr_core =
                         self.check_expr(expr, &Type::mk_app(Type::Record, rows.clone()))?;
@@ -2360,8 +2366,8 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Variant(ctor) => {
                     let ctor: Rc<str> = Rc::from(ctor.as_ref());
 
-                    let arg_ty = self.fresh_typevar(Kind::Type);
-                    let rest = self.fresh_typevar(Kind::Row);
+                    let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let rest = self.fresh_typevar(Kind::Row).get_value().clone();
                     let tag = self.evidence.placeholder(
                         None,
                         evidence::Constraint::HasField {
@@ -2380,8 +2386,8 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Embed(ctor, rest) => {
                     let ctor: Rc<str> = Rc::from(ctor.as_ref());
 
-                    let arg_ty = self.fresh_typevar(Kind::Type);
-                    let rest_rows = self.fresh_typevar(Kind::Row);
+                    let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let rest_rows = self.fresh_typevar(Kind::Row).get_value().clone();
                     let rest_core =
                         self.check_expr(rest, &Type::mk_app(Type::Variant, rest_rows.clone()))?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
@@ -2420,7 +2426,7 @@ impl<'modules> Typechecker<'modules> {
                         }
 
                         syntax::Binop::Append => {
-                            let item_ty = self.fresh_typevar(Kind::Type);
+                            let item_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                             let expected = Type::mk_app(Type::Array, item_ty);
                             let left_core = self.check_expr(left, &expected)?;
                             let right_core = self.check_expr(right, &expected)?;
@@ -2463,7 +2469,7 @@ impl<'modules> Typechecker<'modules> {
                     let (expr_core, expr_ty) = self.infer_expr(expr)?;
                     let mut branches_core = Vec::new();
 
-                    let expected_body_ty = self.fresh_typevar(Kind::Type);
+                    let expected_body_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                     let mut expected_pattern_ty = expr_ty.clone();
                     let mut seen_fallthrough = false;
                     let mut matching_variant = false;
@@ -2584,12 +2590,12 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Lam { args, body } => {
                     self.check_duplicate_args(args)?;
 
-                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                     let mut actual = out_ty.clone();
 
                     let mut arg_tys = Vec::new();
                     for _ in args.iter().rev() {
-                        let arg_ty = self.fresh_typevar(Kind::Type);
+                        let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
                         arg_tys.push(arg_ty.clone());
                         actual = Type::mk_arrow(arg_ty, actual);
                     }
