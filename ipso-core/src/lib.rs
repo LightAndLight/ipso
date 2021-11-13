@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, ModuleName};
+use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleName};
 use ipso_util::iter::Step;
 use std::{
     cmp,
@@ -9,6 +9,195 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
+
+/**
+Well-kinded types. Atomic types like `Int` and `Bool` are inherently well-kinded,
+and their kind is always known. Compound types may be ill-kinded if they are constructed
+incorrectly, e.g. by trying to form `x y : Type` where `x : Type` and `y : Type`.
+When kind polymorphism isn't in play, the kind of a compound type is always known; it's
+just well-formedness that needs to be checked.
+*/
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Type {
+    value: r#type::Type<usize>,
+    kind: Kind,
+}
+
+impl Type {
+    pub fn get_value(&self) -> &r#type::Type<usize> {
+        &self.value
+    }
+
+    pub fn get_kind(&self) -> &Kind {
+        &self.kind
+    }
+
+    pub fn instantiate_many(&self, tys: &[r#type::Type<usize>]) -> Self {
+        Type {
+            value: self.value.instantiate_many(tys),
+            kind: self.kind.clone(),
+        }
+    }
+    pub fn unsafe_new(value: r#type::Type<usize>, kind: Kind) -> Self {
+        Type { value, kind }
+    }
+
+    pub fn unsafe_mk_name(name: Rc<str>, kind: Kind) -> Self {
+        Type {
+            value: r#type::Type::Name(name),
+            kind,
+        }
+    }
+
+    pub fn unsafe_mk_var(ix: usize, kind: Kind) -> Self {
+        Type {
+            value: r#type::Type::Var(ix),
+            kind,
+        }
+    }
+
+    pub fn mk_io() -> Self {
+        Type {
+            value: r#type::Type::IO,
+            kind: Kind::mk_arrow(Kind::Type, Kind::Type),
+        }
+    }
+
+    pub fn mk_array() -> Self {
+        Type {
+            value: r#type::Type::Array,
+            kind: Kind::mk_arrow(Kind::Type, Kind::Type),
+        }
+    }
+
+    pub fn mk_char() -> Self {
+        Type {
+            value: r#type::Type::Char,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_unit() -> Self {
+        Type {
+            value: r#type::Type::Unit,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_bool() -> Self {
+        Type {
+            value: r#type::Type::Bool,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_int() -> Self {
+        Type {
+            value: r#type::Type::Int,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_string() -> Self {
+        Type {
+            value: r#type::Type::String,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_bytes() -> Self {
+        Type {
+            value: r#type::Type::Bytes,
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_app(a: Type, b: Type) -> Self {
+        debug_assert!(
+            {
+                match &a.kind {
+                    Kind::Ref(r) => match r.as_ref() {
+                        syntax::kind::KindCompound::Arrow(a, _) => a == &b.kind,
+                    },
+                    _ => false,
+                }
+            },
+            "mk_app({:?}, {:?}) invalid",
+            a,
+            b
+        );
+
+        Type {
+            value: r#type::Type::mk_app(a.value, b.value),
+            kind: match a.kind {
+                Kind::Ref(r) => match r.as_ref() {
+                    syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
+                },
+                r => panic!("{:?} has no return kind", r),
+            },
+        }
+    }
+
+    pub fn mk_arrow(a: Type, b: Type) -> Self {
+        debug_assert!(a.kind == Kind::Type, "{:?} is not Kind::Type", a,);
+        debug_assert!(b.kind == Kind::Type, "{:?} is not Kind::Type", b,);
+
+        Type {
+            value: r#type::Type::mk_arrow(a.value, b.value),
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_fatarrow(a: Type, b: Type) -> Self {
+        debug_assert!(
+            a.kind == Kind::Constraint,
+            "{:?} is not Kind::Constraint",
+            a,
+        );
+        debug_assert!(b.kind == Kind::Type, "{:?} is not Kind::Type", b,);
+
+        Type {
+            value: r#type::Type::mk_fatarrow(a.value, b.value),
+            kind: Kind::Type,
+        }
+    }
+
+    pub fn mk_hasfield(name: Rc<str>, ty: Type) -> Self {
+        debug_assert!(ty.kind == Kind::Row, "{:?} is not Kind::Row", ty);
+
+        Type {
+            value: r#type::Type::mk_hasfield(name, ty.value),
+            kind: Kind::Constraint,
+        }
+    }
+
+    pub fn mk_record(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
+        debug_assert!(
+            fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
+            "{:?} is not Kind::Type",
+            fields.iter().find(|x| x.1.kind != Kind::Type).unwrap()
+        );
+        debug_assert!(
+            match &rest {
+                Some(rest) => rest.kind == Kind::Row,
+                None => true,
+            },
+            "{:?} is not Kind::Row",
+            rest
+        );
+
+        Type {
+            value: r#type::Type::mk_record(
+                fields
+                    .into_iter()
+                    .map(|(name, ty)| (name, ty.value))
+                    .collect(),
+                rest.map(|x| x.get_value().clone()),
+            ),
+            kind: Kind::Type,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
@@ -872,11 +1061,11 @@ impl<'a> Iterator for IterEVars<'a> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeSig {
     pub ty_vars: Vec<(Rc<str>, Kind)>,
-    pub body: Type<usize>,
+    pub body: Type,
 }
 
 impl TypeSig {
-    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> TypeSig {
+    pub fn instantiate_many(&self, tys: &[r#type::Type<usize>]) -> TypeSig {
         let mut ty_vars = self.ty_vars.clone();
         for _ty in tys.iter().rev() {
             match ty_vars.pop() {
@@ -917,14 +1106,14 @@ pub enum Declaration {
     TypeAlias {
         name: String,
         args: Vec<Kind>,
-        body: Type<usize>,
+        body: Type,
     },
     Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(Rc<str>, Kind)>,
         superclass_constructors: Vec<Expr>,
-        assumes: Vec<Type<usize>>,
-        head: Type<usize>,
+        assumes: Vec<Type>,
+        head: Type,
         members: Vec<InstanceMember>,
     },
 }
@@ -969,7 +1158,7 @@ impl Declaration {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClassDeclaration {
-    pub supers: Vec<Type<usize>>,
+    pub supers: Vec<Type>,
     pub name: Rc<str>,
     pub args: Vec<(Rc<str>, Kind)>,
     pub members: Vec<ClassMember>,
@@ -978,6 +1167,18 @@ pub struct ClassDeclaration {
 impl ClassDeclaration {
     pub fn get_bindings(&self) -> HashMap<String, (TypeSig, Rc<Expr>)> {
         let supers_len = self.supers.len();
+
+        let name_kind = self
+            .args
+            .iter()
+            .rev()
+            .fold(Kind::Constraint, |acc, (_, arg_kind)| {
+                Kind::mk_arrow(arg_kind.clone(), acc)
+            });
+        let name_ty = Type {
+            value: r#type::Type::Name(self.name.clone()),
+            kind: name_kind,
+        };
 
         self.members
             .iter()
@@ -1000,10 +1201,16 @@ impl ClassDeclaration {
                 } else {
                     0
                 };
-                let applied_type = (adjustment..adjustment + self.args.len())
-                    .into_iter()
-                    .fold(Type::Name(self.name.clone()), |acc, el| {
-                        Type::mk_app(acc, Type::Var(el))
+                let applied_type = self
+                    .args // (adjustment..adjustment + self.args.len())
+                    .iter()
+                    .enumerate()
+                    .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
+                        let arg_ty = Type {
+                            value: r#type::Type::Var(adjustment + arg_index),
+                            kind: arg_kind.clone(),
+                        };
+                        Type::mk_app(acc, arg_ty)
                     });
                 let sig = {
                     let mut body = member.sig.body.clone();
