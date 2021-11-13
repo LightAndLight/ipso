@@ -1756,7 +1756,7 @@ fn kind_occurs_1() {
         assert_eq!(
             tc.unify_kind(
                 &UnifyKindContextRefs {
-                    ty: &Type::Unit,
+                    ty: &core::Type::Unit,
                     has_kind: &Kind::Type,
                     unifying_types: None
                 },

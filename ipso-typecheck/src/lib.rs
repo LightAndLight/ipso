@@ -204,7 +204,7 @@ pub struct UnifyKindContext<A> {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyKindContextRefs<'a, A> {
-    ty: &'a Type<A>,
+    ty: &'a core::Type,
     has_kind: &'a Kind,
     unifying_types: Option<&'a UnifyTypeContext<A>>,
 }
@@ -804,7 +804,7 @@ impl<'modules> Typechecker<'modules> {
         let expected = kind;
         let (ty, actual) = self.infer_kind(ty)?;
         let context = UnifyKindContextRefs {
-            ty: &ty.get_value(),
+            ty: &ty,
             has_kind: expected,
             unifying_types: context,
         };
@@ -1433,7 +1433,7 @@ impl<'modules> Typechecker<'modules> {
         actual: &Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(context.ty)),
+            ty: self.fill_ty_names(self.zonk_type(&context.ty.get_value())),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_type(&x.expected)),
@@ -1775,7 +1775,7 @@ impl<'modules> Typechecker<'modules> {
         let actual_kind = actual.get_kind();
         self.unify_kind(
             &UnifyKindContextRefs {
-                ty: &actual.get_value(),
+                ty: &actual,
                 has_kind: &expected_kind,
                 unifying_types: Some(context),
             },

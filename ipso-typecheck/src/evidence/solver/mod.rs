@@ -117,7 +117,7 @@ pub fn solve_constraint(
         Constraint::HasField { field, rest } => {
             tc.unify_kind(
                 &UnifyKindContextRefs {
-                    ty: &rest.get_value(),
+                    ty: rest,
                     has_kind: &Kind::Row,
                     unifying_types: None,
                 },
