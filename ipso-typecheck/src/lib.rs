@@ -1291,10 +1291,10 @@ impl<'modules> Typechecker<'modules> {
         self.position.unwrap_or(0)
     }
 
-    fn lookup_var(&self, name: &str) -> Option<(usize, Type<usize>)> {
+    fn lookup_var(&self, name: &str) -> Option<(usize, core::Type)> {
         self.bound_vars
             .lookup_name(name)
-            .map(|(ix, ty)| (ix, ty.get_value().clone()))
+            .map(|(ix, ty)| (ix, ty.clone()))
     }
 
     fn lookup_name(&self, name: &str) -> Option<core::TypeSig> {
@@ -2060,7 +2060,7 @@ impl<'modules> Typechecker<'modules> {
     fn infer_variant_pattern_case(
         &mut self,
         m_expr_rows: &mut Option<Type<usize>>,
-        expected_pattern_ty: &mut Type<usize>,
+        expected_pattern_ty: &mut core::Type,
         seen_ctors: &mut HashSet<Rc<str>>,
         name: &str,
         arg: &Spanned<String>,
@@ -2068,10 +2068,10 @@ impl<'modules> Typechecker<'modules> {
         let name: Rc<str> = Rc::from(name);
 
         let arg_ty = self.fresh_typevar(Kind::Type);
-        let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
+        let rest_row = self.fresh_typevar(Kind::Row);
         let pattern_rows = Type::mk_rows(
             vec![(name.clone(), arg_ty.get_value().clone())],
-            Some(rest_row.clone()),
+            Some(rest_row.get_value().clone()),
         );
         let expr_rows: Type<usize> = match &m_expr_rows {
             None => {
@@ -2091,16 +2091,16 @@ impl<'modules> Typechecker<'modules> {
 
         let pattern_ty = Type::mk_app(Type::Variant, pattern_rows);
         let context: UnifyTypeContext<usize> = UnifyTypeContext {
-            expected: expected_pattern_ty.clone(),
+            expected: expected_pattern_ty.get_value().clone(),
             actual: pattern_ty.clone(),
         };
-        match self.unify_type(&context, expected_pattern_ty, &pattern_ty) {
+        match self.unify_type(&context, expected_pattern_ty.get_value(), &pattern_ty) {
             Err(err) => {
                 return Err(err);
             }
             Ok(()) => {}
         }
-        *expected_pattern_ty = Type::mk_variant(Vec::new(), Some(rest_row));
+        *expected_pattern_ty = core::Type::mk_variant(Vec::new(), Some(rest_row));
 
         seen_ctors.insert(name);
 
@@ -2136,7 +2136,7 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn instantiate(&mut self, expr: core::Expr, sig: core::TypeSig) -> (core::Expr, Type<usize>) {
+    fn instantiate(&mut self, expr: core::Expr, sig: core::TypeSig) -> (core::Expr, core::Type) {
         let metas: Vec<Type<usize>> = sig
             .ty_vars
             .into_iter()
@@ -2155,13 +2155,13 @@ impl<'modules> Typechecker<'modules> {
             );
             expr = core::Expr::mk_app(expr, core::Expr::Placeholder(p));
         }
-        (expr, ty.clone())
+        (expr, core::Type::unsafe_new(ty.clone(), Kind::Type))
     }
 
     fn infer_expr(
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
-    ) -> Result<(core::Expr, Type<usize>), TypeError> {
+    ) -> Result<(core::Expr, core::Type), TypeError> {
         with_position!(
             self,
             expr.pos,
@@ -2203,21 +2203,21 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::App(f, x) => {
                     let (f_core, f_ty) = self.infer_expr(f)?;
                     let in_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let expected = Type::mk_arrow(in_ty.clone(), out_ty.clone());
+                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let expected = Type::mk_arrow(in_ty.clone(), out_ty.get_value().clone());
                     let actual = f_ty;
                     let context = UnifyTypeContext {
                         expected: expected.clone(),
-                        actual: actual.clone(),
+                        actual: actual.get_value().clone(),
                     };
-                    self.unify_type(&context, &expected, &actual)?;
+                    self.unify_type(&context, &expected, actual.get_value())?;
                     let x_core = self.check_expr(x, &in_ty)?;
                     Ok((core::Expr::mk_app(f_core, x_core), out_ty))
                 }
                 syntax::Expr::Lam { args, body } => {
-                    let in_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let ty = Type::mk_arrow(in_ty, out_ty);
+                    let in_ty = self.fresh_typevar(Kind::Type);
+                    let out_ty = self.fresh_typevar(Kind::Type);
+                    let ty = core::Type::mk_arrow(in_ty, out_ty);
                     let expr_core = self.check_expr(
                         &Spanned {
                             pos: expr.pos,
@@ -2226,15 +2226,14 @@ impl<'modules> Typechecker<'modules> {
                                 body: body.clone(),
                             },
                         },
-                        &ty,
+                        ty.get_value(),
                     )?;
                     Ok((expr_core, ty))
                 }
                 syntax::Expr::Let { name, value, rest } => {
                     let (value_core, value_ty) = self.infer_expr(value)?;
 
-                    self.bound_vars
-                        .insert(&[(name.clone(), core::Type::unsafe_new(value_ty, Kind::Type))]);
+                    self.bound_vars.insert(&[(name.clone(), value_ty)]);
                     let (rest_core, rest_ty) = self.infer_expr(rest)?;
                     self.bound_vars.delete(1);
 
@@ -2246,20 +2245,20 @@ impl<'modules> Typechecker<'modules> {
                         rest_ty,
                     ))
                 }
-                syntax::Expr::True => Ok((core::Expr::True, Type::Bool)),
-                syntax::Expr::False => Ok((core::Expr::False, Type::Bool)),
+                syntax::Expr::True => Ok((core::Expr::True, core::Type::mk_bool())),
+                syntax::Expr::False => Ok((core::Expr::False, core::Type::mk_bool())),
                 syntax::Expr::IfThenElse(cond, then_, else_) => {
                     let cond_core = self.check_expr(cond, &Type::Bool)?;
                     let (then_core, then_ty) = self.infer_expr(then_)?;
-                    let else_core = self.check_expr(else_, &then_ty)?;
+                    let else_core = self.check_expr(else_, then_ty.get_value())?;
                     Ok((
                         core::Expr::mk_ifthenelse(cond_core, then_core, else_core),
                         then_ty,
                     ))
                 }
-                syntax::Expr::Unit => Ok((core::Expr::Unit, Type::Unit)),
-                syntax::Expr::Int(n) => Ok((core::Expr::Int(*n), Type::Int)),
-                syntax::Expr::Char(c) => Ok((core::Expr::Char(*c), Type::Char)),
+                syntax::Expr::Unit => Ok((core::Expr::Unit, core::Type::mk_unit())),
+                syntax::Expr::Int(n) => Ok((core::Expr::Int(*n), core::Type::mk_int())),
+                syntax::Expr::Char(c) => Ok((core::Expr::Char(*c), core::Type::mk_char())),
                 syntax::Expr::String(parts) => {
                     let mut parts_core = Vec::new();
                     for part in parts {
@@ -2268,7 +2267,7 @@ impl<'modules> Typechecker<'modules> {
                             Ok(part_core) => parts_core.push(part_core),
                         }
                     }
-                    Ok((core::Expr::String(parts_core), Type::String))
+                    Ok((core::Expr::String(parts_core), core::Type::mk_string()))
                 }
                 syntax::Expr::Array(items) => {
                     let mut items_iter = items.iter();
@@ -2277,39 +2276,43 @@ impl<'modules> Typechecker<'modules> {
                             let (first_core, first_ty) = self.infer_expr(first)?;
                             let mut items_core = vec![first_core];
                             for item in items_iter {
-                                let item_core = self.check_expr(item, &first_ty)?;
+                                let item_core = self.check_expr(item, first_ty.get_value())?;
                                 items_core.push(item_core);
                             }
                             Ok((
                                 core::Expr::Array(items_core),
-                                Type::mk_app(Type::Array, first_ty),
+                                core::Type::mk_app(core::Type::mk_array(), first_ty),
                             ))
                         }
                         None => Ok((
                             core::Expr::Array(Vec::new()),
-                            Type::mk_app(
-                                Type::Array,
-                                self.fresh_typevar(Kind::Type).get_value().clone(),
+                            core::Type::mk_app(
+                                core::Type::mk_array(),
+                                self.fresh_typevar(Kind::Type),
                             ),
                         )),
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
                     let mut fields_result: Vec<(Rc<str>, core::Expr, Type<usize>)> = Vec::new();
-                    let mut fields_rows: Vec<(Rc<str>, Type<usize>)> = Vec::new();
+                    let mut fields_rows: Vec<(Rc<str>, core::Type)> = Vec::new();
                     for (field, expr) in fields {
                         match self.infer_expr(expr) {
                             Err(err) => return Err(err),
                             Ok((expr_core, expr_ty)) => {
                                 let field: Rc<str> = Rc::from(field.as_ref());
-                                fields_result.push((field.clone(), expr_core, expr_ty.clone()));
+                                fields_result.push((
+                                    field.clone(),
+                                    expr_core,
+                                    expr_ty.get_value().clone(),
+                                ));
                                 fields_rows.push((field, expr_ty));
                             }
                         }
                     }
 
-                    let rest_row_var = self.fresh_typevar(Kind::Row).get_value().clone();
-                    let mut extending_row = rest_row_var.clone();
+                    let rest_row_var = self.fresh_typevar(Kind::Row);
+                    let mut extending_row = rest_row_var.get_value().clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
                         let index = self.evidence.placeholder(
@@ -2329,16 +2332,22 @@ impl<'modules> Typechecker<'modules> {
                     let mut rest_row = None;
                     let _ = match rest {
                         None => {
+                            let fields_rows: Vec<(Rc<str>, Type<usize>)> = fields_rows
+                                .iter()
+                                .map(|(a, b)| (a.clone(), b.get_value().clone()))
+                                .collect();
                             let expected = Type::mk_record(fields_rows.clone(), None);
-                            let actual =
-                                Type::mk_record(fields_rows.clone(), Some(rest_row_var.clone()));
+                            let actual = Type::mk_record(
+                                fields_rows,
+                                Some(rest_row_var.get_value().clone()),
+                            );
                             let context = UnifyTypeContext { expected, actual };
-                            self.unify_type(&context, &Type::RowNil, &rest_row_var)
+                            self.unify_type(&context, &Type::RowNil, rest_row_var.get_value())
                         }
                         Some(expr) => {
                             let expr_core = self.check_expr(
                                 expr,
-                                &Type::mk_app(Type::Record, rest_row_var.clone()),
+                                &Type::mk_app(Type::Record, rest_row_var.get_value().clone()),
                             )?;
                             rest_core = Some(expr_core);
                             rest_row = Some(rest_row_var);
@@ -2348,14 +2357,17 @@ impl<'modules> Typechecker<'modules> {
 
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),
-                        Type::mk_record(fields_rows, rest_row),
+                        core::Type::mk_record(fields_rows, rest_row),
                     ))
                 }
                 syntax::Expr::Project(expr, field) => {
                     let field: Rc<str> = Rc::from(field.as_ref());
-                    let out_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let out_ty = self.fresh_typevar(Kind::Type);
                     let rest = self.fresh_typevar(Kind::Row).get_value().clone();
-                    let rows = Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
+                    let rows = Type::mk_rows(
+                        vec![(field.clone(), out_ty.get_value().clone())],
+                        Some(rest),
+                    );
                     let expr_core =
                         self.check_expr(expr, &Type::mk_app(Type::Record, rows.clone()))?;
                     let offset = self
@@ -2369,40 +2381,48 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Variant(ctor) => {
                     let ctor: Rc<str> = Rc::from(ctor.as_ref());
 
-                    let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let rest = self.fresh_typevar(Kind::Row).get_value().clone();
+                    let arg_ty = self.fresh_typevar(Kind::Type);
+                    let rest = self.fresh_typevar(Kind::Row);
                     let tag = self.evidence.placeholder(
                         None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
-                            rest: Type::mk_rows(vec![], Some(rest.clone())),
+                            rest: Type::mk_rows(vec![], Some(rest.get_value().clone())),
                         },
                     );
                     Ok((
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
-                        Type::mk_arrow(
+                        core::Type::mk_arrow(
                             arg_ty.clone(),
-                            Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
+                            core::Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
                         ),
                     ))
                 }
                 syntax::Expr::Embed(ctor, rest) => {
                     let ctor: Rc<str> = Rc::from(ctor.as_ref());
 
-                    let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                    let rest_rows = self.fresh_typevar(Kind::Row).get_value().clone();
-                    let rest_core =
-                        self.check_expr(rest, &Type::mk_app(Type::Variant, rest_rows.clone()))?;
+                    let arg_ty = self.fresh_typevar(Kind::Type);
+                    let rest_rows = self.fresh_typevar(Kind::Row);
+                    let rest_core = self.check_expr(
+                        rest,
+                        &Type::mk_app(Type::Variant, rest_rows.get_value().clone()),
+                    )?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
                         None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
-                            rest: rest_rows.clone(),
+                            rest: rest_rows.get_value().clone(),
                         },
                     ));
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
-                        Type::mk_app(Type::Variant, Type::mk_rowcons(ctor, arg_ty, rest_rows)),
+                        core::Type::mk_app(
+                            core::Type::unsafe_new(
+                                Type::Variant,
+                                Kind::mk_arrow(Kind::Row, Kind::Type),
+                            ),
+                            core::Type::mk_rowcons(ctor, arg_ty, rest_rows),
+                        ),
                     ))
                 }
                 syntax::Expr::Binop(op, left, right) => {
@@ -2410,41 +2430,59 @@ impl<'modules> Typechecker<'modules> {
                         syntax::Binop::Add => {
                             let left_core = self.check_expr(left, &Type::Int)?;
                             let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
                         syntax::Binop::Multiply => {
                             let left_core = self.check_expr(left, &Type::Int)?;
                             let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
                         syntax::Binop::Subtract => {
                             let left_core = self.check_expr(left, &Type::Int)?;
                             let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
                         syntax::Binop::Divide => {
                             let left_core = self.check_expr(left, &Type::Int)?;
                             let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
 
                         syntax::Binop::Append => {
-                            let item_ty = self.fresh_typevar(Kind::Type).get_value().clone();
-                            let expected = Type::mk_app(Type::Array, item_ty);
-                            let left_core = self.check_expr(left, &expected)?;
-                            let right_core = self.check_expr(right, &expected)?;
+                            let item_ty = self.fresh_typevar(Kind::Type);
+                            let expected = core::Type::mk_app(core::Type::mk_array(), item_ty);
+                            let left_core = self.check_expr(left, expected.get_value())?;
+                            let right_core = self.check_expr(right, expected.get_value())?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), expected))
                         }
 
                         syntax::Binop::Or => {
                             let left_core = self.check_expr(left, &Type::Bool)?;
                             let right_core = self.check_expr(right, &Type::Bool)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
                         syntax::Binop::And => {
                             let left_core = self.check_expr(left, &Type::Bool)?;
                             let right_core = self.check_expr(right, &Type::Bool)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::mk_int(),
+                            ))
                         }
 
                         syntax::Binop::Eq => {
@@ -2472,7 +2510,7 @@ impl<'modules> Typechecker<'modules> {
                     let (expr_core, expr_ty) = self.infer_expr(expr)?;
                     let mut branches_core = Vec::new();
 
-                    let expected_body_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+                    let expected_body_ty = self.fresh_typevar(Kind::Type);
                     let mut expected_pattern_ty = expr_ty.clone();
                     let mut seen_fallthrough = false;
                     let mut matching_variant = false;
@@ -2518,12 +2556,12 @@ impl<'modules> Typechecker<'modules> {
                                     }?;
                                 if !saw_variant {
                                     let context: UnifyTypeContext<usize> = UnifyTypeContext {
-                                        expected: expected_pattern_ty.clone(),
+                                        expected: expected_pattern_ty.get_value().clone(),
                                         actual: pattern_ty.clone(),
                                     };
                                     match self.unify_type(
                                         &context,
-                                        &expected_pattern_ty,
+                                        expected_pattern_ty.get_value(),
                                         &pattern_ty,
                                     ) {
                                         Err(err) => {
@@ -2545,7 +2583,8 @@ impl<'modules> Typechecker<'modules> {
                                 Ok((pattern_core, pattern_ty, pattern_binds))
                             })?;
                         self.bound_vars.insert(&pattern_binds);
-                        let body_core = self.check_expr(&branch.body, &expected_body_ty)?;
+                        let body_core =
+                            self.check_expr(&branch.body, expected_body_ty.get_value())?;
                         self.bound_vars.delete(pattern_binds.len());
                         branches_core.push(core::Branch {
                             pattern: pattern_core,
@@ -2554,7 +2593,7 @@ impl<'modules> Typechecker<'modules> {
                     }
 
                     if matching_variant && !seen_fallthrough {
-                        let expr_ty = self.zonk_type(&expr_ty);
+                        let expr_ty = self.zonk_type(expr_ty.get_value());
                         let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
                         let ctors: Vec<(Rc<str>, Type<usize>)> = ctors
                             .iter()
@@ -2567,7 +2606,7 @@ impl<'modules> Typechecker<'modules> {
                         };
                         let _ = self.unify_type(
                             &context,
-                            &expected_pattern_ty,
+                            expected_pattern_ty.get_value(),
                             &Type::mk_variant(Vec::new(), None),
                         )?;
                     }
@@ -2658,9 +2697,9 @@ impl<'modules> Typechecker<'modules> {
                     let (expr, actual) = self.infer_expr(expr)?;
                     let context = UnifyTypeContext {
                         expected: expected.clone(),
-                        actual: actual.clone(),
+                        actual: actual.get_value().clone(),
                     };
-                    self.unify_type(&context, expected, &actual)?;
+                    self.unify_type(&context, expected, actual.get_value())?;
                     Ok(expr)
                 }
             }
