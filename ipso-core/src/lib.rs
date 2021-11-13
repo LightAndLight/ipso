@@ -326,6 +326,23 @@ impl Type {
         }
     }
 
+    /**
+    ```
+    use std::rc::Rc;
+    use ipso_core::{CommonKinds, Type};
+    use ipso_syntax::kind::Kind;
+
+    let common_kinds = CommonKinds::default();
+
+    let expected_constraint = Type::mk_hasfield(Rc::from("x"), Type::Var(Kind::Row, 0));
+    let expected = (vec![&expected_constraint], &Type::Var(Kind::Type, 1));
+
+    let ty = Type::mk_fatarrow(&common_kinds, Type::mk_hasfield(Rc::from("x"), Type::Var(Kind::Row, 0)), Type::Var(Kind::Type, 1));
+    let actual = ty.unwrap_constraints();
+
+    assert_eq!(expected, actual)
+    ```
+    */
     pub fn unwrap_constraints(&self) -> (Vec<&Type>, &Type) {
         fn flatten_constraints(ty: &Type) -> Vec<&Type> {
             match ty {
