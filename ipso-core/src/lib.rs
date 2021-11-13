@@ -41,6 +41,25 @@ pub enum Type {
     Meta(Kind, usize),
 }
 
+pub struct CommonKinds {
+    pub type_to_type: Kind,
+    pub type_to_type_to_type: Kind,
+    pub constraint_to_type_to_type: Kind,
+    pub row_to_type: Kind,
+}
+
+impl Default for CommonKinds {
+    fn default() -> Self {
+        let type_to_type = Kind::mk_arrow(Kind::Type, Kind::Type);
+        Self {
+            type_to_type_to_type: Kind::mk_arrow(Kind::Type, type_to_type.clone()),
+            constraint_to_type_to_type: Kind::mk_arrow(Kind::Constraint, type_to_type.clone()),
+            type_to_type,
+            row_to_type: Kind::mk_arrow(Kind::Row, Kind::Type),
+        }
+    }
+}
+
 impl Type {
     pub fn get_value(&self) -> r#type::Type<usize> {
         match self {
@@ -77,7 +96,7 @@ impl Type {
         }
     }
 
-    pub fn get_kind(&self) -> Kind {
+    pub fn get_kind(&self, common_kinds: &CommonKinds) -> Kind {
         match self {
             Type::Bool => Kind::Type,
             Type::Int => Kind::Type,
@@ -89,14 +108,12 @@ impl Type {
             Type::RowCons(_, _, _) => Kind::Row,
             Type::Constraints(_) => Kind::Constraint,
             Type::HasField(_, _) => Kind::Constraint,
-            Type::Array => Kind::mk_arrow(Kind::Type, Kind::Type),
-            Type::IO => Kind::mk_arrow(Kind::Type, Kind::Type),
-            Type::Record => Kind::mk_arrow(Kind::Row, Kind::Type),
-            Type::Variant => Kind::mk_arrow(Kind::Row, Kind::Type),
-            Type::Arrow => Kind::mk_arrow(Kind::Type, Kind::mk_arrow(Kind::Type, Kind::Type)),
-            Type::FatArrow => {
-                Kind::mk_arrow(Kind::Constraint, Kind::mk_arrow(Kind::Type, Kind::Type))
-            }
+            Type::Array => common_kinds.type_to_type.clone(),
+            Type::IO => common_kinds.type_to_type.clone(),
+            Type::Record => common_kinds.row_to_type.clone(),
+            Type::Variant => common_kinds.row_to_type.clone(),
+            Type::Arrow => common_kinds.type_to_type_to_type.clone(),
+            Type::FatArrow => common_kinds.constraint_to_type_to_type.clone(),
             Type::Name(k, _) => k.clone(),
             Type::Var(k, _) => k.clone(),
             Type::App(k, _, _) => k.clone(),
@@ -112,9 +129,9 @@ impl Type {
         Type::Var(kind, ix)
     }
 
-    pub fn mk_app(a: Type, b: Type) -> Self {
+    pub fn mk_app(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
         Type::App(
-            match a.get_kind() {
+            match a.get_kind(common_kinds) {
                 Kind::Ref(r) => match r.as_ref() {
                     syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
                 },
@@ -125,12 +142,16 @@ impl Type {
         )
     }
 
-    pub fn mk_arrow(a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::Arrow, a), b)
+    pub fn mk_arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
+        Type::mk_app(common_kinds, Type::mk_app(common_kinds, Type::Arrow, a), b)
     }
 
-    pub fn mk_fatarrow(a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::FatArrow, a), b)
+    pub fn mk_fatarrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
+        Type::mk_app(
+            common_kinds,
+            Type::mk_app(common_kinds, Type::FatArrow, a),
+            b,
+        )
     }
 
     pub fn mk_hasfield(name: Rc<str>, ty: Type) -> Self {
@@ -151,12 +172,20 @@ impl Type {
         )
     }
 
-    pub fn mk_record(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
-        Type::mk_app(Type::Record, Type::mk_rows(fields, rest))
+    pub fn mk_record(
+        common_kinds: &CommonKinds,
+        fields: Vec<(Rc<str>, Type)>,
+        rest: Option<Type>,
+    ) -> Self {
+        Type::mk_app(common_kinds, Type::Record, Type::mk_rows(fields, rest))
     }
 
-    pub fn mk_variant(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
-        Type::mk_app(Type::Variant, Type::mk_rows(fields, rest))
+    pub fn mk_variant(
+        common_kinds: &CommonKinds,
+        fields: Vec<(Rc<str>, Type)>,
+        rest: Option<Type>,
+    ) -> Self {
+        Type::mk_app(common_kinds, Type::Variant, Type::mk_rows(fields, rest))
     }
 
     pub fn subst_metas<F: Fn(&Kind, usize) -> Type>(&self, f: &F) -> Self {
@@ -1357,7 +1386,7 @@ pub enum Declaration {
 }
 
 impl Declaration {
-    pub fn get_bindings(&self) -> HashMap<String, Rc<Expr>> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig: _, body } => {
@@ -1367,7 +1396,7 @@ impl Declaration {
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
-                .get_bindings()
+                .get_bindings(common_kinds)
                 .into_iter()
                 .map(|(a, b)| (a, b.1))
                 .collect(),
@@ -1375,7 +1404,7 @@ impl Declaration {
         }
     }
 
-    pub fn get_signatures(&self) -> HashMap<String, TypeSig> {
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig, body: _ } => {
@@ -1385,7 +1414,7 @@ impl Declaration {
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
-                .get_bindings()
+                .get_bindings(common_kinds)
                 .into_iter()
                 .map(|(a, b)| (a, b.0))
                 .collect(),
@@ -1403,7 +1432,7 @@ pub struct ClassDeclaration {
 }
 
 impl ClassDeclaration {
-    pub fn get_bindings(&self) -> HashMap<String, (TypeSig, Rc<Expr>)> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, (TypeSig, Rc<Expr>)> {
         let supers_len = self.supers.len();
 
         let name_kind = self
@@ -1442,11 +1471,11 @@ impl ClassDeclaration {
                     .enumerate()
                     .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
                         let arg_ty = Type::unsafe_mk_var(adjustment + arg_index, arg_kind.clone());
-                        Type::mk_app(acc, arg_ty)
+                        Type::mk_app(common_kinds, acc, arg_ty)
                     });
                 let sig = {
                     let mut body = member.sig.body.clone();
-                    body = Type::mk_fatarrow(applied_type, body);
+                    body = Type::mk_fatarrow(common_kinds, applied_type, body);
 
                     TypeSig {
                         ty_vars: member.sig.ty_vars.clone(),
@@ -1531,18 +1560,18 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_bindings(&self) -> HashMap<String, Rc<Expr>> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
         let bindings: HashMap<String, Rc<Expr>> = HashMap::new();
         self.decls.iter().fold(bindings, |mut acc, decl| {
-            acc.extend(decl.get_bindings().into_iter());
+            acc.extend(decl.get_bindings(common_kinds).into_iter());
             acc
         })
     }
 
-    pub fn get_signatures(&self) -> HashMap<String, TypeSig> {
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
         let signatures: HashMap<String, TypeSig> = HashMap::new();
         self.decls.iter().fold(signatures, |mut acc, decl| {
-            acc.extend(decl.get_signatures().into_iter());
+            acc.extend(decl.get_signatures(common_kinds).into_iter());
             acc
         })
     }
