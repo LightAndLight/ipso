@@ -1351,40 +1351,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn zonk_type(&self, ty: &syntax::Type<usize>) -> syntax::Type<usize> {
-        match ty {
-            syntax::Type::Name(n) => syntax::Type::Name(n.clone()),
-            syntax::Type::Var(n) => syntax::Type::Var(*n),
-            syntax::Type::Bool => syntax::Type::Bool,
-            syntax::Type::Int => syntax::Type::Int,
-            syntax::Type::Char => syntax::Type::Char,
-            syntax::Type::String => syntax::Type::String,
-            syntax::Type::Bytes => syntax::Type::Bytes,
-            syntax::Type::Arrow => syntax::Type::Arrow,
-            syntax::Type::FatArrow => syntax::Type::FatArrow,
-            syntax::Type::Constraints(cs) => {
-                syntax::Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
-            }
-            syntax::Type::Array => syntax::Type::Array,
-            syntax::Type::Record => syntax::Type::Record,
-            syntax::Type::Variant => syntax::Type::Variant,
-            syntax::Type::IO => syntax::Type::IO,
-            syntax::Type::App(a, b) => syntax::Type::mk_app(self.zonk_type(a), self.zonk_type(b)),
-            syntax::Type::RowNil => syntax::Type::RowNil,
-            syntax::Type::Unit => syntax::Type::Unit,
-            syntax::Type::RowCons(field, ty, rest) => {
-                syntax::Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
-            }
-            syntax::Type::HasField(field, rest) => {
-                syntax::Type::mk_hasfield(field.clone(), self.zonk_type(rest))
-            }
-            syntax::Type::Meta(n) => match &self.type_solutions[*n].1 {
-                None => syntax::Type::Meta(*n),
-                Some(ty) => self.zonk_type(&ty.to_syntax()),
-            },
-        }
-    }
-
     pub fn zonk_kind(&self, close_unsolved: bool, kind: &Kind) -> Kind {
         match kind {
             Kind::Ref(kind) => match kind.as_ref() {
@@ -1426,7 +1392,7 @@ impl<'modules> Typechecker<'modules> {
         actual: &Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(&context.ty.to_syntax())),
+            ty: self.fill_ty_names(self.zonk_core_type(context.ty).to_syntax()),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
                 expected: self.fill_ty_names(self.zonk_core_type(x.expected).to_syntax()),
