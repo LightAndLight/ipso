@@ -1445,7 +1445,7 @@ fn infer_record_1() {
                 core::Expr::Int(0),
                 Constraint::HasField {
                     field: Rc::from("x"),
-                    rest: Type::RowNil
+                    rest: core::Type::mk_rownil()
                 }
             )),
             solve_placeholder(&mut tc, *p0)
@@ -1457,7 +1457,7 @@ fn infer_record_1() {
                 core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0)),
                 Constraint::HasField {
                     field: Rc::from("y"),
-                    rest: Type::mk_rows(vec![(Rc::from("x"), Type::Int)], None)
+                    rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::mk_int())], None)
                 }
             )),
             solve_placeholder(&mut tc, *p1)
@@ -1473,8 +1473,11 @@ fn infer_record_1() {
                 ),
                 Constraint::HasField {
                     field: Rc::from("z"),
-                    rest: Type::mk_rows(
-                        vec![(Rc::from("y"), Type::String), (Rc::from("x"), Type::Int)],
+                    rest: core::Type::mk_rows(
+                        vec![
+                            (Rc::from("y"), core::Type::mk_string()),
+                            (Rc::from("x"), core::Type::mk_int())
+                        ],
                         None
                     )
                 }

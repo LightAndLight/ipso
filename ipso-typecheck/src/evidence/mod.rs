@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::Typechecker;
-use ipso_core::{EVar, Expr, Placeholder};
-use ipso_syntax::r#type::Type;
+use ipso_core::{self as core, EVar, Expr, Placeholder};
+use ipso_syntax::{kind::Kind, r#type::Type};
 pub mod solver;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -13,24 +13,32 @@ pub struct Evidence {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
-    HasField { field: Rc<str>, rest: Type<usize> },
-    Type(Type<usize>),
+    HasField { field: Rc<str>, rest: core::Type },
+    Type(core::Type),
 }
 
 impl Constraint {
-    pub fn from_type(ty: &Type<usize>) -> Self {
-        match ty {
+    pub fn from_type(ty: &core::Type) -> Self {
+        debug_assert!(
+            ty.get_kind() == &Kind::Constraint,
+            "{:?} is not Kind::Constraint",
+            ty
+        );
+
+        match ty.get_value() {
             Type::HasField(field, rest) => Constraint::HasField {
                 field: field.clone(),
-                rest: (**rest).clone(),
+                rest: core::Type::unsafe_new(rest.as_ref().clone(), Kind::Row),
             },
             _ => Constraint::Type(ty.clone()),
         }
     }
 
-    pub fn to_type(&self) -> Type<usize> {
+    pub fn to_type(&self) -> core::Type {
         match self {
-            Constraint::HasField { field, rest } => Type::mk_hasfield(field.clone(), rest.clone()),
+            Constraint::HasField { field, rest } => {
+                core::Type::mk_hasfield(field.clone(), rest.clone())
+            }
             Constraint::Type(ty) => ty.clone(),
         }
     }

@@ -8,7 +8,7 @@ use ipso_core::{
     self as core, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig,
 };
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, r#type::Type, Binop};
+use ipso_syntax::{kind::Kind, Binop};
 #[cfg(test)]
 use std::rc::Rc;
 
@@ -17,8 +17,11 @@ fn solve_constraint_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
             field: Rc::from("x"),
-            rest: Type::mk_rows(
-                vec![(Rc::from("y"), Type::Int), (Rc::from("z"), Type::Bool)],
+            rest: core::Type::mk_rows(
+                vec![
+                    (Rc::from("y"), core::Type::mk_int()),
+                    (Rc::from("z"), core::Type::mk_bool()),
+                ],
                 None,
             ),
         };
@@ -33,8 +36,11 @@ fn solve_constraint_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let constraint = Constraint::HasField {
             field: Rc::from("y"),
-            rest: Type::mk_rows(
-                vec![(Rc::from("x"), Type::Int), (Rc::from("z"), Type::Bool)],
+            rest: core::Type::mk_rows(
+                vec![
+                    (Rc::from("x"), core::Type::mk_int()),
+                    (Rc::from("z"), core::Type::mk_bool()),
+                ],
                 None,
             ),
         };
@@ -47,7 +53,7 @@ fn solve_constraint_2() {
 #[test]
 fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let var = tc.fresh_typevar(Kind::Row).get_value().clone();
+        let var = tc.fresh_typevar(Kind::Row);
         tc.evidence.assume(
             None,
             Constraint::HasField {
@@ -58,8 +64,11 @@ fn solve_constraint_3() {
         // HasField "z" (x : Int, y : Bool, ?0)
         let constraint = Constraint::HasField {
             field: Rc::from("z"),
-            rest: Type::mk_rows(
-                vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
+            rest: core::Type::mk_rows(
+                vec![
+                    (Rc::from("x"), core::Type::mk_int()),
+                    (Rc::from("y"), core::Type::mk_bool()),
+                ],
                 Some(var.clone()),
             ),
         };
@@ -111,8 +120,10 @@ fn solve_constraint_4() {
             });
         }
 
-        let eq_ty =
-            core::Type::unsafe_mk_name(Rc::from("Eq"), Kind::mk_arrow(Kind::Type, Kind::Type));
+        let eq_ty = core::Type::unsafe_mk_name(
+            Rc::from("Eq"),
+            Kind::mk_arrow(Kind::Type, Kind::Constraint),
+        );
         tc.register_instance(
             &Vec::new(),
             &Vec::new(),
@@ -129,7 +140,7 @@ fn solve_constraint_4() {
             &[(Rc::from("a"), a.get_kind().clone())],
             &Vec::new(),
             &[core::Type::mk_app(eq_ty.clone(), a.clone())],
-            &core::Type::mk_app(eq_ty, core::Type::mk_app(core::Type::mk_array(), a)),
+            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_app(core::Type::mk_array(), a)),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqArray),
@@ -149,9 +160,9 @@ fn solve_constraint_4() {
         let actual = solve_constraint(
             &None,
             &mut tc,
-            &Constraint::from_type(&Type::mk_app(
-                Type::Name(Rc::from("Eq")),
-                Type::mk_app(Type::Array, Type::Int),
+            &Constraint::from_type(&core::Type::mk_app(
+                eq_ty,
+                core::Type::mk_app(core::Type::mk_array(), core::Type::mk_int()),
             )),
         );
 

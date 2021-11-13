@@ -590,11 +590,13 @@ impl<'modules> Typechecker<'modules> {
                 evidence::Constraint::HasField {
                     field: field2,
                     rest: rest2,
-                } => field == field2 && self.eq_zonked_type(rest, rest2),
+                } => field == field2 && self.eq_zonked_type(rest.get_value(), rest2.get_value()),
                 _ => false,
             },
             evidence::Constraint::Type(ty) => match c2 {
-                evidence::Constraint::Type(ty2) => self.eq_zonked_type(ty, ty2),
+                evidence::Constraint::Type(ty2) => {
+                    self.eq_zonked_type(ty.get_value(), ty2.get_value())
+                }
                 _ => false,
             },
         }
@@ -825,7 +827,7 @@ impl<'modules> Typechecker<'modules> {
             if !seen_evars.contains(ev) {
                 seen_evars.insert(*ev);
                 let constraint = self.evidence.lookup_evar(ev).unwrap();
-                unsolved_constraints.push((*ev, self.zonk_type(&constraint.to_type())));
+                unsolved_constraints.push((*ev, self.zonk_type(constraint.to_type().get_value())));
             }
         }
 
@@ -919,8 +921,13 @@ impl<'modules> Typechecker<'modules> {
 
         let (constraints, ty) = ty.get_value().unwrap_constraints();
         for constraint in constraints {
-            self.evidence
-                .assume(None, evidence::Constraint::from_type(constraint));
+            self.evidence.assume(
+                None,
+                evidence::Constraint::from_type(&core::Type::unsafe_new(
+                    constraint.clone(),
+                    Kind::Constraint,
+                )),
+            );
         }
 
         let body = self.check_expr(
@@ -1082,14 +1089,9 @@ impl<'modules> Typechecker<'modules> {
             })
             .abstract_vars(&Vec::new());
 
-        let assumes: Vec<Type<usize>> = assumes
-            .iter()
-            .map(|assume| assume.item.abstract_vars(&ty_vars).0)
-            .collect();
-
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = ty_vars
-            .into_iter()
-            .map(|var| (var, self.fresh_kindvar()))
+            .iter()
+            .map(|var| (var.clone(), self.fresh_kindvar()))
             .collect();
 
         let (_, args) = head.unwrap_app();
@@ -1097,11 +1099,24 @@ impl<'modules> Typechecker<'modules> {
 
         self.bound_tyvars.insert(&ty_var_kinds);
 
+        let assumes: Vec<Type<usize>> = assumes
+            .iter()
+            .map(|assume| {
+                let assume = assume.item.abstract_vars(&ty_vars).0;
+                self.check_kind(None, &assume, &Kind::Constraint)?;
+                Ok(assume)
+            })
+            .collect::<Result<_, TypeError>>()?;
+
         // generate evidence for assumptions
         assumes.iter().for_each(|constraint| {
-            let _ = self
-                .evidence
-                .assume(None, evidence::Constraint::from_type(constraint));
+            let _ = self.evidence.assume(
+                None,
+                evidence::Constraint::from_type(&core::Type::unsafe_new(
+                    constraint.clone(),
+                    Kind::Constraint,
+                )),
+            );
         });
 
         // locate evidence for superclasses
@@ -1117,7 +1132,7 @@ impl<'modules> Typechecker<'modules> {
                         constraint: self.fill_ty_names(superclass.get_value().clone()),
                     }),
                     self,
-                    &evidence::Constraint::from_type(superclass.get_value()),
+                    &evidence::Constraint::from_type(&superclass),
                 )
                 .and_then(|evidence| self.abstract_evidence(evidence))
                 {
@@ -1305,9 +1320,15 @@ impl<'modules> Typechecker<'modules> {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
                 field: field.clone(),
-                rest: self.zonk_type(rest),
+                rest: core::Type::unsafe_new(
+                    self.zonk_type(rest.get_value()),
+                    rest.get_kind().clone(),
+                ),
             },
-            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty)),
+            Constraint::Type(ty) => Constraint::Type(core::Type::unsafe_new(
+                self.zonk_type(ty.get_value()),
+                ty.get_kind().clone(),
+            )),
         }
     }
 
@@ -1936,10 +1957,10 @@ impl<'modules> Typechecker<'modules> {
         arg: &Spanned<String>,
     ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
         let arg_ty = self.fresh_typevar(Kind::Type);
-        let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
+        let rest_row = self.fresh_typevar(Kind::Row);
         let ty = Type::mk_variant(
             vec![(name.clone(), arg_ty.get_value().clone())],
-            Some(rest_row.clone()),
+            Some(rest_row.get_value().clone()),
         );
 
         let tag = self.evidence.placeholder(
@@ -2005,8 +2026,8 @@ impl<'modules> Typechecker<'modules> {
         );
 
         let mut extending_row = match &rest_row {
-            Some((_, row)) => row.get_value().clone(),
-            None => Type::RowNil,
+            Some((_, row)) => row.clone(),
+            None => core::Type::mk_rownil(),
         };
         let mut names_placeholders = Vec::new();
         for (name, ty) in names_tys.iter().rev() {
@@ -2018,8 +2039,7 @@ impl<'modules> Typechecker<'modules> {
                 },
             );
             names_placeholders.push(core::Expr::Placeholder(p));
-            extending_row =
-                Type::mk_rowcons(name.item.clone(), ty.get_value().clone(), extending_row);
+            extending_row = core::Type::mk_rowcons(name.item.clone(), ty.clone(), extending_row);
         }
         names_placeholders.reverse();
 
@@ -2059,7 +2079,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn infer_variant_pattern_case(
         &mut self,
-        m_expr_rows: &mut Option<Type<usize>>,
+        m_expr_rows: &mut Option<core::Type>,
         expected_pattern_ty: &mut core::Type,
         seen_ctors: &mut HashSet<Rc<str>>,
         name: &str,
@@ -2069,11 +2089,9 @@ impl<'modules> Typechecker<'modules> {
 
         let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row);
-        let pattern_rows = Type::mk_rows(
-            vec![(name.clone(), arg_ty.get_value().clone())],
-            Some(rest_row.get_value().clone()),
-        );
-        let expr_rows: Type<usize> = match &m_expr_rows {
+        let pattern_rows =
+            core::Type::mk_rows(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let expr_rows: core::Type = match &m_expr_rows {
             None => {
                 *m_expr_rows = Some(pattern_rows.clone());
                 pattern_rows.clone()
@@ -2089,12 +2107,19 @@ impl<'modules> Typechecker<'modules> {
             },
         ));
 
-        let pattern_ty = Type::mk_app(Type::Variant, pattern_rows);
+        let pattern_ty = core::Type::mk_app(
+            core::Type::unsafe_new(Type::Variant, Kind::mk_arrow(Kind::Row, Kind::Type)),
+            pattern_rows,
+        );
         let context: UnifyTypeContext<usize> = UnifyTypeContext {
             expected: expected_pattern_ty.get_value().clone(),
-            actual: pattern_ty.clone(),
+            actual: pattern_ty.get_value().clone(),
         };
-        match self.unify_type(&context, expected_pattern_ty.get_value(), &pattern_ty) {
+        match self.unify_type(
+            &context,
+            expected_pattern_ty.get_value(),
+            pattern_ty.get_value(),
+        ) {
             Err(err) => {
                 return Err(err);
             }
@@ -2106,7 +2131,7 @@ impl<'modules> Typechecker<'modules> {
 
         let pattern_core = core::Pattern::mk_variant(tag);
         let pattern_binds: Vec<(Rc<str>, core::Type)> = vec![(Rc::from(arg.item.as_ref()), arg_ty)];
-        Ok((pattern_core, pattern_ty, pattern_binds))
+        Ok((pattern_core, pattern_ty.get_value().clone(), pattern_binds))
     }
 
     fn check_pattern(
@@ -2151,7 +2176,10 @@ impl<'modules> Typechecker<'modules> {
         for constraint in constraints {
             let p = self.evidence.placeholder(
                 Some(self.current_position()),
-                evidence::Constraint::from_type(constraint),
+                evidence::Constraint::from_type(&core::Type::unsafe_new(
+                    constraint.clone(),
+                    Kind::Constraint,
+                )),
             );
             expr = core::Expr::mk_app(expr, core::Expr::Placeholder(p));
         }
@@ -2295,25 +2323,21 @@ impl<'modules> Typechecker<'modules> {
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
-                    let mut fields_result: Vec<(Rc<str>, core::Expr, Type<usize>)> = Vec::new();
+                    let mut fields_result: Vec<(Rc<str>, core::Expr, core::Type)> = Vec::new();
                     let mut fields_rows: Vec<(Rc<str>, core::Type)> = Vec::new();
                     for (field, expr) in fields {
                         match self.infer_expr(expr) {
                             Err(err) => return Err(err),
                             Ok((expr_core, expr_ty)) => {
                                 let field: Rc<str> = Rc::from(field.as_ref());
-                                fields_result.push((
-                                    field.clone(),
-                                    expr_core,
-                                    expr_ty.get_value().clone(),
-                                ));
+                                fields_result.push((field.clone(), expr_core, expr_ty.clone()));
                                 fields_rows.push((field, expr_ty));
                             }
                         }
                     }
 
                     let rest_row_var = self.fresh_typevar(Kind::Row);
-                    let mut extending_row = rest_row_var.get_value().clone();
+                    let mut extending_row = rest_row_var.clone();
                     let mut fields_core = Vec::with_capacity(fields_result.len());
                     for (field, expr_core, expr_ty) in fields_result.into_iter().rev() {
                         let index = self.evidence.placeholder(
@@ -2324,7 +2348,7 @@ impl<'modules> Typechecker<'modules> {
                             },
                         );
                         fields_core.push((core::Expr::Placeholder(index), expr_core));
-                        extending_row = Type::mk_rowcons(field, expr_ty, extending_row);
+                        extending_row = core::Type::mk_rowcons(field, expr_ty, extending_row);
                     }
                     // we did a right fold to build extending_row, but we want fields_core too look like we did a left fold
                     fields_core.reverse();
@@ -2383,13 +2407,9 @@ impl<'modules> Typechecker<'modules> {
                             rows.clone(),
                         ),
                     )?;
-                    let offset = self.evidence.placeholder(
-                        None,
-                        evidence::Constraint::HasField {
-                            field,
-                            rest: rows.get_value().clone(),
-                        },
-                    );
+                    let offset = self
+                        .evidence
+                        .placeholder(None, evidence::Constraint::HasField { field, rest: rows });
                     Ok((
                         core::Expr::mk_project(expr_core, core::Expr::Placeholder(offset)),
                         out_ty,
@@ -2404,7 +2424,7 @@ impl<'modules> Typechecker<'modules> {
                         None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
-                            rest: Type::mk_rows(vec![], Some(rest.get_value().clone())),
+                            rest: core::Type::mk_rows(vec![], Some(rest.clone())),
                         },
                     );
                     Ok((
@@ -2434,7 +2454,7 @@ impl<'modules> Typechecker<'modules> {
                         None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
-                            rest: rest_rows.get_value().clone(),
+                            rest: rest_rows.clone(),
                         },
                     ));
                     Ok((
