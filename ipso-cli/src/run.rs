@@ -5,7 +5,7 @@ use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, kind::Kind, r#type::Type};
+use ipso_syntax::{self as syntax, kind::Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     io::{self, BufRead, BufReader, Write},
@@ -91,13 +91,13 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected = Type::mk_app(Type::IO, tc.fresh_typevar(Kind::Type).get_value().clone());
+        let expected = core::Type::mk_app(core::Type::IO, tc.fresh_typevar(Kind::Type));
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContext {
-            expected: expected.clone(),
-            actual: actual.get_value().clone(),
+            expected: expected.get_value(),
+            actual: actual.get_value(),
         };
-        let _ = tc.unify_type(&context, &expected, actual.get_value())?;
+        let _ = tc.unify_type(&context, &expected, &actual)?;
     }
 
     let bytes = Arena::new();

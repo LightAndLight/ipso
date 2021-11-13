@@ -19,8 +19,8 @@ fn solve_constraint_1() {
             field: Rc::from("x"),
             rest: core::Type::mk_rows(
                 vec![
-                    (Rc::from("y"), core::Type::mk_int()),
-                    (Rc::from("z"), core::Type::mk_bool()),
+                    (Rc::from("y"), core::Type::Int),
+                    (Rc::from("z"), core::Type::Bool),
                 ],
                 None,
             ),
@@ -38,8 +38,8 @@ fn solve_constraint_2() {
             field: Rc::from("y"),
             rest: core::Type::mk_rows(
                 vec![
-                    (Rc::from("x"), core::Type::mk_int()),
-                    (Rc::from("z"), core::Type::mk_bool()),
+                    (Rc::from("x"), core::Type::Int),
+                    (Rc::from("z"), core::Type::Bool),
                 ],
                 None,
             ),
@@ -66,8 +66,8 @@ fn solve_constraint_3() {
             field: Rc::from("z"),
             rest: core::Type::mk_rows(
                 vec![
-                    (Rc::from("x"), core::Type::mk_int()),
-                    (Rc::from("y"), core::Type::mk_bool()),
+                    (Rc::from("x"), core::Type::Int),
+                    (Rc::from("y"), core::Type::Bool),
                 ],
                 Some(var.clone()),
             ),
@@ -104,7 +104,7 @@ fn solve_constraint_4() {
             tc.register_class(&ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),
-                args: vec![(Rc::from("a"), a.get_kind().clone())],
+                args: vec![(Rc::from("a"), a.get_kind())],
                 members: vec![ClassMember {
                     name: String::from("eq"),
                     sig: {
@@ -112,7 +112,7 @@ fn solve_constraint_4() {
                             ty_vars: Vec::new(),
                             body: core::Type::mk_arrow(
                                 a.clone(),
-                                core::Type::mk_arrow(a, core::Type::mk_bool()),
+                                core::Type::mk_arrow(a, core::Type::Bool),
                             ),
                         }
                     },
@@ -128,7 +128,7 @@ fn solve_constraint_4() {
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_int()),
+            &core::Type::mk_app(eq_ty.clone(), core::Type::Int),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
@@ -137,10 +137,10 @@ fn solve_constraint_4() {
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
-            &[(Rc::from("a"), a.get_kind().clone())],
+            &[(Rc::from("a"), a.get_kind())],
             &Vec::new(),
             &[core::Type::mk_app(eq_ty.clone(), a.clone())],
-            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_app(core::Type::mk_array(), a)),
+            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_app(core::Type::Array, a)),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqArray),
@@ -162,7 +162,7 @@ fn solve_constraint_4() {
             &mut tc,
             &Constraint::from_type(&core::Type::mk_app(
                 eq_ty,
-                core::Type::mk_app(core::Type::mk_array(), core::Type::mk_int()),
+                core::Type::mk_app(core::Type::Array, core::Type::Int),
             )),
         );
 

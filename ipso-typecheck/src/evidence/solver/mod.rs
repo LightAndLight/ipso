@@ -1,6 +1,6 @@
 use crate::{
     substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
-    UnifyTypeContext,
+    UnifyKindContextRefs, UnifyTypeContext,
 };
 use ipso_core::{self as core, Expr, Placeholder};
 use ipso_syntax::{kind::Kind, r#type::Type, Binop};
@@ -42,10 +42,10 @@ pub fn solve_constraint(
 
             let mut result = None;
             for implication in implications.into_iter() {
-                let metas: Vec<Type<usize>> = implication
+                let metas: Vec<core::Type> = implication
                     .ty_vars
                     .iter()
-                    .map(|kind| tc.fresh_typevar(kind.clone()).get_value().clone())
+                    .map(|kind| tc.fresh_typevar(kind.clone()))
                     .collect();
 
                 let implication = implication.instantiate_many(&metas);
@@ -59,8 +59,8 @@ pub fn solve_constraint(
                 match tc.unify_type_subst(
                     &mut subst,
                     &unify_context,
-                    constraint.get_value(),
-                    implication.consequent.get_value(),
+                    constraint,
+                    &implication.consequent,
                 ) {
                     Err(_) => {
                         continue;
@@ -72,17 +72,9 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| {
-                                    core::Type::unsafe_new(
-                                        tc.zonk_type(x.get_value()),
-                                        x.get_kind().clone(),
-                                    )
-                                })
+                                .map(|x| tc.zonk_core_type(&x))
                                 .collect(),
-                            consequent: core::Type::unsafe_new(
-                                tc.zonk_type(implication.consequent.get_value()),
-                                implication.consequent.get_kind().clone(),
-                            ),
+                            consequent: tc.zonk_core_type(&implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -123,20 +115,25 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            let _ = tc.check_kind(None, rest.get_value(), &Kind::Row)?;
-            let new_evidence = match rest.get_value() {
-                Type::RowNil => Ok(core::Expr::Int(0)),
-                Type::RowCons(other_field, _, other_rest) => {
+            tc.unify_kind(
+                &UnifyKindContextRefs {
+                    ty: &rest.get_value(),
+                    has_kind: &Kind::Row,
+                    unifying_types: None,
+                },
+                &Kind::Row,
+                &rest.get_kind(),
+            )?;
+            let new_evidence = match rest {
+                core::Type::RowNil => Ok(core::Expr::Int(0)),
+                core::Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
                             context,
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
-                                rest: core::Type::unsafe_new(
-                                    other_rest.as_ref().clone(),
-                                    Kind::Row,
-                                ),
+                                rest: other_rest.as_ref().clone(),
                             },
                         )
                     } else {
@@ -145,19 +142,16 @@ pub fn solve_constraint(
                             tc,
                             &Constraint::HasField {
                                 field: field.clone(),
-                                rest: core::Type::unsafe_new(
-                                    other_rest.as_ref().clone(),
-                                    Kind::Row,
-                                ),
+                                rest: other_rest.as_ref().clone(),
                             },
                         )?;
                         Ok(core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), ev))
                     }
                 }
 
-                Type::Name(n) => todo!("deduce HasField for Name({})", n),
+                core::Type::Name(_, n) => todo!("deduce HasField for Name({})", n),
 
-                Type::Var(_) => {
+                core::Type::Var(_, _) => {
                     let evidence = lookup_evidence(tc, constraint);
                     match evidence {
                         None => {
@@ -170,7 +164,7 @@ pub fn solve_constraint(
                         Some(evidence) => Ok(evidence),
                     }
                 }
-                Type::App(_, _) => {
+                core::Type::App(_, _, _) => {
                     let evidence = lookup_evidence(tc, constraint);
                     match evidence {
                         None => {
@@ -182,7 +176,7 @@ pub fn solve_constraint(
                         Some(evidence) => Ok(evidence),
                     }
                 }
-                Type::Meta(n) => {
+                core::Type::Meta(_, n) => {
                     let (kind, sol) = &tc.type_solutions[*n];
                     // we assume solving is done after unification, so any unsolved variables
                     // will never recieve solutions
@@ -199,7 +193,7 @@ pub fn solve_constraint(
                                     tc.solve_typevar_left(
                                         &unify_type_context,
                                         *n,
-                                        &core::Type::mk_rownil(),
+                                        &core::Type::RowNil,
                                     )?;
                                     solve_constraint(context, tc, constraint)
                                 }
@@ -217,34 +211,31 @@ pub fn solve_constraint(
                                 }
                             }
                         }
-                        Some(sol) => {
-                            let kind = kind.clone();
-                            solve_constraint(
-                                context,
-                                tc,
-                                &Constraint::HasField {
-                                    field: field.clone(),
-                                    rest: core::Type::unsafe_new(sol, kind),
-                                },
-                            )
-                        }
+                        Some(sol) => solve_constraint(
+                            context,
+                            tc,
+                            &Constraint::HasField {
+                                field: field.clone(),
+                                rest: sol,
+                            },
+                        ),
                     }
                 }
 
-                Type::Bool
-                | Type::Int
-                | Type::Char
-                | Type::String
-                | Type::Bytes
-                | Type::Arrow
-                | Type::FatArrow
-                | Type::Constraints(_)
-                | Type::HasField(_, _)
-                | Type::Array
-                | Type::Record
-                | Type::Variant
-                | Type::IO
-                | Type::Unit => panic!("impossible"),
+                core::Type::Bool
+                | core::Type::Int
+                | core::Type::Char
+                | core::Type::String
+                | core::Type::Bytes
+                | core::Type::Arrow
+                | core::Type::FatArrow
+                | core::Type::Constraints(_)
+                | core::Type::HasField(_, _)
+                | core::Type::Array
+                | core::Type::Record
+                | core::Type::Variant
+                | core::Type::IO
+                | core::Type::Unit => panic!("impossible"),
             }?;
             Ok(new_evidence)
         }
@@ -261,7 +252,8 @@ pub fn solve_placeholder(
             let expr = solve_constraint(
                 &Some(SolveConstraintContext {
                     pos: pos.unwrap_or(0),
-                    constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type().get_value())),
+                    constraint: tc
+                        .fill_ty_names(tc.zonk_core_type(&constraint.to_type()).get_value()),
                 }),
                 tc,
                 &constraint,

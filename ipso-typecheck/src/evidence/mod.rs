@@ -1,9 +1,8 @@
-use std::rc::Rc;
+pub mod solver;
 
 use crate::Typechecker;
 use ipso_core::{self as core, EVar, Expr, Placeholder};
-use ipso_syntax::{kind::Kind, r#type::Type};
-pub mod solver;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evidence {
@@ -19,16 +18,10 @@ pub enum Constraint {
 
 impl Constraint {
     pub fn from_type(ty: &core::Type) -> Self {
-        debug_assert!(
-            ty.get_kind() == &Kind::Constraint,
-            "{:?} is not Kind::Constraint",
-            ty
-        );
-
-        match ty.get_value() {
-            Type::HasField(field, rest) => Constraint::HasField {
+        match ty {
+            core::Type::HasField(field, rest) => Constraint::HasField {
                 field: field.clone(),
-                rest: core::Type::unsafe_new(rest.as_ref().clone(), Kind::Row),
+                rest: rest.as_ref().clone(),
             },
             _ => Constraint::Type(ty.clone()),
         }
