@@ -111,25 +111,25 @@ fn solve_constraint_4() {
             });
         }
 
+        let eq_ty =
+            core::Type::unsafe_mk_name(Rc::from("Eq"), Kind::mk_arrow(Kind::Type, Kind::Type));
         tc.register_instance(
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
+            &core::Type::mk_app(eq_ty.clone(), core::Type::mk_int()),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
             }],
         );
 
+        let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
-            &[(Rc::from("a"), Kind::Type)],
+            &[(Rc::from("a"), a.get_kind().clone())],
             &Vec::new(),
-            &[Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(0))],
-            &Type::mk_app(
-                Type::Name(Rc::from("Eq")),
-                Type::mk_app(Type::Array, Type::Var(0)),
-            ),
+            &[core::Type::mk_app(eq_ty.clone(), a.clone())],
+            &core::Type::mk_app(eq_ty, core::Type::mk_app(core::Type::mk_array(), a)),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqArray),

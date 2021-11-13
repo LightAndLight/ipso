@@ -117,8 +117,8 @@ impl<A> BoundVars<A> {
 #[derive(Debug, Clone)]
 pub struct Implication {
     pub ty_vars: Vec<Kind>,
-    pub antecedents: Vec<Type<usize>>,
-    pub consequent: Type<usize>,
+    pub antecedents: Vec<core::Type>,
+    pub consequent: core::Type,
     pub evidence: core::Expr,
 }
 
@@ -602,6 +602,14 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn register_class(&mut self, decl: &core::ClassDeclaration) {
         let decl_name: Rc<str> = Rc::from(decl.name.as_ref());
+        let decl_name_kind = decl
+            .args
+            .iter()
+            .rev()
+            .fold(Kind::Constraint, |acc, (_, arg_kind)| {
+                Kind::mk_arrow(arg_kind.clone(), acc)
+            });
+        let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
 
         // generate constraint's kind
         let mut constraint_kind = self.constants.constraint.clone();
@@ -614,11 +622,13 @@ impl<'modules> Typechecker<'modules> {
         self.type_context.insert(decl_name.clone(), constraint_kind);
 
         // generate superclass accessors
-        let applied_type = (0..decl.args.len())
-            .into_iter()
-            .fold(Type::Name(decl_name.clone()), |acc, el| {
-                Type::mk_app(acc, Type::Var(el))
-            });
+        let applied_type =
+            decl.args
+                .iter()
+                .enumerate()
+                .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
+                    core::Type::mk_app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
+                });
         self.implications
             .extend(
                 decl.supers
@@ -627,7 +637,7 @@ impl<'modules> Typechecker<'modules> {
                     .map(|(pos, superclass)| Implication {
                         ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
                         antecedents: vec![applied_type.clone()],
-                        consequent: superclass.get_value().clone(),
+                        consequent: superclass.clone(),
                         evidence: core::Expr::mk_lam(
                             true,
                             core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
@@ -652,8 +662,8 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         ty_vars: &[(Rc<str>, Kind)],
         superclass_constructors: &[core::Expr],
-        assumes: &[Type<usize>],
-        head: &Type<usize>,
+        assumes: &[core::Type],
+        head: &core::Type,
         members: &[core::InstanceMember],
     ) {
         let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
@@ -706,17 +716,7 @@ impl<'modules> Typechecker<'modules> {
                 assumes,
                 head,
                 members,
-            } => self.register_instance(
-                ty_vars,
-                superclass_constructors,
-                &assumes
-                    .iter()
-                    .map(core::Type::get_value)
-                    .cloned()
-                    .collect::<Vec<_>>(),
-                head.get_value(),
-                members,
-            ),
+            } => self.register_instance(ty_vars, superclass_constructors, assumes, head, members),
         }
     }
 

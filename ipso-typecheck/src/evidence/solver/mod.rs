@@ -53,14 +53,14 @@ pub fn solve_constraint(
                 let mut subst = Substitution::new();
                 let unify_context = UnifyTypeContext {
                     expected: constraint.clone(),
-                    actual: implication.consequent.clone(),
+                    actual: implication.consequent.get_value().clone(),
                 };
 
                 match tc.unify_type_subst(
                     &mut subst,
                     &unify_context,
                     constraint,
-                    &implication.consequent,
+                    implication.consequent.get_value(),
                 ) {
                     Err(_) => {
                         continue;
@@ -72,17 +72,28 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.zonk_type(&x))
+                                .map(|x| {
+                                    core::Type::unsafe_new(
+                                        tc.zonk_type(x.get_value()),
+                                        x.get_kind().clone(),
+                                    )
+                                })
                                 .collect(),
-                            consequent: tc.zonk_type(&implication.consequent),
+                            consequent: core::Type::unsafe_new(
+                                tc.zonk_type(implication.consequent.get_value()),
+                                implication.consequent.get_kind().clone(),
+                            ),
                             evidence: implication.evidence,
                         };
 
                         let mut evidence = Ok(implication.evidence);
 
                         for antecedent in &implication.antecedents {
-                            match solve_constraint(context, tc, &Constraint::from_type(antecedent))
-                            {
+                            match solve_constraint(
+                                context,
+                                tc,
+                                &Constraint::from_type(antecedent.get_value()),
+                            ) {
                                 Err(err) => {
                                     evidence = Err(err);
                                     break;
