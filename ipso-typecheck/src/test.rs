@@ -1559,7 +1559,7 @@ fn check_definition_1() {
             Ok(Some(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
-                    ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                    ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                     body: core::Type::mk_arrow(tc.common_kinds, a.clone(), a)
                 },
                 body: Rc::new(core::Expr::mk_lam(true, core::Expr::Var(0)))
@@ -1613,7 +1613,7 @@ fn check_definition_2() {
         let expected = Ok(Some(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
-                ty_vars: vec![(Rc::from("r"), r.get_kind(tc.common_kinds))],
+                ty_vars: vec![(Rc::from("r"), r.kind(tc.common_kinds))],
                 body: core::Type::mk_fatarrow(
                     tc.common_kinds,
                     core::Type::mk_hasfield(Rc::from("x"), r.clone()),
@@ -1763,7 +1763,7 @@ fn check_definition_4() {
             sig: {
                 let r = core::Type::unsafe_mk_var(0, Kind::Row);
                 core::TypeSig {
-                    ty_vars: vec![(Rc::from("r"), r.get_kind(tc.common_kinds))],
+                    ty_vars: vec![(Rc::from("r"), r.kind(tc.common_kinds))],
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
                         core::Type::mk_hasfield(Rc::from("x"), r.clone()),
@@ -1865,11 +1865,11 @@ fn check_class_1() {
             Ok(Some(core::Declaration::Class(core::ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),
-                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 members: vec![ClassMember {
                     name: String::from("eq"),
                     sig: TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -1915,12 +1915,12 @@ fn check_class_1() {
                 Rc::from("Eq"),
                 core::ClassDeclaration {
                     supers: Vec::new(),
-                    args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                    args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                     name: Rc::from("Eq"),
                     members: vec![core::ClassMember {
                         name: String::from("eq"),
                         sig: core::TypeSig {
-                            ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                            ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                             body: core::Type::mk_arrow(
                                 tc.common_kinds,
                                 a.clone(),
@@ -1944,7 +1944,7 @@ fn check_class_1() {
             );
             (
                 core::TypeSig {
-                    ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                    ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
                         core::Type::mk_app(tc.common_kinds, eq_ty, a.clone()),
@@ -1977,13 +1977,13 @@ fn check_class_2() {
             Ok(Some(core::Declaration::Class(core::ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Wut"),
-                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 members: vec![ClassMember {
                     name: String::from("wut"),
                     sig: TypeSig {
                         ty_vars: vec![
-                            (Rc::from("a"), a.get_kind(tc.common_kinds)),
-                            (Rc::from("b"), b.get_kind(tc.common_kinds)),
+                            (Rc::from("a"), a.kind(tc.common_kinds)),
+                            (Rc::from("b"), b.kind(tc.common_kinds)),
                         ],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
@@ -2031,14 +2031,14 @@ fn check_class_2() {
                 Rc::from("Wut"),
                 core::ClassDeclaration {
                     supers: Vec::new(),
-                    args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                    args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                     name: Rc::from("Wut"),
                     members: vec![core::ClassMember {
                         name: String::from("wut"),
                         sig: core::TypeSig {
                             ty_vars: vec![
-                                (Rc::from("a"), a.get_kind(tc.common_kinds)),
-                                (Rc::from("b"), b.get_kind(tc.common_kinds)),
+                                (Rc::from("a"), a.kind(tc.common_kinds)),
+                                (Rc::from("b"), b.kind(tc.common_kinds)),
                             ],
                             body: core::Type::mk_arrow(
                                 tc.common_kinds,
@@ -2065,8 +2065,8 @@ fn check_class_2() {
             (
                 core::TypeSig {
                     ty_vars: vec![
-                        (Rc::from("a"), a.get_kind(tc.common_kinds)),
-                        (Rc::from("b"), b.get_kind(tc.common_kinds)),
+                        (Rc::from("a"), a.kind(tc.common_kinds)),
+                        (Rc::from("b"), b.kind(tc.common_kinds)),
                     ],
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
@@ -2120,7 +2120,7 @@ fn check_instance_1() {
                 members: vec![ClassMember {
                     name: String::from("eq"),
                     sig: TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -2207,7 +2207,7 @@ fn class_and_instance_1() {
                 members: vec![core::ClassMember {
                     name: String::from("eq"),
                     sig: core::TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -2227,11 +2227,11 @@ fn class_and_instance_1() {
             tc.register_class(&core::ClassDeclaration {
                 supers: vec![core::Type::mk_app(tc.common_kinds, eq_ty, a.clone())],
                 name: Rc::from("Ord"),
-                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 members: vec![core::ClassMember {
                     name: String::from("lt"),
                     sig: core::TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -2390,11 +2390,11 @@ fn class_and_instance_2() {
             tc.register_class(&core::ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),
-                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 members: vec![core::ClassMember {
                     name: String::from("eq"),
                     sig: core::TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -2411,11 +2411,11 @@ fn class_and_instance_2() {
             tc.register_class(&core::ClassDeclaration {
                 supers: vec![core::Type::mk_app(tc.common_kinds, eq_ty, a.clone())],
                 name: Rc::from("Ord"),
-                args: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                args: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 members: vec![core::ClassMember {
                     name: String::from("lt"),
                     sig: core::TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                         body: core::Type::mk_arrow(
                             tc.common_kinds,
                             a.clone(),
@@ -2585,7 +2585,7 @@ fn class_and_instance_2() {
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             Ok(Some(core::Declaration::Instance {
-                ty_vars: vec![(Rc::from("a"), a.get_kind(tc.common_kinds))],
+                ty_vars: vec![(Rc::from("a"), a.kind(tc.common_kinds))],
                 superclass_constructors: vec![core::Expr::mk_lam(
                     true, // dict : Ord a
                     core::Expr::mk_record(

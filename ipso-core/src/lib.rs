@@ -90,7 +90,7 @@ impl Type {
         }
     }
 
-    pub fn get_kind(&self, common_kinds: &CommonKinds) -> Kind {
+    pub fn kind(&self, common_kinds: &CommonKinds) -> Kind {
         match self {
             Type::Bool => Kind::Type,
             Type::Int => Kind::Type,
@@ -125,7 +125,7 @@ impl Type {
 
     pub fn mk_app(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
         Type::App(
-            match a.get_kind(common_kinds) {
+            match a.kind(common_kinds) {
                 Kind::Ref(r) => match r.as_ref() {
                     syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
                 },

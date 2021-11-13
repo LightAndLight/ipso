@@ -122,7 +122,7 @@ pub fn solve_constraint(
                     unifying_types: None,
                 },
                 &Kind::Row,
-                &rest.get_kind(tc.common_kinds),
+                &rest.kind(tc.common_kinds),
             )?;
             let new_evidence = match rest {
                 core::Type::RowNil => Ok(core::Expr::Int(0)),

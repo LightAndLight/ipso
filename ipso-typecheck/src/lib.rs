@@ -1736,8 +1736,8 @@ impl<'modules> Typechecker<'modules> {
         let expected = self.walk(expected);
         let actual = self.walk(actual);
 
-        let expected_kind = expected.get_kind(self.common_kinds);
-        let actual_kind = actual.get_kind(self.common_kinds);
+        let expected_kind = expected.kind(self.common_kinds);
+        let actual_kind = actual.kind(self.common_kinds);
         self.unify_kind(
             &UnifyKindContextRefs {
                 ty: &actual,

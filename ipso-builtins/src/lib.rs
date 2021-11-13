@@ -27,9 +27,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     TypeSig {
                         ty_vars: vec![
                             // a : Type
-                            (Rc::from("a"), a.get_kind(common_kinds)),
+                            (Rc::from("a"), a.kind(common_kinds)),
                             // b : Type
-                            (Rc::from("b"), b.get_kind(common_kinds)),
+                            (Rc::from("b"), b.kind(common_kinds)),
                         ],
                         body: Type::mk_arrow(
                             common_kinds,
@@ -52,7 +52,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     TypeSig {
                         ty_vars: vec![
                             // a : Type
-                            (Rc::from("a"), a.get_kind(common_kinds)),
+                            (Rc::from("a"), a.kind(common_kinds)),
                         ],
                         body: Type::mk_arrow(
                             common_kinds,
@@ -72,9 +72,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     TypeSig {
                         ty_vars: vec![
                             // a : Type
-                            (Rc::from("a"), a.get_kind(common_kinds)),
+                            (Rc::from("a"), a.kind(common_kinds)),
                             // b : Type
-                            (Rc::from("b"), a.get_kind(common_kinds)),
+                            (Rc::from("b"), a.kind(common_kinds)),
                         ],
                         body: Type::mk_arrow(
                             common_kinds,
@@ -102,9 +102,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     TypeSig {
                         ty_vars: vec![
                             // a : Type
-                            (Rc::from("a"), a.get_kind(common_kinds)),
+                            (Rc::from("a"), a.kind(common_kinds)),
                             // b : Type
-                            (Rc::from("b"), a.get_kind(common_kinds)),
+                            (Rc::from("b"), a.kind(common_kinds)),
                         ],
                         body: Type::mk_arrow(
                             common_kinds,
@@ -288,7 +288,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             Type::mk_arrow(
@@ -316,7 +316,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             Type::mk_arrow(
@@ -346,8 +346,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![
-                            (Rc::from("b"), b.get_kind(common_kinds)),
-                            (Rc::from("a"), a.get_kind(common_kinds)),
+                            (Rc::from("b"), b.kind(common_kinds)),
+                            (Rc::from("a"), a.kind(common_kinds)),
                         ],
                         body: Type::mk_arrow(
                             common_kinds,
@@ -376,7 +376,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             int_ty.clone(),
@@ -396,7 +396,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             Type::mk_app(common_kinds, array_ty.clone(), a),
@@ -412,7 +412,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             int_ty.clone(),
@@ -432,7 +432,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             int_ty.clone(),
@@ -499,7 +499,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.get_kind(common_kinds))],
+                        ty_vars: vec![(Rc::from("a"), a.kind(common_kinds))],
                         body: Type::mk_arrow(
                             common_kinds,
                             Type::mk_arrow(
