@@ -72,9 +72,9 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.zonk_core_type(&x))
+                                .map(|x| tc.zonk_type(&x))
                                 .collect(),
-                            consequent: tc.zonk_core_type(&implication.consequent),
+                            consequent: tc.zonk_type(&implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -252,8 +252,7 @@ pub fn solve_placeholder(
             let expr = solve_constraint(
                 &Some(SolveConstraintContext {
                     pos: pos.unwrap_or(0),
-                    constraint: tc
-                        .fill_ty_names(tc.zonk_core_type(&constraint.to_type()).to_syntax()),
+                    constraint: tc.fill_ty_names(tc.zonk_type(&constraint.to_type()).to_syntax()),
                 }),
                 tc,
                 &constraint,

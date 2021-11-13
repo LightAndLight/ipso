@@ -814,7 +814,7 @@ impl<'modules> Typechecker<'modules> {
             if !seen_evars.contains(ev) {
                 seen_evars.insert(*ev);
                 let constraint = self.evidence.lookup_evar(ev).unwrap();
-                unsolved_constraints.push((*ev, self.zonk_core_type(&constraint.to_type())));
+                unsolved_constraints.push((*ev, self.zonk_type(&constraint.to_type())));
             }
         }
 
@@ -842,7 +842,7 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
 
-        let mut ty = self.zonk_core_type(&ty);
+        let mut ty = self.zonk_type(&ty);
         for constraint in unsolved_constraints.into_iter().rev() {
             ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
         }
@@ -971,7 +971,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let sig = core::TypeSig {
             ty_vars,
-            body: self.zonk_core_type(&type_),
+            body: self.zonk_type(&type_),
         };
         Ok(core::ClassMember {
             name: name.to_string(),
@@ -1200,9 +1200,9 @@ impl<'modules> Typechecker<'modules> {
             superclass_constructors,
             assumes: assumes
                 .iter()
-                .map(|assume| self.zonk_core_type(assume))
+                .map(|assume| self.zonk_type(assume))
                 .collect(),
-            head: self.zonk_core_type(&head),
+            head: self.zonk_type(&head),
             members: new_members,
         })
     }
@@ -1305,13 +1305,13 @@ impl<'modules> Typechecker<'modules> {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
                 field: field.clone(),
-                rest: self.zonk_core_type(rest),
+                rest: self.zonk_type(rest),
             },
-            Constraint::Type(ty) => Constraint::Type(self.zonk_core_type(ty)),
+            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty)),
         }
     }
 
-    pub fn zonk_core_type(&self, ty: &core::Type) -> core::Type {
+    pub fn zonk_type(&self, ty: &core::Type) -> core::Type {
         match ty {
             core::Type::Name(k, n) => core::Type::Name(self.zonk_kind(false, k), n.clone()),
             core::Type::Var(k, n) => core::Type::Var(self.zonk_kind(false, k), *n),
@@ -1323,7 +1323,7 @@ impl<'modules> Typechecker<'modules> {
             core::Type::Arrow => core::Type::Arrow,
             core::Type::FatArrow => core::Type::FatArrow,
             core::Type::Constraints(cs) => {
-                core::Type::Constraints(cs.iter().map(|c| self.zonk_core_type(c)).collect())
+                core::Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
             }
             core::Type::Array => core::Type::Array,
             core::Type::Record => core::Type::Record,
@@ -1331,22 +1331,20 @@ impl<'modules> Typechecker<'modules> {
             core::Type::IO => core::Type::IO,
             core::Type::App(k, a, b) => core::Type::App(
                 self.zonk_kind(false, k),
-                Rc::new(self.zonk_core_type(a)),
-                Rc::new(self.zonk_core_type(b)),
+                Rc::new(self.zonk_type(a)),
+                Rc::new(self.zonk_type(b)),
             ),
             core::Type::RowNil => core::Type::RowNil,
             core::Type::Unit => core::Type::Unit,
-            core::Type::RowCons(field, ty, rest) => core::Type::mk_rowcons(
-                field.clone(),
-                self.zonk_core_type(ty),
-                self.zonk_core_type(rest),
-            ),
+            core::Type::RowCons(field, ty, rest) => {
+                core::Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
+            }
             core::Type::HasField(field, rest) => {
-                core::Type::mk_hasfield(field.clone(), self.zonk_core_type(rest))
+                core::Type::mk_hasfield(field.clone(), self.zonk_type(rest))
             }
             core::Type::Meta(k, n) => match &self.type_solutions[*n].1 {
                 None => core::Type::Meta(self.zonk_kind(false, k), *n),
-                Some(ty) => self.zonk_core_type(ty),
+                Some(ty) => self.zonk_type(ty),
             },
         }
     }
@@ -1392,11 +1390,11 @@ impl<'modules> Typechecker<'modules> {
         actual: &Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_core_type(context.ty).to_syntax()),
+            ty: self.fill_ty_names(self.zonk_type(context.ty).to_syntax()),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
-                expected: self.fill_ty_names(self.zonk_core_type(x.expected).to_syntax()),
-                actual: self.fill_ty_names(self.zonk_core_type(x.actual).to_syntax()),
+                expected: self.fill_ty_names(self.zonk_type(x.expected).to_syntax()),
+                actual: self.fill_ty_names(self.zonk_type(x.actual).to_syntax()),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1516,8 +1514,8 @@ impl<'modules> Typechecker<'modules> {
         actual: core::Type,
     ) -> Result<A, TypeError> {
         let context = UnifyTypeContext {
-            expected: self.fill_ty_names(self.zonk_core_type(context.expected).to_syntax()),
-            actual: self.fill_ty_names(self.zonk_core_type(context.actual).to_syntax()),
+            expected: self.fill_ty_names(self.zonk_type(context.expected).to_syntax()),
+            actual: self.fill_ty_names(self.zonk_type(context.actual).to_syntax()),
         };
         Err(TypeError::TypeMismatch {
             source: self.source(),
@@ -1559,7 +1557,7 @@ impl<'modules> Typechecker<'modules> {
                 source: self.source(),
                 pos: self.current_position(),
                 meta,
-                ty: self.fill_ty_names(self.zonk_core_type(ty).to_syntax()),
+                ty: self.fill_ty_names(self.zonk_type(ty).to_syntax()),
             })
         } else {
             Ok(())
@@ -2603,7 +2601,7 @@ impl<'modules> Typechecker<'modules> {
                     }
 
                     if matching_variant && !seen_fallthrough {
-                        let expr_ty = self.zonk_core_type(&expr_ty);
+                        let expr_ty = self.zonk_type(&expr_ty);
                         let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
                         let ctors: Vec<(Rc<str>, core::Type)> = ctors
                             .iter()
