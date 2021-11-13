@@ -199,20 +199,26 @@ macro_rules! with_position {
 pub struct UnifyKindContext<A> {
     ty: Type<A>,
     has_kind: Kind,
-    unifying_types: Option<UnifyTypeContext<A>>,
+    unifying_types: Option<UnifyTypeContext>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyKindContextRefs<'a, A> {
+pub struct UnifyKindContextRefs<'a> {
     ty: &'a core::Type,
     has_kind: &'a Kind,
-    unifying_types: Option<&'a UnifyTypeContext<A>>,
+    unifying_types: Option<&'a UnifyTypeContextRefs<'a>>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyTypeContext<A> {
-    pub expected: Type<A>,
-    pub actual: Type<A>,
+pub struct UnifyTypeContext {
+    pub expected: Type<Rc<str>>,
+    pub actual: Type<Rc<str>>,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct UnifyTypeContextRefs<'a> {
+    pub expected: &'a core::Type,
+    pub actual: &'a core::Type,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -252,7 +258,7 @@ pub enum TypeError {
     TypeMismatch {
         source: Source,
         pos: usize,
-        context: UnifyTypeContext<Rc<str>>,
+        context: UnifyTypeContext,
         expected: Type<Rc<str>>,
         actual: Type<Rc<str>>,
     },
@@ -797,7 +803,7 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn check_kind(
         &mut self,
-        context: Option<&UnifyTypeContext<usize>>,
+        context: Option<&UnifyTypeContextRefs>,
         ty: Type<usize>,
         kind: &Kind,
     ) -> Result<core::Type, TypeError> {
@@ -1428,7 +1434,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn kind_mismatch<A>(
         &self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         actual: &Kind,
     ) -> Result<A, TypeError> {
@@ -1436,8 +1442,8 @@ impl<'modules> Typechecker<'modules> {
             ty: self.fill_ty_names(self.zonk_type(&context.ty.get_value())),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
-                expected: self.fill_ty_names(self.zonk_type(&x.expected)),
-                actual: self.fill_ty_names(self.zonk_type(&x.actual)),
+                expected: self.fill_ty_names(self.zonk_core_type(x.expected).get_value()),
+                actual: self.fill_ty_names(self.zonk_core_type(x.actual).get_value()),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1451,7 +1457,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn unify_kind(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         actual: &Kind,
     ) -> Result<(), TypeError> {
@@ -1512,7 +1518,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_right(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -1528,7 +1534,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_left(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         meta: usize,
         actual: &Kind,
     ) -> Result<(), TypeError> {
@@ -1552,13 +1558,13 @@ impl<'modules> Typechecker<'modules> {
 
     fn type_mismatch<A>(
         &self,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: core::Type,
         actual: core::Type,
     ) -> Result<A, TypeError> {
         let context = UnifyTypeContext {
-            expected: self.fill_ty_names(self.zonk_type(&context.expected)),
-            actual: self.fill_ty_names(self.zonk_type(&context.actual)),
+            expected: self.fill_ty_names(self.zonk_core_type(context.expected).get_value()),
+            actual: self.fill_ty_names(self.zonk_core_type(context.actual).get_value()),
         };
         Err(TypeError::TypeMismatch {
             source: self.source(),
@@ -1609,7 +1615,7 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn solve_typevar_right(
         &mut self,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: &core::Type,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -1624,7 +1630,7 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn solve_typevar_left(
         &mut self,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         meta: usize,
         actual: &core::Type,
     ) -> Result<(), TypeError> {
@@ -1764,7 +1770,7 @@ impl<'modules> Typechecker<'modules> {
     pub fn unify_type_subst(
         &mut self,
         subst: &mut Substitution,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: &core::Type,
         actual: &core::Type,
     ) -> Result<(), TypeError> {
@@ -1971,7 +1977,7 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn unify_type(
         &mut self,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: &core::Type,
         actual: &core::Type,
     ) -> Result<(), TypeError> {
@@ -2157,9 +2163,9 @@ impl<'modules> Typechecker<'modules> {
         ));
 
         let pattern_ty = core::Type::mk_app(core::Type::Variant, pattern_rows);
-        let context: UnifyTypeContext<usize> = UnifyTypeContext {
-            expected: expected_pattern_ty.get_value(),
-            actual: pattern_ty.get_value(),
+        let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
+            expected: expected_pattern_ty,
+            actual: &pattern_ty,
         };
         match self.unify_type(&context, expected_pattern_ty, &pattern_ty) {
             Err(err) => {
@@ -2183,9 +2189,9 @@ impl<'modules> Typechecker<'modules> {
         expected: &core::Type,
     ) -> Result<(core::Pattern, Vec<(Rc<str>, core::Type)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
-        let context = UnifyTypeContext {
-            expected: expected.get_value(),
-            actual: actual.get_value(),
+        let context = UnifyTypeContextRefs {
+            expected,
+            actual: &actual,
         };
         self.unify_type(&context, expected, &actual)?;
         Ok((pat, binds))
@@ -2271,9 +2277,9 @@ impl<'modules> Typechecker<'modules> {
                     let out_ty = self.fresh_typevar(Kind::Type);
                     let expected = core::Type::mk_arrow(in_ty.clone(), out_ty.clone());
                     let actual = f_ty;
-                    let context = UnifyTypeContext {
-                        expected: expected.get_value(),
-                        actual: actual.get_value(),
+                    let context = UnifyTypeContextRefs {
+                        expected: &expected,
+                        actual: &actual,
                     };
                     self.unify_type(&context, &expected, &actual)?;
                     let x_core = self.check_expr(x, &in_ty)?;
@@ -2390,14 +2396,15 @@ impl<'modules> Typechecker<'modules> {
                     let mut rest_row = None;
                     let _ = match rest {
                         None => {
-                            let fields_rows: Vec<(Rc<str>, Type<usize>)> = fields_rows
-                                .iter()
-                                .map(|(a, b)| (a.clone(), b.get_value()))
-                                .collect();
-                            let expected = Type::mk_record(fields_rows.clone(), None);
-                            let actual =
-                                Type::mk_record(fields_rows, Some(rest_row_var.get_value()));
-                            let context = UnifyTypeContext { expected, actual };
+                            let expected = core::Type::mk_record(fields_rows.clone(), None);
+                            let actual = core::Type::mk_record(
+                                fields_rows.clone(),
+                                Some(rest_row_var.clone()),
+                            );
+                            let context = UnifyTypeContextRefs {
+                                expected: &expected,
+                                actual: &actual,
+                            };
                             self.unify_type(&context, &core::Type::RowNil, &rest_row_var)
                         }
                         Some(expr) => {
@@ -2606,9 +2613,9 @@ impl<'modules> Typechecker<'modules> {
                                         }
                                     }?;
                                 if !saw_variant {
-                                    let context: UnifyTypeContext<usize> = UnifyTypeContext {
-                                        expected: expected_pattern_ty.get_value().clone(),
-                                        actual: pattern_ty.get_value().clone(),
+                                    let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
+                                        expected: &expected_pattern_ty,
+                                        actual: &pattern_ty,
                                     };
                                     match self.unify_type(
                                         &context,
@@ -2643,16 +2650,16 @@ impl<'modules> Typechecker<'modules> {
                     }
 
                     if matching_variant && !seen_fallthrough {
-                        let expr_ty = self.zonk_type(&expr_ty.get_value());
+                        let expr_ty = self.zonk_core_type(&expr_ty);
                         let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
-                        let ctors: Vec<(Rc<str>, Type<usize>)> = ctors
+                        let ctors: Vec<(Rc<str>, core::Type)> = ctors
                             .iter()
                             .map(|(x, y)| ((*x).clone(), (*y).clone()))
                             .collect();
-                        let rest: Option<Type<usize>> = rest.cloned();
-                        let context = UnifyTypeContext {
-                            expected: Type::mk_variant(ctors.clone(), None),
-                            actual: Type::mk_variant(ctors, rest),
+                        let rest: Option<core::Type> = rest.cloned();
+                        let context = UnifyTypeContextRefs {
+                            expected: &core::Type::mk_variant(ctors.clone(), None),
+                            actual: &core::Type::mk_variant(ctors, rest),
                         };
                         let _ = self.unify_type(
                             &context,
@@ -2693,9 +2700,9 @@ impl<'modules> Typechecker<'modules> {
                     }
                     arg_tys.reverse();
 
-                    let context = UnifyTypeContext {
-                        expected: ty.get_value(),
-                        actual: actual.get_value(),
+                    let context = UnifyTypeContextRefs {
+                        expected: ty,
+                        actual: &actual,
                     };
                     self.unify_type(&context, ty, &actual)?;
 
@@ -2745,9 +2752,9 @@ impl<'modules> Typechecker<'modules> {
                 _ => {
                     let expected = ty;
                     let (expr, actual) = self.infer_expr(expr)?;
-                    let context = UnifyTypeContext {
-                        expected: expected.get_value(),
-                        actual: actual.get_value(),
+                    let context = UnifyTypeContextRefs {
+                        expected,
+                        actual: &actual,
                     };
                     self.unify_type(&context, expected, &actual)?;
                     Ok(expr)

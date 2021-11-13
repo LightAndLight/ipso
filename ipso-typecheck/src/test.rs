@@ -3,6 +3,7 @@ use super::SolveConstraintContext;
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
     BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
+    UnifyTypeContextRefs,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -717,9 +718,9 @@ fn unify_rows_test_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
-                &UnifyTypeContext {
-                    expected: Type::Unit,
-                    actual: Type::Unit
+                &UnifyTypeContextRefs {
+                    expected: &core::Type::Unit,
+                    actual: &core::Type::Unit
                 },
                 &core::Type::mk_record(
                     vec![
@@ -746,9 +747,9 @@ fn unify_rows_test_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
-                &UnifyTypeContext {
-                    expected: Type::Unit,
-                    actual: Type::Unit,
+                &UnifyTypeContextRefs {
+                    expected: &core::Type::Unit,
+                    actual: &core::Type::Unit,
                 },
                 &core::Type::mk_record(
                     vec![
@@ -777,9 +778,9 @@ fn unify_rows_test_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
-                &UnifyTypeContext {
-                    expected: Type::Unit,
-                    actual: Type::Unit,
+                &UnifyTypeContextRefs {
+                    expected: &core::Type::Unit,
+                    actual: &core::Type::Unit,
                 },
                 &core::Type::mk_record(
                     vec![
@@ -808,9 +809,9 @@ fn unify_rows_test_4() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         assert_eq!(
             tc.unify_type(
-                &UnifyTypeContext {
-                    expected: Type::Unit,
-                    actual: Type::Unit
+                &UnifyTypeContextRefs {
+                    expected: &core::Type::Unit,
+                    actual: &core::Type::Unit
                 },
                 &core::Type::mk_record(
                     vec![
@@ -1782,9 +1783,9 @@ fn type_occurs_1() {
         let v2 = tc.fresh_typevar(Kind::Type);
         assert_eq!(
             tc.unify_type(
-                &UnifyTypeContext {
-                    expected: Type::Unit,
-                    actual: Type::Unit,
+                &UnifyTypeContextRefs {
+                    expected: &core::Type::Unit,
+                    actual: &core::Type::Unit,
                 },
                 &v1,
                 &core::Type::mk_arrow(v1.clone(), v2.clone())
@@ -2699,9 +2700,9 @@ fn unify_1() {
         let holey = core::Type::mk_app(core::Type::mk_app(core::Type::Arrow, m_1), m_0);
         let expected = Ok(real.clone());
         let actual = {
-            let context = UnifyTypeContext {
-                expected: real.get_value(),
-                actual: holey.get_value(),
+            let context = UnifyTypeContextRefs {
+                expected: &real,
+                actual: &holey,
             };
             tc.unify_type(&context, &real, &holey)
                 .map(|_| tc.zonk_core_type(&holey))

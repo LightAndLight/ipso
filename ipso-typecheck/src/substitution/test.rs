@@ -1,9 +1,9 @@
 #[cfg(test)]
-use crate::{substitution::Substitution, Typechecker, UnifyTypeContext};
+use crate::{substitution::Substitution, Typechecker, UnifyTypeContextRefs};
 #[cfg(test)]
 use ipso_core as core;
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, r#type::Type};
+use ipso_syntax::kind::Kind;
 #[cfg(test)]
 use std::rc::Rc;
 
@@ -22,9 +22,9 @@ fn subst_left_1() {
             ),
         ];
         let mut subst = Substitution::new();
-        let context = UnifyTypeContext {
-            expected: Type::Meta(0),
-            actual: Type::Int,
+        let context = UnifyTypeContextRefs {
+            expected: &core::Type::Meta(Kind::Type, 0),
+            actual: &core::Type::Int,
         };
         subst
             .subst_left(&mut tc, &context, 0, core::Type::Int)

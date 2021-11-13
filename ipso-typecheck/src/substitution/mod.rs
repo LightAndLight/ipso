@@ -1,6 +1,8 @@
 mod test;
 
-use super::{TypeError, Typechecker, UnifyTypeContext};
+use crate::UnifyTypeContextRefs;
+
+use super::{TypeError, Typechecker};
 use fnv::FnvHashMap;
 use ipso_core::{self as core};
 
@@ -19,7 +21,7 @@ impl Substitution {
     pub fn subst_left(
         &mut self,
         tc: &mut Typechecker,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: usize,
         actual: core::Type,
     ) -> Result<(), TypeError> {
@@ -59,7 +61,7 @@ impl Substitution {
     pub fn subst_right(
         &mut self,
         tc: &mut Typechecker,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         expected: core::Type,
         actual: usize,
     ) -> Result<(), TypeError> {

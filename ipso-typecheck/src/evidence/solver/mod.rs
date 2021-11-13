@@ -1,9 +1,9 @@
 use crate::{
     substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
-    UnifyKindContextRefs, UnifyTypeContext,
+    UnifyKindContextRefs, UnifyTypeContextRefs,
 };
 use ipso_core::{self as core, Expr, Placeholder};
-use ipso_syntax::{kind::Kind, r#type::Type, Binop};
+use ipso_syntax::{kind::Kind, Binop};
 
 use super::Constraint;
 
@@ -51,9 +51,9 @@ pub fn solve_constraint(
                 let implication = implication.instantiate_many(&metas);
 
                 let mut subst = Substitution::new();
-                let unify_context = UnifyTypeContext {
-                    expected: constraint.get_value().clone(),
-                    actual: implication.consequent.get_value().clone(),
+                let unify_context = UnifyTypeContextRefs {
+                    expected: constraint,
+                    actual: &implication.consequent,
                 };
 
                 match tc.unify_type_subst(
@@ -186,9 +186,9 @@ pub fn solve_constraint(
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
-                                    let unify_type_context = UnifyTypeContext {
-                                        expected: Type::Meta(*n),
-                                        actual: Type::RowNil,
+                                    let unify_type_context = UnifyTypeContextRefs {
+                                        expected: &core::Type::Meta(Kind::Row, *n),
+                                        actual: &core::Type::RowNil,
                                     };
                                     tc.solve_typevar_left(
                                         &unify_type_context,
