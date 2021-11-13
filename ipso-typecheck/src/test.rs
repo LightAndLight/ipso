@@ -225,7 +225,10 @@ fn infer_pattern_test_1() {
             (
                 core::Pattern::Name,
                 Type::Meta(0),
-                vec![(Rc::from("x"), Type::Meta(0))]
+                vec![(
+                    Rc::from("x"),
+                    core::Type::unsafe_new(Type::Meta(0), Kind::Type)
+                )]
             )
         )
     })
@@ -271,9 +274,18 @@ fn infer_pattern_test_2() {
                     None
                 ),
                 vec![
-                    (Rc::from("x"), Type::Meta(0)),
-                    (Rc::from("y"), Type::Meta(1)),
-                    (Rc::from("z"), Type::Meta(2)),
+                    (
+                        Rc::from("x"),
+                        core::Type::unsafe_new(Type::Meta(0), Kind::Type)
+                    ),
+                    (
+                        Rc::from("y"),
+                        core::Type::unsafe_new(Type::Meta(1), Kind::Type)
+                    ),
+                    (
+                        Rc::from("z"),
+                        core::Type::unsafe_new(Type::Meta(2), Kind::Type)
+                    ),
                 ]
             )
         )
@@ -323,12 +335,24 @@ fn infer_pattern_test_3() {
                     Some(Type::Meta(3))
                 ),
                 vec![
-                    (Rc::from("x"), Type::Meta(0)),
-                    (Rc::from("y"), Type::Meta(1)),
-                    (Rc::from("z"), Type::Meta(2)),
+                    (
+                        Rc::from("x"),
+                        core::Type::unsafe_new(Type::Meta(0), Kind::Type)
+                    ),
+                    (
+                        Rc::from("y"),
+                        core::Type::unsafe_new(Type::Meta(1), Kind::Type)
+                    ),
+                    (
+                        Rc::from("z"),
+                        core::Type::unsafe_new(Type::Meta(2), Kind::Type)
+                    ),
                     (
                         Rc::from("w"),
-                        Type::mk_record(Vec::new(), Some(Type::Meta(3)))
+                        core::Type::mk_record(
+                            Vec::new(),
+                            Some(core::Type::unsafe_new(Type::Meta(3), Kind::Row))
+                        )
                     ),
                 ]
             )
@@ -351,7 +375,10 @@ fn infer_pattern_test_4() {
             (
                 core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
                 Type::mk_variant(vec![(Rc::from("just"), Type::Meta(0))], Some(Type::Meta(1))),
-                vec![(Rc::from("x"), Type::Meta(0))]
+                vec![(
+                    Rc::from("x"),
+                    core::Type::unsafe_new(Type::Meta(0), Kind::Type)
+                )]
             )
         )
     })

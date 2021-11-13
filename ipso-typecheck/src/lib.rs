@@ -178,7 +178,7 @@ pub struct Typechecker<'modules> {
     module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
     module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: BoundVars<Type<usize>>,
+    bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
     modules: &'modules HashMap<ModulePath, &'modules core::Module>,
@@ -1294,7 +1294,7 @@ impl<'modules> Typechecker<'modules> {
     fn lookup_var(&self, name: &str) -> Option<(usize, Type<usize>)> {
         self.bound_vars
             .lookup_name(name)
-            .map(|(ix, ty)| (ix, ty.clone()))
+            .map(|(ix, ty)| (ix, ty.get_value().clone()))
     }
 
     fn lookup_name(&self, name: &str) -> Option<core::TypeSig> {
@@ -1934,10 +1934,13 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         name: &Rc<str>,
         arg: &Spanned<String>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let arg_ty: Type<usize> = self.fresh_typevar(Kind::Type).get_value().clone();
+    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
+        let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
-        let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let ty = Type::mk_variant(
+            vec![(name.clone(), arg_ty.get_value().clone())],
+            Some(rest_row.clone()),
+        );
 
         let tag = self.evidence.placeholder(
             Some(self.current_position()),
@@ -1955,7 +1958,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn infer_wildcard_pattern(
         &mut self,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
+    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
         (
             core::Pattern::Wildcard,
             self.fresh_typevar(Kind::Type).get_value().clone(),
@@ -1966,11 +1969,11 @@ impl<'modules> Typechecker<'modules> {
     fn infer_name_pattern(
         &mut self,
         name: &Spanned<String>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let ty = self.fresh_typevar(Kind::Type).get_value().clone();
+    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
+        let ty = self.fresh_typevar(Kind::Type);
         (
             core::Pattern::Name,
-            ty.clone(),
+            ty.get_value().clone(),
             vec![(Rc::from(name.item.as_ref()), ty)],
         )
     }
@@ -1979,33 +1982,30 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         names: &[Spanned<String>],
         rest: &Option<Spanned<String>>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let mut names_tys: Vec<(Spanned<Rc<str>>, Type<usize>)> = names
+    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
+        let mut names_tys: Vec<(Spanned<Rc<str>>, core::Type)> = names
             .iter()
             .map(|name| {
                 let name = Spanned {
                     pos: name.pos,
                     item: Rc::from(name.item.as_ref()),
                 };
-                (name, self.fresh_typevar(Kind::Type).get_value().clone())
+                (name, self.fresh_typevar(Kind::Type))
             })
             .collect();
-        let rest_row: Option<(Spanned<String>, Type<usize>)> = rest.as_ref().map(|name| {
-            (
-                name.clone(),
-                self.fresh_typevar(Kind::Row).get_value().clone(),
-            )
-        });
+        let rest_row: Option<(Spanned<String>, core::Type)> = rest
+            .as_ref()
+            .map(|name| (name.clone(), self.fresh_typevar(Kind::Row)));
         let ty = Type::mk_record(
             names_tys
                 .iter()
-                .map(|(name, ty)| (name.item.clone(), ty.clone()))
+                .map(|(name, ty)| (name.item.clone(), ty.get_value().clone()))
                 .collect(),
-            rest_row.clone().map(|x| x.1),
+            rest_row.as_ref().map(|x| x.1.get_value().clone()),
         );
 
         let mut extending_row = match &rest_row {
-            Some((_, row)) => row.clone(),
+            Some((_, row)) => row.get_value().clone(),
             None => Type::RowNil,
         };
         let mut names_placeholders = Vec::new();
@@ -2018,7 +2018,8 @@ impl<'modules> Typechecker<'modules> {
                 },
             );
             names_placeholders.push(core::Expr::Placeholder(p));
-            extending_row = Type::mk_rowcons(name.item.clone(), ty.clone(), extending_row);
+            extending_row =
+                Type::mk_rowcons(name.item.clone(), ty.get_value().clone(), extending_row);
         }
         names_placeholders.reverse();
 
@@ -2028,7 +2029,7 @@ impl<'modules> Typechecker<'modules> {
                     pos: rest_name.pos,
                     item: Rc::from(rest_name.item.as_ref()),
                 },
-                Type::mk_record(Vec::new(), Some(rest_row.clone())),
+                core::Type::mk_record(Vec::new(), Some(rest_row.clone())),
             ))
         });
 
@@ -2045,7 +2046,7 @@ impl<'modules> Typechecker<'modules> {
     fn infer_pattern(
         &mut self,
         arg: &syntax::Pattern,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
+    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>) {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
@@ -2063,13 +2064,15 @@ impl<'modules> Typechecker<'modules> {
         seen_ctors: &mut HashSet<Rc<str>>,
         name: &str,
         arg: &Spanned<String>,
-    ) -> Result<(core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>), TypeError> {
+    ) -> Result<(core::Pattern, Type<usize>, Vec<(Rc<str>, core::Type)>), TypeError> {
         let name: Rc<str> = Rc::from(name);
 
-        let arg_ty = self.fresh_typevar(Kind::Type).get_value().clone();
+        let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row).get_value().clone();
-        let pattern_rows =
-            Type::mk_rows(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let pattern_rows = Type::mk_rows(
+            vec![(name.clone(), arg_ty.get_value().clone())],
+            Some(rest_row.clone()),
+        );
         let expr_rows: Type<usize> = match &m_expr_rows {
             None => {
                 *m_expr_rows = Some(pattern_rows.clone());
@@ -2102,8 +2105,7 @@ impl<'modules> Typechecker<'modules> {
         seen_ctors.insert(name);
 
         let pattern_core = core::Pattern::mk_variant(tag);
-        let pattern_binds: Vec<(Rc<str>, Type<usize>)> =
-            vec![(Rc::from(arg.item.as_ref()), arg_ty)];
+        let pattern_binds: Vec<(Rc<str>, core::Type)> = vec![(Rc::from(arg.item.as_ref()), arg_ty)];
         Ok((pattern_core, pattern_ty, pattern_binds))
     }
 
@@ -2111,7 +2113,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         arg: &syntax::Pattern,
         expected: &Type<usize>,
-    ) -> Result<(core::Pattern, Vec<(Rc<str>, Type<usize>)>), TypeError> {
+    ) -> Result<(core::Pattern, Vec<(Rc<str>, core::Type)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
         let context = UnifyTypeContext {
             expected: expected.clone(),
@@ -2231,7 +2233,8 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Let { name, value, rest } => {
                     let (value_core, value_ty) = self.infer_expr(value)?;
 
-                    self.bound_vars.insert(&[(name.clone(), value_ty)]);
+                    self.bound_vars
+                        .insert(&[(name.clone(), core::Type::unsafe_new(value_ty, Kind::Type))]);
                     let (rest_core, rest_ty) = self.infer_expr(rest)?;
                     self.bound_vars.delete(1);
 
