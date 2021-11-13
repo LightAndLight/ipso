@@ -28,22 +28,6 @@ pub enum Type<A> {
 }
 
 impl<A> Type<A> {
-    pub fn flatten_constraints(&self) -> Vec<&Self> {
-        fn go<'a, A>(constraints: &mut Vec<&'a Type<A>>, ty: &'a Type<A>) {
-            match ty {
-                Type::Constraints(cs) => {
-                    for c in cs {
-                        go(constraints, c);
-                    }
-                }
-                _ => constraints.push(ty),
-            }
-        }
-        let mut constraints = Vec::new();
-        go(&mut constraints, self);
-        constraints
-    }
-
     pub fn unwrap_name(&self) -> Option<&Rc<str>> {
         match self {
             Type::Name(n) => Some(n),
