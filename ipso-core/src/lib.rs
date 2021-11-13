@@ -181,6 +181,33 @@ impl Type {
         }
     }
 
+    pub fn mk_rows(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
+        debug_assert!(
+            fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
+            "{:?} is not Kind::Type",
+            fields.iter().find(|x| x.1.kind != Kind::Type).unwrap()
+        );
+        debug_assert!(
+            match &rest {
+                Some(rest) => rest.kind == Kind::Row,
+                None => true,
+            },
+            "{:?} is not Kind::Row",
+            rest
+        );
+
+        Type {
+            value: r#type::Type::mk_rows(
+                fields
+                    .into_iter()
+                    .map(|(name, ty)| (name, ty.value))
+                    .collect(),
+                rest.map(|x| x.get_value().clone()),
+            ),
+            kind: Kind::Row,
+        }
+    }
+
     pub fn mk_record(fields: Vec<(Rc<str>, Type)>, rest: Option<Type>) -> Self {
         debug_assert!(
             fields.iter().all(|(_, ty)| ty.kind == Kind::Type),
