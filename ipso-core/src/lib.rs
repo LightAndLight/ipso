@@ -264,6 +264,17 @@ impl Type {
     }
 
     #[allow(clippy::type_complexity)]
+    pub fn unwrap_variant(&self) -> Option<(Vec<(&Rc<str>, &Type)>, Option<&Type>)> {
+        match self {
+            Type::App(_, a, b) => match **a {
+                Type::Variant => Some(b.unwrap_rows()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
     pub fn unwrap_rows(&self) -> (Vec<(&Rc<str>, &Type)>, Option<&Type>) {
         let mut current = self;
         let mut fields = Vec::new();

@@ -93,9 +93,9 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         };
         let expected = core::Type::mk_app(core::Type::IO, tc.fresh_typevar(Kind::Type));
         let actual = target_sig.body;
-        let context = typecheck::UnifyTypeContext {
-            expected: expected.get_value(),
-            actual: actual.get_value(),
+        let context = typecheck::UnifyTypeContextRefs {
+            expected: &expected,
+            actual: &actual,
         };
         let _ = tc.unify_type(&context, &expected, &actual)?;
     }
