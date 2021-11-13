@@ -182,7 +182,11 @@ pub fn solve_constraint(
                                         expected: Type::Meta(*n),
                                         actual: Type::RowNil,
                                     };
-                                    tc.solve_typevar_left(&unify_type_context, *n, &Type::RowNil)?;
+                                    tc.solve_typevar_left(
+                                        &unify_type_context,
+                                        *n,
+                                        &core::Type::mk_rownil(),
+                                    )?;
                                     solve_constraint(context, tc, constraint)
                                 }
                                 _ => {

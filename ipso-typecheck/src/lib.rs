@@ -1561,15 +1561,15 @@ impl<'modules> Typechecker<'modules> {
     pub fn solve_typevar_right(
         &mut self,
         context: &UnifyTypeContext<usize>,
-        expected: &Type<usize>,
+        expected: &core::Type,
         meta: usize,
     ) -> Result<(), TypeError> {
         match &self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta].1 = Some(expected.clone());
+                self.type_solutions[meta].1 = Some(expected.get_value().clone());
                 Ok(())
             }
-            Some(actual) => self.unify_type(context, expected, actual),
+            Some(actual) => self.unify_type(context, expected.get_value(), actual),
         }
     }
 
@@ -1577,14 +1577,14 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         context: &UnifyTypeContext<usize>,
         meta: usize,
-        actual: &Type<usize>,
+        actual: &core::Type,
     ) -> Result<(), TypeError> {
         match &self.type_solutions[meta].1.clone() {
             None => {
-                self.type_solutions[meta].1 = Some(actual.clone());
+                self.type_solutions[meta].1 = Some(actual.get_value().clone());
                 Ok(())
             }
-            Some(expected) => self.unify_type(context, expected, actual),
+            Some(expected) => self.unify_type(context, expected, actual.get_value()),
         }
     }
 
