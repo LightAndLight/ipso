@@ -26,17 +26,17 @@ pub enum Type {
     Char,
     String,
     Bytes,
-    Arrow,
-    FatArrow,
-    Array,
-    Record,
-    Variant,
-    IO,
     RowNil,
     Unit,
     Constraints(Vec<Type>),
     RowCons(Rc<str>, Rc<Type>, Rc<Type>),
     HasField(Rc<str>, Rc<Type>),
+    Arrow(Kind),
+    FatArrow(Kind),
+    Array(Kind),
+    Record(Kind),
+    Variant(Kind),
+    IO(Kind),
     Name(Kind, Rc<str>),
     Var(Kind, usize),
     App(Kind, Rc<Type>, Rc<Type>),
@@ -70,12 +70,12 @@ impl Type {
             Type::Char => r#type::Type::Char,
             Type::String => r#type::Type::String,
             Type::Bytes => r#type::Type::Bytes,
-            Type::Arrow => r#type::Type::Arrow,
-            Type::FatArrow => r#type::Type::FatArrow,
-            Type::Array => r#type::Type::Array,
-            Type::Record => r#type::Type::Record,
-            Type::Variant => r#type::Type::Variant,
-            Type::IO => r#type::Type::IO,
+            Type::Arrow(_) => r#type::Type::Arrow,
+            Type::FatArrow(_) => r#type::Type::FatArrow,
+            Type::Array(_) => r#type::Type::Array,
+            Type::Record(_) => r#type::Type::Record,
+            Type::Variant(_) => r#type::Type::Variant,
+            Type::IO(_) => r#type::Type::IO,
             Type::RowNil => r#type::Type::RowNil,
             Type::Unit => r#type::Type::Unit,
             Type::Name(_, n) => r#type::Type::Name(n.clone()),
@@ -92,7 +92,7 @@ impl Type {
         }
     }
 
-    pub fn kind(&self, common_kinds: &CommonKinds) -> Kind {
+    pub fn kind(&self) -> Kind {
         match self {
             Type::Bool => Kind::Type,
             Type::Int => Kind::Type,
@@ -104,12 +104,12 @@ impl Type {
             Type::RowCons(_, _, _) => Kind::Row,
             Type::Constraints(_) => Kind::Constraint,
             Type::HasField(_, _) => Kind::Constraint,
-            Type::Array => common_kinds.type_to_type.clone(),
-            Type::IO => common_kinds.type_to_type.clone(),
-            Type::Record => common_kinds.row_to_type.clone(),
-            Type::Variant => common_kinds.row_to_type.clone(),
-            Type::Arrow => common_kinds.type_to_type_to_type.clone(),
-            Type::FatArrow => common_kinds.constraint_to_type_to_type.clone(),
+            Type::Array(k) => k.clone(),
+            Type::IO(k) => k.clone(),
+            Type::Record(k) => k.clone(),
+            Type::Variant(k) => k.clone(),
+            Type::Arrow(k) => k.clone(),
+            Type::FatArrow(k) => k.clone(),
             Type::Name(k, _) => k.clone(),
             Type::Var(k, _) => k.clone(),
             Type::App(k, _, _) => k.clone(),
@@ -125,9 +125,9 @@ impl Type {
         Type::Var(kind, ix)
     }
 
-    pub fn mk_app(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
+    pub fn mk_app(a: Type, b: Type) -> Self {
         Type::App(
-            match a.kind(common_kinds) {
+            match a.kind() {
                 Kind::Ref(r) => match r.as_ref() {
                     syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
                 },
@@ -138,16 +138,28 @@ impl Type {
         )
     }
 
+    pub fn mk_arrow_ctor(common_kinds: &CommonKinds) -> Self {
+        Type::Arrow(common_kinds.type_to_type_to_type.clone())
+    }
+
     pub fn mk_arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(common_kinds, Type::mk_app(common_kinds, Type::Arrow, a), b)
+        Type::mk_app(Type::mk_app(Type::mk_arrow_ctor(common_kinds), a), b)
+    }
+
+    pub fn mk_fatarrow_ctor(common_kinds: &CommonKinds) -> Self {
+        Type::FatArrow(common_kinds.constraint_to_type_to_type.clone())
     }
 
     pub fn mk_fatarrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(
-            common_kinds,
-            Type::mk_app(common_kinds, Type::FatArrow, a),
-            b,
-        )
+        Type::mk_app(Type::mk_app(Type::mk_fatarrow_ctor(common_kinds), a), b)
+    }
+
+    pub fn mk_io(common_kinds: &CommonKinds) -> Self {
+        Type::IO(common_kinds.type_to_type.clone())
+    }
+
+    pub fn mk_array(common_kinds: &CommonKinds) -> Self {
+        Type::Array(common_kinds.type_to_type.clone())
     }
 
     pub fn mk_hasfield(name: Rc<str>, ty: Type) -> Self {
@@ -168,12 +180,23 @@ impl Type {
         )
     }
 
+    pub fn mk_record_ctor(common_kinds: &CommonKinds) -> Self {
+        Type::Record(common_kinds.row_to_type.clone())
+    }
+
     pub fn mk_record(
         common_kinds: &CommonKinds,
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(common_kinds, Type::Record, Type::mk_rows(fields, rest))
+        Type::mk_app(
+            Type::mk_record_ctor(common_kinds),
+            Type::mk_rows(fields, rest),
+        )
+    }
+
+    pub fn mk_variant_ctor(common_kinds: &CommonKinds) -> Self {
+        Type::Variant(common_kinds.row_to_type.clone())
     }
 
     pub fn mk_variant(
@@ -181,7 +204,10 @@ impl Type {
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(common_kinds, Type::Variant, Type::mk_rows(fields, rest))
+        Type::mk_app(
+            Type::mk_variant_ctor(common_kinds),
+            Type::mk_rows(fields, rest),
+        )
     }
 
     pub fn subst_metas<F: Fn(&Kind, usize) -> Type>(&self, f: &F) -> Self {
@@ -193,15 +219,15 @@ impl Type {
             Type::Char => Type::Char,
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
+            Type::Arrow(k) => Type::Arrow(k.clone()),
+            Type::FatArrow(k) => Type::FatArrow(k.clone()),
             Type::Constraints(cs) => {
                 Type::Constraints(cs.iter().map(|c| c.subst_metas(f)).collect())
             }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
+            Type::Array(k) => Type::Array(k.clone()),
+            Type::Record(k) => Type::Record(k.clone()),
+            Type::Variant(k) => Type::Variant(k.clone()),
+            Type::IO(k) => Type::IO(k.clone()),
             Type::App(k, a, b) => Type::App(
                 k.clone(),
                 Rc::new(a.subst_metas(f)),
@@ -226,13 +252,13 @@ impl Type {
             Type::Char => Type::Char,
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
+            Type::Arrow(k) => Type::Arrow(k.clone()),
+            Type::FatArrow(k) => Type::FatArrow(k.clone()),
             Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.subst(f)).collect()),
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
+            Type::Array(k) => Type::Array(k.clone()),
+            Type::Record(k) => Type::Record(k.clone()),
+            Type::Variant(k) => Type::Variant(k.clone()),
+            Type::IO(k) => Type::IO(k.clone()),
             Type::App(k, a, b) => Type::App(k.clone(), Rc::new(a.subst(f)), Rc::new(b.subst(f))),
             Type::RowNil => Type::RowNil,
             Type::RowCons(field, ty, rest) => {
@@ -260,15 +286,15 @@ impl Type {
             Type::Char => Type::Char,
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
+            Type::Arrow(k) => Type::Arrow(k.clone()),
+            Type::FatArrow(k) => Type::FatArrow(k.clone()),
             Type::Constraints(cs) => {
                 Type::Constraints(cs.iter().map(|c| c.instantiate_many(tys)).collect())
             }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
+            Type::Array(k) => Type::Array(k.clone()),
+            Type::Record(k) => Type::Record(k.clone()),
+            Type::Variant(k) => Type::Variant(k.clone()),
+            Type::IO(k) => Type::IO(k.clone()),
             Type::App(k, a, b) => Type::App(
                 k.clone(),
                 Rc::new(a.instantiate_many(tys)),
@@ -292,7 +318,7 @@ impl Type {
     pub fn unwrap_variant(&self) -> Option<(Vec<(&Rc<str>, &Type)>, Option<&Type>)> {
         match self {
             Type::App(_, a, b) => match **a {
-                Type::Variant => Some(b.unwrap_rows()),
+                Type::Variant(_) => Some(b.unwrap_rows()),
                 _ => None,
             },
             _ => None,
@@ -319,7 +345,7 @@ impl Type {
         match self {
             Type::App(_, a, out_ty) => match a.as_ref() {
                 Type::App(_, c, in_ty) => match c.as_ref() {
-                    Type::FatArrow => Some((in_ty, out_ty)),
+                    Type::FatArrow(_) => Some((in_ty, out_ty)),
                     _ => None,
                 },
                 _ => None,
@@ -421,13 +447,13 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::Char => Step::Skip,
                 Type::String => Step::Skip,
                 Type::Bytes => Step::Skip,
-                Type::Arrow => Step::Skip,
-                Type::FatArrow => Step::Skip,
+                Type::Arrow(_) => Step::Skip,
+                Type::FatArrow(_) => Step::Skip,
                 Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
-                Type::Array => Step::Skip,
-                Type::Record => Step::Skip,
-                Type::Variant => Step::Skip,
-                Type::IO => Step::Skip,
+                Type::Array(_) => Step::Skip,
+                Type::Record(_) => Step::Skip,
+                Type::Variant(_) => Step::Skip,
+                Type::IO(_) => Step::Skip,
                 Type::App(_, a, b) => Step::Continue2(a, b),
                 Type::RowNil => Step::Skip,
                 Type::RowCons(_, a, b) => Step::Continue2(a, b),
@@ -1484,7 +1510,7 @@ impl ClassDeclaration {
                     .enumerate()
                     .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
                         let arg_ty = Type::unsafe_mk_var(adjustment + arg_index, arg_kind.clone());
-                        Type::mk_app(common_kinds, acc, arg_ty)
+                        Type::mk_app(acc, arg_ty)
                     });
                 let sig = {
                     let mut body = member.sig.body.clone();
