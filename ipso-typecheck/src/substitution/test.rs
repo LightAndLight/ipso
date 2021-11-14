@@ -1,7 +1,9 @@
 #[cfg(test)]
-use crate::{substitution::Substitution, Typechecker, UnifyTypeContext};
+use crate::{substitution::Substitution, Typechecker, UnifyTypeContextRefs};
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, r#type::Type};
+use ipso_core as core;
+#[cfg(test)]
+use ipso_syntax::kind::Kind;
 #[cfg(test)]
 use std::rc::Rc;
 
@@ -11,18 +13,32 @@ fn subst_left_1() {
         tc.bound_tyvars.insert(&[(Rc::from("r"), Kind::Row)]);
         tc.type_solutions = vec![
             (Kind::Type, None),
-            (Kind::Type, Some(Type::mk_app(Type::Record, Type::Var(0)))),
+            (
+                Kind::Type,
+                Some(core::Type::mk_app(
+                    core::Type::mk_record_ctor(tc.common_kinds),
+                    core::Type::Var(Kind::Row, 0),
+                )),
+            ),
         ];
         let mut subst = Substitution::new();
-        let context = UnifyTypeContext {
-            expected: Type::Meta(0),
-            actual: Type::Int,
+        let context = UnifyTypeContextRefs {
+            expected: &core::Type::Meta(Kind::Type, 0),
+            actual: &core::Type::Int,
         };
-        subst.subst_left(&mut tc, &context, 0, Type::Int).unwrap();
+        subst
+            .subst_left(&mut tc, &context, 0, core::Type::Int)
+            .unwrap();
         tc.commit_substitutions(subst);
         let expected = vec![
-            (Kind::Type, Some(Type::Int)),
-            (Kind::Type, Some(Type::mk_app(Type::Record, Type::Var(0)))),
+            (Kind::Type, Some(core::Type::Int)),
+            (
+                Kind::Type,
+                Some(core::Type::mk_app(
+                    core::Type::mk_record_ctor(tc.common_kinds),
+                    core::Type::Var(Kind::Row, 0),
+                )),
+            ),
         ];
         let actual = tc.type_solutions;
         assert_eq!(expected, actual)

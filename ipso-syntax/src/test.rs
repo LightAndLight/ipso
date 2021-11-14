@@ -40,15 +40,6 @@ fn iter_vars_test_3() {
 }
 
 #[test]
-fn unwrap_constraints_1() {
-    let expected_constraint = Type::mk_hasfield(Rc::from("x"), Type::Var(0));
-    let expected = (vec![&expected_constraint], &Type::Var(1));
-    let ty = Type::mk_fatarrow(Type::mk_hasfield(Rc::from("x"), Type::Var(0)), Type::Var(1));
-    let actual = ty.unwrap_constraints();
-    assert_eq!(expected, actual)
-}
-
-#[test]
 fn unwrap_fatarrow_1() {
     let expected = Some((&Type::Var(0), &Type::Var(1)));
     let ty = Type::mk_fatarrow(Type::Var(0), Type::Var(1));

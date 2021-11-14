@@ -8,13 +8,12 @@ use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use fnv::FnvHashSet;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, ModulePath};
+use ipso_core::{self as core, CommonKinds, ModulePath};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_rope::Rope;
 use ipso_syntax::{
     self as syntax,
     kind::{Kind, KindCompound},
-    r#type::Type,
     ModuleName, Spanned,
 };
 use std::{
@@ -117,13 +116,13 @@ impl<A> BoundVars<A> {
 #[derive(Debug, Clone)]
 pub struct Implication {
     pub ty_vars: Vec<Kind>,
-    pub antecedents: Vec<Type<usize>>,
-    pub consequent: Type<usize>,
+    pub antecedents: Vec<core::Type>,
+    pub consequent: core::Type,
     pub evidence: core::Expr,
 }
 
 impl Implication {
-    pub fn instantiate_many(&self, tys: &[Type<usize>]) -> Self {
+    pub fn instantiate_many(&self, tys: &[core::Type]) -> Self {
         let mut ty_vars = self.ty_vars.clone();
         for _ in tys.iter().rev() {
             let _ = ty_vars.pop();
@@ -143,33 +142,11 @@ impl Implication {
     }
 }
 
-struct Constants {
-    r#type: Kind,
-    constraint: Kind,
-    row: Kind,
-    type_to_type_to_type: Kind,
-}
-
-impl Constants {
-    fn new() -> Self {
-        let r#type = Kind::Type;
-        Constants {
-            r#type: r#type.clone(),
-            constraint: Kind::Constraint,
-            row: Kind::Row,
-            type_to_type_to_type: Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                r#type.clone(),
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(r#type.clone(), r#type))),
-            ))),
-        }
-    }
-}
-
 pub struct Typechecker<'modules> {
-    constants: Constants,
+    common_kinds: &'modules CommonKinds,
     source: Source,
     kind_solutions: Vec<Option<Kind>>,
-    pub type_solutions: Vec<(Kind, Option<Type<usize>>)>,
+    pub type_solutions: Vec<(Kind, Option<core::Type>)>,
     pub implications: Vec<Implication>,
     pub evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
@@ -178,7 +155,7 @@ pub struct Typechecker<'modules> {
     module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
     module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: BoundVars<Type<usize>>,
+    bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
     modules: &'modules HashMap<ModulePath, &'modules core::Module>,
@@ -197,28 +174,34 @@ macro_rules! with_position {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyKindContext<A> {
-    ty: Type<A>,
+    ty: syntax::Type<A>,
     has_kind: Kind,
-    unifying_types: Option<UnifyTypeContext<A>>,
+    unifying_types: Option<UnifyTypeContext>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyKindContextRefs<'a, A> {
-    ty: &'a Type<A>,
+pub struct UnifyKindContextRefs<'a> {
+    ty: &'a core::Type,
     has_kind: &'a Kind,
-    unifying_types: Option<&'a UnifyTypeContext<A>>,
+    unifying_types: Option<&'a UnifyTypeContextRefs<'a>>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyTypeContext<A> {
-    pub expected: Type<A>,
-    pub actual: Type<A>,
+pub struct UnifyTypeContext {
+    pub expected: syntax::Type<Rc<str>>,
+    pub actual: syntax::Type<Rc<str>>,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct UnifyTypeContextRefs<'a> {
+    pub expected: &'a core::Type,
+    pub actual: &'a core::Type,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SolveConstraintContext {
     pub pos: usize,
-    pub constraint: Type<Rc<str>>,
+    pub constraint: syntax::Type<Rc<str>>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -252,9 +235,9 @@ pub enum TypeError {
     TypeMismatch {
         source: Source,
         pos: usize,
-        context: UnifyTypeContext<Rc<str>>,
-        expected: Type<Rc<str>>,
-        actual: Type<Rc<str>>,
+        context: UnifyTypeContext,
+        expected: syntax::Type<Rc<str>>,
+        actual: syntax::Type<Rc<str>>,
     },
     RedundantPattern {
         source: Source,
@@ -270,7 +253,7 @@ pub enum TypeError {
         source: Source,
         pos: usize,
         meta: usize,
-        ty: Type<Rc<str>>,
+        ty: syntax::Type<Rc<str>>,
     },
     NoSuchClass {
         source: Source,
@@ -454,9 +437,11 @@ impl TypeError {
 #[macro_export]
 macro_rules! with_tc {
     ($path:expr, $location:expr, $f:expr) => {{
+        use ipso_core::CommonKinds;
         use std::collections::HashMap;
+        let common_kinds = CommonKinds::default();
         let modules = HashMap::new();
-        let tc = Typechecker::new_with_builtins($path, $location, &modules);
+        let tc = Typechecker::new_with_builtins($path, $location, &common_kinds, &modules);
         $f(tc)
     }};
 }
@@ -479,11 +464,11 @@ impl<'modules> Typechecker<'modules> {
     pub fn new(
         working_dir: &'modules Path,
         source: Source,
+        common_kinds: &'modules CommonKinds,
         modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
-        let constants = Constants::new();
         Typechecker {
-            constants,
+            common_kinds,
             source,
             kind_solutions: Vec::new(),
             type_solutions: Vec::new(),
@@ -506,48 +491,49 @@ impl<'modules> Typechecker<'modules> {
     pub fn new_with_builtins(
         working_dir: &'modules Path,
         location: Source,
+        common_kinds: &'modules CommonKinds,
         modules: &'modules HashMap<ModulePath, &'modules core::Module>,
     ) -> Self {
-        let mut tc = Self::new(working_dir, location, modules);
-        tc.register_from_import(&builtins::builtins(), &syntax::Names::All);
+        let mut tc = Self::new(working_dir, location, common_kinds, modules);
+        tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
         tc
     }
 
-    fn eq_zonked_type(&self, t1: &Type<usize>, t2: &Type<usize>) -> bool {
-        fn zonk_just_enough<'a>(tc: &'a Typechecker, t: &'a Type<usize>) -> &'a Type<usize> {
+    fn eq_zonked_type(&self, t1: &core::Type, t2: &core::Type) -> bool {
+        fn zonk_just_enough<'a>(tc: &'a Typechecker, t: &'a core::Type) -> &'a core::Type {
             match t {
-                Type::Meta(n) => match &tc.type_solutions[*n].1 {
+                core::Type::Meta(_, n) => match &tc.type_solutions[*n].1 {
                     None => t,
                     Some(sol) => zonk_just_enough(tc, sol),
                 },
                 t => t,
             }
         }
-        let t2: &Type<usize> = zonk_just_enough(self, t2);
+        let t2: &core::Type = zonk_just_enough(self, t2);
         match t1 {
-            Type::Name(n) => match t2 {
-                Type::Name(n2) => n == n2,
+            core::Type::Name(_, n) => match t2 {
+                core::Type::Name(_, n2) => n == n2,
                 _ => false,
             },
-            Type::Var(v) => match t2 {
-                Type::Var(v2) => v == v2,
+            core::Type::Var(_, v) => match t2 {
+                core::Type::Var(_, v2) => v == v2,
                 _ => false,
             },
-            Type::Bool => matches!(t2, Type::Bool),
-            Type::Int => matches!(t2, Type::Int),
-            Type::Char => matches!(t2, Type::Char),
-            Type::String => matches!(t2, Type::String),
-            Type::Bytes => matches!(t2, Type::Bytes),
-            Type::Arrow => matches!(t2, Type::Arrow),
-            Type::FatArrow => matches!(t2, Type::FatArrow),
-            Type::Array => matches!(t2, Type::Arrow),
-            Type::Record => matches!(t2, Type::Record),
-            Type::Variant => matches!(t2, Type::Variant),
-            Type::IO => matches!(t2, Type::IO),
-            Type::RowNil => matches!(t2, Type::RowNil),
-            Type::Unit => matches!(t2, Type::Unit),
-            Type::Constraints(cs) => match t2 {
-                Type::Constraints(cs2) => {
+            core::Type::Bool => matches!(t2, core::Type::Bool),
+            core::Type::Int => matches!(t2, core::Type::Int),
+            core::Type::Char => matches!(t2, core::Type::Char),
+            core::Type::String => matches!(t2, core::Type::String),
+            core::Type::Bytes => matches!(t2, core::Type::Bytes),
+            core::Type::Arrow(_) => matches!(t2, core::Type::Arrow(_)),
+            core::Type::FatArrow(_) => matches!(t2, core::Type::FatArrow(_)),
+            core::Type::Array(_) => matches!(t2, core::Type::Arrow(_)),
+            core::Type::Record(_) => matches!(t2, core::Type::Record(_)),
+            core::Type::Variant(_) => matches!(t2, core::Type::Variant(_)),
+            core::Type::IO(_) => matches!(t2, core::Type::IO(_)),
+            core::Type::RowNil => matches!(t2, core::Type::RowNil),
+            core::Type::Unit => matches!(t2, core::Type::Unit),
+            core::Type::Constraints(cs) => match t2 {
+                core::Type::Constraints(cs2) => {
                     cs.len() == cs2.len()
                         && cs
                             .iter()
@@ -556,23 +542,25 @@ impl<'modules> Typechecker<'modules> {
                 }
                 _ => false,
             },
-            Type::App(a, b) => match t2 {
-                Type::App(a2, b2) => self.eq_zonked_type(a, a2) && self.eq_zonked_type(b, b2),
+            core::Type::App(_, a, b) => match t2 {
+                core::Type::App(_, a2, b2) => {
+                    self.eq_zonked_type(a, a2) && self.eq_zonked_type(b, b2)
+                }
                 _ => false,
             },
-            Type::RowCons(a, b, c) => match t2 {
-                Type::RowCons(a2, b2, c2) => {
+            core::Type::RowCons(a, b, c) => match t2 {
+                core::Type::RowCons(a2, b2, c2) => {
                     a == a2 && self.eq_zonked_type(b, b2) && self.eq_zonked_type(c, c2)
                 }
                 _ => false,
             },
-            Type::HasField(a, b) => match t2 {
-                Type::HasField(a2, b2) => a == a2 && self.eq_zonked_type(b, b2),
+            core::Type::HasField(a, b) => match t2 {
+                core::Type::HasField(a2, b2) => a == a2 && self.eq_zonked_type(b, b2),
                 _ => false,
             },
-            Type::Meta(n) => match &self.type_solutions[*n].1 {
+            core::Type::Meta(_, n) => match &self.type_solutions[*n].1 {
                 None => match t2 {
-                    Type::Meta(n2) => n == n2,
+                    core::Type::Meta(_, n2) => n == n2,
                     _ => false,
                 },
                 Some(sol) => self.eq_zonked_type(sol, t2),
@@ -602,23 +590,30 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn register_class(&mut self, decl: &core::ClassDeclaration) {
         let decl_name: Rc<str> = Rc::from(decl.name.as_ref());
+        let decl_name_kind = decl
+            .args
+            .iter()
+            .rev()
+            .fold(Kind::Constraint, |acc, (_, arg_kind)| {
+                Kind::mk_arrow(arg_kind.clone(), acc)
+            });
+        let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
 
         // generate constraint's kind
-        let mut constraint_kind = self.constants.constraint.clone();
+        let mut constraint_kind = Kind::Constraint;
         for (_, kind) in decl.args.iter().rev() {
-            constraint_kind = Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                kind.clone(),
-                constraint_kind,
-            )));
+            constraint_kind = Kind::mk_arrow(kind.clone(), Kind::Constraint);
         }
         self.type_context.insert(decl_name.clone(), constraint_kind);
 
         // generate superclass accessors
-        let applied_type = (0..decl.args.len())
-            .into_iter()
-            .fold(Type::Name(decl_name.clone()), |acc, el| {
-                Type::mk_app(acc, Type::Var(el))
-            });
+        let applied_type =
+            decl.args
+                .iter()
+                .enumerate()
+                .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
+                    core::Type::mk_app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
+                });
         self.implications
             .extend(
                 decl.supers
@@ -636,7 +631,7 @@ impl<'modules> Typechecker<'modules> {
             );
 
         // generate class members
-        let decl_bindings = decl.get_bindings();
+        let decl_bindings = decl.get_bindings(self.common_kinds);
         self.context.extend(
             decl_bindings
                 .iter()
@@ -652,8 +647,8 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         ty_vars: &[(Rc<str>, Kind)],
         superclass_constructors: &[core::Expr],
-        assumes: &[Type<usize>],
-        head: &Type<usize>,
+        assumes: &[core::Type],
+        head: &core::Type,
         members: &[core::InstanceMember],
     ) {
         let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
@@ -785,31 +780,31 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn check_kind(
         &mut self,
-        context: Option<&UnifyTypeContext<usize>>,
-        ty: &Type<usize>,
+        context: Option<&UnifyTypeContextRefs>,
+        ty: syntax::Type<usize>,
         kind: &Kind,
-    ) -> Result<(), TypeError> {
+    ) -> Result<core::Type, TypeError> {
         let expected = kind;
-        let actual = self.infer_kind(ty)?;
+        let (ty, actual) = self.infer_kind(ty)?;
         let context = UnifyKindContextRefs {
-            ty,
+            ty: &ty,
             has_kind: expected,
             unifying_types: context,
         };
         self.unify_kind(&context, expected, &actual)?;
-        Ok(())
+        Ok(ty)
     }
 
     fn abstract_evidence(
         &mut self,
         mut expr: core::Expr,
-    ) -> Result<(core::Expr, Vec<Type<usize>>), TypeError> {
+    ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
         expr.subst_placeholder(&mut |p| {
             let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
             Ok(expr)
         })?;
 
-        let mut unsolved_constraints: Vec<(core::EVar, Type<usize>)> = Vec::new();
+        let mut unsolved_constraints: Vec<(core::EVar, core::Type)> = Vec::new();
         let mut seen_evars: HashSet<core::EVar> = HashSet::new();
         for ev in expr.iter_evars() {
             if !seen_evars.contains(ev) {
@@ -839,13 +834,13 @@ impl<'modules> Typechecker<'modules> {
     fn generalise(
         &mut self,
         expr: core::Expr,
-        ty: Type<usize>,
+        ty: core::Type,
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
 
-        let mut ty = ty;
+        let mut ty = self.zonk_type(&ty);
         for constraint in unsolved_constraints.into_iter().rev() {
-            ty = Type::mk_fatarrow(constraint, ty);
+            ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
         }
 
         let ty_vars: Vec<(Rc<str>, Kind)> = self
@@ -863,7 +858,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         pos: usize,
         name: &str,
-        ty: &Type<Rc<str>>,
+        ty: &syntax::Type<Rc<str>>,
         args: &[syntax::Pattern],
         body: &Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
@@ -896,6 +891,10 @@ impl<'modules> Typechecker<'modules> {
             (ty, kinds)
         };
 
+        self.bound_tyvars.insert(&ty_var_kinds);
+
+        let ty = self.check_kind(None, ty, &Kind::Type)?;
+
         let _ = self.context.insert(
             name.to_string(),
             core::TypeSig {
@@ -903,8 +902,6 @@ impl<'modules> Typechecker<'modules> {
                 body: ty.clone(),
             },
         );
-
-        self.bound_tyvars.insert(&ty_var_kinds);
 
         let (constraints, ty) = ty.unwrap_constraints();
         for constraint in constraints {
@@ -938,7 +935,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         class_args_kinds: &[(Rc<str>, Kind)],
         name: &str,
-        type_: &Type<Rc<str>>,
+        type_: &syntax::Type<Rc<str>>,
     ) -> Result<core::ClassMember, TypeError> {
         let class_args: Vec<Rc<str>> = class_args_kinds.iter().map(|(x, _)| x.clone()).collect();
         let (type_, ty_vars) = type_.abstract_vars(&class_args);
@@ -961,7 +958,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
-        self.check_kind(None, &type_, &Kind::Type)?;
+        let type_ = self.check_kind(None, type_, &Kind::Type)?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
         let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
@@ -970,7 +967,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let sig = core::TypeSig {
             ty_vars,
-            body: type_,
+            body: self.zonk_type(&type_),
         };
         Ok(core::ClassMember {
             name: name.to_string(),
@@ -980,10 +977,10 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_class(
         &mut self,
-        supers: &[Spanned<Type<Rc<str>>>],
+        supers: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Rc<str>,
         args: &[Spanned<Rc<str>>],
-        members: &[(String, Type<Rc<str>>)],
+        members: &[(String, syntax::Type<Rc<str>>)],
     ) -> Result<core::Declaration, TypeError> {
         let args_len = args.len();
         let arg_names: Vec<Rc<str>> = args.iter().map(|x| x.item.clone()).collect();
@@ -1010,11 +1007,11 @@ impl<'modules> Typechecker<'modules> {
             let (s_item, _) = s.item.abstract_vars(&arg_names);
             with_position!(self, s.pos, {
                 self.bound_tyvars.insert(&args_kinds);
-                match self.check_kind(None, &s_item, &Kind::Constraint) {
+                match self.check_kind(None, s_item, &Kind::Constraint) {
                     Err(err) => {
                         return Err(err);
                     }
-                    Ok(()) => {
+                    Ok(s_item) => {
                         new_supers.push(s_item);
                         self.bound_tyvars.delete(args_len);
                     }
@@ -1045,9 +1042,9 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_instance(
         &mut self,
-        assumes: &[Spanned<Type<Rc<str>>>],
+        assumes: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Spanned<Rc<str>>,
-        args: &[Type<Rc<str>>],
+        args: &[syntax::Type<Rc<str>>],
         members: &[(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)],
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
@@ -1063,25 +1060,34 @@ impl<'modules> Typechecker<'modules> {
 
         let (head, ty_vars) = args
             .iter()
-            .fold(Type::Name(name_item), |acc, el| {
-                Type::mk_app(acc, el.clone())
+            .fold(syntax::Type::Name(name_item), |acc, el| {
+                syntax::Type::mk_app(acc, el.clone())
             })
             .abstract_vars(&Vec::new());
 
-        let assumes: Vec<Type<usize>> = assumes
-            .iter()
-            .map(|assume| assume.item.abstract_vars(&ty_vars).0)
-            .collect();
-
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = ty_vars
-            .into_iter()
-            .map(|var| (var, self.fresh_kindvar()))
+            .iter()
+            .map(|var| (var.clone(), self.fresh_kindvar()))
             .collect();
-
-        let (_, args) = head.unwrap_app();
-        let args: Vec<Type<usize>> = args.into_iter().cloned().collect();
 
         self.bound_tyvars.insert(&ty_var_kinds);
+
+        let (_, args) = head.unwrap_app();
+        let args: Vec<core::Type> = args
+            .into_iter()
+            .map(|arg| {
+                let res = self.infer_kind(arg.clone())?;
+                Ok(res.0)
+            })
+            .collect::<Result<_, TypeError>>()?;
+
+        let assumes: Vec<core::Type> = assumes
+            .iter()
+            .map(|assume| {
+                let assume = assume.item.abstract_vars(&ty_vars).0;
+                self.check_kind(None, assume, &Kind::Constraint)
+            })
+            .collect::<Result<_, TypeError>>()?;
 
         // generate evidence for assumptions
         assumes.iter().for_each(|constraint| {
@@ -1100,7 +1106,7 @@ impl<'modules> Typechecker<'modules> {
                 match evidence::solver::solve_constraint(
                     &Some(SolveConstraintContext {
                         pos: name.pos,
-                        constraint: self.fill_ty_names(superclass.clone()),
+                        constraint: self.fill_ty_names(superclass.to_syntax()),
                     }),
                     self,
                     &evidence::Constraint::from_type(&superclass),
@@ -1127,10 +1133,10 @@ impl<'modules> Typechecker<'modules> {
             })
             .collect();
 
-        with_position!(
+        let head = with_position!(
             self,
             name.pos,
-            self.check_kind(None, &head, &Kind::Constraint)
+            self.check_kind(None, head, &Kind::Constraint)
         )?;
 
         // type check members
@@ -1188,8 +1194,11 @@ impl<'modules> Typechecker<'modules> {
         Ok(core::Declaration::Instance {
             ty_vars,
             superclass_constructors,
-            assumes,
-            head,
+            assumes: assumes
+                .iter()
+                .map(|assume| self.zonk_type(assume))
+                .collect(),
+            head: self.zonk_type(&head),
             members: new_members,
         })
     }
@@ -1210,7 +1219,11 @@ impl<'modules> Typechecker<'modules> {
 
         match module_mapping.get(&path) {
             None => {
-                let signatures = self.modules.get(&path).unwrap().get_signatures();
+                let signatures = self
+                    .modules
+                    .get(&path)
+                    .unwrap()
+                    .get_signatures(self.common_kinds);
                 self.module_context.insert(path.clone(), signatures);
                 self.module_unmapping
                     .insert(ModuleName(vec![actual_name.item.clone()]), path.clone());
@@ -1274,7 +1287,7 @@ impl<'modules> Typechecker<'modules> {
         self.position.unwrap_or(0)
     }
 
-    fn lookup_var(&self, name: &str) -> Option<(usize, Type<usize>)> {
+    fn lookup_var(&self, name: &str) -> Option<(usize, core::Type)> {
         self.bound_vars
             .lookup_name(name)
             .map(|(ix, ty)| (ix, ty.clone()))
@@ -1294,35 +1307,42 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn zonk_type(&self, ty: &Type<usize>) -> Type<usize> {
+    pub fn zonk_type(&self, ty: &core::Type) -> core::Type {
         match ty {
-            Type::Name(n) => Type::Name(n.clone()),
-            Type::Var(n) => Type::Var(*n),
-            Type::Bool => Type::Bool,
-            Type::Int => Type::Int,
-            Type::Char => Type::Char,
-            Type::String => Type::String,
-            Type::Bytes => Type::Bytes,
-            Type::Arrow => Type::Arrow,
-            Type::FatArrow => Type::FatArrow,
-            Type::Constraints(cs) => {
-                Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
+            core::Type::Name(k, n) => core::Type::Name(self.zonk_kind(false, k), n.clone()),
+            core::Type::Var(k, n) => core::Type::Var(self.zonk_kind(false, k), *n),
+            core::Type::Bool => core::Type::Bool,
+            core::Type::Int => core::Type::Int,
+            core::Type::Char => core::Type::Char,
+            core::Type::String => core::Type::String,
+            core::Type::Bytes => core::Type::Bytes,
+            core::Type::Constraints(cs) => {
+                core::Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
             }
-            Type::Array => Type::Array,
-            Type::Record => Type::Record,
-            Type::Variant => Type::Variant,
-            Type::IO => Type::IO,
-            Type::App(a, b) => Type::mk_app(self.zonk_type(a), self.zonk_type(b)),
-            Type::RowNil => Type::RowNil,
-            Type::Unit => Type::Unit,
-            Type::RowCons(field, ty, rest) => {
-                Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
+            core::Type::App(k, a, b) => core::Type::App(
+                self.zonk_kind(false, k),
+                Rc::new(self.zonk_type(a)),
+                Rc::new(self.zonk_type(b)),
+            ),
+            core::Type::RowNil => core::Type::RowNil,
+            core::Type::Unit => core::Type::Unit,
+            core::Type::RowCons(field, ty, rest) => {
+                core::Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
             }
-            Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), self.zonk_type(rest)),
-            Type::Meta(n) => match &self.type_solutions[*n].1 {
-                None => Type::Meta(*n),
+            core::Type::HasField(field, rest) => {
+                core::Type::mk_hasfield(field.clone(), self.zonk_type(rest))
+            }
+            core::Type::Meta(k, n) => match &self.type_solutions[*n].1 {
+                None => core::Type::Meta(self.zonk_kind(false, k), *n),
                 Some(ty) => self.zonk_type(ty),
             },
+            // These types have known kinds that don't need to be zonked
+            core::Type::Arrow(k) => core::Type::Arrow(k.clone()),
+            core::Type::FatArrow(k) => core::Type::FatArrow(k.clone()),
+            core::Type::Array(k) => core::Type::Array(k.clone()),
+            core::Type::Record(k) => core::Type::Record(k.clone()),
+            core::Type::Variant(k) => core::Type::Variant(k.clone()),
+            core::Type::IO(k) => core::Type::IO(k.clone()),
         }
     }
 
@@ -1334,9 +1354,9 @@ impl<'modules> Typechecker<'modules> {
                     self.zonk_kind(close_unsolved, b),
                 ))),
             },
-            Kind::Type => self.constants.r#type.clone(),
-            Kind::Row => self.constants.row.clone(),
-            Kind::Constraint => self.constants.constraint.clone(),
+            Kind::Type => Kind::Type,
+            Kind::Row => Kind::Row,
+            Kind::Constraint => Kind::Constraint,
             Kind::Meta(m) => match &self.kind_solutions[*m] {
                 None => {
                     if close_unsolved {
@@ -1356,22 +1376,22 @@ impl<'modules> Typechecker<'modules> {
         Kind::Meta(n)
     }
 
-    pub fn fill_ty_names(&self, ty: Type<usize>) -> Type<Rc<str>> {
+    pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {
         ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
     }
 
     fn kind_mismatch<A>(
         &self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         actual: &Kind,
     ) -> Result<A, TypeError> {
         let context = UnifyKindContext {
-            ty: self.fill_ty_names(self.zonk_type(context.ty)),
+            ty: self.fill_ty_names(self.zonk_type(context.ty).to_syntax()),
             has_kind: self.zonk_kind(false, context.has_kind),
             unifying_types: context.unifying_types.map(|x| UnifyTypeContext {
-                expected: self.fill_ty_names(self.zonk_type(&x.expected)),
-                actual: self.fill_ty_names(self.zonk_type(&x.actual)),
+                expected: self.fill_ty_names(self.zonk_type(x.expected).to_syntax()),
+                actual: self.fill_ty_names(self.zonk_type(x.actual).to_syntax()),
             }),
         };
         Err(TypeError::KindMismatch {
@@ -1385,7 +1405,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn unify_kind(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         actual: &Kind,
     ) -> Result<(), TypeError> {
@@ -1446,7 +1466,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_right(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         expected: &Kind,
         meta: usize,
     ) -> Result<(), TypeError> {
@@ -1462,7 +1482,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn solve_kindvar_left(
         &mut self,
-        context: &UnifyKindContextRefs<usize>,
+        context: &UnifyKindContextRefs,
         meta: usize,
         actual: &Kind,
     ) -> Result<(), TypeError> {
@@ -1486,33 +1506,33 @@ impl<'modules> Typechecker<'modules> {
 
     fn type_mismatch<A>(
         &self,
-        context: &UnifyTypeContext<usize>,
-        expected: Type<usize>,
-        actual: Type<usize>,
+        context: &UnifyTypeContextRefs,
+        expected: core::Type,
+        actual: core::Type,
     ) -> Result<A, TypeError> {
         let context = UnifyTypeContext {
-            expected: self.fill_ty_names(self.zonk_type(&context.expected)),
-            actual: self.fill_ty_names(self.zonk_type(&context.actual)),
+            expected: self.fill_ty_names(self.zonk_type(context.expected).to_syntax()),
+            actual: self.fill_ty_names(self.zonk_type(context.actual).to_syntax()),
         };
         Err(TypeError::TypeMismatch {
             source: self.source(),
             pos: self.current_position(),
             context,
-            expected: self.fill_ty_names(expected),
-            actual: self.fill_ty_names(actual),
+            expected: self.fill_ty_names(expected.to_syntax()),
+            actual: self.fill_ty_names(actual.to_syntax()),
         })
     }
 
-    fn occurs_type(&self, meta: usize, ty: &Type<usize>) -> Result<(), TypeError> {
+    fn occurs_type(&self, meta: usize, ty: &core::Type) -> Result<(), TypeError> {
         debug_assert!(
             match ty {
-                Type::Meta(n) => self.type_solutions[*n].1 == None,
+                core::Type::Meta(_, n) => self.type_solutions[*n].1 == None,
                 _ => true,
             },
             "ty is a meta with a solution"
         );
 
-        fn metas_set(tc: &Typechecker, ty: &Type<usize>, set: &mut FnvHashSet<usize>) {
+        fn metas_set(tc: &Typechecker, ty: &core::Type, set: &mut FnvHashSet<usize>) {
             for meta in ty.iter_metas() {
                 match &tc.type_solutions[meta].1 {
                     None => {
@@ -1534,7 +1554,7 @@ impl<'modules> Typechecker<'modules> {
                 source: self.source(),
                 pos: self.current_position(),
                 meta,
-                ty: self.fill_ty_names(self.zonk_type(ty)),
+                ty: self.fill_ty_names(self.zonk_type(ty).to_syntax()),
             })
         } else {
             Ok(())
@@ -1543,8 +1563,8 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn solve_typevar_right(
         &mut self,
-        context: &UnifyTypeContext<usize>,
-        expected: &Type<usize>,
+        context: &UnifyTypeContextRefs,
+        expected: &core::Type,
         meta: usize,
     ) -> Result<(), TypeError> {
         match &self.type_solutions[meta].1.clone() {
@@ -1558,9 +1578,9 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn solve_typevar_left(
         &mut self,
-        context: &UnifyTypeContext<usize>,
+        context: &UnifyTypeContextRefs,
         meta: usize,
-        actual: &Type<usize>,
+        actual: &core::Type,
     ) -> Result<(), TypeError> {
         match &self.type_solutions[meta].1.clone() {
             None => {
@@ -1578,97 +1598,98 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn infer_kind(&mut self, ty: &Type<usize>) -> Result<Kind, TypeError> {
+    fn infer_kind(&mut self, ty: syntax::Type<usize>) -> Result<(core::Type, Kind), TypeError> {
         match ty {
-            Type::Name(n) => match self.type_context.get(n) {
-                None => self.not_in_scope(n),
-                Some(kind) => Ok(kind.clone()),
+            syntax::Type::Name(n) => match self.type_context.get(n.as_ref()) {
+                None => self.not_in_scope(n.as_ref()),
+                Some(kind) => Ok((core::Type::Name(kind.clone(), n), kind.clone())),
             },
-            Type::Var(ix) => match self.bound_tyvars.lookup_index(*ix) {
+            syntax::Type::Var(ix) => match self.bound_tyvars.lookup_index(ix) {
                 None => {
                     panic!("missing tyvar {:?}", ix);
                 }
-                Some((_, kind)) => Ok(kind.clone()),
+                Some((_, kind)) => Ok((core::Type::Var(kind.clone(), ix), kind.clone())),
             },
-            Type::Bool => Ok(Kind::Type),
-            Type::Int => Ok(Kind::Type),
-            Type::Char => Ok(Kind::Type),
-            Type::String => Ok(Kind::Type),
-            Type::Bytes => Ok(Kind::Type),
-            Type::Arrow => Ok(self.constants.type_to_type_to_type.clone()),
-            Type::FatArrow => Ok(Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                self.constants.constraint.clone(),
-                Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                    self.constants.r#type.clone(),
-                    self.constants.r#type.clone(),
-                ))),
-            )))),
-            Type::Constraints(constraints) => {
-                for constraint in constraints {
-                    match self.check_kind(None, constraint, &Kind::Constraint) {
-                        Err(err) => return Err(err),
-                        Ok(()) => {}
-                    }
-                }
-                Ok(Kind::Constraint)
+            syntax::Type::Bool => Ok((core::Type::Bool, Kind::Type)),
+            syntax::Type::Int => Ok((core::Type::Int, Kind::Type)),
+            syntax::Type::Char => Ok((core::Type::Char, Kind::Type)),
+            syntax::Type::String => Ok((core::Type::String, Kind::Type)),
+            syntax::Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
+            syntax::Type::Arrow => Ok((
+                core::Type::mk_arrow_ctor(self.common_kinds),
+                self.common_kinds.type_to_type_to_type.clone(),
+            )),
+            syntax::Type::FatArrow => Ok((
+                core::Type::mk_fatarrow_ctor(self.common_kinds),
+                self.common_kinds.constraint_to_type_to_type.clone(),
+            )),
+            syntax::Type::Constraints(constraints) => {
+                let constraints = constraints
+                    .into_iter()
+                    .map(|constraint| self.check_kind(None, constraint, &Kind::Constraint))
+                    .collect::<Result<_, TypeError>>()?;
+                Ok((core::Type::Constraints(constraints), Kind::Constraint))
             }
-            Type::Array => Ok(Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                self.constants.r#type.clone(),
-                self.constants.r#type.clone(),
-            )))),
-            Type::Record => Ok(Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                self.constants.row.clone(),
-                self.constants.r#type.clone(),
-            )))),
-            Type::Variant => Ok(Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                self.constants.row.clone(),
-                self.constants.r#type.clone(),
-            )))),
-            Type::IO => Ok(Kind::Ref(Rc::new(KindCompound::mk_arrow(
-                self.constants.r#type.clone(),
-                self.constants.r#type.clone(),
-            )))),
-            Type::App(a, b) => {
+            syntax::Type::Array => Ok((
+                core::Type::mk_array(self.common_kinds),
+                self.common_kinds.type_to_type.clone(),
+            )),
+            syntax::Type::Record => Ok((
+                core::Type::mk_record_ctor(self.common_kinds),
+                self.common_kinds.row_to_type.clone(),
+            )),
+            syntax::Type::Variant => Ok((
+                core::Type::mk_variant_ctor(self.common_kinds),
+                self.common_kinds.row_to_type.clone(),
+            )),
+            syntax::Type::IO => Ok((
+                core::Type::mk_io(self.common_kinds),
+                self.common_kinds.type_to_type.clone(),
+            )),
+            syntax::Type::App(a, b) => {
                 let in_kind = self.fresh_kindvar();
                 let out_kind = self.fresh_kindvar();
-                self.check_kind(
+                let a = self.check_kind(
                     None,
-                    a,
+                    a.as_ref().clone(),
                     &Kind::Ref(Rc::new(KindCompound::mk_arrow(
                         in_kind.clone(),
                         out_kind.clone(),
                     ))),
                 )?;
-                self.check_kind(None, b, &in_kind)?;
-                Ok(out_kind)
+                let b = self.check_kind(None, b.as_ref().clone(), &in_kind)?;
+                Ok((
+                    core::Type::App(out_kind.clone(), Rc::new(a), Rc::new(b)),
+                    out_kind,
+                ))
             }
-            Type::RowNil => Ok(Kind::Row),
-            Type::RowCons(_field, ty, rest) => {
-                self.check_kind(None, ty, &Kind::Type)?;
-                self.check_kind(None, rest, &Kind::Row)?;
-                Ok(Kind::Row)
+            syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
+            syntax::Type::RowCons(field, ty, rest) => {
+                let ty = self.check_kind(None, ty.as_ref().clone(), &Kind::Type)?;
+                let rest = self.check_kind(None, rest.as_ref().clone(), &Kind::Row)?;
+                Ok((core::Type::mk_rowcons(field, ty, rest), Kind::Row))
             }
-            Type::HasField(_field, rest) => {
-                self.check_kind(None, rest, &Kind::Row)?;
-                Ok(Kind::Constraint)
+            syntax::Type::HasField(field, rest) => {
+                let rest = self.check_kind(None, rest.as_ref().clone(), &Kind::Row)?;
+                Ok((core::Type::mk_hasfield(field, rest), Kind::Constraint))
             }
-            Type::Unit => Ok(Kind::Type),
-            Type::Meta(n) => {
-                let kind = self.lookup_typevar(*n)?;
-                Ok(kind)
+            syntax::Type::Unit => Ok((core::Type::Unit, Kind::Type)),
+            syntax::Type::Meta(n) => {
+                let kind = self.lookup_typevar(n)?;
+                Ok((core::Type::Meta(kind.clone(), n), kind))
             }
         }
     }
 
-    pub fn fresh_typevar<A>(&mut self, kind: Kind) -> Type<A> {
+    pub fn fresh_typevar(&mut self, kind: Kind) -> core::Type {
         let n = self.type_solutions.len();
-        self.type_solutions.push((kind, None));
-        Type::Meta(n)
+        self.type_solutions.push((kind.clone(), None));
+        core::Type::Meta(kind, n)
     }
 
-    fn walk(&self, ty: &Type<usize>) -> Type<usize> {
+    fn walk(&self, ty: &core::Type) -> core::Type {
         match ty {
-            Type::Meta(n) => match &self.type_solutions[*n].1 {
+            core::Type::Meta(_, n) => match &self.type_solutions[*n].1 {
                 None => ty.clone(),
                 Some(ty) => self.walk(ty),
             },
@@ -1679,130 +1700,135 @@ impl<'modules> Typechecker<'modules> {
     pub fn unify_type_subst(
         &mut self,
         subst: &mut Substitution,
-        context: &UnifyTypeContext<usize>,
-        expected: &Type<usize>,
-        actual: &Type<usize>,
+        context: &UnifyTypeContextRefs,
+        expected: &core::Type,
+        actual: &core::Type,
     ) -> Result<(), TypeError> {
         let expected = self.walk(expected);
         let actual = self.walk(actual);
 
-        let expected_kind = self.infer_kind(&expected)?;
-        let _ = self.check_kind(Some(context), &actual, &expected_kind)?;
+        let expected_kind = expected.kind();
+        let actual_kind = actual.kind();
+        self.unify_kind(
+            &UnifyKindContextRefs {
+                ty: &actual,
+                has_kind: &expected_kind,
+                unifying_types: Some(context),
+            },
+            &expected_kind,
+            &actual_kind,
+        )?;
 
-        match expected {
-            Type::App(a1, b1) => match actual {
-                Type::App(a2, b2) => {
-                    self.unify_type_subst(subst, context, &a1, &a2)?;
-                    self.unify_type_subst(subst, context, &b1, &b2)?;
+        match &expected {
+            core::Type::App(_, a1, b1) => match actual {
+                core::Type::App(_, a2, b2) => {
+                    self.unify_type_subst(subst, context, a1, &a2)?;
+                    self.unify_type_subst(subst, context, b1, &b2)?;
                     Ok(())
                 }
-                Type::Meta(n) => subst.subst_right(self, context, Type::App(a1, b1), n),
-                actual => self.type_mismatch(context, Type::App(a1, b1), actual),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
+                actual => self.type_mismatch(context, expected, actual),
             },
-            Type::Name(n) => match actual {
-                Type::Name(nn) if n == nn => Ok(()),
-                Type::Meta(nn) => subst.subst_right(self, context, Type::Name(n), nn),
-                actual => self.type_mismatch(context, Type::Name(n), actual),
+            core::Type::Name(_, n) => match actual {
+                core::Type::Name(_, nn) if *n == nn => Ok(()),
+                core::Type::Meta(_, nn) => subst.subst_right(self, context, expected, nn),
+                actual => self.type_mismatch(context, expected, actual),
             },
-            Type::Var(n) => match actual {
-                Type::Var(nn) if n == nn => Ok(()),
-                Type::Meta(nn) => subst.subst_right(self, context, Type::Var(n), nn),
-                actual => self.type_mismatch(context, Type::Var(n), actual),
+            core::Type::Var(_, n) => match actual {
+                core::Type::Var(_, nn) if *n == nn => Ok(()),
+                core::Type::Meta(_, nn) => subst.subst_right(self, context, expected, nn),
+                actual => self.type_mismatch(context, expected, actual),
             },
-            Type::Bool => match actual {
-                Type::Bool => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Bool => match actual {
+                core::Type::Bool => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Int => match actual {
-                Type::Int => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Int => match actual {
+                core::Type::Int => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Char => match actual {
-                Type::Char => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Char => match actual {
+                core::Type::Char => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::String => match actual {
-                Type::String => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::String => match actual {
+                core::Type::String => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Bytes => match actual {
-                Type::Bytes => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Bytes => match actual {
+                core::Type::Bytes => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Array => match actual {
-                Type::Array => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Array(_) => match actual {
+                core::Type::Array(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Arrow => match actual {
-                Type::Arrow => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Arrow(_) => match actual {
+                core::Type::Arrow(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::FatArrow => match actual {
-                Type::FatArrow => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::FatArrow(_) => match actual {
+                core::Type::FatArrow(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Constraints(constraints1) => match actual {
-                Type::Constraints(constraints2) => {
-                    for (c1, c2) in constraints1.into_iter().zip(constraints2.into_iter()) {
-                        if let Err(err) = self.unify_type_subst(subst, context, &c1, &c2) {
+            core::Type::Constraints(constraints1) => match actual {
+                core::Type::Constraints(constraints2) => {
+                    for (c1, c2) in constraints1.iter().zip(constraints2.into_iter()) {
+                        if let Err(err) = self.unify_type_subst(subst, context, c1, &c2) {
                             return Err(err);
                         }
                     }
                     Ok(())
                 }
-                Type::Meta(n) => {
-                    subst.subst_right(self, context, Type::Constraints(constraints1), n)
-                }
-                actual => self.type_mismatch(context, Type::Constraints(constraints1), actual),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
+                actual => self.type_mismatch(context, expected, actual),
             },
-            Type::Record => match actual {
-                Type::Record => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Record(_) => match actual {
+                core::Type::Record(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Variant => match actual {
-                Type::Variant => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::Variant(_) => match actual {
+                core::Type::Variant(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::IO => match actual {
-                Type::IO => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::IO(_) => match actual {
+                core::Type::IO(_) => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::RowNil => match actual {
-                Type::RowNil => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+            core::Type::RowNil => match actual {
+                core::Type::RowNil => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::RowCons(field1, ty1, rest1) => match actual {
-                Type::RowCons(field2, ty2, rest2) => {
-                    let expected = Type::RowCons(field1, ty1, rest1);
-                    let actual = Type::RowCons(field2, ty2, rest2);
+            core::Type::RowCons(_, _, _) => match actual {
+                core::Type::RowCons(_, _, _) => {
                     let (rows1, rest1) = expected.unwrap_rows();
                     let (rows2, rest2) = actual.unwrap_rows();
 
                     let mut rows2_remaining = Rope::from_vec(&rows2);
 
-                    let mut sames: Vec<(&Rc<str>, &Type<usize>, &Type<usize>)> = Vec::new();
-                    let mut not_in_rows2: Vec<(Rc<str>, Type<usize>)> = Vec::new();
+                    let mut sames: Vec<(&Rc<str>, &core::Type, &core::Type)> = Vec::new();
+                    let mut not_in_rows2: Vec<(Rc<str>, core::Type)> = Vec::new();
 
-                    for (field1, ty1) in &rows1 {
-                        match rows2_remaining.iter().find(|(field2, _)| field1 == field2) {
+                    for (field1, ty1) in rows1 {
+                        match rows2_remaining.iter().find(|(field2, _)| field1 == *field2) {
                             None => {
-                                not_in_rows2.push(((**field1).clone(), (**ty1).clone()));
+                                not_in_rows2.push((field1.clone(), ty1.clone()));
                             }
                             Some((_, ty2)) => {
                                 rows2_remaining =
-                                    match rows2_remaining.delete_first(|(f, _)| f == field1) {
+                                    match rows2_remaining.delete_first(|(f, _)| *f == field1) {
                                         Err(new) => new,
                                         Ok(new) => new,
                                     };
@@ -1813,9 +1839,9 @@ impl<'modules> Typechecker<'modules> {
 
                     // every field in rows1 that has a partner in rows2 has been deleted from rows2
                     // therefore whatever's left in rows2_remaining is necessarily not in rows_1
-                    let not_in_rows1: Vec<(Rc<str>, Type<usize>)> = rows2_remaining
+                    let not_in_rows1: Vec<(Rc<str>, core::Type)> = rows2_remaining
                         .iter()
-                        .map(|(a, b)| ((**a).clone(), (**b).clone()))
+                        .map(|(a, b)| ((*a).clone(), (*b).clone()))
                         .collect();
 
                     // now we're working with: sames, not_in_rows1, not_in_rows2
@@ -1833,43 +1859,41 @@ impl<'modules> Typechecker<'modules> {
                         subst,
                         context,
                         match rest1 {
-                            None => &Type::RowNil,
+                            None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
-                        &Type::mk_rows(not_in_rows1, rest3.clone()),
+                        &core::Type::mk_rows(not_in_rows1, rest3.clone()),
                     )?;
                     self.unify_type_subst(
                         subst,
                         context,
-                        &Type::mk_rows(not_in_rows2, rest3),
+                        &core::Type::mk_rows(not_in_rows2, rest3),
                         match rest2 {
-                            None => &Type::RowNil,
+                            None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
                     )?;
 
                     Ok(())
                 }
-                Type::Meta(n) => {
-                    subst.subst_right(self, context, Type::RowCons(field1, ty1, rest1), n)
-                }
-                actual => self.type_mismatch(context, Type::RowCons(field1, ty1, rest1), actual),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
+                actual => self.type_mismatch(context, expected, actual),
             },
-            Type::HasField(field, rest) => match actual {
-                Type::HasField(field2, rest2) if field == field2 => {
-                    self.unify_type_subst(subst, context, &rest, &rest2)
+            core::Type::HasField(field, rest) => match actual {
+                core::Type::HasField(field2, rest2) if *field == field2 => {
+                    self.unify_type_subst(subst, context, rest, &rest2)
                 }
-                Type::Meta(n) => subst.subst_right(self, context, Type::HasField(field, rest), n),
-                _ => self.type_mismatch(context, Type::HasField(field, rest), actual),
-            },
-            Type::Unit => match actual {
-                Type::Unit => Ok(()),
-                Type::Meta(n) => subst.subst_right(self, context, expected, n),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
                 _ => self.type_mismatch(context, expected, actual),
             },
-            Type::Meta(n) => match actual {
-                Type::Meta(nn) if n == nn => Ok(()),
-                _ => subst.subst_left(self, context, n, actual),
+            core::Type::Unit => match actual {
+                core::Type::Unit => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
+            },
+            core::Type::Meta(_, n) => match actual {
+                core::Type::Meta(_, nn) if *n == nn => Ok(()),
+                _ => subst.subst_left(self, context, *n, actual),
             },
         }
     }
@@ -1883,9 +1907,9 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn unify_type(
         &mut self,
-        context: &UnifyTypeContext<usize>,
-        expected: &Type<usize>,
-        actual: &Type<usize>,
+        context: &UnifyTypeContextRefs,
+        expected: &core::Type,
+        actual: &core::Type,
     ) -> Result<(), TypeError> {
         let mut subst = Substitution::new();
         self.unify_type_subst(&mut subst, context, expected, actual)?;
@@ -1917,10 +1941,14 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         name: &Rc<str>,
         arg: &Spanned<String>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let arg_ty: Type<usize> = self.fresh_typevar(Kind::Type);
+    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+        let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row);
-        let ty = Type::mk_variant(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let ty = core::Type::mk_variant(
+            self.common_kinds,
+            vec![(name.clone(), arg_ty.clone())],
+            Some(rest_row.clone()),
+        );
 
         let tag = self.evidence.placeholder(
             Some(self.current_position()),
@@ -1938,7 +1966,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn infer_wildcard_pattern(
         &mut self,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
+    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
         (
             core::Pattern::Wildcard,
             self.fresh_typevar(Kind::Type),
@@ -1949,7 +1977,7 @@ impl<'modules> Typechecker<'modules> {
     fn infer_name_pattern(
         &mut self,
         name: &Spanned<String>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
+    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
         let ty = self.fresh_typevar(Kind::Type);
         (
             core::Pattern::Name,
@@ -1962,8 +1990,8 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         names: &[Spanned<String>],
         rest: &Option<Spanned<String>>,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
-        let mut names_tys: Vec<(Spanned<Rc<str>>, Type<usize>)> = names
+    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+        let mut names_tys: Vec<(Spanned<Rc<str>>, core::Type)> = names
             .iter()
             .map(|name| {
                 let name = Spanned {
@@ -1973,20 +2001,21 @@ impl<'modules> Typechecker<'modules> {
                 (name, self.fresh_typevar(Kind::Type))
             })
             .collect();
-        let rest_row: Option<(Spanned<String>, Type<usize>)> = rest
+        let rest_row: Option<(Spanned<String>, core::Type)> = rest
             .as_ref()
             .map(|name| (name.clone(), self.fresh_typevar(Kind::Row)));
-        let ty = Type::mk_record(
+        let ty = core::Type::mk_record(
+            self.common_kinds,
             names_tys
                 .iter()
                 .map(|(name, ty)| (name.item.clone(), ty.clone()))
                 .collect(),
-            rest_row.clone().map(|x| x.1),
+            rest_row.as_ref().map(|x| x.1.clone()),
         );
 
         let mut extending_row = match &rest_row {
             Some((_, row)) => row.clone(),
-            None => Type::RowNil,
+            None => core::Type::RowNil,
         };
         let mut names_placeholders = Vec::new();
         for (name, ty) in names_tys.iter().rev() {
@@ -1998,7 +2027,7 @@ impl<'modules> Typechecker<'modules> {
                 },
             );
             names_placeholders.push(core::Expr::Placeholder(p));
-            extending_row = Type::mk_rowcons(name.item.clone(), ty.clone(), extending_row);
+            extending_row = core::Type::mk_rowcons(name.item.clone(), ty.clone(), extending_row);
         }
         names_placeholders.reverse();
 
@@ -2008,7 +2037,7 @@ impl<'modules> Typechecker<'modules> {
                     pos: rest_name.pos,
                     item: Rc::from(rest_name.item.as_ref()),
                 },
-                Type::mk_record(Vec::new(), Some(rest_row.clone())),
+                core::Type::mk_record(self.common_kinds, Vec::new(), Some(rest_row.clone())),
             ))
         });
 
@@ -2025,7 +2054,7 @@ impl<'modules> Typechecker<'modules> {
     fn infer_pattern(
         &mut self,
         arg: &syntax::Pattern,
-    ) -> (core::Pattern, Type<usize>, Vec<(Rc<str>, Type<usize>)>) {
+    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
@@ -2036,15 +2065,69 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
+    fn infer_variant_pattern_case(
+        &mut self,
+        m_expr_rows: &mut Option<core::Type>,
+        expected_pattern_ty: &mut core::Type,
+        seen_ctors: &mut HashSet<Rc<str>>,
+        name: &str,
+        arg: &Spanned<String>,
+    ) -> Result<(core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>), TypeError> {
+        let name: Rc<str> = Rc::from(name);
+
+        let arg_ty = self.fresh_typevar(Kind::Type);
+        let rest_row = self.fresh_typevar(Kind::Row);
+        let pattern_rows =
+            core::Type::mk_rows(vec![(name.clone(), arg_ty.clone())], Some(rest_row.clone()));
+        let expr_rows: core::Type = match &m_expr_rows {
+            None => {
+                *m_expr_rows = Some(pattern_rows.clone());
+                pattern_rows.clone()
+            }
+            Some(rows) => rows.clone(),
+        };
+
+        let tag = core::Expr::Placeholder(self.evidence.placeholder(
+            None,
+            evidence::Constraint::HasField {
+                field: name.clone(),
+                rest: expr_rows,
+            },
+        ));
+
+        let pattern_ty =
+            core::Type::mk_app(core::Type::mk_variant_ctor(self.common_kinds), pattern_rows);
+        let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
+            expected: expected_pattern_ty,
+            actual: &pattern_ty,
+        };
+        match self.unify_type(&context, expected_pattern_ty, &pattern_ty) {
+            Err(err) => {
+                return Err(err);
+            }
+            Ok(()) => {}
+        }
+        *expected_pattern_ty =
+            core::Type::mk_variant(self.common_kinds, Vec::new(), Some(rest_row));
+
+        seen_ctors.insert(name);
+
+        let pattern_core = core::Pattern::mk_variant(tag);
+        let pattern_binds: Vec<(Rc<str>, core::Type)> = vec![(Rc::from(arg.item.as_ref()), arg_ty)];
+        Ok((pattern_core, pattern_ty, pattern_binds))
+    }
+
+    #[allow(clippy::type_complexity)]
     fn check_pattern(
         &mut self,
         arg: &syntax::Pattern,
-        expected: &Type<usize>,
-    ) -> Result<(core::Pattern, Vec<(Rc<str>, Type<usize>)>), TypeError> {
+        expected: &core::Type,
+    ) -> Result<(core::Pattern, Vec<(Rc<str>, core::Type)>), TypeError> {
         let (pat, actual, binds) = self.infer_pattern(arg);
-        let context = UnifyTypeContext {
-            expected: expected.clone(),
-            actual: actual.clone(),
+        let context = UnifyTypeContextRefs {
+            expected,
+            actual: &actual,
         };
         self.unify_type(&context, expected, &actual)?;
         Ok((pat, binds))
@@ -2057,14 +2140,14 @@ impl<'modules> Typechecker<'modules> {
         match part {
             syntax::StringPart::String(s) => Ok(core::StringPart::String(s.clone())),
             syntax::StringPart::Expr(e) => {
-                let e_core = self.check_expr(e, &Type::String)?;
+                let e_core = self.check_expr(e, &core::Type::String)?;
                 Ok(core::StringPart::Expr(e_core))
             }
         }
     }
 
-    fn instantiate(&mut self, expr: core::Expr, sig: core::TypeSig) -> (core::Expr, Type<usize>) {
-        let metas: Vec<Type<usize>> = sig
+    fn instantiate(&mut self, expr: core::Expr, sig: core::TypeSig) -> (core::Expr, core::Type) {
+        let metas: Vec<core::Type> = sig
             .ty_vars
             .into_iter()
             .map(|(_, kind)| self.fresh_typevar(kind))
@@ -2085,7 +2168,7 @@ impl<'modules> Typechecker<'modules> {
     fn infer_expr(
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
-    ) -> Result<(core::Expr, Type<usize>), TypeError> {
+    ) -> Result<(core::Expr, core::Type), TypeError> {
         with_position!(
             self,
             expr.pos,
@@ -2128,11 +2211,12 @@ impl<'modules> Typechecker<'modules> {
                     let (f_core, f_ty) = self.infer_expr(f)?;
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let expected = Type::mk_arrow(in_ty.clone(), out_ty.clone());
+                    let expected =
+                        core::Type::mk_arrow(self.common_kinds, in_ty.clone(), out_ty.clone());
                     let actual = f_ty;
-                    let context = UnifyTypeContext {
-                        expected: expected.clone(),
-                        actual: actual.clone(),
+                    let context = UnifyTypeContextRefs {
+                        expected: &expected,
+                        actual: &actual,
                     };
                     self.unify_type(&context, &expected, &actual)?;
                     let x_core = self.check_expr(x, &in_ty)?;
@@ -2141,7 +2225,7 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Lam { args, body } => {
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let ty = Type::mk_arrow(in_ty, out_ty);
+                    let ty = core::Type::mk_arrow(self.common_kinds, in_ty, out_ty);
                     let expr_core = self.check_expr(
                         &Spanned {
                             pos: expr.pos,
@@ -2169,10 +2253,10 @@ impl<'modules> Typechecker<'modules> {
                         rest_ty,
                     ))
                 }
-                syntax::Expr::True => Ok((core::Expr::True, Type::Bool)),
-                syntax::Expr::False => Ok((core::Expr::False, Type::Bool)),
+                syntax::Expr::True => Ok((core::Expr::True, core::Type::Bool)),
+                syntax::Expr::False => Ok((core::Expr::False, core::Type::Bool)),
                 syntax::Expr::IfThenElse(cond, then_, else_) => {
-                    let cond_core = self.check_expr(cond, &Type::Bool)?;
+                    let cond_core = self.check_expr(cond, &core::Type::Bool)?;
                     let (then_core, then_ty) = self.infer_expr(then_)?;
                     let else_core = self.check_expr(else_, &then_ty)?;
                     Ok((
@@ -2180,9 +2264,9 @@ impl<'modules> Typechecker<'modules> {
                         then_ty,
                     ))
                 }
-                syntax::Expr::Unit => Ok((core::Expr::Unit, Type::Unit)),
-                syntax::Expr::Int(n) => Ok((core::Expr::Int(*n), Type::Int)),
-                syntax::Expr::Char(c) => Ok((core::Expr::Char(*c), Type::Char)),
+                syntax::Expr::Unit => Ok((core::Expr::Unit, core::Type::Unit)),
+                syntax::Expr::Int(n) => Ok((core::Expr::Int(*n), core::Type::Int)),
+                syntax::Expr::Char(c) => Ok((core::Expr::Char(*c), core::Type::Char)),
                 syntax::Expr::String(parts) => {
                     let mut parts_core = Vec::new();
                     for part in parts {
@@ -2191,7 +2275,7 @@ impl<'modules> Typechecker<'modules> {
                             Ok(part_core) => parts_core.push(part_core),
                         }
                     }
-                    Ok((core::Expr::String(parts_core), Type::String))
+                    Ok((core::Expr::String(parts_core), core::Type::String))
                 }
                 syntax::Expr::Array(items) => {
                     let mut items_iter = items.iter();
@@ -2205,18 +2289,24 @@ impl<'modules> Typechecker<'modules> {
                             }
                             Ok((
                                 core::Expr::Array(items_core),
-                                Type::mk_app(Type::Array, first_ty),
+                                core::Type::mk_app(
+                                    core::Type::mk_array(self.common_kinds),
+                                    first_ty,
+                                ),
                             ))
                         }
-                        None => Ok((
-                            core::Expr::Array(Vec::new()),
-                            Type::mk_app(Type::Array, self.fresh_typevar(Kind::Type)),
-                        )),
+                        None => {
+                            let ty_var = self.fresh_typevar(Kind::Type);
+                            Ok((
+                                core::Expr::Array(Vec::new()),
+                                core::Type::mk_app(core::Type::mk_array(self.common_kinds), ty_var),
+                            ))
+                        }
                     }
                 }
                 syntax::Expr::Record { fields, rest } => {
-                    let mut fields_result: Vec<(Rc<str>, core::Expr, Type<usize>)> = Vec::new();
-                    let mut fields_rows: Vec<(Rc<str>, Type<usize>)> = Vec::new();
+                    let mut fields_result: Vec<(Rc<str>, core::Expr, core::Type)> = Vec::new();
+                    let mut fields_rows: Vec<(Rc<str>, core::Type)> = Vec::new();
                     for (field, expr) in fields {
                         match self.infer_expr(expr) {
                             Err(err) => return Err(err),
@@ -2240,7 +2330,7 @@ impl<'modules> Typechecker<'modules> {
                             },
                         );
                         fields_core.push((core::Expr::Placeholder(index), expr_core));
-                        extending_row = Type::mk_rowcons(field, expr_ty, extending_row);
+                        extending_row = core::Type::mk_rowcons(field, expr_ty, extending_row);
                     }
                     // we did a right fold to build extending_row, but we want fields_core too look like we did a left fold
                     fields_core.reverse();
@@ -2249,16 +2339,26 @@ impl<'modules> Typechecker<'modules> {
                     let mut rest_row = None;
                     let _ = match rest {
                         None => {
-                            let expected = Type::mk_record(fields_rows.clone(), None);
-                            let actual =
-                                Type::mk_record(fields_rows.clone(), Some(rest_row_var.clone()));
-                            let context = UnifyTypeContext { expected, actual };
-                            self.unify_type(&context, &Type::RowNil, &rest_row_var)
+                            let expected =
+                                core::Type::mk_record(self.common_kinds, fields_rows.clone(), None);
+                            let actual = core::Type::mk_record(
+                                self.common_kinds,
+                                fields_rows.clone(),
+                                Some(rest_row_var.clone()),
+                            );
+                            let context = UnifyTypeContextRefs {
+                                expected: &expected,
+                                actual: &actual,
+                            };
+                            self.unify_type(&context, &core::Type::RowNil, &rest_row_var)
                         }
                         Some(expr) => {
                             let expr_core = self.check_expr(
                                 expr,
-                                &Type::mk_app(Type::Record, rest_row_var.clone()),
+                                &core::Type::mk_app(
+                                    core::Type::mk_record_ctor(self.common_kinds),
+                                    rest_row_var.clone(),
+                                ),
                             )?;
                             rest_core = Some(expr_core);
                             rest_row = Some(rest_row_var);
@@ -2268,16 +2368,22 @@ impl<'modules> Typechecker<'modules> {
 
                     Ok((
                         core::Expr::mk_record(fields_core, rest_core),
-                        Type::mk_record(fields_rows, rest_row),
+                        core::Type::mk_record(self.common_kinds, fields_rows, rest_row),
                     ))
                 }
                 syntax::Expr::Project(expr, field) => {
                     let field: Rc<str> = Rc::from(field.as_ref());
                     let out_ty = self.fresh_typevar(Kind::Type);
                     let rest = self.fresh_typevar(Kind::Row);
-                    let rows = Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
-                    let expr_core =
-                        self.check_expr(expr, &Type::mk_app(Type::Record, rows.clone()))?;
+                    let rows =
+                        core::Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
+                    let expr_core = self.check_expr(
+                        expr,
+                        &core::Type::mk_app(
+                            core::Type::mk_record_ctor(self.common_kinds),
+                            rows.clone(),
+                        ),
+                    )?;
                     let offset = self
                         .evidence
                         .placeholder(None, evidence::Constraint::HasField { field, rest: rows });
@@ -2295,14 +2401,19 @@ impl<'modules> Typechecker<'modules> {
                         None,
                         evidence::Constraint::HasField {
                             field: ctor.clone(),
-                            rest: Type::mk_rows(vec![], Some(rest.clone())),
+                            rest: core::Type::mk_rows(vec![], Some(rest.clone())),
                         },
                     );
                     Ok((
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
-                        Type::mk_arrow(
+                        core::Type::mk_arrow(
+                            self.common_kinds,
                             arg_ty.clone(),
-                            Type::mk_variant(vec![(ctor, arg_ty)], Some(rest)),
+                            core::Type::mk_variant(
+                                self.common_kinds,
+                                vec![(ctor, arg_ty)],
+                                Some(rest),
+                            ),
                         ),
                     ))
                 }
@@ -2311,8 +2422,13 @@ impl<'modules> Typechecker<'modules> {
 
                     let arg_ty = self.fresh_typevar(Kind::Type);
                     let rest_rows = self.fresh_typevar(Kind::Row);
-                    let rest_core =
-                        self.check_expr(rest, &Type::mk_app(Type::Variant, rest_rows.clone()))?;
+                    let rest_core = self.check_expr(
+                        rest,
+                        &core::Type::mk_app(
+                            core::Type::mk_variant_ctor(self.common_kinds),
+                            rest_rows.clone(),
+                        ),
+                    )?;
                     let tag = core::Expr::Placeholder(self.evidence.placeholder(
                         None,
                         evidence::Constraint::HasField {
@@ -2322,49 +2438,73 @@ impl<'modules> Typechecker<'modules> {
                     ));
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
-                        Type::mk_app(Type::Variant, Type::mk_rowcons(ctor, arg_ty, rest_rows)),
+                        core::Type::mk_app(
+                            core::Type::mk_variant_ctor(self.common_kinds),
+                            core::Type::mk_rowcons(ctor, arg_ty, rest_rows),
+                        ),
                     ))
                 }
                 syntax::Expr::Binop(op, left, right) => {
                     match op {
                         syntax::Binop::Add => {
-                            let left_core = self.check_expr(left, &Type::Int)?;
-                            let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            let left_core = self.check_expr(left, &core::Type::Int)?;
+                            let right_core = self.check_expr(right, &core::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
                         syntax::Binop::Multiply => {
-                            let left_core = self.check_expr(left, &Type::Int)?;
-                            let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            let left_core = self.check_expr(left, &core::Type::Int)?;
+                            let right_core = self.check_expr(right, &core::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
                         syntax::Binop::Subtract => {
-                            let left_core = self.check_expr(left, &Type::Int)?;
-                            let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            let left_core = self.check_expr(left, &core::Type::Int)?;
+                            let right_core = self.check_expr(right, &core::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
                         syntax::Binop::Divide => {
-                            let left_core = self.check_expr(left, &Type::Int)?;
-                            let right_core = self.check_expr(right, &Type::Int)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Int))
+                            let left_core = self.check_expr(left, &core::Type::Int)?;
+                            let right_core = self.check_expr(right, &core::Type::Int)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
 
                         syntax::Binop::Append => {
                             let item_ty = self.fresh_typevar(Kind::Type);
-                            let expected = Type::mk_app(Type::Array, item_ty);
+                            let expected = core::Type::mk_app(
+                                core::Type::mk_array(self.common_kinds),
+                                item_ty,
+                            );
                             let left_core = self.check_expr(left, &expected)?;
                             let right_core = self.check_expr(right, &expected)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), expected))
                         }
 
                         syntax::Binop::Or => {
-                            let left_core = self.check_expr(left, &Type::Bool)?;
-                            let right_core = self.check_expr(right, &Type::Bool)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
+                            let left_core = self.check_expr(left, &core::Type::Bool)?;
+                            let right_core = self.check_expr(right, &core::Type::Bool)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
                         syntax::Binop::And => {
-                            let left_core = self.check_expr(left, &Type::Bool)?;
-                            let right_core = self.check_expr(right, &Type::Bool)?;
-                            Ok((core::Expr::mk_binop(*op, left_core, right_core), Type::Bool))
+                            let left_core = self.check_expr(left, &core::Type::Bool)?;
+                            let right_core = self.check_expr(right, &core::Type::Bool)?;
+                            Ok((
+                                core::Expr::mk_binop(*op, left_core, right_core),
+                                core::Type::Int,
+                            ))
                         }
 
                         syntax::Binop::Eq => {
@@ -2397,7 +2537,7 @@ impl<'modules> Typechecker<'modules> {
                     let mut seen_fallthrough = false;
                     let mut matching_variant = false;
                     let mut seen_ctors: HashSet<Rc<str>> = HashSet::new();
-                    let mut expr_rows: Option<Type<usize>> = None;
+                    let mut expr_rows = None;
                     for branch in branches {
                         if seen_fallthrough
                             || match &branch.pattern.item {
@@ -2417,72 +2557,29 @@ impl<'modules> Typechecker<'modules> {
                                 let ((pattern_core, pattern_ty, pattern_binds), saw_variant) =
                                     match &branch.pattern.item {
                                         syntax::Pattern::Wildcard => {
-                                            (self.infer_wildcard_pattern(), false)
+                                            Ok((self.infer_wildcard_pattern(), false))
                                         }
                                         syntax::Pattern::Name(n) => {
-                                            (self.infer_name_pattern(n), false)
+                                            Ok((self.infer_name_pattern(n), false))
                                         }
                                         syntax::Pattern::Record { names, rest } => {
-                                            (self.infer_record_pattern(names, rest), false)
+                                            Ok((self.infer_record_pattern(names, rest), false))
                                         }
                                         syntax::Pattern::Variant { name, arg } => {
-                                            let name: Rc<str> = Rc::from(name.as_ref());
-
-                                            let arg_ty = self.fresh_typevar(Kind::Type);
-                                            let rest_row = self.fresh_typevar(Kind::Row);
-                                            let pattern_rows = Type::mk_rows(
-                                                vec![(name.clone(), arg_ty.clone())],
-                                                Some(rest_row.clone()),
-                                            );
-                                            let expr_rows: Type<usize> = match &expr_rows {
-                                                None => {
-                                                    expr_rows = Some(pattern_rows.clone());
-                                                    pattern_rows.clone()
-                                                }
-                                                Some(rows) => rows.clone(),
-                                            };
-
-                                            let tag =
-                                                core::Expr::Placeholder(self.evidence.placeholder(
-                                                    None,
-                                                    evidence::Constraint::HasField {
-                                                        field: name.clone(),
-                                                        rest: expr_rows,
-                                                    },
-                                                ));
-
-                                            let pattern_ty =
-                                                Type::mk_app(Type::Variant, pattern_rows);
-                                            let context: UnifyTypeContext<usize> =
-                                                UnifyTypeContext {
-                                                    expected: expected_pattern_ty.clone(),
-                                                    actual: pattern_ty.clone(),
-                                                };
-                                            match self.unify_type(
-                                                &context,
-                                                &expected_pattern_ty,
-                                                &pattern_ty,
-                                            ) {
-                                                Err(err) => {
-                                                    return Err(err);
-                                                }
-                                                Ok(()) => {}
-                                            }
-                                            expected_pattern_ty =
-                                                Type::mk_variant(Vec::new(), Some(rest_row));
-
-                                            seen_ctors.insert(name);
-
-                                            let pattern_core = core::Pattern::mk_variant(tag);
-                                            let pattern_binds: Vec<(Rc<str>, Type<usize>)> =
-                                                vec![(Rc::from(arg.item.as_ref()), arg_ty)];
-                                            ((pattern_core, pattern_ty, pattern_binds), true)
+                                            let res = self.infer_variant_pattern_case(
+                                                &mut expr_rows,
+                                                &mut expected_pattern_ty,
+                                                &mut seen_ctors,
+                                                name,
+                                                arg,
+                                            )?;
+                                            Ok((res, true))
                                         }
-                                    };
+                                    }?;
                                 if !saw_variant {
-                                    let context: UnifyTypeContext<usize> = UnifyTypeContext {
-                                        expected: expected_pattern_ty.clone(),
-                                        actual: pattern_ty.clone(),
+                                    let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
+                                        expected: &expected_pattern_ty,
+                                        actual: &pattern_ty,
                                     };
                                     match self.unify_type(
                                         &context,
@@ -2519,19 +2616,23 @@ impl<'modules> Typechecker<'modules> {
                     if matching_variant && !seen_fallthrough {
                         let expr_ty = self.zonk_type(&expr_ty);
                         let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
-                        let ctors: Vec<(Rc<str>, Type<usize>)> = ctors
+                        let ctors: Vec<(Rc<str>, core::Type)> = ctors
                             .iter()
                             .map(|(x, y)| ((*x).clone(), (*y).clone()))
                             .collect();
-                        let rest: Option<Type<usize>> = rest.cloned();
-                        let context = UnifyTypeContext {
-                            expected: Type::mk_variant(ctors.clone(), None),
-                            actual: Type::mk_variant(ctors, rest),
+                        let rest: Option<core::Type> = rest.cloned();
+                        let context = UnifyTypeContextRefs {
+                            expected: &core::Type::mk_variant(
+                                self.common_kinds,
+                                ctors.clone(),
+                                None,
+                            ),
+                            actual: &core::Type::mk_variant(self.common_kinds, ctors, rest),
                         };
                         let _ = self.unify_type(
                             &context,
                             &expected_pattern_ty,
-                            &Type::mk_variant(Vec::new(), None),
+                            &core::Type::mk_variant(self.common_kinds, Vec::new(), None),
                         )?;
                     }
 
@@ -2547,7 +2648,7 @@ impl<'modules> Typechecker<'modules> {
     fn check_expr(
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
-        ty: &Type<usize>,
+        ty: &core::Type,
     ) -> Result<core::Expr, TypeError> {
         with_position!(
             self,
@@ -2563,13 +2664,13 @@ impl<'modules> Typechecker<'modules> {
                     for _ in args.iter().rev() {
                         let arg_ty = self.fresh_typevar(Kind::Type);
                         arg_tys.push(arg_ty.clone());
-                        actual = Type::mk_arrow(arg_ty, actual);
+                        actual = core::Type::mk_arrow(self.common_kinds, arg_ty, actual);
                     }
                     arg_tys.reverse();
 
-                    let context = UnifyTypeContext {
-                        expected: ty.clone(),
-                        actual: actual.clone(),
+                    let context = UnifyTypeContextRefs {
+                        expected: ty,
+                        actual: &actual,
                     };
                     self.unify_type(&context, ty, &actual)?;
 
@@ -2619,9 +2720,9 @@ impl<'modules> Typechecker<'modules> {
                 _ => {
                     let expected = ty;
                     let (expr, actual) = self.infer_expr(expr)?;
-                    let context = UnifyTypeContext {
-                        expected: expected.clone(),
-                        actual: actual.clone(),
+                    let context = UnifyTypeContextRefs {
+                        expected,
+                        actual: &actual,
                     };
                     self.unify_type(&context, expected, &actual)?;
                     Ok(expr)
