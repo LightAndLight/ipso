@@ -11,7 +11,9 @@ use std::{
 };
 
 /**
-Well-kinded types. Atomic types like `Int` and `Bool` are inherently well-kinded,
+Well-kinded types.
+
+Atomic types like `Int` and `Bool` are inherently well-kinded,
 and their kind is always known. Compound types may be ill-kinded if they are constructed
 incorrectly, e.g. by trying to form `x y : Type` where `x : Type` and `y : Type`.
 When kind polymorphism isn't in play, the kind of a compound type is always known; it's
