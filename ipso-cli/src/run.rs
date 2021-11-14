@@ -93,8 +93,10 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected =
-            core::Type::mk_app(&common_kinds, core::Type::IO, tc.fresh_typevar(Kind::Type));
+        let expected = core::Type::mk_app(
+            core::Type::mk_io(&common_kinds),
+            tc.fresh_typevar(Kind::Type),
+        );
         let actual = target_sig.body;
         let context = typecheck::UnifyTypeContextRefs {
             expected: &expected,

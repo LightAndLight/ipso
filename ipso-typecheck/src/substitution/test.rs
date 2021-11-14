@@ -16,8 +16,7 @@ fn subst_left_1() {
             (
                 Kind::Type,
                 Some(core::Type::mk_app(
-                    tc.common_kinds,
-                    core::Type::Record,
+                    core::Type::mk_record_ctor(tc.common_kinds),
                     core::Type::Var(Kind::Row, 0),
                 )),
             ),
@@ -36,8 +35,7 @@ fn subst_left_1() {
             (
                 Kind::Type,
                 Some(core::Type::mk_app(
-                    tc.common_kinds,
-                    core::Type::Record,
+                    core::Type::mk_record_ctor(tc.common_kinds),
                     core::Type::Var(Kind::Row, 0),
                 )),
             ),

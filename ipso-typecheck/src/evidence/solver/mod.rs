@@ -122,7 +122,7 @@ pub fn solve_constraint(
                     unifying_types: None,
                 },
                 &Kind::Row,
-                &rest.kind(tc.common_kinds),
+                &rest.kind(),
             )?;
             let new_evidence = match rest {
                 core::Type::RowNil => Ok(core::Expr::Int(0)),
@@ -227,14 +227,14 @@ pub fn solve_constraint(
                 | core::Type::Char
                 | core::Type::String
                 | core::Type::Bytes
-                | core::Type::Arrow
-                | core::Type::FatArrow
+                | core::Type::Arrow(_)
+                | core::Type::FatArrow(_)
                 | core::Type::Constraints(_)
                 | core::Type::HasField(_, _)
-                | core::Type::Array
-                | core::Type::Record
-                | core::Type::Variant
-                | core::Type::IO
+                | core::Type::Array(_)
+                | core::Type::Record(_)
+                | core::Type::Variant(_)
+                | core::Type::IO(_)
                 | core::Type::Unit => panic!("impossible"),
             }?;
             Ok(new_evidence)
