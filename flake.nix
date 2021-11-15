@@ -22,35 +22,22 @@
           rust-overlay.overlay 
         ]; 
       };
-    in {
-      defaultPackage.x86_64-linux =
-        let  
-          rustPkgs = args: pkgs.rustBuilder.makePackageSet' {
-            rustChannel = "1.56.1";
-            packageFun = import "${self}/Cargo.nix";
-            inherit (args) release;
-          };
-
-          ipso = rustPkgsArgs: args: (rustPkgs rustPkgsArgs).workspace.ipso-cli args;
-          ipsoTests = pkgs.rustBuilder.runTests (ipso { release = false; }) {};
-        in
-          pkgs.stdenv.mkDerivation {
-            name = "ipso";
-            unpackPhase = "true";
-
-            buildPhase = "true";
-
-            doCheck = true;
-            checkInputs = [
-              ipsoTests
-            ];
-            checkPhase = "true";
-
-            installPhase = ''
-              mkdir -p $out
-              cp -R ${ipso { release = true; } {}}/* $out/
-            '';
-          };
+      
+      rustPkgs = { release }: pkgs.rustBuilder.makePackageSet' {
+        rustChannel = "1.56.1";
+        packageFun = import "${self}/Cargo.nix";
+        inherit release;
+      };
+    in rec {
+      
+      packages.x86_64-linux = {
+        ipso-cli = (rustPkgs { release = true; }).workspace.ipso-cli {};
+        ipso-golden = import ./tests/golden { inherit pkgs; };
+        ipso-shebang = import ./tests/shebang { inherit pkgs; };
+      };
+      
+      defaultPackage.x86_64-linux = packages.x86_64-linux.ipso-cli;
+      
       devShell.x86_64-linux =
         pkgs.mkShell {
           buildInputs = [
@@ -66,5 +53,19 @@
             })
           ];
         };
+      
+      devShells.x86_64-linux.tests =
+        let
+          RUST_BACKTRACE = false;
+        in
+          pkgs.mkShell {
+            RUST_BACKTRACE = if RUST_BACKTRACE then "1" else "0";
+            buildInputs = [
+              packages.x86_64-linux.ipso-cli
+              packages.x86_64-linux.ipso-golden
+              packages.x86_64-linux.ipso-shebang
+            ];
+          };
+    
     };
 }
