@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+nix develop -c cargo test
+nix develop .#tests -c ./scripts/golden
+nix develop .#tests -c ./scripts/shebang
