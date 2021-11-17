@@ -173,12 +173,12 @@ hello
 
 ```ipso-repl
 > :type true
-Int
+Bool
 ```
 
 ```ipso-repl
 > :type false
-Int
+Bool
 ```
 
 ```ipso-repl
