@@ -1,0 +1,4 @@
+main : IO ()
+main = do
+  x <- readLineStdin stdin
+  writeStdout stdout x
