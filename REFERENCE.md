@@ -17,6 +17,7 @@
       - [Wildcard Imports](#wildcard-imports)
     - [Execution](#execution)
   - [Let Bindings](#let-bindings)
+  - [`do`-notation](#do-notation)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
     - [Integers](#integers)
@@ -165,6 +166,22 @@ hello
 . let y = 2 in
 . x + y
 3
+```
+
+## `do`-notation
+
+```ipso-repl
+> :t do
+.   x <- getLine
+.   print x
+IO ()
+```
+
+```ipso-repl
+> :t do
+.   x <- getLine
+.   return x
+IO String
 ```
 
 ## Datatypes
