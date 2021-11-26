@@ -143,7 +143,7 @@ fn solve_constraint_4() {
             &[core::Type::mk_app(eq_ty.clone(), a.clone())],
             &core::Type::mk_app(
                 eq_ty.clone(),
-                core::Type::mk_app(core::Type::mk_array(&tc.common_kinds), a),
+                core::Type::mk_app(core::Type::mk_array(tc.common_kinds), a),
             ),
             &[InstanceMember {
                 name: String::from("Eq"),
@@ -163,7 +163,7 @@ fn solve_constraint_4() {
         ));
         let constraint = &Constraint::from_type(&core::Type::mk_app(
             eq_ty,
-            core::Type::mk_app(core::Type::mk_array(&tc.common_kinds), core::Type::Int),
+            core::Type::mk_app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
         ));
         let actual = solve_constraint(&None, &mut tc, constraint);
 
