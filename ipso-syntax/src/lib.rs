@@ -33,6 +33,7 @@ pub enum Keyword {
     Where,
     Let,
     In,
+    Do,
 }
 
 impl Arbitrary for Keyword {
@@ -61,7 +62,7 @@ impl Arbitrary for Keyword {
 
 impl Keyword {
     pub fn num_variants() -> usize {
-        16
+        17
     }
 
     pub fn matches(&self, actual: &str) -> bool {
@@ -86,6 +87,7 @@ impl Keyword {
             Keyword::Where => "where",
             Keyword::Let => "let",
             Keyword::In => "in",
+            Keyword::Do => "do",
         }
     }
 }
@@ -226,6 +228,12 @@ impl ModuleName {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DoLine {
+    Expr(Spanned<Expr>),
+    Bind(Rc<str>, Spanned<Expr>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
@@ -270,6 +278,8 @@ pub enum Expr {
     Case(Rc<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
+
+    DoBlock(Vec<DoLine>),
 }
 
 impl Expr {

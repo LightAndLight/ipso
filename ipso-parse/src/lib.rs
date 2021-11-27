@@ -20,6 +20,7 @@ use std::{
     rc::Rc,
     vec,
 };
+use syntax::DoLine;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -888,6 +889,28 @@ impl<'input> Parser<'input> {
                 },
             }
         })
+    }
+
+    /**
+    do_line ::=
+      [ident '<-'] expr
+    */
+    fn do_line(&mut self) -> ParseResult<DoLine> {
+        todo!()
+    }
+
+    fn expr_do_block(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            keep_left!(
+                self.keyword(&Keyword::Do),
+                many!(self, self.token(&token::Data::Space))
+            )
+            .and_then(|_| keep_right!(
+                self.indent(),
+                sep_by!(self, self.do_line(), self.newline()).map(Expr::DoBlock)
+            ))
+        )
     }
 
     /*
