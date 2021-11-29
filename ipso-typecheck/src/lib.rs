@@ -272,6 +272,14 @@ pub enum TypeError {
         source: Source,
         pos: usize,
     },
+    EmptyCompExpr {
+        source: Source,
+        pos: usize,
+    },
+    CompExprEndsWithBind {
+        source: Source,
+        pos: usize,
+    },
 }
 
 impl TypeError {
@@ -290,6 +298,8 @@ impl TypeError {
             TypeError::NotAMember { source, .. } => source.clone(),
             TypeError::CannotDeduce { source, .. } => source.clone(),
             TypeError::ShadowedModuleName { source, .. } => source.clone(),
+            TypeError::EmptyCompExpr { source, .. } => source.clone(),
+            TypeError::CompExprEndsWithBind { source, .. } => source.clone(),
         }
     }
 
@@ -311,6 +321,8 @@ impl TypeError {
                 Some(context) => context.pos,
             },
             TypeError::ShadowedModuleName { pos, .. } => *pos,
+            TypeError::EmptyCompExpr { pos, .. } => *pos,
+            TypeError::CompExprEndsWithBind { pos, .. } => *pos,
         }
     }
 
@@ -370,6 +382,10 @@ impl TypeError {
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
             TypeError::ShadowedModuleName { .. } => String::from("shadowed module name"),
+            TypeError::EmptyCompExpr { .. } => String::from("empty computation expression"),
+            TypeError::CompExprEndsWithBind { .. } => {
+                String::from("computation expression ends with a bind")
+            }
         }
     }
 
@@ -417,6 +433,8 @@ impl TypeError {
             TypeError::NotAMember { .. } => None,
             TypeError::CannotDeduce { .. } => None,
             TypeError::ShadowedModuleName { .. } => None,
+            TypeError::EmptyCompExpr { .. } => None,
+            TypeError::CompExprEndsWithBind { .. } => None,
         }
     }
 
@@ -2640,6 +2658,144 @@ impl<'modules> Typechecker<'modules> {
                         core::Expr::mk_case(expr_core, branches_core),
                         expected_body_ty,
                     ))
+                }
+                syntax::Expr::Comp(lines) => {
+                    if lines.is_empty() {
+                        return Err(TypeError::EmptyCompExpr {
+                            source: self.source(),
+                            pos: self.current_position(),
+                        });
+                    }
+
+                    enum CheckedCompLine {
+                        Expr(core::Expr),
+                        Bind {
+                            vars_bound: usize,
+                            value: core::Expr,
+                        },
+                        Return(core::Expr),
+                    }
+
+                    let mut ret_ty = None;
+                    let mut checked_lines: Vec<CheckedCompLine> = lines
+                        .iter()
+                        .map(|line| match line {
+                            syntax::CompLine::Expr(value) => {
+                                let ret_ty_var = self.fresh_typevar(Kind::Type);
+                                let value = self.check_expr(
+                                    value,
+                                    &core::Type::mk_app(
+                                        core::Type::mk_io(self.common_kinds),
+                                        ret_ty_var.clone(),
+                                    ),
+                                )?;
+                                ret_ty = Some(ret_ty_var);
+                                Ok(CheckedCompLine::Expr(value))
+                            }
+                            syntax::CompLine::Bind(name, value) => {
+                                let name_ty = self.fresh_typevar(Kind::Type);
+                                let value = self.check_expr(
+                                    value,
+                                    &core::Type::mk_app(
+                                        core::Type::mk_io(self.common_kinds),
+                                        name_ty.clone(),
+                                    ),
+                                )?;
+
+                                // [note: checking `bind`s]
+                                //
+                                // Register the variables bound by this line so the variables
+                                // can be references by subsequent lines.
+                                self.bound_vars.insert(&[(name.clone(), name_ty)]);
+
+                                ret_ty = None;
+                                Ok(CheckedCompLine::Bind {
+                                    vars_bound: 1,
+                                    value,
+                                })
+                            }
+                            syntax::CompLine::Return(value) => {
+                                let (value, value_ty) = self.infer_expr(value)?;
+                                ret_ty = Some(value_ty);
+                                Ok(CheckedCompLine::Return(value))
+                            }
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    match ret_ty {
+                        None => {
+                            debug_assert!(matches!(
+                                checked_lines.last().unwrap(),
+                                CheckedCompLine::Bind { .. }
+                            ));
+
+                            Err(TypeError::CompExprEndsWithBind {
+                                source: self.source(),
+                                pos: self.current_position(),
+                            })
+                        }
+                        Some(ret_ty) => {
+                            debug_assert!(!matches!(
+                                checked_lines.last().unwrap(),
+                                CheckedCompLine::Bind { .. }
+                            ));
+
+                            let mut desugared: core::Expr = match checked_lines.pop().unwrap() {
+                                CheckedCompLine::Bind { .. } => unreachable!(),
+                                CheckedCompLine::Expr(value) => value,
+                                CheckedCompLine::Return(value) => core::Expr::mk_app(
+                                    core::Expr::Name(String::from("pureIO")),
+                                    value,
+                                ),
+                            };
+
+                            for checked_line in checked_lines.into_iter().rev() {
+                                match checked_line {
+                                    CheckedCompLine::Expr(value) => {
+                                        // Desugar[comp { value; rest }] -> bindIO value (\_ -> Desugar[rest])
+                                        desugared = core::Expr::mk_app(
+                                            core::Expr::mk_app(
+                                                core::Expr::Name(String::from("bindIO")),
+                                                value,
+                                            ),
+                                            core::Expr::mk_lam(false, desugared),
+                                        );
+                                    }
+                                    CheckedCompLine::Bind { vars_bound, value } => {
+                                        // Delete the variables that were bound in [note: checking `bind`s]
+                                        self.bound_vars.delete(vars_bound);
+
+                                        // Desugar[comp { bind name <- value; rest }] -> bindIO value (\name -> Desugar[rest])
+                                        desugared = core::Expr::mk_app(
+                                            core::Expr::mk_app(
+                                                core::Expr::Name(String::from("bindIO")),
+                                                value,
+                                            ),
+                                            core::Expr::mk_lam(true, desugared),
+                                        );
+                                    }
+                                    CheckedCompLine::Return(value) => {
+                                        // Desugar[comp { return value; rest }] -> bindIO (pureIO value) (\_ -> Desugar[rest])
+                                        desugared = core::Expr::mk_app(
+                                            core::Expr::mk_app(
+                                                core::Expr::Name(String::from("bindIO")),
+                                                core::Expr::mk_app(
+                                                    core::Expr::Name(String::from("pureIO")),
+                                                    value,
+                                                ),
+                                            ),
+                                            core::Expr::mk_lam(true, desugared),
+                                        );
+                                    }
+                                }
+                            }
+
+                            Ok((
+                                desugared,
+                                core::Type::mk_app(core::Type::mk_io(self.common_kinds), ret_ty),
+                            ))
+                        }
+                    }
                 }
             }
         )

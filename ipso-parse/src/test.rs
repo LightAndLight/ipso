@@ -523,6 +523,12 @@ fn parse_case_2() {
 #[test]
 fn parse_case_3() {
     parse_test!(
+        /*
+        case x of
+          a ->
+            b
+          c -> d
+        */
         "case x of\n  a ->\n    b\n  c -> d",
         expr_case,
         Ok(Spanned {

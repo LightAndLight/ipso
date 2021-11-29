@@ -360,10 +360,18 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '<' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::LAngle,
-                            pos,
-                        })
+                        if let Some('-') = self.current {
+                            self.consume();
+                            Some(Token {
+                                data: token::Data::LeftArrow,
+                                pos,
+                            })
+                        } else {
+                            Some(Token {
+                                data: token::Data::LAngle,
+                                pos,
+                            })
+                        }
                     }
                     '>' => {
                         self.consume();

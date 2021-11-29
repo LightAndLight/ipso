@@ -519,25 +519,19 @@ impl<'input> Parser<'input> {
             None => Some(0),
         };
         match dedent_to {
-            None => {
-                return self.unexpected(false);
-            }
+            None => self.unexpected(false),
             Some(n) => match self.indentation.last() {
                 None => panic!("dedent: indentation is empty"),
                 Some(top) => match n.cmp(top) {
                     cmp::Ordering::Less => {
                         self.indentation.pop();
+                        ParseResult::pure(())
                     }
-                    cmp::Ordering::Equal => {
-                        return self.unexpected(false);
-                    }
-                    cmp::Ordering::Greater => {
-                        return self.unexpected(false);
-                    }
+                    cmp::Ordering::Equal => self.unexpected(false),
+                    cmp::Ordering::Greater => self.unexpected(false),
                 },
             },
         }
-        ParseResult::pure(())
     }
 
     fn comment_body(&mut self) -> ParseResult<()> {
@@ -922,9 +916,17 @@ impl<'input> Parser<'input> {
     fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(self.keyword(&Keyword::Comp), self.spaces()).and_then(|_| keep_right!(
-                self.indent(),
-                sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
+            keep_left!(self.keyword(&Keyword::Comp), self.spaces()).and_then(|_| between!(
+                keep_left!(
+                    self.token(&token::Data::LBrace),
+                    many_!(self, self.token(&token::Data::Space))
+                ),
+                keep_right!(self.spaces(), self.token(&token::Data::RBrace)),
+                between!(
+                    self.indent(),
+                    self.dedent(),
+                    sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
+                )
             ))
         )
     }
