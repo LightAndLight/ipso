@@ -890,14 +890,33 @@ impl<'input> Parser<'input> {
         })
     }
 
+    fn comp_line_bind(&mut self) -> ParseResult<CompLine> {
+        keep_left!(self.keyword(&Keyword::Bind), self.spaces()).and_then(|_| {
+            keep_left!(self.ident(), self.spaces()).and_then(|name| {
+                keep_left!(self.token(&token::Data::LeftArrow), self.spaces())
+                    .and_then(|_| self.expr().map(|value| CompLine::Bind(name, value)))
+            })
+        })
+    }
+
+    fn comp_line_return(&mut self) -> ParseResult<CompLine> {
+        keep_left!(self.keyword(&Keyword::Return), self.spaces())
+            .and_then(|_| self.expr().map(CompLine::Return))
+    }
+
     /**
     comp_line ::=
-      expr
       'bind' ident '<-' expr
       'return' expr
+      expr
     */
     fn comp_line(&mut self) -> ParseResult<CompLine> {
-        todo!()
+        choices!(
+            self,
+            self.comp_line_bind(),
+            self.comp_line_return(),
+            self.expr().map(CompLine::Expr)
+        )
     }
 
     fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
@@ -1267,11 +1286,12 @@ impl<'input> Parser<'input> {
         keep_left!(
             choices!(
                 self,
-                self.expr_app(),
                 self.expr_case(),
                 self.expr_lam(),
                 self.expr_ifthenelse(),
-                self.expr_let()
+                self.expr_let(),
+                self.expr_comp(),
+                self.expr_app()
             ),
             self.spaces()
         )
