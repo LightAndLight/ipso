@@ -8,8 +8,8 @@ use ipso_lex::{
     Lexer,
 };
 use ipso_syntax::{
-    self as syntax, r#type::Type, Branch, Declaration, Expr, Keyword, Module, Names, Pattern,
-    Spanned, StringPart,
+    self as syntax, r#type::Type, Branch, CompLine, Declaration, Expr, Keyword, Module, Names,
+    Pattern, Spanned, StringPart,
 };
 use std::{
     cmp,
@@ -20,7 +20,6 @@ use std::{
     rc::Rc,
     vec,
 };
-use syntax::DoLine;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -892,23 +891,21 @@ impl<'input> Parser<'input> {
     }
 
     /**
-    do_line ::=
-      [ident '<-'] expr
+    comp_line ::=
+      expr
+      'bind' ident '<-' expr
+      'return' expr
     */
-    fn do_line(&mut self) -> ParseResult<DoLine> {
+    fn comp_line(&mut self) -> ParseResult<CompLine> {
         todo!()
     }
 
-    fn expr_do_block(&mut self) -> ParseResult<Spanned<Expr>> {
+    fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(
-                self.keyword(&Keyword::Do),
-                many!(self, self.token(&token::Data::Space))
-            )
-            .and_then(|_| keep_right!(
+            keep_left!(self.keyword(&Keyword::Comp), self.spaces()).and_then(|_| keep_right!(
                 self.indent(),
-                sep_by!(self, self.do_line(), self.newline()).map(Expr::DoBlock)
+                sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
             ))
         )
     }

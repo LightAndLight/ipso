@@ -17,7 +17,7 @@
       - [Wildcard Imports](#wildcard-imports)
     - [Execution](#execution)
   - [Let Bindings](#let-bindings)
-  - [`do`-notation](#do-notation)
+  - [Computation Expressions](#computation-expressions)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
     - [Integers](#integers)
@@ -168,19 +168,21 @@ hello
 3
 ```
 
-## `do`-notation
+## Computation Expressions
 
 ```ipso-repl
-> :t do
+> :t comp {
 .   x <- getLine
 .   print x
+.   }
 IO ()
 ```
 
 ```ipso-repl
-> :t do
+> :t comp {
 .   x <- getLine
 .   return x
+.   }
 IO String
 ```
 

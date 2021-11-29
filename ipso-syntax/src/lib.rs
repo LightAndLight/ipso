@@ -33,7 +33,7 @@ pub enum Keyword {
     Where,
     Let,
     In,
-    Do,
+    Comp,
 }
 
 impl Arbitrary for Keyword {
@@ -87,7 +87,7 @@ impl Keyword {
             Keyword::Where => "where",
             Keyword::Let => "let",
             Keyword::In => "in",
-            Keyword::Do => "do",
+            Keyword::Comp => "comp",
         }
     }
 }
@@ -228,7 +228,7 @@ impl ModuleName {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DoLine {
+pub enum CompLine {
     Expr(Spanned<Expr>),
     Bind(Rc<str>, Spanned<Expr>),
 }
@@ -279,7 +279,7 @@ pub enum Expr {
 
     Unit,
 
-    DoBlock(Vec<DoLine>),
+    Comp(Vec<CompLine>),
 }
 
 impl Expr {
