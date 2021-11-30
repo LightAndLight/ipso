@@ -669,12 +669,12 @@ record_pattern ::=
   ident (',' ident)* [',' '..' ident] |
   '..' ident |
  
- 
 expr ::=
   lambda |
   case |
   ifthenelse |
   let |
+  comp |
   binop
   
 lambda ::=
@@ -691,6 +691,14 @@ ifthenelse ::=
 
 let ::=
   'let' ident '=' expr 'in' expr
+
+comp_line ::=
+  expr
+  'bind' ident '<-' expr
+  'return' expr
+
+comp ::=
+  'comp' '{' comp_line+ '}'
   
 binop ::=
   app (operator app)*
