@@ -2689,6 +2689,7 @@ impl<'modules> Typechecker<'modules> {
                                         ret_ty_var.clone(),
                                     ),
                                 )?;
+
                                 ret_ty = Some(ret_ty_var);
                                 Ok(CheckedCompLine::Expr(value))
                             }
@@ -2716,6 +2717,7 @@ impl<'modules> Typechecker<'modules> {
                             }
                             syntax::CompLine::Return(value) => {
                                 let (value, value_ty) = self.infer_expr(value)?;
+
                                 ret_ty = Some(value_ty);
                                 Ok(CheckedCompLine::Return(value))
                             }
