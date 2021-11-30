@@ -1,0 +1,6 @@
+main : IO ()
+main = 
+  comp {
+    bind x <- readLineStdin stdin
+    writeStdout stdout (toUtf8 x)
+  }

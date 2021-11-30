@@ -72,6 +72,20 @@ pub struct Modules<'a> {
     pub index: HashMap<ModulePath, &'a core::Module>,
 }
 
+fn desugar_module_accessors_comp_line(module_names: &Rope<String>, line: &mut syntax::CompLine) {
+    match line {
+        syntax::CompLine::Expr(value) => {
+            desugar_module_accessors_expr(module_names, &mut value.item);
+        }
+        syntax::CompLine::Bind(_, value) => {
+            desugar_module_accessors_expr(module_names, &mut value.item);
+        }
+        syntax::CompLine::Return(value) => {
+            desugar_module_accessors_expr(module_names, &mut value.item);
+        }
+    }
+}
+
 fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax::Expr) {
     match expr {
         syntax::Expr::Var(_) => {}
@@ -176,6 +190,9 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
             }
         }
         syntax::Expr::Unit => {}
+        syntax::Expr::Comp(lines) => lines
+            .iter_mut()
+            .for_each(|line| desugar_module_accessors_comp_line(module_names, line)),
     }
 }
 

@@ -8,8 +8,8 @@ use ipso_lex::{
     Lexer,
 };
 use ipso_syntax::{
-    self as syntax, r#type::Type, Branch, Declaration, Expr, Keyword, Module, Names, Pattern,
-    Spanned, StringPart,
+    self as syntax, r#type::Type, Branch, CompLine, Declaration, Expr, Keyword, Module, Names,
+    Pattern, Spanned, StringPart,
 };
 use std::{
     cmp,
@@ -519,25 +519,19 @@ impl<'input> Parser<'input> {
             None => Some(0),
         };
         match dedent_to {
-            None => {
-                return self.unexpected(false);
-            }
+            None => self.unexpected(false),
             Some(n) => match self.indentation.last() {
                 None => panic!("dedent: indentation is empty"),
                 Some(top) => match n.cmp(top) {
                     cmp::Ordering::Less => {
                         self.indentation.pop();
+                        ParseResult::pure(())
                     }
-                    cmp::Ordering::Equal => {
-                        return self.unexpected(false);
-                    }
-                    cmp::Ordering::Greater => {
-                        return self.unexpected(false);
-                    }
+                    cmp::Ordering::Equal => self.unexpected(false),
+                    cmp::Ordering::Greater => self.unexpected(false),
                 },
             },
         }
-        ParseResult::pure(())
     }
 
     fn comment_body(&mut self) -> ParseResult<()> {
@@ -888,6 +882,57 @@ impl<'input> Parser<'input> {
                 },
             }
         })
+    }
+
+    fn comp_line_bind(&mut self) -> ParseResult<CompLine> {
+        keep_left!(self.keyword(&Keyword::Bind), self.spaces()).and_then(|_| {
+            keep_left!(self.ident(), self.spaces()).and_then(|name| {
+                keep_left!(self.token(&token::Data::LeftArrow), self.spaces())
+                    .and_then(|_| self.expr().map(|value| CompLine::Bind(name, value)))
+            })
+        })
+    }
+
+    fn comp_line_return(&mut self) -> ParseResult<CompLine> {
+        keep_left!(self.keyword(&Keyword::Return), self.spaces())
+            .and_then(|_| self.expr().map(CompLine::Return))
+    }
+
+    /**
+    comp_line ::=
+      'bind' ident '<-' expr
+      'return' expr
+      expr
+    */
+    fn comp_line(&mut self) -> ParseResult<CompLine> {
+        choices!(
+            self,
+            self.comp_line_bind(),
+            self.comp_line_return(),
+            self.expr().map(CompLine::Expr)
+        )
+    }
+
+    fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            keep_left!(self.keyword(&Keyword::Comp), self.spaces()).and_then(|_| between!(
+                keep_left!(
+                    self.token(&token::Data::LBrace),
+                    many_!(self, self.token(&token::Data::Space))
+                ),
+                keep_right!(self.spaces(), self.token(&token::Data::RBrace)),
+                choices!(
+                    self,
+                    between!(
+                        self.indent(),
+                        self.dedent(),
+                        sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
+                    ),
+                    ParseResult::pure(Expr::Comp(Vec::new()))
+                )
+            ))
+        )
     }
 
     /*
@@ -1247,11 +1292,12 @@ impl<'input> Parser<'input> {
         keep_left!(
             choices!(
                 self,
-                self.expr_app(),
                 self.expr_case(),
                 self.expr_lam(),
                 self.expr_ifthenelse(),
-                self.expr_let()
+                self.expr_let(),
+                self.expr_comp(),
+                self.expr_app()
             ),
             self.spaces()
         )

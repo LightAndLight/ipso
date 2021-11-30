@@ -186,6 +186,7 @@ fn parse_definition_3() {
                 token::Name::Keyword(Keyword::False),
                 token::Name::Keyword(Keyword::If),
                 token::Name::Keyword(Keyword::Let),
+                token::Name::Keyword(Keyword::Comp),
                 token::Name::Ctor,
                 token::Name::Space,
                 token::Name::LAngle,
@@ -522,6 +523,12 @@ fn parse_case_2() {
 #[test]
 fn parse_case_3() {
     parse_test!(
+        /*
+        case x of
+          a ->
+            b
+          c -> d
+        */
         "case x of\n  a ->\n    b\n  c -> d",
         expr_case,
         Ok(Spanned {

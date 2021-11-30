@@ -17,6 +17,7 @@
       - [Wildcard Imports](#wildcard-imports)
     - [Execution](#execution)
   - [Let Bindings](#let-bindings)
+  - [Computation Expressions](#computation-expressions)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
     - [Integers](#integers)
@@ -165,6 +166,24 @@ hello
 . let y = 2 in
 . x + y
 3
+```
+
+## Computation Expressions
+
+```ipso-repl
+> :t comp {
+.   x <- getLine
+.   print x
+.   }
+IO ()
+```
+
+```ipso-repl
+> :t comp {
+.   x <- getLine
+.   return x
+.   }
+IO String
 ```
 
 ## Datatypes
@@ -650,12 +669,12 @@ record_pattern ::=
   ident (',' ident)* [',' '..' ident] |
   '..' ident |
  
- 
 expr ::=
   lambda |
   case |
   ifthenelse |
   let |
+  comp |
   binop
   
 lambda ::=
@@ -672,6 +691,14 @@ ifthenelse ::=
 
 let ::=
   'let' ident '=' expr 'in' expr
+
+comp_line ::=
+  expr
+  'bind' ident '<-' expr
+  'return' expr
+
+comp ::=
+  'comp' '{' comp_line+ '}'
   
 binop ::=
   app (operator app)*
