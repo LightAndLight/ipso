@@ -922,10 +922,14 @@ impl<'input> Parser<'input> {
                     many_!(self, self.token(&token::Data::Space))
                 ),
                 keep_right!(self.spaces(), self.token(&token::Data::RBrace)),
-                between!(
-                    self.indent(),
-                    self.dedent(),
-                    sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
+                choices!(
+                    self,
+                    between!(
+                        self.indent(),
+                        self.dedent(),
+                        sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
+                    ),
+                    ParseResult::pure(Expr::Comp(Vec::new()))
                 )
             ))
         )
