@@ -831,12 +831,8 @@ impl Expr {
 
     pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
         if op == syntax::Binop::Add {
-            #[allow(clippy::single_match)]
-            match (&a, &b) {
-                (Expr::Int(a), Expr::Int(b)) => {
-                    return Expr::Int(*a + *b);
-                }
-                _ => {}
+            if let (Expr::Int(a), Expr::Int(b)) = (&a, &b) {
+                return Expr::Int(*a + *b);
             }
         }
         Expr::Binop(op, Rc::new(a), Rc::new(b))
