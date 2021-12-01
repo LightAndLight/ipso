@@ -21,6 +21,8 @@ macro_rules! function1 {
                 env: &'heap [Value<'heap>],
                 arg: Value<'heap>,
             ) -> Value<'heap> {
+                // This clippy lint is `allow`ed because requiring `$body` to be a function
+                // seems to be the only way to make sure it's scope-checked.
                 #[allow(clippy::redundant_closure_call)]
                 $body(eval, env, arg)
             }
