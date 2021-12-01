@@ -62,6 +62,11 @@ impl Default for CommonKinds {
     }
 }
 
+pub struct RowParts<'a> {
+    pub fields: Vec<(&'a Rc<str>, &'a Type)>,
+    pub rest: Option<&'a Type>,
+}
+
 impl Type {
     pub fn to_syntax(&self) -> r#type::Type<usize> {
         match self {
@@ -314,8 +319,7 @@ impl Type {
         TypeIterMetas::One(self)
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn unwrap_variant(&self) -> Option<(Vec<(&Rc<str>, &Type)>, Option<&Type>)> {
+    pub fn unwrap_variant(&self) -> Option<RowParts> {
         match self {
             Type::App(_, a, b) => match **a {
                 Type::Variant(_) => Some(b.unwrap_rows()),
@@ -325,18 +329,22 @@ impl Type {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn unwrap_rows(&self) -> (Vec<(&Rc<str>, &Type)>, Option<&Type>) {
+    pub fn unwrap_rows(&self) -> RowParts {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
             match current {
-                Type::RowNil => return (fields, None),
+                Type::RowNil => return RowParts { fields, rest: None },
                 Type::RowCons(field, ty, rest) => {
                     fields.push((field, ty));
                     current = rest;
                 }
-                _ => return (fields, Some(current)),
+                _ => {
+                    return RowParts {
+                        fields,
+                        rest: Some(current),
+                    }
+                }
             }
         }
     }

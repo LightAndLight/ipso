@@ -1831,15 +1831,15 @@ impl<'modules> Typechecker<'modules> {
             },
             core::Type::RowCons(_, _, _) => match actual {
                 core::Type::RowCons(_, _, _) => {
-                    let (rows1, rest1) = expected.unwrap_rows();
-                    let (rows2, rest2) = actual.unwrap_rows();
+                    let row_parts_1 = expected.unwrap_rows();
+                    let row_parts_2 = actual.unwrap_rows();
 
-                    let mut rows2_remaining = Rope::from_vec(&rows2);
+                    let mut rows2_remaining = Rope::from_vec(&row_parts_2.fields);
 
                     let mut sames: Vec<(&Rc<str>, &core::Type, &core::Type)> = Vec::new();
                     let mut not_in_rows2: Vec<(Rc<str>, core::Type)> = Vec::new();
 
-                    for (field1, ty1) in rows1 {
+                    for (field1, ty1) in row_parts_1.fields {
                         match rows2_remaining.iter().find(|(field2, _)| field1 == *field2) {
                             None => {
                                 not_in_rows2.push((field1.clone(), ty1.clone()));
@@ -1876,7 +1876,7 @@ impl<'modules> Typechecker<'modules> {
                     self.unify_type_subst(
                         subst,
                         context,
-                        match rest1 {
+                        match row_parts_1.rest {
                             None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
@@ -1886,7 +1886,7 @@ impl<'modules> Typechecker<'modules> {
                         subst,
                         context,
                         &core::Type::mk_rows(not_in_rows2, rest3),
-                        match rest2 {
+                        match row_parts_2.rest {
                             None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
@@ -2633,12 +2633,13 @@ impl<'modules> Typechecker<'modules> {
 
                     if matching_variant && !seen_fallthrough {
                         let expr_ty = self.zonk_type(&expr_ty);
-                        let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
-                        let ctors: Vec<(Rc<str>, core::Type)> = ctors
+                        let row_parts = expr_ty.unwrap_variant().unwrap();
+                        let ctors: Vec<(Rc<str>, core::Type)> = row_parts
+                            .fields
                             .iter()
                             .map(|(x, y)| ((*x).clone(), (*y).clone()))
                             .collect();
-                        let rest: Option<core::Type> = rest.cloned();
+                        let rest: Option<core::Type> = row_parts.rest.cloned();
                         let context = UnifyTypeContextRefs {
                             expected: &core::Type::mk_variant(
                                 self.common_kinds,
