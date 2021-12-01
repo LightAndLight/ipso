@@ -2,8 +2,8 @@ use super::SolveConstraintContext;
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    BoundVars, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs, UnifyTypeContext,
-    UnifyTypeContextRefs,
+    BoundVars, InferredPattern, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs,
+    UnifyTypeContext, UnifyTypeContextRefs,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -228,11 +228,11 @@ fn infer_pattern_test_1() {
         });
         assert_eq!(
             tc.infer_pattern(&pat),
-            (
-                core::Pattern::Name,
-                core::Type::Meta(Kind::Type, 0),
-                vec![(Rc::from("x"), core::Type::Meta(Kind::Type, 0))]
-            )
+            InferredPattern {
+                pattern: core::Pattern::Name,
+                r#type: core::Type::Meta(Kind::Type, 0),
+                bindings: vec![(Rc::from("x"), core::Type::Meta(Kind::Type, 0))]
+            }
         )
     })
 }
@@ -259,8 +259,8 @@ fn infer_pattern_test_2() {
         };
         assert_eq!(
             tc.infer_pattern(&pat),
-            (
-                core::Pattern::Record {
+            InferredPattern {
+                pattern: core::Pattern::Record {
                     names: vec![
                         core::Expr::mk_placeholder(2),
                         core::Expr::mk_placeholder(1),
@@ -268,7 +268,7 @@ fn infer_pattern_test_2() {
                     ],
                     rest: false
                 },
-                core::Type::mk_record(
+                r#type: core::Type::mk_record(
                     tc.common_kinds,
                     vec![
                         (Rc::from("x"), core::Type::Meta(Kind::Type, 0)),
@@ -277,12 +277,12 @@ fn infer_pattern_test_2() {
                     ],
                     None
                 ),
-                vec![
+                bindings: vec![
                     (Rc::from("x"), core::Type::Meta(Kind::Type, 0)),
                     (Rc::from("y"), core::Type::Meta(Kind::Type, 1)),
                     (Rc::from("z"), core::Type::Meta(Kind::Type, 2)),
                 ]
-            )
+            }
         )
     })
 }
@@ -312,8 +312,8 @@ fn infer_pattern_test_3() {
         };
         assert_eq!(
             tc.infer_pattern(&pat),
-            (
-                core::Pattern::Record {
+            InferredPattern {
+                pattern: core::Pattern::Record {
                     names: vec![
                         core::Expr::mk_placeholder(2),
                         core::Expr::mk_placeholder(1),
@@ -321,7 +321,7 @@ fn infer_pattern_test_3() {
                     ],
                     rest: true
                 },
-                core::Type::mk_record(
+                r#type: core::Type::mk_record(
                     tc.common_kinds,
                     vec![
                         (Rc::from("x"), core::Type::Meta(Kind::Type, 0)),
@@ -330,7 +330,7 @@ fn infer_pattern_test_3() {
                     ],
                     Some(core::Type::Meta(Kind::Row, 3))
                 ),
-                vec![
+                bindings: vec![
                     (Rc::from("x"), core::Type::Meta(Kind::Type, 0)),
                     (Rc::from("y"), core::Type::Meta(Kind::Type, 1)),
                     (Rc::from("z"), core::Type::Meta(Kind::Type, 2)),
@@ -343,7 +343,7 @@ fn infer_pattern_test_3() {
                         )
                     ),
                 ]
-            )
+            }
         )
     })
 }
@@ -360,15 +360,15 @@ fn infer_pattern_test_4() {
         };
         assert_eq!(
             tc.infer_pattern(&pat),
-            (
-                core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
-                core::Type::mk_variant(
+            InferredPattern {
+                pattern: core::Pattern::mk_variant(core::Expr::mk_placeholder(0)),
+                r#type: core::Type::mk_variant(
                     tc.common_kinds,
                     vec![(Rc::from("just"), core::Type::Meta(Kind::Type, 0))],
                     Some(core::Type::Meta(Kind::Row, 1))
                 ),
-                vec![(Rc::from("x"), core::Type::Meta(Kind::Type, 0))]
-            )
+                bindings: vec![(Rc::from("x"), core::Type::Meta(Kind::Type, 0))]
+            }
         )
     })
 }
