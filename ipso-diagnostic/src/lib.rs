@@ -35,13 +35,13 @@ pub struct Message {
     pub addendum: Option<String>,
 }
 
+#[derive(Default)]
 pub struct Diagnostic {
     items: Vec<Message>,
     located_items: Vec<(Location, Message)>,
 }
 
 impl Diagnostic {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Diagnostic {
             items: Vec::new(),

@@ -478,6 +478,26 @@ macro_rules! current_dir_with_tc {
     }};
 }
 
+/// The results of typechecking a pattern
+#[derive(Debug, PartialEq, Eq)]
+pub struct CheckedPattern {
+    /// The elaborated pattern
+    pub pattern: core::Pattern,
+    /// The variables bound by the pattern, and their types
+    pub bindings: Vec<(Rc<str>, core::Type)>,
+}
+
+/// The results of inferring a type for a pattern
+#[derive(Debug, PartialEq, Eq)]
+pub struct InferredPattern {
+    /// The elaborated pattern
+    pub pattern: core::Pattern,
+    /// The pattern's inferred type
+    pub r#type: core::Type,
+    /// The variables bound by the pattern, and their types
+    pub bindings: Vec<(Rc<str>, core::Type)>,
+}
+
 impl<'modules> Typechecker<'modules> {
     pub fn new(
         working_dir: &'modules Path,
@@ -1831,15 +1851,15 @@ impl<'modules> Typechecker<'modules> {
             },
             core::Type::RowCons(_, _, _) => match actual {
                 core::Type::RowCons(_, _, _) => {
-                    let (rows1, rest1) = expected.unwrap_rows();
-                    let (rows2, rest2) = actual.unwrap_rows();
+                    let row_parts_1 = expected.unwrap_rows();
+                    let row_parts_2 = actual.unwrap_rows();
 
-                    let mut rows2_remaining = Rope::from_vec(&rows2);
+                    let mut rows2_remaining = Rope::from_vec(&row_parts_2.fields);
 
                     let mut sames: Vec<(&Rc<str>, &core::Type, &core::Type)> = Vec::new();
                     let mut not_in_rows2: Vec<(Rc<str>, core::Type)> = Vec::new();
 
-                    for (field1, ty1) in rows1 {
+                    for (field1, ty1) in row_parts_1.fields {
                         match rows2_remaining.iter().find(|(field2, _)| field1 == *field2) {
                             None => {
                                 not_in_rows2.push((field1.clone(), ty1.clone()));
@@ -1876,7 +1896,7 @@ impl<'modules> Typechecker<'modules> {
                     self.unify_type_subst(
                         subst,
                         context,
-                        match rest1 {
+                        match row_parts_1.rest {
                             None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
@@ -1886,7 +1906,7 @@ impl<'modules> Typechecker<'modules> {
                         subst,
                         context,
                         &core::Type::mk_rows(not_in_rows2, rest3),
-                        match rest2 {
+                        match row_parts_2.rest {
                             None => &core::Type::RowNil,
                             Some(ty) => ty,
                         },
@@ -1955,11 +1975,7 @@ impl<'modules> Typechecker<'modules> {
         Ok(())
     }
 
-    fn infer_variant_pattern(
-        &mut self,
-        name: &Rc<str>,
-        arg: &Spanned<String>,
-    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+    fn infer_variant_pattern(&mut self, name: &Rc<str>, arg: &Spanned<String>) -> InferredPattern {
         let arg_ty = self.fresh_typevar(Kind::Type);
         let rest_row = self.fresh_typevar(Kind::Row);
         let ty = core::Type::mk_variant(
@@ -1975,40 +1991,35 @@ impl<'modules> Typechecker<'modules> {
                 rest: rest_row,
             },
         );
-        (
-            core::Pattern::mk_variant(core::Expr::Placeholder(tag)),
-            ty,
-            vec![(Rc::from(arg.item.as_ref()), arg_ty)],
-        )
+        InferredPattern {
+            pattern: core::Pattern::mk_variant(core::Expr::Placeholder(tag)),
+            r#type: ty,
+            bindings: vec![(Rc::from(arg.item.as_ref()), arg_ty)],
+        }
     }
 
-    fn infer_wildcard_pattern(
-        &mut self,
-    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
-        (
-            core::Pattern::Wildcard,
-            self.fresh_typevar(Kind::Type),
-            Vec::new(),
-        )
+    fn infer_wildcard_pattern(&mut self) -> InferredPattern {
+        InferredPattern {
+            pattern: core::Pattern::Wildcard,
+            r#type: self.fresh_typevar(Kind::Type),
+            bindings: Vec::new(),
+        }
     }
 
-    fn infer_name_pattern(
-        &mut self,
-        name: &Spanned<String>,
-    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+    fn infer_name_pattern(&mut self, name: &Spanned<String>) -> InferredPattern {
         let ty = self.fresh_typevar(Kind::Type);
-        (
-            core::Pattern::Name,
-            ty.clone(),
-            vec![(Rc::from(name.item.as_ref()), ty)],
-        )
+        InferredPattern {
+            pattern: core::Pattern::Name,
+            r#type: ty.clone(),
+            bindings: vec![(Rc::from(name.item.as_ref()), ty)],
+        }
     }
 
     fn infer_record_pattern(
         &mut self,
         names: &[Spanned<String>],
         rest: &Option<Spanned<String>>,
-    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+    ) -> InferredPattern {
         let mut names_tys: Vec<(Spanned<Rc<str>>, core::Type)> = names
             .iter()
             .map(|name| {
@@ -2059,20 +2070,17 @@ impl<'modules> Typechecker<'modules> {
             ))
         });
 
-        (
-            core::Pattern::Record {
+        InferredPattern {
+            pattern: core::Pattern::Record {
                 names: names_placeholders,
                 rest: rest.is_some(),
             },
-            ty,
-            names_tys.into_iter().map(|(a, b)| (a.item, b)).collect(),
-        )
+            r#type: ty,
+            bindings: names_tys.into_iter().map(|(a, b)| (a.item, b)).collect(),
+        }
     }
 
-    fn infer_pattern(
-        &mut self,
-        arg: &syntax::Pattern,
-    ) -> (core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>) {
+    fn infer_pattern(&mut self, arg: &syntax::Pattern) -> InferredPattern {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
@@ -2083,7 +2091,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    #[allow(clippy::type_complexity)]
     fn infer_variant_pattern_case(
         &mut self,
         m_expr_rows: &mut Option<core::Type>,
@@ -2091,7 +2098,7 @@ impl<'modules> Typechecker<'modules> {
         seen_ctors: &mut HashSet<Rc<str>>,
         name: &str,
         arg: &Spanned<String>,
-    ) -> Result<(core::Pattern, core::Type, Vec<(Rc<str>, core::Type)>), TypeError> {
+    ) -> Result<InferredPattern, TypeError> {
         let name: Rc<str> = Rc::from(name);
 
         let arg_ty = self.fresh_typevar(Kind::Type);
@@ -2133,22 +2140,29 @@ impl<'modules> Typechecker<'modules> {
 
         let pattern_core = core::Pattern::mk_variant(tag);
         let pattern_binds: Vec<(Rc<str>, core::Type)> = vec![(Rc::from(arg.item.as_ref()), arg_ty)];
-        Ok((pattern_core, pattern_ty, pattern_binds))
+        Ok(InferredPattern {
+            pattern: pattern_core,
+            r#type: pattern_ty,
+            bindings: pattern_binds,
+        })
     }
 
-    #[allow(clippy::type_complexity)]
     fn check_pattern(
         &mut self,
         arg: &syntax::Pattern,
         expected: &core::Type,
-    ) -> Result<(core::Pattern, Vec<(Rc<str>, core::Type)>), TypeError> {
-        let (pat, actual, binds) = self.infer_pattern(arg);
+    ) -> Result<CheckedPattern, TypeError> {
+        let InferredPattern {
+            pattern,
+            r#type: actual,
+            bindings,
+        } = self.infer_pattern(arg);
         let context = UnifyTypeContextRefs {
             expected,
             actual: &actual,
         };
         self.unify_type(&context, expected, &actual)?;
-        Ok((pat, binds))
+        Ok(CheckedPattern { pattern, bindings })
     }
 
     fn check_string_part(
@@ -2570,58 +2584,65 @@ impl<'modules> Typechecker<'modules> {
                                 pos: branch.pattern.pos,
                             });
                         }
-                        let (pattern_core, _pattern_ty, pattern_binds) =
-                            with_position!(self, branch.pattern.pos, {
-                                let ((pattern_core, pattern_ty, pattern_binds), saw_variant) =
-                                    match &branch.pattern.item {
-                                        syntax::Pattern::Wildcard => {
-                                            Ok((self.infer_wildcard_pattern(), false))
-                                        }
-                                        syntax::Pattern::Name(n) => {
-                                            Ok((self.infer_name_pattern(n), false))
-                                        }
-                                        syntax::Pattern::Record { names, rest } => {
-                                            Ok((self.infer_record_pattern(names, rest), false))
-                                        }
-                                        syntax::Pattern::Variant { name, arg } => {
-                                            let res = self.infer_variant_pattern_case(
-                                                &mut expr_rows,
-                                                &mut expected_pattern_ty,
-                                                &mut seen_ctors,
-                                                name,
-                                                arg,
-                                            )?;
-                                            Ok((res, true))
-                                        }
-                                    }?;
-                                if !saw_variant {
-                                    let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
-                                        expected: &expected_pattern_ty,
-                                        actual: &pattern_ty,
-                                    };
-                                    match self.unify_type(
-                                        &context,
-                                        &expected_pattern_ty,
-                                        &pattern_ty,
-                                    ) {
-                                        Err(err) => {
-                                            return Err(err);
-                                        }
-                                        Ok(()) => {}
-                                    }
+                        let InferredPattern {
+                            pattern: pattern_core,
+                            bindings: pattern_binds,
+                            ..
+                        } = with_position!(self, branch.pattern.pos, {
+                            let (
+                                InferredPattern {
+                                    pattern: pattern_core,
+                                    r#type: pattern_ty,
+                                    bindings: pattern_binds,
+                                },
+                                saw_variant,
+                            ) = match &branch.pattern.item {
+                                syntax::Pattern::Wildcard => {
+                                    Ok((self.infer_wildcard_pattern(), false))
                                 }
-                                match branch.pattern.item {
-                                    syntax::Pattern::Wildcard
-                                    | syntax::Pattern::Name(_)
-                                    | syntax::Pattern::Record { .. } => {
-                                        seen_fallthrough = true;
-                                    }
-                                    syntax::Pattern::Variant { .. } => {
-                                        matching_variant = true;
-                                    }
+                                syntax::Pattern::Name(n) => Ok((self.infer_name_pattern(n), false)),
+                                syntax::Pattern::Record { names, rest } => {
+                                    Ok((self.infer_record_pattern(names, rest), false))
                                 }
-                                Ok((pattern_core, pattern_ty, pattern_binds))
-                            })?;
+                                syntax::Pattern::Variant { name, arg } => {
+                                    let res = self.infer_variant_pattern_case(
+                                        &mut expr_rows,
+                                        &mut expected_pattern_ty,
+                                        &mut seen_ctors,
+                                        name,
+                                        arg,
+                                    )?;
+                                    Ok((res, true))
+                                }
+                            }?;
+                            if !saw_variant {
+                                let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
+                                    expected: &expected_pattern_ty,
+                                    actual: &pattern_ty,
+                                };
+                                match self.unify_type(&context, &expected_pattern_ty, &pattern_ty) {
+                                    Err(err) => {
+                                        return Err(err);
+                                    }
+                                    Ok(()) => {}
+                                }
+                            }
+                            match branch.pattern.item {
+                                syntax::Pattern::Wildcard
+                                | syntax::Pattern::Name(_)
+                                | syntax::Pattern::Record { .. } => {
+                                    seen_fallthrough = true;
+                                }
+                                syntax::Pattern::Variant { .. } => {
+                                    matching_variant = true;
+                                }
+                            }
+                            Ok(InferredPattern {
+                                pattern: pattern_core,
+                                r#type: pattern_ty,
+                                bindings: pattern_binds,
+                            })
+                        })?;
                         self.bound_vars.insert(&pattern_binds);
                         let body_core = self.check_expr(&branch.body, &expected_body_ty)?;
                         self.bound_vars.delete(pattern_binds.len());
@@ -2633,12 +2654,13 @@ impl<'modules> Typechecker<'modules> {
 
                     if matching_variant && !seen_fallthrough {
                         let expr_ty = self.zonk_type(&expr_ty);
-                        let (ctors, rest) = expr_ty.unwrap_variant().unwrap();
-                        let ctors: Vec<(Rc<str>, core::Type)> = ctors
+                        let row_parts = expr_ty.unwrap_variant().unwrap();
+                        let ctors: Vec<(Rc<str>, core::Type)> = row_parts
+                            .fields
                             .iter()
                             .map(|(x, y)| ((*x).clone(), (*y).clone()))
                             .collect();
-                        let rest: Option<core::Type> = rest.cloned();
+                        let rest: Option<core::Type> = row_parts.rest.cloned();
                         let context = UnifyTypeContextRefs {
                             expected: &core::Type::mk_variant(
                                 self.common_kinds,
@@ -2839,7 +2861,10 @@ impl<'modules> Typechecker<'modules> {
                             Err(err) => {
                                 return Err(err);
                             }
-                            Ok((arg_core, arg_binds)) => {
+                            Ok(CheckedPattern {
+                                pattern: arg_core,
+                                bindings: arg_binds,
+                            }) => {
                                 args_core.push(arg_core);
                                 args_binds.extend(arg_binds);
                             }

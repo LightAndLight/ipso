@@ -21,6 +21,8 @@ macro_rules! function1 {
                 env: &'heap [Value<'heap>],
                 arg: Value<'heap>,
             ) -> Value<'heap> {
+                // This clippy lint is `allow`ed because requiring `$body` to be a function
+                // seems to be the only way to make sure it's scope-checked.
                 #[allow(clippy::redundant_closure_call)]
                 $body(eval, env, arg)
             }
@@ -124,6 +126,12 @@ pub enum Env<'heap> {
     Owned(Vec<Value<'heap>>),
 }
 
+impl<'heap> Default for Env<'heap> {
+    fn default() -> Self {
+        Env::Owned(Default::default())
+    }
+}
+
 impl<'heap> Env<'heap> {
     fn push(&mut self, value: Value<'heap>) {
         match self {
@@ -144,7 +152,6 @@ impl<'heap> Env<'heap> {
         }
     }
 
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Env::Owned(Vec::new())
     }

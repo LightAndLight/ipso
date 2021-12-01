@@ -27,6 +27,11 @@ pub enum Type<A> {
     Meta(usize),
 }
 
+pub struct RowParts<'a, A> {
+    pub fields: Vec<(&'a Rc<str>, &'a Type<A>)>,
+    pub rest: Option<&'a Type<A>>,
+}
+
 impl<A> Type<A> {
     pub fn unwrap_name(&self) -> Option<&Rc<str>> {
         match self {
@@ -223,24 +228,27 @@ impl<A> Type<A> {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn unwrap_rows(&self) -> (Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>) {
+    pub fn unwrap_rows(&self) -> RowParts<A> {
         let mut current = self;
         let mut fields = Vec::new();
         loop {
             match current {
-                Type::RowNil => return (fields, None),
+                Type::RowNil => return RowParts { fields, rest: None },
                 Type::RowCons(field, ty, rest) => {
                     fields.push((field, ty));
                     current = rest;
                 }
-                _ => return (fields, Some(current)),
+                _ => {
+                    return RowParts {
+                        fields,
+                        rest: Some(current),
+                    }
+                }
             }
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn unwrap_record(&self) -> Option<(Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>)> {
+    pub fn unwrap_record(&self) -> Option<RowParts<A>> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Record => Some(b.unwrap_rows()),
@@ -250,8 +258,7 @@ impl<A> Type<A> {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn unwrap_variant(&self) -> Option<(Vec<(&Rc<str>, &Type<A>)>, Option<&Type<A>>)> {
+    pub fn unwrap_variant(&self) -> Option<RowParts<A>> {
         match self {
             Type::App(a, b) => match **a {
                 Type::Variant => Some(b.unwrap_rows()),
@@ -307,9 +314,9 @@ impl<A> Type<A> {
     {
         let mut s = String::new();
 
-        if let Some((fields, rest)) = self.unwrap_record() {
+        if let Some(row_parts) = self.unwrap_record() {
             s.push('{');
-            let mut fields_iter = fields.iter();
+            let mut fields_iter = row_parts.fields.iter();
             match fields_iter.next() {
                 None => {}
                 Some((first_field, first_ty)) => {
@@ -325,14 +332,14 @@ impl<A> Type<A> {
                     }
                 }
             }
-            match rest {
+            match row_parts.rest {
                 None => {
-                    if !fields.is_empty() {
+                    if !row_parts.fields.is_empty() {
                         s.push(' ')
                     }
                 }
                 Some(ty) => {
-                    if !fields.is_empty() {
+                    if !row_parts.fields.is_empty() {
                         s.push_str(", ")
                     }
                     s.push_str(ty.render().as_str());
@@ -343,9 +350,9 @@ impl<A> Type<A> {
             return s;
         }
 
-        if let Some((fields, rest)) = self.unwrap_variant() {
+        if let Some(row_parts) = self.unwrap_variant() {
             s.push('<');
-            let mut fields_iter = fields.iter();
+            let mut fields_iter = row_parts.fields.iter();
             match fields_iter.next() {
                 None => {}
                 Some((first_field, first_ty)) => {
@@ -361,14 +368,14 @@ impl<A> Type<A> {
                     }
                 }
             }
-            match rest {
+            match row_parts.rest {
                 None => {
-                    if !fields.is_empty() {
+                    if !row_parts.fields.is_empty() {
                         s.push(' ');
                     }
                 }
                 Some(ty) => {
-                    if !fields.is_empty() {
+                    if !row_parts.fields.is_empty() {
                         s.push_str(" |")
                     }
                     s.push(' ');

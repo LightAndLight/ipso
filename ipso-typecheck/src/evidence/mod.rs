@@ -4,7 +4,7 @@ use crate::Typechecker;
 use ipso_core::{self as core, EVar, Expr, Placeholder};
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Evidence {
     evars: Vec<Constraint>,
     environment: Vec<(Constraint, Option<usize>, Option<Expr>)>,
@@ -38,7 +38,6 @@ impl Constraint {
 }
 
 impl Evidence {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Evidence {
             evars: Vec::new(),
