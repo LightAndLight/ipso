@@ -6,10 +6,10 @@ use super::{TypeError, Typechecker};
 use fnv::FnvHashMap;
 use ipso_core::{self as core};
 
+#[derive(Default)]
 pub struct Substitution(FnvHashMap<usize, core::Type>);
 
 impl Substitution {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Substitution(FnvHashMap::with_hasher(Default::default()))
     }
