@@ -7,7 +7,7 @@
     ''
     comp_expr_empty.ipso:2:8: error: empty computation expression
       |
-    2 | main = comp {}
+    2 | main = comp
       |        ^
     '',
   exitcode = 1
