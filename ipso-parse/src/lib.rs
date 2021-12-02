@@ -916,21 +916,14 @@ impl<'input> Parser<'input> {
     fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            keep_left!(self.keyword(&Keyword::Comp), self.spaces()).and_then(|_| between!(
-                keep_left!(
-                    self.token(&token::Data::LBrace),
-                    many_!(self, self.token(&token::Data::Space))
+            self.keyword(&Keyword::Comp).and_then(|_| choices!(
+                self,
+                between!(
+                    self.indent(),
+                    self.dedent(),
+                    sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
                 ),
-                keep_right!(self.spaces(), self.token(&token::Data::RBrace)),
-                choices!(
-                    self,
-                    between!(
-                        self.indent(),
-                        self.dedent(),
-                        sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
-                    ),
-                    ParseResult::pure(Expr::Comp(Vec::new()))
-                )
+                ParseResult::pure(Expr::Comp(Vec::new()))
             ))
         )
     }
