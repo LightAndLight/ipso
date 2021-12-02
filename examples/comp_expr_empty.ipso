@@ -1,2 +1,2 @@
 main : IO ()
-main = comp {}
+main = comp

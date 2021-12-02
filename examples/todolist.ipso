@@ -79,10 +79,10 @@ writeTodos todos =
   then writeStdout stdout (toUtf8 "nothing to do\n")
   else
     foldlArray
-      (\acc todo -> comp {
+      (\acc todo -> comp
         acc
         writeStdout stdout (toUtf8 "$todo\n")
-      })
+      )
       (pureIO ())
       todos
 
@@ -94,15 +94,13 @@ runCommand cmd todos =
   case cmd of
     Quit x ->
       pureIO (Quit ())
-    Help x ->
-      comp {
-        writeStdout stdout (toUtf8 "help - display this message\n")
-        writeStdout stdout (toUtf8 "quit - exit the application\n")
-        writeStdout stdout (toUtf8 "list - display the todolist\n")
-        writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
-        writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
-        return (Continue todos)
-      }
+    Help x -> comp
+      writeStdout stdout (toUtf8 "help - display this message\n")
+      writeStdout stdout (toUtf8 "quit - exit the application\n")
+      writeStdout stdout (toUtf8 "list - display the todolist\n")
+      writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
+      writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
+      return (Continue todos)
     Add todo ->
       pureIO (Continue (snocArray todos todo))
     List x ->
@@ -117,20 +115,16 @@ runCommand cmd todos =
       pureIO (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
-loop todos =
-  comp {
-    writeStdout stdout (toUtf8 "> ") 
-    flushStdout stdout
-    bind line <- readLineStdin stdin
-    bind next <- runCommand (parseCommand line) todos
-    case next of
-      Continue newTodos -> loop newTodos
-      Quit x -> pureIO ()
-  }
+loop todos = comp
+  writeStdout stdout (toUtf8 "> ") 
+  flushStdout stdout
+  bind line <- readLineStdin stdin
+  bind next <- runCommand (parseCommand line) todos
+  case next of
+    Continue newTodos -> loop newTodos
+    Quit x -> pureIO ()
 
 main : IO ()
-main =
-  comp {
-    writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
-    loop []
-  }
+main = comp
+  writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
+  loop []

@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    comp_expr_bind_end.ipso:3:3: error: computation expression ends with a bind
+    comp_expr_bind_end.ipso:2:8: error: computation expression ends with a bind
       |
-    3 |   comp {
-      |   ^
+    2 | main = comp
+      |        ^
     '',
   exitcode = 1
 }

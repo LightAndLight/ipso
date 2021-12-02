@@ -171,18 +171,18 @@ hello
 ## Computation Expressions
 
 ```ipso-repl
-> :t comp {
+> :t comp
 .   x <- getLine
 .   print x
-.   }
+.
 IO ()
 ```
 
 ```ipso-repl
-> :t comp {
+> :t comp
 .   x <- getLine
 .   return x
-.   }
+.
 IO String
 ```
 
@@ -488,7 +488,7 @@ Type -> Type
 ```
 
 ```ipso-repl
-> do
+> comp
 .   line <- getLine
 .   print line
 hello
@@ -698,7 +698,7 @@ comp_line ::=
   'return' expr
 
 comp ::=
-  'comp' '{' comp_line+ '}'
+  'comp' comp_line+
   
 binop ::=
   app (operator app)*
