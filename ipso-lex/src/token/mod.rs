@@ -319,65 +319,6 @@ pub enum Data {
 }
 
 impl Data {
-    pub fn render(&self) -> String {
-        match self {
-            Data::Unexpected(_) => String::from("unexpected"),
-            Data::Ident(s) => {
-                if s.is_empty() {
-                    String::from("identifier")
-                } else {
-                    format!("\"{}\"", s)
-                }
-            }
-            Data::Int { value, length } => {
-                if *length == 0 {
-                    String::from("integer")
-                } else {
-                    format!("\"{}\"", value)
-                }
-            }
-            Data::Comment { .. } => String::from("comment"),
-            Data::DoubleQuote => String::from("'\"'"),
-            Data::Dollar => String::from("'$'"),
-            Data::DollarLBrace => String::from("'${'"),
-            Data::String { value, .. } => format!("{:?}", value),
-            Data::SingleQuote => String::from("'"),
-            Data::Char { value, .. } => format!("'{}'", value),
-            Data::LBrace => String::from("'{'"),
-            Data::RBrace => String::from("'}'"),
-            Data::LParen => String::from("'('"),
-            Data::RParen => String::from("')'"),
-            Data::LBracket => String::from("'['"),
-            Data::RBracket => String::from("']'"),
-            Data::Backslash => String::from("'\\'"),
-            Data::LeftArrow => String::from("'<-'"),
-            Data::Arrow => String::from("'->'"),
-            Data::FatArrow => String::from("'=>'"),
-            Data::Dot => String::from("'.'"),
-            Data::Asterisk => String::from("'*'"),
-            Data::Equals => String::from("'='"),
-            Data::Colon => String::from("':'"),
-            Data::Comma => String::from("','"),
-            Data::Underscore => String::from("'_'"),
-            Data::Hyphen => String::from("'-'"),
-            Data::Plus => String::from("'+'"),
-            Data::Slash => String::from("'/'"),
-            Data::Indent(n) => {
-                if *n == 0 {
-                    String::from("newline")
-                } else {
-                    format!("indent ({})", n)
-                }
-            }
-            Data::Dedent => String::from("dedent"),
-            Data::Space => String::from("space"),
-            Data::Ctor => String::from("constructor"),
-            Data::Pipe => String::from("'|'"),
-            Data::LAngle => String::from("'<'"),
-            Data::RAngle => String::from("'>'"),
-        }
-    }
-
     pub fn length(&self) -> usize {
         match self {
             Data::Unexpected(_) => 1,
