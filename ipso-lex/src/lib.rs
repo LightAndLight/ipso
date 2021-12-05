@@ -425,11 +425,22 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '.' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::Dot,
-                            pos,
-                            column,
-                        })
+
+                        match self.current {
+                            Some(c) if c == '.' => {
+                                self.consume();
+                                Some(Token {
+                                    data: token::Data::DotDot,
+                                    pos,
+                                    column,
+                                })
+                            }
+                            _ => Some(Token {
+                                data: token::Data::Dot,
+                                pos,
+                                column,
+                            }),
+                        }
                     }
                     '=' => {
                         self.consume();

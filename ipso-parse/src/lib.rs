@@ -970,10 +970,7 @@ impl<'input> Parser<'input> {
             }),
             // '..' ident
             keep_right!(
-                keep_left!(
-                    keep_left!(self.token(&token::Data::Dot), self.token(&token::Data::Dot)),
-                    self.spaces()
-                ),
+                keep_left!(self.token(&token::Data::DotDot), self.spaces()),
                 keep_left!(spanned!(self, self.ident_owned()), self.spaces()).map(Some)
             )
         )
@@ -1097,13 +1094,7 @@ impl<'input> Parser<'input> {
                     })
                 }),
                 keep_right!(
-                    keep_left!(
-                        keep_left!(
-                            parser.token(&token::Data::Dot),
-                            parser.token(&token::Data::Dot)
-                        ),
-                        parser.spaces()
-                    ),
+                    keep_left!(parser.token(&token::Data::DotDot), parser.spaces()),
                     keep_left!(parser.expr_atom(), parser.spaces()).map(Some)
                 )
             )

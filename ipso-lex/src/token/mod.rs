@@ -31,6 +31,7 @@ pub enum Name {
     Arrow,
     FatArrow,
     Dot,
+    DotDot,
     Asterisk,
     Equals,
     Colon,
@@ -72,6 +73,7 @@ impl Arbitrary for Name {
             Name::Arrow,
             Name::FatArrow,
             Name::Dot,
+            Name::DotDot,
             Name::Asterisk,
             Name::Equals,
             Name::Colon,
@@ -90,7 +92,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        36 + Keyword::num_variants()
+        37 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -138,17 +140,18 @@ impl Name {
             40 => Some(Self::Arrow),
             41 => Some(Self::FatArrow),
             42 => Some(Self::Dot),
-            43 => Some(Self::Asterisk),
-            44 => Some(Self::Equals),
-            45 => Some(Self::Colon),
-            46 => Some(Self::Comma),
-            47 => Some(Self::Pipe),
-            48 => Some(Self::Underscore),
-            49 => Some(Self::Hyphen),
-            50 => Some(Self::Plus),
-            51 => Some(Self::Slash),
-            // 52 => Self::Indent(_),
-            53 => Some(Self::Dedent),
+            43 => Some(Self::DotDot),
+            44 => Some(Self::Asterisk),
+            45 => Some(Self::Equals),
+            46 => Some(Self::Colon),
+            47 => Some(Self::Comma),
+            48 => Some(Self::Pipe),
+            49 => Some(Self::Underscore),
+            50 => Some(Self::Hyphen),
+            51 => Some(Self::Plus),
+            52 => Some(Self::Slash),
+            // 53 => Self::Indent(_),
+            54 => Some(Self::Dedent),
             _ => None,
         }
     }
@@ -198,17 +201,18 @@ impl Name {
             Self::Arrow => 40,
             Self::FatArrow => 41,
             Self::Dot => 42,
-            Self::Asterisk => 43,
-            Self::Equals => 44,
-            Self::Colon => 45,
-            Self::Comma => 46,
-            Self::Pipe => 47,
-            Self::Underscore => 48,
-            Self::Hyphen => 49,
-            Self::Plus => 50,
-            Self::Slash => 51,
-            Self::Indent(_) => 52,
-            Self::Dedent => 53,
+            Self::DotDot => 43,
+            Self::Asterisk => 44,
+            Self::Equals => 45,
+            Self::Colon => 46,
+            Self::Comma => 47,
+            Self::Pipe => 48,
+            Self::Underscore => 49,
+            Self::Hyphen => 50,
+            Self::Plus => 51,
+            Self::Slash => 52,
+            Self::Indent(_) => 53,
+            Self::Dedent => 54,
         }
     }
 
@@ -236,6 +240,7 @@ impl Name {
             Name::Arrow => String::from("'->'"),
             Name::FatArrow => String::from("'=>'"),
             Name::Dot => String::from("'.'"),
+            Name::DotDot => String::from("'..'"),
             Name::Asterisk => String::from("'*'"),
             Name::Equals => String::from("'='"),
             Name::Colon => String::from("':'"),
@@ -293,6 +298,7 @@ pub enum Data {
     FatArrow,
 
     Dot,
+    DotDot,
 
     Asterisk,
 
@@ -345,6 +351,7 @@ impl Data {
             Data::Arrow => String::from("'->'"),
             Data::FatArrow => String::from("'=>'"),
             Data::Dot => String::from("'.'"),
+            Data::DotDot => String::from("'..'"),
             Data::Asterisk => String::from("'*'"),
             Data::Equals => String::from("'='"),
             Data::Colon => String::from("':'"),
@@ -377,6 +384,7 @@ impl Data {
             Data::Arrow => 2,
             Data::FatArrow => 2,
             Data::Dot => 1,
+            Data::DotDot => 2,
             Data::Asterisk => 1,
             Data::Equals => 1,
             Data::Colon => 1,
@@ -425,6 +433,7 @@ impl Data {
             Data::Arrow => Name::Arrow,
             Data::FatArrow => Name::FatArrow,
             Data::Dot => Name::Dot,
+            Data::DotDot => Name::DotDot,
             Data::Asterisk => Name::Asterisk,
             Data::Equals => Name::Equals,
             Data::Colon => Name::Colon,
