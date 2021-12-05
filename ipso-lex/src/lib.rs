@@ -403,10 +403,20 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '.' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::Dot,
-                            pos,
-                        })
+
+                        match self.current {
+                            Some(c) if c == '.' => {
+                                self.consume();
+                                Some(Token {
+                                    data: token::Data::DotDot,
+                                    pos,
+                                })
+                            }
+                            _ => Some(Token {
+                                data: token::Data::Dot,
+                                pos,
+                            }),
+                        }
                     }
                     '=' => {
                         self.consume();
