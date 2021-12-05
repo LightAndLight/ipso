@@ -281,6 +281,7 @@ impl Expecting {
 pub struct Parser<'input> {
     source: Source,
     pos: usize,
+    column: usize,
     indentation: Vec<usize>,
     expecting: Expecting,
     current: Option<Token>,
@@ -423,7 +424,8 @@ impl<'input> Parser<'input> {
         Parser {
             source,
             pos: 0,
-            indentation: vec![0],
+            column: 0,
+            indentation: vec![],
             expecting: Expecting::new(),
             current,
             input,
@@ -448,6 +450,60 @@ impl<'input> Parser<'input> {
         }
     }
 
+    fn indent_scope<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
+        self.indentation.push(self.column);
+        f().map(|b| {
+            self.indentation.pop().unwrap();
+            b
+        })
+    }
+
+    fn indent_error<B>(&self) -> ParseResult<B> {
+        todo!()
+    }
+
+    fn indent_eq<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
+        let current_indentation: usize = *self.indentation.last().unwrap();
+        match &self.current {
+            None => self.unexpected(false),
+            Some(token) => {
+                if token.column == current_indentation {
+                    f()
+                } else {
+                    self.indent_error()
+                }
+            }
+        }
+    }
+
+    fn indent_gte<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
+        let current_indentation: usize = *self.indentation.last().unwrap();
+        match &self.current {
+            None => self.unexpected(false),
+            Some(token) => {
+                if token.column >= current_indentation {
+                    f()
+                } else {
+                    self.indent_error()
+                }
+            }
+        }
+    }
+
+    fn indent_gt<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
+        let current_indentation: usize = *self.indentation.last().unwrap();
+        match &self.current {
+            None => self.unexpected(false),
+            Some(token) => {
+                if token.column > current_indentation {
+                    f()
+                } else {
+                    self.indent_error()
+                }
+            }
+        }
+    }
+
     pub fn eof(&self) -> ParseResult<()> {
         match self.current {
             None => ParseResult::pure(()),
@@ -461,6 +517,7 @@ impl<'input> Parser<'input> {
             Some(ref token) => {
                 self.pos += token.data.length();
                 self.current = self.input.next();
+                self.column = token.column;
                 self.expecting.clear();
                 ParseResult {
                     consumed: true,
@@ -470,71 +527,8 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn current_indentation(&self) -> usize {
-        self.indentation[self.indentation.len() - 1]
-    }
-
-    fn space_body(&mut self) -> ParseResult<()> {
-        match self.current {
-            Some(ref token) => match token.data {
-                token::Data::Indent(n) if n > self.current_indentation() => {
-                    map0!((), self.consume())
-                }
-                token::Data::Space => {
-                    map0!((), self.consume())
-                }
-                _ => self.unexpected(false),
-            },
-            None => self.unexpected(false),
-        }
-    }
-
-    fn space(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Space);
-        self.space_body()
-    }
-
-    fn indent(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Indent(0));
-        let current_indentation = self.current_indentation();
-        match self.current {
-            Some(ref token) => match token.data {
-                token::Data::Indent(n) if n > current_indentation => {
-                    self.indentation.push(n);
-                    map0!((), self.consume())
-                }
-                _ => self.unexpected(false),
-            },
-            None => self.unexpected(false),
-        }
-    }
-
-    fn dedent(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Dedent);
-        let dedent_to = match &self.current {
-            Some(token) => match token.data {
-                token::Data::Indent(n) => Some(n),
-                _ => None,
-            },
-            None => Some(0),
-        };
-        match dedent_to {
-            None => self.unexpected(false),
-            Some(n) => match self.indentation.last() {
-                None => panic!("dedent: indentation is empty"),
-                Some(top) => match n.cmp(top) {
-                    cmp::Ordering::Less => {
-                        self.indentation.pop();
-                        ParseResult::pure(())
-                    }
-                    cmp::Ordering::Equal => self.unexpected(false),
-                    cmp::Ordering::Greater => self.unexpected(false),
-                },
-            },
-        }
-    }
-
-    fn comment_body(&mut self) -> ParseResult<()> {
+    fn comment(&mut self) -> ParseResult<()> {
+        self.expecting.insert(token::Name::Comment);
         match self.current {
             None => self.unexpected(false),
             Some(ref token) => match token.data {
@@ -542,15 +536,6 @@ impl<'input> Parser<'input> {
                 _ => self.unexpected(false),
             },
         }
-    }
-
-    fn comment(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Comment);
-        self.comment_body()
-    }
-
-    fn spaces(&mut self) -> ParseResult<()> {
-        many_!(self, choices!(self, self.space(), self.comment()))
     }
 
     fn keyword(&mut self, expected: &Keyword) -> ParseResult<()> {
@@ -582,12 +567,11 @@ impl<'input> Parser<'input> {
 
     fn ident(&mut self) -> ParseResult<Rc<str>> {
         self.expecting.insert(token::Name::Ident);
-        match self.current {
-            Some(ref token) => match &token.data {
+        match &self.current {
+            Some(token) => match &token.data {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_lowercase() => {
-                        let s = s.clone();
-                        map0!(s, self.consume())
+                        map0!(s.clone(), self.consume())
                     }
                     _ => self.unexpected(false),
                 },
@@ -685,158 +669,185 @@ impl<'input> Parser<'input> {
     }
 
     /*
-    type_record ::=
-      '{' record_fields '}'
-
     type_record_fields ::=
-      [ident [':' type [',' record_fields]]]
-     */
-    fn type_record(&mut self) -> ParseResult<Type<Rc<str>>> {
-        fn type_record_fields(
-            parser: &mut Parser,
-            fields: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
-        ) -> ParseResult<Option<Type<Rc<str>>>> {
-            optional!(self, keep_left!(parser.ident(), parser.spaces())).and_then(|m_ident| {
-                match m_ident {
-                    None => ParseResult::pure(None),
-                    Some(ident) => optional!(
-                        self,
+      [ident [':' type [',' type_record_fields]]
+    */
+    fn type_record_fields(
+        &mut self,
+        fields: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
+    ) -> ParseResult<Option<Type<Rc<str>>>> {
+        /*
+        `indent_gte` allows the record type's contents to be in any column
+        greater than or equal to the record type's opening brace.
+        */
+        optional!(self, self.indent_gte(|| self.ident())).and_then(|m_ident| match m_ident {
+            None => ParseResult::pure(None),
+            Some(ident) => optional!(
+                self,
+                keep_right!(
+                    self.indent_gte(|| self.token(&token::Data::Colon)),
+                    self.indent_gte(|| self.type_())
+                )
+            )
+            .and_then(|m_ty| match m_ty {
+                None => ParseResult::pure(Some(Type::Var(ident))),
+                Some(ty) => {
+                    fields.push((ident, ty));
+                    optional!(
+                        parser,
                         keep_right!(
-                            keep_left!(parser.token(&token::Data::Colon), parser.spaces()),
-                            parser.type_()
+                            self.indent_gte(|| self.token(&token::Data::Comma)),
+                            self.indent_gte(|| self.type_record_fields(fields))
                         )
                     )
-                    .and_then(|m_ty| match m_ty {
-                        None => ParseResult::pure(Some(Type::Var(ident))),
-                        Some(ty) => {
-                            fields.push((ident, ty));
-                            optional!(
-                                parser,
-                                keep_right!(
-                                    keep_left!(parser.token(&token::Data::Comma), parser.spaces()),
-                                    type_record_fields(parser, fields)
-                                )
-                            )
-                            .map(|m_rest| match m_rest {
-                                None => None,
-                                Some(rest) => rest,
-                            })
-                        }
-                    }),
+                    .map(|m_rest| match m_rest {
+                        None => None,
+                        Some(rest) => rest,
+                    })
                 }
-            })
-        }
-        keep_right!(
-            keep_left!(self.token(&token::Data::LBrace), self.spaces()),
-            keep_left!(
+            }),
+        })
+    }
+
+    /*
+    type_record ::=
+      '{' type_record_fields '}'
+     */
+    fn type_record(&mut self) -> ParseResult<Type<Rc<str>>> {
+        self.indent_scope(|| {
+            between!(
+                self.indent_eq(|| self.token(&token::Data::LBrace)),
+                self.indent_gte(|| self.token(&token::Data::RBrace)),
                 {
                     let mut fields = Vec::new();
-                    type_record_fields(self, &mut fields).map(|rest| Type::mk_record(fields, rest))
-                },
-                self.token(&token::Data::RBrace)
+                    self.type_record_fields(&mut fields)
+                        .map(|rest| Type::mk_record(fields, rest))
+                }
             )
+        })
+    }
+
+    /*
+    type_variant_ctors ::=
+      ident
+      ctor ':' type ['|' type_variant_ctors]
+    */
+    fn type_variant_ctors(
+        &mut self,
+        ctors: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
+    ) -> ParseResult<Option<Type<Rc<str>>>> {
+        choices!(
+            self,
+            self.indent_gte(|| self.ident()).map(|x| Some(Type::Var(x))),
+            self.indent_gte(|| self.ctor())
+                .and_then(|ctor| map0!(ctor, self.indent_gte(|| self.token(&token::Data::Colon))))
+                .and_then(|ctor| self.type_().map(|ty| (ctor, ty)))
+                .and_then(|(ctor, ty)| {
+                    ctors.push((ctor, ty));
+                    optional!(
+                        parser,
+                        self.indent_gte(|| self.token(&token::Data::Pipe))
+                            .and_then(|_| self.type_variant_ctors(ctors))
+                    )
+                    .map(|m_rest| match m_rest {
+                        None => None,
+                        Some(rest) => rest,
+                    })
+                })
         )
     }
 
     /*
     type_variant ::=
       '<' [type_variant_ctors] '>'
-
-    type_variant_ctors ::=
-      ident
-      ctor ':' type ['|' type_variant_ctors]
      */
     fn type_variant(&mut self) -> ParseResult<Type<Rc<str>>> {
-        fn type_variant_ctors(
-            parser: &mut Parser,
-            ctors: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
-        ) -> ParseResult<Option<Type<Rc<str>>>> {
-            choices!(
-                parser,
-                keep_left!(parser.ident(), parser.spaces()).map(|x| Some(Type::Var(x))),
-                keep_left!(parser.ctor(), parser.spaces()).and_then(|ctor| keep_left!(
-                    parser.token(&token::Data::Colon),
-                    parser.spaces()
-                )
-                .and_then(|_| parser.type_().and_then(|ty| {
-                    ctors.push((ctor, ty));
-                    optional!(
-                        parser,
-                        keep_left!(parser.token(&token::Data::Pipe), parser.spaces())
-                            .and_then(|_| type_variant_ctors(parser, ctors))
+        self.indent_scope(|| {
+            between!(
+                self.indent_eq(|| self.token(&token::Data::LAngle)),
+                self.indent_gte(|| self.token(&token::Data::RAngle)),
+                {
+                    let mut ctors = Vec::new();
+                    optional!(self, self.type_variant_ctors(&mut ctors)).map(
+                        |m_rest| match m_rest {
+                            None => Type::mk_variant(Vec::new(), None),
+                            Some(rest) => Type::mk_variant(ctors, rest),
+                        },
                     )
-                    .map(|m_rest| match m_rest {
-                        None => None,
-                        Some(rest) => rest,
-                    })
-                })))
+                }
             )
-        }
-
-        between!(
-            keep_left!(self.token(&token::Data::LAngle), self.spaces()),
-            self.token(&token::Data::RAngle),
-            {
-                let mut ctors = Vec::new();
-                optional!(self, type_variant_ctors(self, &mut ctors)).map(|m_rest| match m_rest {
-                    None => Type::mk_variant(Vec::new(), None),
-                    Some(rest) => Type::mk_variant(ctors, rest),
-                })
-            }
-        )
+        })
     }
 
+    /*
+    type_atom ::=
+      'Bool'
+      'Int'
+      'Char'
+      'String'
+      'Array'
+      'IO'
+      type_record
+      type_variant
+      ident
+      ctor
+      '(' type ')'
+    */
     fn type_atom(&mut self) -> ParseResult<Type<Rc<str>>> {
-        keep_left!(
-            choices!(
-                self,
-                map0!(
-                    Type::Bool,
-                    self.token(&token::Data::Ident(Rc::from("Bool")))
-                ),
-                map0!(Type::Int, self.token(&token::Data::Ident(Rc::from("Int")))),
-                map0!(
-                    Type::Char,
-                    self.token(&token::Data::Ident(Rc::from("Char")))
-                ),
-                map0!(
-                    Type::String,
-                    self.token(&token::Data::Ident(Rc::from("String")))
-                ),
-                map0!(
-                    Type::Array,
-                    self.token(&token::Data::Ident(Rc::from("Array")))
-                ),
-                map0!(Type::IO, self.token(&token::Data::Ident(Rc::from("IO")))),
-                self.type_record(),
-                self.type_variant(),
-                self.ctor().map(Type::Name),
-                self.ident().map(Type::Var),
-                keep_right!(
-                    keep_left!(self.token(&token::Data::LParen), self.spaces()),
-                    keep_left!(
-                        optional!(self, self.type_()).map(|m_ty| m_ty.unwrap_or(Type::Unit)),
-                        self.token(&token::Data::RParen)
-                    )
-                )
+        choices!(
+            self,
+            map0!(
+                Type::Bool,
+                self.token(&token::Data::Ident(Rc::from("Bool")))
             ),
-            self.spaces()
+            map0!(Type::Int, self.token(&token::Data::Ident(Rc::from("Int")))),
+            map0!(
+                Type::Char,
+                self.token(&token::Data::Ident(Rc::from("Char")))
+            ),
+            map0!(
+                Type::String,
+                self.token(&token::Data::Ident(Rc::from("String")))
+            ),
+            map0!(
+                Type::Array,
+                self.token(&token::Data::Ident(Rc::from("Array")))
+            ),
+            map0!(Type::IO, self.token(&token::Data::Ident(Rc::from("IO")))),
+            self.type_record(),
+            self.type_variant(),
+            self.ctor().map(Type::Name),
+            self.ident().map(Type::Var),
+            self.indent_scope(|| between!(
+                self.indent_eq(|| self.token(&token::Data::LParen)),
+                self.indent_gte(|| self.token(&token::Data::RParen)),
+                optional!(self, self.indent_gte(|| self.type_()))
+                    .map(|m_ty| m_ty.unwrap_or(Type::Unit))
+            ))
         )
     }
 
+    /*
+    type_app ::=
+      type_atom+
+     */
     fn type_app(&mut self) -> ParseResult<Type<Rc<str>>> {
         self.type_atom().and_then(|first| {
             many!(self, self.type_atom()).map(|rest| rest.into_iter().fold(first, Type::mk_app))
         })
     }
 
+    /*
+    type_arrow ::=
+      type_app ['->' type_arrow]
+     */
     fn type_arrow(&mut self) -> ParseResult<Type<Rc<str>>> {
         self.type_app().and_then(|a| {
             optional!(
                 self,
                 map2!(
                     |_, ty| ty,
-                    keep_left!(self.token(&token::Data::Arrow), self.spaces()),
+                    self.indent_gt(|| self.token(&token::Data::Arrow)),
                     self.type_arrow()
                 )
             )
@@ -847,13 +858,17 @@ impl<'input> Parser<'input> {
         })
     }
 
+    /*
+    type_fatarrow ::=
+      type_arrow ['=>' type_fatarrow]
+     */
     fn type_fatarrow(&mut self) -> ParseResult<Type<Rc<str>>> {
         self.type_arrow().and_then(|a| {
             optional!(
                 self,
                 map2!(
                     |_, ty| ty,
-                    keep_left!(self.token(&token::Data::FatArrow), self.spaces()),
+                    self.indent_gt(|| self.token(&token::Data::FatArrow)),
                     self.type_fatarrow()
                 )
             )
@@ -864,38 +879,12 @@ impl<'input> Parser<'input> {
         })
     }
 
+    /*
+    type ::=
+      type_fatarrow
+    */
     fn type_(&mut self) -> ParseResult<Type<Rc<str>>> {
         self.type_fatarrow()
-    }
-
-    fn newline(&mut self) -> ParseResult<()> {
-        keep_right!(optional!(self, self.comment()), {
-            let current = self.current_indentation();
-            self.expecting.insert(token::Name::Indent(current));
-            match self.current {
-                None => self.unexpected(false),
-                Some(ref token) => match token.data {
-                    token::Data::Indent(n) if n == current => {
-                        map0!((), self.consume())
-                    }
-                    _ => self.unexpected(false),
-                },
-            }
-        })
-    }
-
-    fn comp_line_bind(&mut self) -> ParseResult<CompLine> {
-        keep_left!(self.keyword(&Keyword::Bind), self.spaces()).and_then(|_| {
-            keep_left!(self.ident(), self.spaces()).and_then(|name| {
-                keep_left!(self.token(&token::Data::LeftArrow), self.spaces())
-                    .and_then(|_| self.expr().map(|value| CompLine::Bind(name, value)))
-            })
-        })
-    }
-
-    fn comp_line_return(&mut self) -> ParseResult<CompLine> {
-        keep_left!(self.keyword(&Keyword::Return), self.spaces())
-            .and_then(|_| self.expr().map(CompLine::Return))
     }
 
     /**
@@ -905,73 +894,94 @@ impl<'input> Parser<'input> {
       expr
     */
     fn comp_line(&mut self) -> ParseResult<CompLine> {
-        choices!(
-            self,
-            self.comp_line_bind(),
-            self.comp_line_return(),
-            self.expr().map(CompLine::Expr)
-        )
+        self.indent_eq(|| {
+            self.indent_scope(|| {
+                choices!(
+                    self,
+                    // 'bind' ident '<-' expr
+                    {
+                        keep_right!(
+                            self.keyword(&Keyword::Bind),
+                            self.indent_gt(|| self.ident())
+                        )
+                        .and_then(|name| {
+                            keep_right!(
+                                self.indent_gt(|| self.token(&token::Data::LeftArrow)),
+                                self.indent_gt(|| self.expr())
+                            )
+                            .map(|value| CompLine::Bind(name, value))
+                        })
+                    },
+                    // 'return' expr
+                    {
+                        keep_right!(
+                            self.keyword(&Keyword::Return),
+                            self.indent_gt(|| self.expr())
+                        )
+                        .map(CompLine::Return)
+                    },
+                    self.expr().map(CompLine::Expr)
+                )
+            })
+        })
     }
 
+    /*
+    expr_comp ::=
+      'comp' comp_line*
+     */
     fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            self.keyword(&Keyword::Comp).and_then(|_| choices!(
-                self,
-                between!(
-                    self.indent(),
-                    self.dedent(),
-                    sep_by!(self, self.comp_line(), self.newline()).map(Expr::Comp)
-                ),
-                ParseResult::pure(Expr::Comp(Vec::new()))
+            self.indent_scope(|| keep_right!(
+                self.keyword(&Keyword::Comp),
+                self.indent_gt(
+                    || self.indent_scope(|| many!(self, self.comp_line()).map(Expr::Comp))
+                )
             ))
+        )
+    }
+
+    /*
+    pattern_record_fields ::=
+      ident [',' pattern_record_fields]
+      '..' ident
+     */
+    fn pattern_record_fields(
+        &mut self,
+        names: &mut Vec<Spanned<String>>,
+    ) -> ParseResult<Option<Spanned<String>>> {
+        choices!(
+            self,
+            keep_left!(spanned!(self, self.ident_owned()), self.spaces()).and_then(|name| {
+                names.push(name);
+                optional!(
+                    self,
+                    keep_right!(
+                        keep_left!(self.token(&token::Data::Comma), self.spaces()),
+                        self.pattern_record_fields(names)
+                    )
+                )
+                .map(|m_rest| match m_rest {
+                    None => None,
+                    Some(rest) => rest,
+                })
+            }),
+            keep_right!(
+                keep_left!(
+                    keep_left!(self.token(&token::Data::Dot), self.token(&token::Data::Dot)),
+                    self.spaces()
+                ),
+                keep_left!(spanned!(self, self.ident_owned()), self.spaces()).map(Some)
+            )
         )
     }
 
     /*
     pattern_record ::=
       '{' [pattern_record_fields] '}'
-
-    pattern_record_fields ::=
-      ident [',' pattern_record_fields]
-      '..' ident
      */
     fn pattern_record(&mut self) -> ParseResult<Pattern> {
-        fn pattern_record_fields(
-            parser: &mut Parser,
-            names: &mut Vec<Spanned<String>>,
-        ) -> ParseResult<Option<Spanned<String>>> {
-            choices!(
-                parser,
-                keep_left!(spanned!(parser, parser.ident_owned()), parser.spaces()).and_then(
-                    |name| {
-                        names.push(name);
-                        optional!(
-                            parser,
-                            keep_right!(
-                                keep_left!(parser.token(&token::Data::Comma), parser.spaces()),
-                                pattern_record_fields(parser, names)
-                            )
-                        )
-                        .map(|m_rest| match m_rest {
-                            None => None,
-                            Some(rest) => rest,
-                        })
-                    }
-                ),
-                keep_right!(
-                    keep_left!(
-                        keep_left!(
-                            parser.token(&token::Data::Dot),
-                            parser.token(&token::Data::Dot)
-                        ),
-                        parser.spaces()
-                    ),
-                    keep_left!(spanned!(parser, parser.ident_owned()), parser.spaces()).map(Some)
-                )
-            )
-        }
-
         keep_right!(
             keep_left!(self.token(&token::Data::LBrace), self.spaces()),
             keep_left!(

@@ -42,7 +42,6 @@ pub enum Name {
     Slash,
     Indent(usize),
     Dedent,
-    Space,
 }
 
 impl Arbitrary for Name {
@@ -84,7 +83,6 @@ impl Arbitrary for Name {
             Name::Slash,
             Name::Indent(usize::arbitrary(g)),
             Name::Dedent,
-            Name::Space,
         ];
         g.choose(vals).unwrap().clone()
     }
@@ -151,7 +149,6 @@ impl Name {
             51 => Some(Self::Slash),
             // 52 => Self::Indent(_),
             53 => Some(Self::Dedent),
-            54 => Some(Self::Space),
             _ => None,
         }
     }
@@ -212,7 +209,6 @@ impl Name {
             Self::Slash => 51,
             Self::Indent(_) => 52,
             Self::Dedent => 53,
-            Self::Space => 54,
         }
     }
 
@@ -256,7 +252,6 @@ impl Name {
                 }
             }
             Name::Dedent => String::from("dedent"),
-            Name::Space => String::from("space"),
             Name::Ctor => String::from("constructor"),
             Name::Pipe => String::from("'|'"),
             Name::LAngle => String::from("'<'"),
@@ -312,10 +307,6 @@ pub enum Data {
     Hyphen,
     Plus,
     Slash,
-
-    Indent(usize),
-    Dedent,
-    Space,
 }
 
 impl Data {
@@ -362,15 +353,6 @@ impl Data {
             Data::Hyphen => String::from("'-'"),
             Data::Plus => String::from("'+'"),
             Data::Slash => String::from("'/'"),
-            Data::Indent(n) => {
-                if *n == 0 {
-                    String::from("newline")
-                } else {
-                    format!("indent ({})", n)
-                }
-            }
-            Data::Dedent => String::from("dedent"),
-            Data::Space => String::from("space"),
             Data::Ctor => String::from("constructor"),
             Data::Pipe => String::from("'|'"),
             Data::LAngle => String::from("'<'"),
@@ -403,8 +385,6 @@ impl Data {
             Data::Hyphen => 1,
             Data::Plus => 1,
             Data::Slash => 1,
-            Data::Indent(n) => n + 1,
-            Data::Space => 1,
             Data::DoubleQuote => 1,
             Data::SingleQuote => 1,
             Data::Dollar => 1,
@@ -415,7 +395,6 @@ impl Data {
             Data::LAngle => 1,
             Data::RAngle => 1,
 
-            Data::Dedent => panic!("Data::Dedent.len()"),
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
     }
@@ -455,15 +434,28 @@ impl Data {
             Data::Hyphen => Name::Hyphen,
             Data::Plus => Name::Plus,
             Data::Slash => Name::Slash,
-            Data::Indent(n) => Name::Indent(*n),
-            Data::Dedent => Name::Dedent,
-            Data::Space => Name::Space,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token {
+    /// The token's position in the input stream, in bytes
     pub pos: usize,
+
+    /// The token's column
+    ///
+    /// To facilitate indentation-sensitive parsing, an input stream is divided
+    /// into rows and columns. Rows are terminated by the '\\n' character. The
+    /// token's column is the position at which it can be found in the row, starting
+    /// from 0.
+    ///
+    /// References:
+    ///
+    /// > Adams, M. D. (2013).
+    /// > Principled parsing for indentation-sensitive languages: revisiting landin's offside rule.
+    /// > ACM SIGPLAN Notices, 48(1), 511-522.
+    pub column: usize,
+
     pub data: Data,
 }
