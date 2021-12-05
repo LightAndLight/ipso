@@ -946,19 +946,20 @@ impl<'input> Parser<'input> {
     pattern_record_fields ::=
       ident [',' pattern_record_fields]
       '..' ident
-     */
+    */
     fn pattern_record_fields(
         &mut self,
         names: &mut Vec<Spanned<String>>,
     ) -> ParseResult<Option<Spanned<String>>> {
         choices!(
             self,
-            keep_left!(spanned!(self, self.ident_owned()), self.spaces()).and_then(|name| {
+            // ident [',' pattern_record_fields]
+            spanned!(self, self.indent_gte(|| self.ident_owned())).and_then(|name| {
                 names.push(name);
                 optional!(
                     self,
                     keep_right!(
-                        keep_left!(self.token(&token::Data::Comma), self.spaces()),
+                        self.indent_gte(|| self.token(&token::Data::Comma)),
                         self.pattern_record_fields(names)
                     )
                 )
@@ -967,6 +968,7 @@ impl<'input> Parser<'input> {
                     Some(rest) => rest,
                 })
             }),
+            // '..' ident
             keep_right!(
                 keep_left!(
                     keep_left!(self.token(&token::Data::Dot), self.token(&token::Data::Dot)),
