@@ -12,7 +12,6 @@ use ipso_syntax::{
     Pattern, Spanned, StringPart,
 };
 use std::{
-    cmp,
     collections::BTreeSet,
     fs::File,
     io::Read,
@@ -28,18 +27,31 @@ pub enum ParseError {
         pos: usize,
         expecting: BTreeSet<token::Name>,
     },
+    IndentError {
+        source: Source,
+        pos: usize,
+    },
+    IndentErrorGt {
+        source: Source,
+        pos: usize,
+        amount: usize,
+    },
 }
 
 impl ParseError {
     fn source(&self) -> Source {
         match self {
             ParseError::Unexpected { source, .. } => source.clone(),
+            ParseError::IndentError { source, .. } => source.clone(),
+            ParseError::IndentErrorGt { source, .. } => source.clone(),
         }
     }
 
     fn position(&self) -> usize {
         match self {
             ParseError::Unexpected { pos, .. } => *pos,
+            ParseError::IndentError { pos, .. } => *pos,
+            ParseError::IndentErrorGt { pos, .. } => *pos,
         }
     }
 
@@ -60,6 +72,8 @@ impl ParseError {
                     }
                 }
             }
+            ParseError::IndentError { .. } => String::from("indentation error"),
+            ParseError::IndentErrorGt { amount, .. } => format!("expected indent (> {})", amount),
         }
     }
 
@@ -78,9 +92,16 @@ impl ParseError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum ParseResultError {
+    Unexpected,
+    IndentError,
+    IndentErrorGt(usize),
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParseResult<A> {
     pub consumed: bool,
-    pub result: Option<A>,
+    pub result: Result<A, ParseResultError>,
 }
 
 impl<A> ParseResult<A> {
@@ -89,11 +110,11 @@ impl<A> ParseResult<A> {
         F: FnOnce(A) -> ParseResult<B>,
     {
         match self.result {
-            None => ParseResult {
+            Err(err) => ParseResult {
                 consumed: self.consumed,
-                result: None,
+                result: Err(err),
             },
-            Some(a) => {
+            Ok(a) => {
                 let mut next = f(a);
                 next.consumed = next.consumed || self.consumed;
                 next
@@ -114,7 +135,7 @@ impl<A> ParseResult<A> {
     fn pure(x: A) -> Self {
         ParseResult {
             consumed: false,
-            result: Some(x),
+            result: Ok(x),
         }
     }
 }
@@ -147,11 +168,11 @@ macro_rules! map2 {
     ($f:expr, $a:expr, $b:expr) => {{
         let a = $a;
         match a.result {
-            None => ParseResult {
+            Err(err) => ParseResult {
                 consumed: a.consumed,
-                result: None,
+                result: Err(err),
             },
-            Some(val1) => {
+            Ok(val1) => {
                 let b = $b;
                 ParseResult {
                     consumed: a.consumed || b.consumed,
@@ -296,13 +317,13 @@ macro_rules! many_with {
         loop {
             let next = $x;
             match next.result {
-                None => {
+                Err(_) => {
                     if next.consumed {
                         error = true;
                     };
                     break;
                 }
-                Some(val) => {
+                Ok(val) => {
                     consumed = consumed || next.consumed;
                     acc.push(val)
                 }
@@ -311,8 +332,8 @@ macro_rules! many_with {
         ParseResult {
             consumed,
             result: match error {
-                false => Some(acc),
-                true => None,
+                false => Ok(acc),
+                true => Err(ParseResultError::Unexpected),
             },
         }
     }};
@@ -322,40 +343,6 @@ macro_rules! many {
     ($self:expr, $x:expr) => {
         many_with!(Vec::new(), $self, $x)
     };
-}
-
-macro_rules! many_ {
-    ($self:expr, $x:expr) => {{
-        let mut error: bool = false;
-        let mut consumed = false;
-        loop {
-            let next = $x;
-            match next.result {
-                None => {
-                    if next.consumed {
-                        error = true;
-                    };
-                    break;
-                }
-                Some(_) => {
-                    consumed = consumed || next.consumed;
-                }
-            }
-        }
-        ParseResult {
-            consumed,
-            result: match error {
-                false => Some(()),
-                true => None,
-            },
-        }
-    }};
-}
-
-macro_rules! some_ {
-    ($self:expr, $x:expr) => {{
-        $x.and_then(|_| many_!($self, $x))
-    }};
 }
 
 macro_rules! sep_by {
@@ -375,16 +362,16 @@ macro_rules! choices {
     ($self:expr, $x:expr $(, $y:expr)*) => {{
         let first = $x;
         match first.result {
-            None => {
+            Err(err) => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: None }
+                    ParseResult{ consumed: true, result: Err(err) }
                 } else {
                     let mut rest = choices!($self $(, $y)*);
                     rest.consumed = first.consumed || rest.consumed ;
                     rest
                 }
             }
-            Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
+            Ok(val) => ParseResult{consumed: first.consumed, result: Ok(val)},
         }
     }}
 }
@@ -393,19 +380,19 @@ macro_rules! optional {
     ($self:expr, $a:expr) => {{
         let first = $a;
         match first.result {
-            None => {
+            Err(err) => {
                 if first.consumed {
                     ParseResult {
                         consumed: true,
-                        result: None,
+                        result: Err(err),
                     }
                 } else {
                     ParseResult::pure(None)
                 }
             }
-            Some(val) => ParseResult {
+            Ok(val) => ParseResult {
                 consumed: first.consumed,
-                result: Some(Some(val)),
+                result: Ok(Some(val)),
             },
         }
     }};
@@ -415,6 +402,64 @@ macro_rules! spanned {
     ($self:expr, $x:expr) => {{
         let pos = $self.pos;
         $x.map(|item| syntax::Spanned { pos, item })
+    }};
+}
+
+macro_rules! indent_gt {
+    ($self:expr, $body:expr) => {{
+        let current_indentation: usize = *$self.indentation.last().unwrap();
+        match &$self.current {
+            None => $self.unexpected(false),
+            Some(token) => {
+                if token.column > current_indentation {
+                    $body
+                } else {
+                    $self.indent_error_gt(current_indentation)
+                }
+            }
+        }
+    }};
+}
+
+macro_rules! indent_gte {
+    ($self:expr, $body:expr) => {{
+        let current_indentation: usize = *$self.indentation.last().unwrap();
+        match &$self.current {
+            None => $self.unexpected(false),
+            Some(token) => {
+                if token.column >= current_indentation {
+                    $body
+                } else {
+                    $self.indent_error()
+                }
+            }
+        }
+    }};
+}
+
+macro_rules! indent_eq {
+    ($self:expr, $body:expr) => {{
+        let current_indentation: usize = *$self.indentation.last().unwrap();
+        match &$self.current {
+            None => $self.unexpected(false),
+            Some(token) => {
+                if token.column == current_indentation {
+                    $body
+                } else {
+                    $self.indent_error()
+                }
+            }
+        }
+    }};
+}
+
+macro_rules! indent_scope {
+    ($self:expr, $body:expr) => {{
+        $self.indentation.push($self.column);
+        $body.map(|b| {
+            $self.indentation.pop().unwrap();
+            b
+        })
     }};
 }
 
@@ -432,13 +477,24 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn into_parse_error<A>(self, result: Option<A>) -> Result<A, ParseError> {
+    pub fn into_parse_error<A>(self, result: Result<A, ParseResultError>) -> Result<A, ParseError> {
         match result {
-            Some(a) => Ok(a),
-            None => Err(ParseError::Unexpected {
-                source: self.source,
-                pos: self.pos,
-                expecting: self.expecting.into_btreeset(),
+            Ok(a) => Ok(a),
+            Err(err) => Err(match err {
+                ParseResultError::Unexpected => ParseError::Unexpected {
+                    source: self.source,
+                    pos: self.pos,
+                    expecting: self.expecting.into_btreeset(),
+                },
+                ParseResultError::IndentError => ParseError::IndentError {
+                    source: self.source,
+                    pos: self.pos,
+                },
+                ParseResultError::IndentErrorGt(n) => ParseError::IndentErrorGt {
+                    source: self.source,
+                    pos: self.pos,
+                    amount: n,
+                },
             }),
         }
     }
@@ -446,61 +502,21 @@ impl<'input> Parser<'input> {
     fn unexpected<A>(&self, consumed: bool) -> ParseResult<A> {
         ParseResult {
             consumed,
-            result: None,
+            result: Err(ParseResultError::Unexpected),
         }
     }
 
-    fn indent_scope<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
-        self.indentation.push(self.column);
-        f().map(|b| {
-            self.indentation.pop().unwrap();
-            b
-        })
+    fn indent_error_gt<B>(&self, n: usize) -> ParseResult<B> {
+        ParseResult {
+            consumed: false,
+            result: Err(ParseResultError::IndentErrorGt(n)),
+        }
     }
 
     fn indent_error<B>(&self) -> ParseResult<B> {
-        todo!()
-    }
-
-    fn indent_eq<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
-        let current_indentation: usize = *self.indentation.last().unwrap();
-        match &self.current {
-            None => self.unexpected(false),
-            Some(token) => {
-                if token.column == current_indentation {
-                    f()
-                } else {
-                    self.indent_error()
-                }
-            }
-        }
-    }
-
-    fn indent_gte<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
-        let current_indentation: usize = *self.indentation.last().unwrap();
-        match &self.current {
-            None => self.unexpected(false),
-            Some(token) => {
-                if token.column >= current_indentation {
-                    f()
-                } else {
-                    self.indent_error()
-                }
-            }
-        }
-    }
-
-    fn indent_gt<B, F: Fn() -> ParseResult<B>>(&mut self, f: F) -> ParseResult<B> {
-        let current_indentation: usize = *self.indentation.last().unwrap();
-        match &self.current {
-            None => self.unexpected(false),
-            Some(token) => {
-                if token.column > current_indentation {
-                    f()
-                } else {
-                    self.indent_error()
-                }
-            }
+        ParseResult {
+            consumed: false,
+            result: Err(ParseResultError::IndentError),
         }
     }
 
@@ -512,21 +528,27 @@ impl<'input> Parser<'input> {
     }
 
     fn consume(&mut self) -> ParseResult<()> {
-        match self.current {
+        match &self.current {
             None => self.unexpected(false),
-            Some(ref token) => {
-                self.pos += token.data.length();
+            Some(_) => {
                 self.current = self.input.next();
-                self.column = token.column;
+                match &self.current {
+                    None => {}
+                    Some(token) => {
+                        self.pos = token.pos;
+                        self.column = token.column;
+                    }
+                };
                 self.expecting.clear();
                 ParseResult {
                     consumed: true,
-                    result: Some(()),
+                    result: Ok(()),
                 }
             }
         }
     }
 
+    #[allow(dead_code)]
     fn comment(&mut self) -> ParseResult<()> {
         self.expecting.insert(token::Name::Comment);
         match self.current {
@@ -571,7 +593,8 @@ impl<'input> Parser<'input> {
             Some(token) => match &token.data {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_lowercase() => {
-                        map0!(s.clone(), self.consume())
+                        let s = s.clone();
+                        map0!(s, self.consume())
                     }
                     _ => self.unexpected(false),
                 },
@@ -680,13 +703,13 @@ impl<'input> Parser<'input> {
         `indent_gte` allows the record type's contents to be in any column
         greater than or equal to the record type's opening brace.
         */
-        optional!(self, self.indent_gte(|| self.ident())).and_then(|m_ident| match m_ident {
+        optional!(self, indent_gte!(self, self.ident())).and_then(|m_ident| match m_ident {
             None => ParseResult::pure(None),
             Some(ident) => optional!(
                 self,
                 keep_right!(
-                    self.indent_gte(|| self.token(&token::Data::Colon)),
-                    self.indent_gte(|| self.type_())
+                    indent_gte!(self, self.token(&token::Data::Colon)),
+                    indent_gte!(self, self.type_())
                 )
             )
             .and_then(|m_ty| match m_ty {
@@ -696,8 +719,8 @@ impl<'input> Parser<'input> {
                     optional!(
                         parser,
                         keep_right!(
-                            self.indent_gte(|| self.token(&token::Data::Comma)),
-                            self.indent_gte(|| self.type_record_fields(fields))
+                            indent_gte!(self, self.token(&token::Data::Comma)),
+                            indent_gte!(self, self.type_record_fields(fields))
                         )
                     )
                     .map(|m_rest| match m_rest {
@@ -714,10 +737,10 @@ impl<'input> Parser<'input> {
       '{' type_record_fields '}'
      */
     fn type_record(&mut self) -> ParseResult<Type<Rc<str>>> {
-        self.indent_scope(|| {
+        indent_scope!(self, {
             between!(
-                self.indent_eq(|| self.token(&token::Data::LBrace)),
-                self.indent_gte(|| self.token(&token::Data::RBrace)),
+                indent_eq!(self, self.token(&token::Data::LBrace)),
+                indent_gte!(self, self.token(&token::Data::RBrace)),
                 {
                     let mut fields = Vec::new();
                     self.type_record_fields(&mut fields)
@@ -738,15 +761,15 @@ impl<'input> Parser<'input> {
     ) -> ParseResult<Option<Type<Rc<str>>>> {
         choices!(
             self,
-            self.indent_gte(|| self.ident()).map(|x| Some(Type::Var(x))),
-            self.indent_gte(|| self.ctor())
-                .and_then(|ctor| map0!(ctor, self.indent_gte(|| self.token(&token::Data::Colon))))
+            indent_gte!(self, self.ident()).map(|x| Some(Type::Var(x))),
+            indent_gte!(self, self.ctor())
+                .and_then(|ctor| map0!(ctor, indent_gte!(self, self.token(&token::Data::Colon))))
                 .and_then(|ctor| self.type_().map(|ty| (ctor, ty)))
                 .and_then(|(ctor, ty)| {
                     ctors.push((ctor, ty));
                     optional!(
                         parser,
-                        self.indent_gte(|| self.token(&token::Data::Pipe))
+                        indent_gte!(self, self.token(&token::Data::Pipe))
                             .and_then(|_| self.type_variant_ctors(ctors))
                     )
                     .map(|m_rest| match m_rest {
@@ -762,10 +785,10 @@ impl<'input> Parser<'input> {
       '<' [type_variant_ctors] '>'
      */
     fn type_variant(&mut self) -> ParseResult<Type<Rc<str>>> {
-        self.indent_scope(|| {
+        indent_scope!(self, {
             between!(
-                self.indent_eq(|| self.token(&token::Data::LAngle)),
-                self.indent_gte(|| self.token(&token::Data::RAngle)),
+                indent_eq!(self, self.token(&token::Data::LAngle)),
+                indent_gte!(self, self.token(&token::Data::RAngle)),
                 {
                     let mut ctors = Vec::new();
                     optional!(self, self.type_variant_ctors(&mut ctors)).map(
@@ -818,12 +841,15 @@ impl<'input> Parser<'input> {
             self.type_variant(),
             self.ctor().map(Type::Name),
             self.ident().map(Type::Var),
-            self.indent_scope(|| between!(
-                self.indent_eq(|| self.token(&token::Data::LParen)),
-                self.indent_gte(|| self.token(&token::Data::RParen)),
-                optional!(self, self.indent_gte(|| self.type_()))
-                    .map(|m_ty| m_ty.unwrap_or(Type::Unit))
-            ))
+            indent_scope!(
+                self,
+                between!(
+                    indent_eq!(self, self.token(&token::Data::LParen)),
+                    indent_gte!(self, self.token(&token::Data::RParen)),
+                    optional!(self, indent_gte!(self, self.type_()))
+                        .map(|m_ty| m_ty.unwrap_or(Type::Unit))
+                )
+            )
         )
     }
 
@@ -847,7 +873,7 @@ impl<'input> Parser<'input> {
                 self,
                 map2!(
                     |_, ty| ty,
-                    self.indent_gt(|| self.token(&token::Data::Arrow)),
+                    indent_gt!(self, self.token(&token::Data::Arrow)),
                     self.type_arrow()
                 )
             )
@@ -868,7 +894,7 @@ impl<'input> Parser<'input> {
                 self,
                 map2!(
                     |_, ty| ty,
-                    self.indent_gt(|| self.token(&token::Data::FatArrow)),
+                    indent_gt!(self, self.token(&token::Data::FatArrow)),
                     self.type_fatarrow()
                 )
             )
@@ -894,29 +920,26 @@ impl<'input> Parser<'input> {
       expr
     */
     fn comp_line(&mut self) -> ParseResult<CompLine> {
-        self.indent_eq(|| {
-            self.indent_scope(|| {
+        indent_eq!(self, {
+            indent_scope!(self, {
                 choices!(
                     self,
                     // 'bind' ident '<-' expr
                     {
-                        keep_right!(
-                            self.keyword(&Keyword::Bind),
-                            self.indent_gt(|| self.ident())
-                        )
-                        .and_then(|name| {
-                            keep_right!(
-                                self.indent_gt(|| self.token(&token::Data::LeftArrow)),
-                                self.indent_gt(|| self.expr())
-                            )
-                            .map(|value| CompLine::Bind(name, value))
-                        })
+                        keep_right!(self.keyword(&Keyword::Bind), indent_gt!(self, self.ident()))
+                            .and_then(|name| {
+                                keep_right!(
+                                    indent_gt!(self, self.token(&token::Data::LeftArrow)),
+                                    indent_gt!(self, self.expr())
+                                )
+                                .map(|value| CompLine::Bind(name, value))
+                            })
                     },
                     // 'return' expr
                     {
                         keep_right!(
                             self.keyword(&Keyword::Return),
-                            self.indent_gt(|| self.expr())
+                            indent_gt!(self, self.expr())
                         )
                         .map(CompLine::Return)
                     },
@@ -933,12 +956,16 @@ impl<'input> Parser<'input> {
     fn expr_comp(&mut self) -> ParseResult<Spanned<Expr>> {
         spanned!(
             self,
-            self.indent_scope(|| keep_right!(
-                self.keyword(&Keyword::Comp),
-                self.indent_gt(
-                    || self.indent_scope(|| many!(self, self.comp_line()).map(Expr::Comp))
+            indent_scope!(
+                self,
+                keep_right!(
+                    self.keyword(&Keyword::Comp),
+                    indent_gt!(
+                        self,
+                        indent_scope!(self, many!(self, self.comp_line()).map(Expr::Comp))
+                    )
                 )
-            ))
+            )
         )
     }
 
@@ -954,12 +981,12 @@ impl<'input> Parser<'input> {
         choices!(
             self,
             // ident [',' pattern_record_fields]
-            spanned!(self, self.indent_gte(|| self.ident_owned())).and_then(|name| {
+            spanned!(self, indent_gte!(self, self.ident_owned())).and_then(|name| {
                 names.push(name);
                 optional!(
                     self,
                     keep_right!(
-                        self.indent_gte(|| self.token(&token::Data::Comma)),
+                        indent_gte!(self, self.token(&token::Data::Comma)),
                         self.pattern_record_fields(names)
                     )
                 )
@@ -970,8 +997,8 @@ impl<'input> Parser<'input> {
             }),
             // '..' ident
             keep_right!(
-                keep_left!(self.token(&token::Data::DotDot), self.spaces()),
-                keep_left!(spanned!(self, self.ident_owned()), self.spaces()).map(Some)
+                indent_gte!(self, self.token(&token::Data::DotDot)),
+                spanned!(self, indent_gte!(self, self.ident_owned())).map(Some)
             )
         )
     }
@@ -979,52 +1006,64 @@ impl<'input> Parser<'input> {
     /*
     pattern_record ::=
       '{' [pattern_record_fields] '}'
-     */
+    */
     fn pattern_record(&mut self) -> ParseResult<Pattern> {
-        keep_right!(
-            keep_left!(self.token(&token::Data::LBrace), self.spaces()),
-            keep_left!(
+        indent_scope!(self, {
+            between!(
+                indent_eq!(self, self.token(&token::Data::LBrace)),
+                indent_gte!(self, self.token(&token::Data::RBrace)),
                 {
                     let mut names = Vec::new();
-                    pattern_record_fields(self, &mut names)
+                    self.pattern_record_fields(&mut names)
                         .map(|rest| Pattern::Record { names, rest })
-                },
-                keep_left!(self.token(&token::Data::RBrace), self.spaces())
+                }
             )
-        )
-    }
-
-    fn pattern_variant(&mut self) -> ParseResult<Pattern> {
-        keep_left!(self.ctor_owned(), self.spaces()).and_then(|name| {
-            spanned!(self, self.ident_owned()).map(|arg| Pattern::Variant { name, arg })
         })
     }
 
+    /*
+    pattern_variant ::=
+      ctor ident
+    */
+    fn pattern_variant(&mut self) -> ParseResult<Pattern> {
+        self.ctor_owned().and_then(|name| {
+            spanned!(self, indent_gt!(self, self.ident_owned()))
+                .map(|arg| Pattern::Variant { name, arg })
+        })
+    }
+
+    /*
+    pattern ::=
+      ident
+      pattern_record
+      pattern_variant
+      '_'
+    */
     fn pattern(&mut self) -> ParseResult<Pattern> {
-        keep_left!(
-            choices!(
-                self,
-                spanned!(self, self.ident_owned()).map(Pattern::Name),
-                self.pattern_record(),
-                self.pattern_variant(),
-                map0!(Pattern::Wildcard, self.token(&token::Data::Underscore))
-            ),
-            self.spaces()
+        choices!(
+            self,
+            spanned!(self, self.ident_owned()).map(Pattern::Name),
+            self.pattern_record(),
+            self.pattern_variant(),
+            map0!(Pattern::Wildcard, self.token(&token::Data::Underscore))
         )
     }
 
+    /*
+    string_part_expr ::=
+      '${' expr '}'
+      '$' ident
+    */
     fn string_part_expr(&mut self) -> ParseResult<StringPart> {
         choices!(
             self,
-            keep_right!(
-                keep_left!(self.token(&token::Data::DollarLBrace), self.spaces()),
-                keep_left!(
-                    self.expr().map(StringPart::Expr),
-                    self.token(&token::Data::RBrace)
-                )
+            between!(
+                indent_gte!(self, self.token(&token::Data::DollarLBrace)),
+                indent_gte!(self, self.token(&token::Data::RBrace)),
+                indent_gte!(self, self.expr().map(StringPart::Expr))
             ),
             keep_right!(
-                self.token(&token::Data::Dollar),
+                indent_gte!(self, self.token(&token::Data::Dollar)),
                 spanned!(self, self.ident_owned().map(Expr::Var)).map(StringPart::Expr)
             )
         )
@@ -1032,83 +1071,95 @@ impl<'input> Parser<'input> {
 
     fn string_part_string(&mut self) -> ParseResult<StringPart> {
         self.expecting.insert(token::Name::String);
-        let str = match &self.current {
-            Some(current) => match &current.data {
-                token::Data::String { value, .. } => value.clone(),
-                _ => return self.unexpected(false),
-            },
-            None => return self.unexpected(false),
-        };
-        self.consume();
-        ParseResult::pure(StringPart::String(str))
+
+        indent_gte!(self, {
+            let str = match &self.current {
+                Some(current) => match &current.data {
+                    token::Data::String { value, .. } => value.clone(),
+                    _ => return self.unexpected(false),
+                },
+                None => return self.unexpected(false),
+            };
+            self.consume();
+            ParseResult::pure(StringPart::String(str))
+        })
     }
 
+    /*
+    string_part ::=
+      string_part_expr
+      string_part_string
+
+    string ::=
+      '"' string_part* '"'
+    */
     fn string(&mut self) -> ParseResult<Vec<StringPart>> {
-        self.token(&token::Data::DoubleQuote).and_then(|_| {
-            keep_left!(
+        indent_scope!(self, {
+            between!(
+                indent_eq!(self, self.token(&token::Data::DoubleQuote)),
+                indent_gte!(self, self.token(&token::Data::DoubleQuote)),
                 many!(
                     self,
                     choices!(self, self.string_part_expr(), self.string_part_string())
-                ),
-                self.token(&token::Data::DoubleQuote)
+                )
             )
         })
     }
 
     /*
-    expr_record ::=
-      '{' [expr_record_fields] '}'
-
     expr_record_fields ::=
       ident '=' expr [',' expr_record_fields]
       '..' expr_atom
-     */
-    fn expr_record(&mut self) -> ParseResult<Expr> {
-        fn expr_record_fields(
-            parser: &mut Parser,
-            fields: &mut Vec<(String, Spanned<Expr>)>,
-        ) -> ParseResult<Option<Spanned<Expr>>> {
-            choices!(
-                parser,
-                keep_left!(
-                    parser.ident_owned(),
-                    keep_left!(
-                        parser.spaces(),
-                        keep_left!(parser.token(&token::Data::Equals), parser.spaces())
-                    )
-                )
-                .and_then(|name| {
-                    parser.expr().and_then(|expr| {
-                        fields.push((name, expr));
-                        optional!(
-                            parser,
-                            keep_right!(
-                                keep_left!(parser.token(&token::Data::Comma), parser.spaces()),
-                                expr_record_fields(parser, fields)
-                            )
-                        )
-                        .map(|m_rest| match m_rest {
-                            None => None,
-                            Some(rest) => rest,
-                        })
-                    })
-                }),
-                keep_right!(
-                    keep_left!(parser.token(&token::Data::DotDot), parser.spaces()),
-                    keep_left!(parser.expr_atom(), parser.spaces()).map(Some)
-                )
-            )
-        }
-        keep_right!(
-            keep_left!(self.token(&token::Data::LBrace), self.spaces()),
+    */
+    fn expr_record_fields(
+        &mut self,
+        fields: &mut Vec<(String, Spanned<Expr>)>,
+    ) -> ParseResult<Option<Spanned<Expr>>> {
+        choices!(
+            self,
             keep_left!(
-                {
-                    let mut fields = Vec::new();
-                    expr_record_fields(self, &mut fields).map(|rest| Expr::mk_record(fields, rest))
-                },
-                keep_left!(self.token(&token::Data::RBrace), self.spaces())
+                indent_gte!(self, self.ident_owned()),
+                indent_gte!(self, self.token(&token::Data::Equals))
+            )
+            .and_then(|name| {
+                indent_gte!(self, self.expr()).and_then(|expr| {
+                    fields.push((name, expr));
+                    optional!(
+                        self,
+                        keep_right!(
+                            indent_gte!(self, self.token(&token::Data::Comma)),
+                            self.expr_record_fields(fields)
+                        )
+                    )
+                    .map(|m_rest| match m_rest {
+                        None => None,
+                        Some(rest) => rest,
+                    })
+                })
+            }),
+            keep_right!(
+                indent_gte!(self, self.token(&token::Data::DotDot)),
+                indent_gte!(self, self.expr_atom()).map(Some)
             )
         )
+    }
+
+    /*
+    expr_record ::=
+      '{' [expr_record_fields] '}'
+    */
+    fn expr_record(&mut self) -> ParseResult<Expr> {
+        indent_scope!(self, {
+            between!(
+                indent_eq!(self, self.token(&token::Data::LBrace)),
+                indent_gte!(self, self.token(&token::Data::RBrace)),
+                {
+                    let mut fields = Vec::new();
+                    self.expr_record_fields(&mut fields)
+                        .map(|rest| Expr::mk_record(fields, rest))
+                }
+            )
+        })
     }
 
     /*
@@ -1116,70 +1167,96 @@ impl<'input> Parser<'input> {
       '<' ctor '|' expr '>'
      */
     fn expr_embed(&mut self) -> ParseResult<Expr> {
-        keep_right!(
-            keep_left!(self.token(&token::Data::LAngle), self.spaces()),
-            keep_left!(
-                keep_left!(self.ctor_owned(), self.spaces()).and_then(|ctor| keep_left!(
-                    self.token(&token::Data::Pipe),
-                    self.spaces()
-                )
-                .and_then(|_| self.expr().map(|rest| Expr::mk_embed(ctor, rest)))),
-                keep_left!(self.token(&token::Data::RAngle), self.spaces())
-            )
-        )
-    }
-
-    fn expr_array(&mut self) -> ParseResult<Expr> {
-        between!(
-            keep_left!(self.token(&token::Data::LBracket), self.spaces()),
-            keep_left!(self.token(&token::Data::RBracket), self.spaces()),
-            sep_by!(
-                self,
-                self.expr(),
-                keep_left!(self.token(&token::Data::Comma), self.spaces())
-            )
-        )
-        .map(Expr::Array)
-    }
-
-    fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
-        keep_left!(
-            spanned!(
-                self,
-                choices!(
+        indent_scope!(self, {
+            between!(
+                indent_eq!(self, self.token(&token::Data::LAngle)),
+                indent_gte!(self, self.token(&token::Data::RAngle)),
+                indent_gte!(self, self.ctor_owned()).and_then(|ctor| indent_gte!(
                     self,
-                    self.int().map(Expr::Int),
-                    self.char().map(Expr::Char),
-                    self.keyword(&Keyword::False).map(|_| Expr::False),
-                    self.keyword(&Keyword::True).map(|_| Expr::True),
-                    self.ident_owned().map(Expr::Var),
-                    self.ctor_owned().map(Expr::Variant),
-                    self.expr_record(),
-                    self.expr_embed(),
-                    self.expr_array(),
-                    keep_right!(
-                        keep_left!(self.token(&token::Data::LParen), self.spaces()),
-                        keep_left!(
-                            optional!(self, self.expr()).map(|m_ty| match m_ty {
-                                None => Expr::Unit,
-                                Some(ty) => ty.item,
-                            }),
-                            self.token(&token::Data::RParen)
-                        )
-                    ),
-                    self.string().map(Expr::String)
+                    self.token(&token::Data::Pipe)
                 )
-            ),
-            self.spaces()
+                .and_then(
+                    |_| indent_gte!(self, self.expr()).map(|rest| Expr::mk_embed(ctor, rest))
+                ))
+            )
+        })
+    }
+
+    /*
+    expr_array ::=
+      '[' expr [',' expr] ']'
+    */
+    fn expr_array(&mut self) -> ParseResult<Expr> {
+        indent_scope!(self, {
+            between!(
+                indent_eq!(self, self.token(&token::Data::LBracket)),
+                indent_gte!(self, self.token(&token::Data::RBracket)),
+                sep_by!(
+                    self,
+                    indent_gte!(self, self.expr()),
+                    indent_gte!(self, self.token(&token::Data::Comma))
+                )
+            )
+            .map(Expr::Array)
+        })
+    }
+
+    /*
+    expr_atom ::=
+      int
+      char
+      'false'
+      'true'
+      ident
+      ctor
+      expr_record
+      expr_embed
+      expr_array
+      '(' expr ')'
+      string
+    */
+    fn expr_atom(&mut self) -> ParseResult<Spanned<Expr>> {
+        spanned!(
+            self,
+            choices!(
+                self,
+                self.int().map(Expr::Int),
+                self.char().map(Expr::Char),
+                self.keyword(&Keyword::False).map(|_| Expr::False),
+                self.keyword(&Keyword::True).map(|_| Expr::True),
+                self.ident_owned().map(Expr::Var),
+                self.ctor_owned().map(Expr::Variant),
+                self.expr_record(),
+                self.expr_embed(),
+                self.expr_array(),
+                indent_scope!(
+                    self,
+                    between!(
+                        indent_eq!(self, self.token(&token::Data::LParen)),
+                        indent_gte!(self, self.token(&token::Data::RParen)),
+                        optional!(self, indent_gte!(self, self.expr())).map(|m_ty| match m_ty {
+                            None => Expr::Unit,
+                            Some(ty) => ty.item,
+                        })
+                    )
+                ),
+                self.string().map(Expr::String)
+            )
         )
     }
 
+    /*
+    expr_project ::=
+      expr_atom ('.' ident)*
+    */
     fn expr_project(&mut self) -> ParseResult<Spanned<Expr>> {
         self.expr_atom().and_then(|val| {
             many!(
                 self,
-                keep_left!(self.token(&token::Data::Dot), self.spaces())
-                    .and_then(|_| keep_left!(self.ident_owned(), self.spaces()))
+                keep_right!(
+                    indent_gt!(self, self.token(&token::Data::Dot)),
+                    indent_gt!(self, self.ident_owned())
+                )
             )
             .map(|fields| {
                 let mut expr = val;
@@ -1194,291 +1271,401 @@ impl<'input> Parser<'input> {
         })
     }
 
-    fn branch(&mut self) -> ParseResult<Branch> {
-        keep_left!(spanned!(self, self.pattern()), self.spaces()).and_then(|pattern| {
+    /*
+    case_branch ::=
+      pattern '->' expr
+    */
+    fn case_branch(&mut self) -> ParseResult<Branch> {
+        spanned!(self, indent_eq!(self, self.pattern())).and_then(|pattern| {
             map2!(
                 |_, body| Branch { pattern, body },
-                keep_left!(self.token(&token::Data::Arrow), self.spaces()),
-                self.expr()
+                indent_gt!(self, self.token(&token::Data::Arrow)),
+                indent_gt!(self, self.expr())
             )
         })
     }
 
+    /*
+    expr_case ::=
+      'case' expr 'of' case_branch*
+    */
     fn expr_case(&mut self) -> ParseResult<Spanned<Expr>> {
-        spanned!(
-            self,
-            keep_left!(self.keyword(&Keyword::Case), self.spaces()).and_then(|_| {
-                self.expr().and_then(|cond| {
-                    keep_left!(
-                        self.keyword(&Keyword::Of),
-                        many_!(self, self.token(&token::Data::Space))
+        indent_scope!(self, {
+            spanned!(
+                self,
+                keep_right!(
+                    indent_eq!(self, self.keyword(&Keyword::Case)),
+                    indent_gt!(self, self.expr())
+                )
+                .and_then(|cond| keep_right!(
+                    indent_gt!(self, self.keyword(&Keyword::Of)),
+                    indent_gt!(
+                        self,
+                        indent_scope!(self, { many!(self, self.case_branch()) })
                     )
-                    .and_then(|_| {
-                        keep_right!(self.indent(), sep_by!(self, self.branch(), self.newline()))
-                            .and_then(|branches| {
-                                self.dedent().map(|_| Expr::mk_case(cond, branches))
-                            })
-                    })
-                })
-            })
-        )
-    }
-
-    fn expr_app(&mut self) -> ParseResult<Spanned<Expr>> {
-        self.expr_project().and_then(|first| {
-            many!(self, self.expr_project()).map(|rest| rest.into_iter().fold(first, Expr::mk_app))
+                )
+                .map(|branches| Expr::mk_case(cond, branches)))
+            )
         })
     }
 
+    /*
+    expr_app ::=
+      expr_project+
+    */
+    fn expr_app(&mut self) -> ParseResult<Spanned<Expr>> {
+        indent_scope!(self, {
+            indent_eq!(self, self.expr_project()).and_then(|first| {
+                many!(self, indent_gt!(self, self.expr_project()))
+                    .map(|rest| rest.into_iter().fold(first, Expr::mk_app))
+            })
+        })
+    }
+
+    /*
+    expr_lam ::=
+      '\' pattern '->' expr
+    */
     fn expr_lam(&mut self) -> ParseResult<Spanned<Expr>> {
-        spanned!(
-            self,
-            keep_right!(
-                keep_left!(self.token(&token::Data::Backslash), self.spaces()),
-                many!(self, self.pattern()).and_then(|args| keep_right!(
-                    keep_left!(self.token(&token::Data::Arrow), self.spaces()),
-                    self.expr().map(|body| syntax::Expr::mk_lam(args, body))
-                ))
-            )
-        )
-    }
-
-    fn expr_ifthenelse(&mut self) -> ParseResult<Spanned<Expr>> {
-        spanned!(
-            self,
-            keep_left!(self.keyword(&Keyword::If), self.spaces()).and_then(|_| self
-                .expr()
-                .and_then(
-                    |cond| keep_left!(self.keyword(&Keyword::Then), self.spaces()).and_then(|_| {
-                        self.expr().and_then(|then| {
-                            keep_left!(self.keyword(&Keyword::Else), self.spaces()).and_then(|_| {
-                                self.expr()
-                                    .map(|else_| syntax::Expr::mk_ifthenelse(cond, then, else_))
-                            })
-                        })
-                    })
-                ))
-        )
-    }
-
-    fn expr_let(&mut self) -> ParseResult<Spanned<Expr>> {
-        spanned!(
-            self,
-            keep_left!(self.keyword(&Keyword::Let), self.spaces()).and_then(|_| keep_left!(
-                self.ident(),
-                self.spaces()
-            )
-            .and_then(
-                move |name| keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(
-                    |_| self.expr().and_then(move |value| keep_left!(
-                        self.keyword(&Keyword::In),
-                        self.spaces()
-                    )
-                    .and_then(|_| self.expr().map(move |rest| syntax::Expr::Let {
-                        name,
-                        value: Rc::new(value),
-                        rest: Rc::new(rest)
-                    })))
-                )
-            ))
-        )
-    }
-
-    fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
-        keep_left!(
-            choices!(
+        indent_scope!(self, {
+            spanned!(
                 self,
-                self.expr_case(),
-                self.expr_lam(),
-                self.expr_ifthenelse(),
-                self.expr_let(),
-                self.expr_comp(),
-                self.expr_app()
-            ),
-            self.spaces()
+                keep_right!(
+                    indent_eq!(self, self.token(&token::Data::Backslash)),
+                    many!(self, indent_gt!(self, self.pattern())).and_then(|args| keep_right!(
+                        indent_gt!(self, self.token(&token::Data::Arrow)),
+                        indent_gt!(self, self.expr()).map(|body| syntax::Expr::mk_lam(args, body))
+                    ))
+                )
+            )
+        })
+    }
+
+    /*
+    expr_ifthenelse ::=
+      'if' expr 'then' expr 'else' expr
+    */
+    fn expr_ifthenelse(&mut self) -> ParseResult<Spanned<Expr>> {
+        indent_scope!(self, {
+            spanned!(
+                self,
+                keep_right!(
+                    indent_eq!(self, self.keyword(&Keyword::If)),
+                    indent_gt!(self, self.expr()).and_then(|cond| keep_right!(
+                        indent_gt!(self, self.keyword(&Keyword::Then)),
+                        indent_gt!(self, self.expr()).and_then(|then| keep_right!(
+                            indent_gt!(self, self.keyword(&Keyword::Else)),
+                            indent_gt!(self, self.expr())
+                                .map(|else_| syntax::Expr::mk_ifthenelse(cond, then, else_))
+                        ))
+                    ))
+                )
+            )
+        })
+    }
+
+    /*
+    expr_let ::=
+      'let' ident '=' expr 'in' expr
+    */
+    fn expr_let(&mut self) -> ParseResult<Spanned<Expr>> {
+        indent_scope!(self, {
+            spanned!(
+                self,
+                keep_right!(
+                    indent_eq!(self, self.keyword(&Keyword::Let)),
+                    indent_gt!(self, self.ident()).and_then(|name| {
+                        keep_right!(
+                            indent_gt!(self, self.token(&token::Data::Equals)),
+                            indent_gt!(self, self.expr()).and_then(|value| {
+                                keep_right!(
+                                    indent_gte!(self, self.keyword(&Keyword::In)),
+                                    indent_gte!(self, self.expr()).map(|rest| syntax::Expr::Let {
+                                        name,
+                                        value: Rc::new(value),
+                                        rest: Rc::new(rest),
+                                    })
+                                )
+                            })
+                        )
+                    })
+                )
+            )
+        })
+    }
+
+    /*
+    expr ::=
+      expr_case
+      expr_lam
+      expr_ifthenelse
+      expr_let
+      expr_comp
+      expr_app
+    */
+    fn expr(&mut self) -> ParseResult<Spanned<Expr>> {
+        choices!(
+            self,
+            self.expr_case(),
+            self.expr_lam(),
+            self.expr_ifthenelse(),
+            self.expr_let(),
+            self.expr_comp(),
+            self.expr_app()
         )
     }
 
+    /*
+    definition ::=
+      ident ':' type ident pattern* '=' expr
+    */
     fn definition(&mut self) -> ParseResult<Declaration> {
-        keep_left!(self.ident_owned(), self.spaces()).and_then(|name| {
-            keep_left!(self.token(&token::Data::Colon), self.spaces()).and_then(|_| {
-                keep_left!(self.type_(), self.newline()).and_then(|ty| {
+        indent_scope!(self, {
+            keep_left!(
+                indent_eq!(self, self.ident_owned()),
+                indent_gt!(self, self.token(&token::Data::Colon))
+            )
+            .and_then(|name| {
+                indent_gt!(self, self.type_()).and_then(|ty| {
                     keep_right!(
-                        keep_left!(
-                            self.token(&token::Data::Ident(Rc::from(name.as_ref()))),
-                            self.spaces()
+                        indent_eq!(
+                            self,
+                            self.token(&token::Data::Ident(Rc::from(name.as_ref())))
                         ),
-                        many!(self, self.pattern())
+                        many!(self, indent_gt!(self, self.pattern()))
                     )
                     .and_then(|args| {
-                        keep_left!(self.token(&token::Data::Equals), self.spaces()).and_then(|_| {
-                            self.expr().map(|body| Declaration::Definition {
+                        keep_right!(
+                            indent_gt!(self, self.token(&token::Data::Equals)),
+                            indent_gt!(self, self.expr()).map(|body| Declaration::Definition {
                                 name,
                                 ty,
                                 args,
                                 body,
                             })
-                        })
+                        )
                     })
                 })
             })
         })
     }
 
+    /*
+    type_alias ::=
+      'type' ctor '=' type
+    */
     fn type_alias(&mut self) -> ParseResult<Declaration> {
-        keep_right!(
-            keep_left!(self.keyword(&Keyword::Type), self.spaces()),
-            keep_left!(self.ctor_owned(), self.spaces()).and_then(|name| many!(
-                self,
-                keep_left!(self.ident_owned(), self.spaces())
-            )
-            .and_then(|args| keep_right!(
-                keep_left!(self.token(&token::Data::Equals), self.spaces()),
-                self.type_()
-                    .map(|body| Declaration::TypeAlias { name, args, body })
-            )))
-        )
-    }
-
-    fn import(&mut self) -> ParseResult<Declaration> {
-        keep_left!(self.keyword(&Keyword::Import), self.spaces()).and_then(|_| {
-            keep_left!(spanned!(self, self.ident_owned()), self.spaces()).and_then(|module| {
-                optional!(
+        indent_scope!(self, {
+            keep_right!(
+                indent_eq!(self, self.keyword(&Keyword::Type)),
+                indent_gt!(self, self.ctor_owned()).and_then(|name| many!(
                     self,
-                    keep_left!(self.keyword(&Keyword::As), self.spaces()).and_then(|_| keep_left!(
-                        spanned!(self, self.ident_owned()),
-                        self.spaces()
-                    ))
+                    self.ident_owned()
                 )
-                .map(|name| Declaration::Import { module, name })
-            })
+                .and_then(|args| keep_right!(
+                    indent_gt!(self, self.token(&token::Data::Equals)),
+                    indent_gt!(self, self.type_()).map(|body| Declaration::TypeAlias {
+                        name,
+                        args,
+                        body
+                    })
+                )))
+            )
         })
     }
 
+    /*
+    import ::=
+      'import' ident ['as' ident]
+    */
+    fn import(&mut self) -> ParseResult<Declaration> {
+        indent_scope!(self, {
+            keep_right!(
+                indent_eq!(self, self.keyword(&Keyword::Import)),
+                spanned!(self, indent_gt!(self, self.ident_owned())).and_then(|module| {
+                    optional!(
+                        self,
+                        keep_right!(
+                            indent_gt!(self, self.keyword(&Keyword::As)),
+                            spanned!(self, indent_gt!(self, self.ident_owned()))
+                        )
+                    )
+                    .map(|name| Declaration::Import { module, name })
+                })
+            )
+        })
+    }
+
+    /*
+    from_import_choices ::=
+      '*'
+      ident [',' ident]
+
+    from_import ::=
+      'from' ident 'import'
+    */
     fn from_import(&mut self) -> ParseResult<Declaration> {
-        keep_right!(
-            keep_left!(self.keyword(&Keyword::From), self.spaces()),
-            keep_left!(spanned!(self, self.ident_owned()), self.spaces()).and_then(
-                |module| keep_right!(
-                    keep_left!(self.keyword(&Keyword::Import), self.spaces()),
-                    choices!(
-                        self,
-                        keep_left!(
-                            map0!(Names::All, self.token(&token::Data::Asterisk)),
-                            self.spaces()
-                        ),
-                        sep_by!(
+        indent_scope!(self, {
+            keep_right!(
+                self.keyword(&Keyword::From),
+                spanned!(self, indent_gt!(self, self.ident_owned())).and_then(
+                    |module| keep_right!(
+                        indent_gt!(self, self.keyword(&Keyword::Import)),
+                        choices!(
                             self,
-                            keep_left!(self.ident_owned(), self.spaces()),
-                            keep_left!(self.token(&token::Data::Comma), self.spaces())
+                            map0!(
+                                Names::All,
+                                indent_gt!(self, self.token(&token::Data::Asterisk))
+                            ),
+                            sep_by!(
+                                self,
+                                indent_gt!(self, self.ident_owned()),
+                                indent_gt!(self, self.token(&token::Data::Comma))
+                            )
+                            .map(Names::Names)
                         )
-                        .map(Names::Names)
+                        .map(|names| Declaration::FromImport { module, names })
                     )
-                    .map(|names| Declaration::FromImport { module, names })
                 )
             )
-        )
+        })
     }
 
+    /*
+    assumptions ::=
+      epsilon
+      '(' type* ')' '=>'
+    */
     fn assumptions(&mut self) -> ParseResult<Vec<Spanned<Type<Rc<str>>>>> {
-        optional!(
-            self,
-            between!(
-                keep_left!(self.token(&token::Data::LParen), self.spaces()),
-                keep_left!(self.token(&token::Data::RParen), self.spaces()),
-                many!(self, spanned!(self, self.type_()))
+        indent_scope!(self, {
+            optional!(
+                self,
+                between!(
+                    indent_eq!(self, self.token(&token::Data::LParen)),
+                    indent_gte!(self, self.token(&token::Data::RParen)),
+                    many!(self, spanned!(self, indent_gte!(self, self.type_())))
+                )
             )
-        )
-        .and_then(|m_tys| match m_tys {
-            None => ParseResult::pure(Vec::new()),
-            Some(tys) => keep_left!(self.token(&token::Data::FatArrow), self.spaces()).map(|_| tys),
+            .and_then(|m_tys| match m_tys {
+                None => ParseResult::pure(Vec::new()),
+                Some(tys) => indent_gte!(self, self.token(&token::Data::FatArrow)).map(|_| tys),
+            })
         })
     }
 
+    /*
+    class_member ::=
+      ident ':' type
+    */
     fn class_member(&mut self) -> ParseResult<(String, Type<Rc<str>>)> {
-        keep_left!(self.ident_owned(), self.spaces()).and_then(|name| {
-            keep_left!(self.token(&token::Data::Colon), self.spaces()).and_then(|_| {
-                keep_left!(self.type_(), many_!(self, self.token(&token::Data::Space)))
-                    .map(|type_| (name, type_))
-            })
+        self.ident_owned().and_then(|name| {
+            keep_right!(
+                indent_gt!(self, self.token(&token::Data::Colon)),
+                indent_gt!(self, self.type_()).map(|type_| (name, type_))
+            )
         })
     }
 
+    /*
+    class ::=
+      'class' assumptions ctor ident* 'where' class_member*
+    */
     fn class(&mut self) -> ParseResult<Declaration> {
-        keep_left!(self.keyword(&Keyword::Class), self.spaces()).and_then(|_| {
-            self.assumptions().and_then(|supers| {
-                keep_left!(self.ctor(), self.spaces()).and_then(|name| {
-                    many!(
-                        self,
-                        keep_left!(spanned!(self, self.ident()), self.spaces())
-                    )
-                    .and_then(|args| {
-                        keep_left!(
-                            self.keyword(&Keyword::Where),
-                            many_!(self, self.token(&token::Data::Space))
-                        )
-                        .and_then(|_| {
-                            keep_right!(
-                                self.indent(),
-                                sep_by!(self, self.class_member(), self.newline()).and_then(
-                                    |members| keep_right!(
-                                        self.dedent(),
-                                        ParseResult::pure(Declaration::Class {
-                                            supers,
-                                            name,
-                                            args,
-                                            members,
-                                        })
+        indent_scope!(self, {
+            keep_right!(
+                indent_eq!(self, self.keyword(&Keyword::Class)),
+                indent_gt!(self, self.assumptions()).and_then(|supers| {
+                    indent_gt!(self, self.ctor()).and_then(|name| {
+                        many!(self, spanned!(self, indent_gt!(self, self.ident()))).and_then(
+                            |args| {
+                                keep_right!(
+                                    indent_gt!(self, self.keyword(&Keyword::Where)),
+                                    indent_gt!(
+                                        self,
+                                        indent_scope!(
+                                            self,
+                                            many!(self, indent_eq!(self, self.class_member())).map(
+                                                |members| {
+                                                    Declaration::Class {
+                                                        supers,
+                                                        name,
+                                                        args,
+                                                        members,
+                                                    }
+                                                }
+                                            )
+                                        )
                                     )
                                 )
-                            )
-                        })
+                            },
+                        )
                     })
                 })
-            })
+            )
         })
     }
 
+    /*
+    instance_member ::=
+      ident pattern* '=' expr
+    */
     fn instance_member(&mut self) -> ParseResult<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)> {
-        keep_left!(spanned!(self, self.ident_owned()), self.spaces()).and_then(|name| {
-            many!(self, keep_left!(self.pattern(), self.spaces())).and_then(|args| {
-                keep_left!(self.token(&token::Data::Equals), self.spaces())
-                    .and_then(|_| self.expr().map(|body| (name, args, body)))
+        spanned!(self, self.ident_owned()).and_then(|name| {
+            many!(self, indent_gt!(self, self.pattern())).and_then(|args| {
+                keep_right!(
+                    indent_gt!(self, self.token(&token::Data::Equals)),
+                    indent_gt!(self, self.expr()).map(|body| (name, args, body))
+                )
             })
         })
     }
 
+    /*
+    instance ::=
+      'instance' assumptions ctor type* 'where' instance_member*
+    */
     fn instance(&mut self) -> ParseResult<Declaration> {
-        keep_left!(self.keyword(&Keyword::Instance), self.spaces()).and_then(|_| {
-            self.assumptions().and_then(|assumes| {
-                keep_left!(spanned!(self, self.ctor()), self.spaces()).and_then(|name| {
-                    many!(self, keep_left!(self.type_(), self.spaces())).and_then(|args| {
-                        keep_left!(
-                            self.keyword(&Keyword::Where),
-                            many_!(self, self.token(&token::Data::Space))
-                        )
-                        .and_then(|_| {
+        indent_scope!(self, {
+            keep_right!(
+                indent_eq!(self, self.keyword(&Keyword::Instance)),
+                indent_gt!(self, self.assumptions()).and_then(|assumes| {
+                    spanned!(self, indent_gt!(self, self.ctor())).and_then(|name| {
+                        many!(self, indent_gt!(self, self.type_())).and_then(|args| {
                             keep_right!(
-                                self.indent(),
-                                sep_by!(self, self.instance_member(), self.newline()).and_then(
-                                    |members| keep_right!(
-                                        self.dedent(),
-                                        ParseResult::pure(Declaration::Instance {
-                                            assumes,
-                                            name,
-                                            args,
-                                            members,
-                                        })
+                                indent_gt!(self, self.keyword(&Keyword::Where)),
+                                indent_gt!(
+                                    self,
+                                    indent_scope!(
+                                        self,
+                                        many!(self, indent_eq!(self, self.instance_member())).map(
+                                            |members| {
+                                                Declaration::Instance {
+                                                    assumes,
+                                                    name,
+                                                    args,
+                                                    members,
+                                                }
+                                            }
+                                        )
                                     )
                                 )
                             )
                         })
                     })
                 })
-            })
+            )
         })
     }
 
+    /*
+    declaration ::=
+      definition
+      type_alias
+      import
+      from_import
+      class
+      instance
+    */
     fn declaration(&mut self) -> ParseResult<Declaration> {
         choices!(
             self,
@@ -1491,15 +1678,14 @@ impl<'input> Parser<'input> {
         )
     }
 
+    /*
+    module ::=
+    */
     pub fn module(&mut self) -> ParseResult<Module> {
-        keep_right!(
-            many!(self, self.newline()),
-            sep_by!(
-                self,
-                spanned!(self, self.declaration()),
-                some_!(self, self.newline())
-            )
-            .map(|decls| Module { decls })
+        indent_scope!(
+            self,
+            many!(self, spanned!(self, indent_eq!(self, self.declaration())))
         )
+        .map(|decls| Module { decls })
     }
 }

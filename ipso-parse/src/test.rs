@@ -16,20 +16,17 @@ use std::rc::Rc;
 #[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {{
-        assert_eq!(
-            {
-                let input = String::from($input);
-                let mut parser = Parser::new(
-                    Source::Interactive {
-                        label: String::from("(parser)"),
-                    },
-                    Lexer::new(&input),
-                );
-                let result = keep_left!(parser.$function(), parser.eof());
-                parser.into_parse_error(result.result)
-            },
-            $output
-        )
+        assert_eq!($output, {
+            let input = String::from($input);
+            let mut parser = Parser::new(
+                Source::Interactive {
+                    label: String::from("(parser)"),
+                },
+                Lexer::new(&input),
+            );
+            let result = keep_left!(parser.$function(), parser.eof());
+            parser.into_parse_error(result.result)
+        })
     }};
 }
 
@@ -118,13 +115,9 @@ fn parse_import_as_3() {
                 label: String::from("(parser)"),
             },
             pos: 10,
-            expecting: vec![
-                token::Name::Space,
-                token::Name::Keyword(Keyword::As),
-                token::Name::Comment
-            ]
-            .into_iter()
-            .collect()
+            expecting: vec![token::Name::Keyword(Keyword::As), token::Name::Comment]
+                .into_iter()
+                .collect()
         })
     )
 }
@@ -188,7 +181,6 @@ fn parse_definition_3() {
                 token::Name::Keyword(Keyword::Let),
                 token::Name::Keyword(Keyword::Comp),
                 token::Name::Ctor,
-                token::Name::Space,
                 token::Name::LAngle,
                 token::Name::LParen,
                 token::Name::LBrace,
@@ -587,7 +579,6 @@ fn parse_case_4() {
             },
             pos: 24,
             expecting: vec![
-                token::Name::Space,
                 token::Name::Indent(2),
                 token::Name::Dedent,
                 token::Name::LAngle,
@@ -640,7 +631,6 @@ fn parse_case_5() {
                 token::Name::Dot,
                 token::Name::Indent(2),
                 token::Name::Dedent,
-                token::Name::Space,
                 token::Name::Comment
             ]
             .into_iter()
