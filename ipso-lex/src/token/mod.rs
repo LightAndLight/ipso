@@ -5,6 +5,20 @@ use quickcheck::Arbitrary;
 use std::rc::Rc;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub enum Relation {
+    Gt,
+    Gte,
+    Eq,
+}
+
+impl Arbitrary for Relation {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let vals = &[Relation::Gt, Relation::Gte, Relation::Eq];
+        g.choose(vals).unwrap().clone()
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
     Comment,
@@ -41,7 +55,7 @@ pub enum Name {
     Hyphen,
     Plus,
     Slash,
-    Indent(usize),
+    Indent(Relation, usize),
     Dedent,
 }
 
@@ -83,7 +97,7 @@ impl Arbitrary for Name {
             Name::Hyphen,
             Name::Plus,
             Name::Slash,
-            Name::Indent(usize::arbitrary(g)),
+            Name::Indent(Relation::arbitrary(g), usize::arbitrary(g)),
             Name::Dedent,
         ];
         g.choose(vals).unwrap().clone()
@@ -211,7 +225,7 @@ impl Name {
             Self::Hyphen => 50,
             Self::Plus => 51,
             Self::Slash => 52,
-            Self::Indent(_) => 53,
+            Self::Indent(_, _) => 53,
             Self::Dedent => 54,
         }
     }
@@ -249,12 +263,16 @@ impl Name {
             Name::Hyphen => String::from("'-'"),
             Name::Plus => String::from("'+'"),
             Name::Slash => String::from("'/'"),
-            Name::Indent(n) => {
-                if *n == 0 {
-                    String::from("newline")
-                } else {
-                    format!("indent ({})", n)
-                }
+            Name::Indent(relation, n) => {
+                format!(
+                    "indent ({} {})",
+                    match relation {
+                        Relation::Gt => ">",
+                        Relation::Gte => ">=",
+                        Relation::Eq => "==",
+                    },
+                    n
+                )
             }
             Name::Dedent => String::from("dedent"),
             Name::Ctor => String::from("constructor"),

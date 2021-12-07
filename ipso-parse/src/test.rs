@@ -5,7 +5,10 @@ use crate::{keep_left, map2};
 #[cfg(test)]
 use ipso_diagnostic::Source;
 #[cfg(test)]
-use ipso_lex::{token, Lexer};
+use ipso_lex::{
+    token::{self, Relation},
+    Lexer,
+};
 #[cfg(test)]
 use ipso_syntax::{
     r#type::Type, Branch, Declaration, Expr, Keyword, Names, Pattern, Spanned, StringPart,
@@ -114,8 +117,8 @@ fn parse_import_as_3() {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
-            pos: 10,
-            expecting: vec![token::Name::Keyword(Keyword::As), token::Name::Comment]
+            pos: 11,
+            expecting: vec![token::Name::Indent(Relation::Gt, 0)]
                 .into_iter()
                 .collect()
         })
@@ -125,6 +128,10 @@ fn parse_import_as_3() {
 #[test]
 fn parse_definition_1() {
     parse_test!(
+        /*
+        x : Int
+        x = 1
+        */
         "x : Int\nx = 1",
         definition,
         Ok(Declaration::Definition {
@@ -170,28 +177,10 @@ fn parse_definition_3() {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
-            pos: 11,
-            expecting: vec![
-                token::Name::Int,
-                token::Name::Ident,
-                token::Name::Keyword(Keyword::Case),
-                token::Name::Keyword(Keyword::True),
-                token::Name::Keyword(Keyword::False),
-                token::Name::Keyword(Keyword::If),
-                token::Name::Keyword(Keyword::Let),
-                token::Name::Keyword(Keyword::Comp),
-                token::Name::Ctor,
-                token::Name::LAngle,
-                token::Name::LParen,
-                token::Name::LBrace,
-                token::Name::LBracket,
-                token::Name::DoubleQuote,
-                token::Name::SingleQuote,
-                token::Name::Backslash,
-                token::Name::Comment,
-            ]
-            .into_iter()
-            .collect()
+            pos: 12,
+            expecting: vec![token::Name::Indent(Relation::Gt, 0)]
+                .into_iter()
+                .collect()
         })
     )
 }
@@ -440,6 +429,10 @@ fn parse_pattern_2() {
 #[test]
 fn parse_case_1() {
     parse_test!(
+        /*
+        case x of
+          a -> b
+        */
         "case x of\n  a -> b",
         expr_case,
         Ok(Spanned {
@@ -579,8 +572,6 @@ fn parse_case_4() {
             },
             pos: 24,
             expecting: vec![
-                token::Name::Indent(2),
-                token::Name::Dedent,
                 token::Name::LAngle,
                 token::Name::LParen,
                 token::Name::LBrace,
@@ -629,7 +620,7 @@ fn parse_case_5() {
                 token::Name::LBracket,
                 token::Name::LAngle,
                 token::Name::Dot,
-                token::Name::Indent(2),
+                token::Name::Indent(Relation::Eq, 2),
                 token::Name::Dedent,
                 token::Name::Comment
             ]

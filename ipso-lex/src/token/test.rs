@@ -7,7 +7,7 @@ use quickcheck_macros::quickcheck;
 #[quickcheck]
 fn prop_from_int_to_int(n: Name) -> bool {
     match n {
-        Name::Indent(_) => true,
+        Name::Indent(_, _) => true,
         _ => Name::from_int(n.to_int()) == Some(n),
     }
 }
