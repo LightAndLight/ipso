@@ -584,7 +584,7 @@ fn parse_case_4() {
                 token::Name::DoubleQuote,
                 token::Name::SingleQuote,
                 token::Name::Int,
-                token::Name::Comment
+                token::Name::Indent(Relation::Eq, 2),
             ]
             .into_iter()
             .collect()
@@ -606,23 +606,10 @@ fn parse_case_5() {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
-            pos: 18,
+            pos: 20,
             expecting: vec![
-                token::Name::Ctor,
-                token::Name::Ident,
-                token::Name::Keyword(Keyword::False),
-                token::Name::Keyword(Keyword::True),
-                token::Name::Int,
-                token::Name::DoubleQuote,
-                token::Name::SingleQuote,
-                token::Name::LBrace,
-                token::Name::LParen,
-                token::Name::LBracket,
-                token::Name::LAngle,
-                token::Name::Dot,
                 token::Name::Indent(Relation::Eq, 2),
-                token::Name::Dedent,
-                token::Name::Comment
+                token::Name::Indent(Relation::Gt, 2)
             ]
             .into_iter()
             .collect()

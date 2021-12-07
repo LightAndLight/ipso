@@ -398,17 +398,25 @@ macro_rules! spanned {
 
 macro_rules! indent {
     ($self:expr, $relation:expr, $body:expr) => {{
-        let current_indentation: usize = *$self.indentation.last().expect("indentation is empty");
-        $self
-            .expecting
-            .insert(token::Name::Indent($relation, current_indentation));
+        let current_indentation: Option<usize> = $self.indentation.last().copied();
+        $self.expecting.insert(match current_indentation {
+            None => token::Name::Indent(Relation::Gte, 0),
+            Some(current_indentation) => token::Name::Indent($relation, current_indentation),
+        });
         match &$self.current {
             None => $self.unexpected(false),
             Some(token) => {
-                let current_indentation_matches = match $relation {
-                    Relation::Gt => token.column > current_indentation,
-                    Relation::Gte => token.column >= current_indentation,
-                    Relation::Eq => token.column == current_indentation,
+                let current_indentation_matches = match current_indentation {
+                    None => match $relation {
+                        Relation::Gt => true,
+                        Relation::Gte => true,
+                        Relation::Eq => false,
+                    },
+                    Some(current_indentation) => match $relation {
+                        Relation::Gt => token.column > current_indentation,
+                        Relation::Gte => token.column >= current_indentation,
+                        Relation::Eq => token.column == current_indentation,
+                    },
                 };
                 if current_indentation_matches {
                     $self.expecting.clear_indents();
@@ -622,8 +630,8 @@ impl<'input> Parser<'input> {
             self.token(&token::Data::SingleQuote),
             {
                 self.expecting.insert(token::Name::Char);
-                match self.current {
-                    Some(ref token) => match token.data {
+                match &self.current {
+                    Some(token) => match token.data {
                         token::Data::Char { value, length: _ } => {
                             map0!(value, self.consume())
                         }
