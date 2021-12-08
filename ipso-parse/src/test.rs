@@ -118,7 +118,7 @@ fn parse_import_as_3() {
                 label: String::from("(parser)"),
             },
             pos: 11,
-            expecting: vec![token::Name::Indent(Relation::Gt, 0)]
+            expecting: vec![token::Name::Indent(Relation::Gt, 0), token::Name::Eof]
                 .into_iter()
                 .collect()
         })
@@ -585,6 +585,7 @@ fn parse_case_4() {
                 token::Name::SingleQuote,
                 token::Name::Int,
                 token::Name::Indent(Relation::Eq, 2),
+                token::Name::Eof,
             ]
             .into_iter()
             .collect()
@@ -609,7 +610,8 @@ fn parse_case_5() {
             pos: 20,
             expecting: vec![
                 token::Name::Indent(Relation::Eq, 2),
-                token::Name::Indent(Relation::Gt, 2)
+                token::Name::Indent(Relation::Gt, 2),
+                token::Name::Eof
             ]
             .into_iter()
             .collect()

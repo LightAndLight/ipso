@@ -57,6 +57,7 @@ pub enum Name {
     Slash,
     Indent(Relation, usize),
     Dedent,
+    Eof,
 }
 
 impl Arbitrary for Name {
@@ -166,6 +167,7 @@ impl Name {
             52 => Some(Self::Slash),
             // 53 => Self::Indent(_),
             54 => Some(Self::Dedent),
+            55 => Some(Self::Eof),
             _ => None,
         }
     }
@@ -227,6 +229,7 @@ impl Name {
             Self::Slash => 52,
             Self::Indent(_, _) => 53,
             Self::Dedent => 54,
+            Self::Eof => 55,
         }
     }
 
@@ -279,6 +282,7 @@ impl Name {
             Name::Pipe => String::from("'|'"),
             Name::LAngle => String::from("'<'"),
             Name::RAngle => String::from("'>'"),
+            Name::Eof => String::from("end of input"),
         }
     }
 }
@@ -286,6 +290,7 @@ impl Name {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum Data {
     Unexpected(char),
+    Eof,
 
     Comment { length: usize },
 
@@ -337,6 +342,7 @@ impl Data {
     pub fn render(&self) -> String {
         match self {
             Data::Unexpected(_) => String::from("unexpected"),
+            Data::Eof => String::from("end of input"),
             Data::Ident(s) => {
                 if s.is_empty() {
                     String::from("identifier")
@@ -388,6 +394,7 @@ impl Data {
     pub fn length(&self) -> usize {
         match self {
             Data::Unexpected(_) => 1,
+            Data::Eof => 0,
             Data::Comment { length } => *length,
             Data::Ident(s) => s.len(),
             Data::Int { value: _, length } => *length,
@@ -428,6 +435,7 @@ impl Data {
     pub fn name(&self) -> Name {
         match self {
             Data::Unexpected(_) => Name::Unexpected,
+            Data::Eof => Name::Eof,
             Data::Comment { .. } => Name::Comment,
             Data::Ctor => Name::Ctor,
             Data::Ident(_) => Name::Ident,

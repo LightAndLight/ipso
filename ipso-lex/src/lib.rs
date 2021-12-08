@@ -19,6 +19,7 @@ pub struct Lexer<'input> {
     current: Option<char>,
     input: Chars<'input>,
     mode: Vec<Mode>,
+    is_eof: bool,
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -38,6 +39,7 @@ impl<'input> Lexer<'input> {
             current: input.next(),
             input,
             mode: vec![Mode::Normal],
+            is_eof: false,
         }
     }
 
@@ -62,7 +64,18 @@ impl<'input> Iterator for Lexer<'input> {
         let column = self.column;
 
         match self.current {
-            None => None,
+            None => {
+                if self.is_eof {
+                    None
+                } else {
+                    self.is_eof = true;
+                    Some(Token {
+                        data: token::Data::Eof,
+                        pos,
+                        column,
+                    })
+                }
+            }
             Some(c) => match &self.mode[self.mode.len() - 1] {
                 Mode::Ident => {
                     if is_ident_start(c) {
@@ -220,8 +233,8 @@ impl<'input> Iterator for Lexer<'input> {
                                         None => {
                                             return Some(Token {
                                                 data: token::Data::Unexpected('\\'),
-                                                pos: self.pos,
-                                                column: self.column,
+                                                pos,
+                                                column,
                                             })
                                         }
                                         Some(c) => match c {

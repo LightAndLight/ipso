@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Ipso.Common (runDiff, eqExitCode, displayError, Config(..), configParser, examplesMain) where
+module Test.Ipso.Common (runDiff, eqExitCode, displayError, Config (..), configParser, examplesMain) where
 
 import qualified Data.Either as Either
 import Data.Foldable (traverse_)
@@ -19,14 +19,14 @@ import qualified System.IO.Temp as Temp
 import System.Process (readProcessWithExitCode)
 
 runDiff :: Text -> Text -> IO (Maybe String)
-runDiff expected actual = 
-  Temp.withSystemTempFile "expected.txt" $ \expectedTmpPath expectedTmpHandle -> 
+runDiff expected actual =
+  Temp.withSystemTempFile "expected.txt" $ \expectedTmpPath expectedTmpHandle ->
     Temp.withSystemTempFile "actual.txt" $ \actualTmpPath actualTmpHandle -> do
       Text.IO.hPutStrLn expectedTmpHandle expected <* System.IO.hClose expectedTmpHandle
       Text.IO.hPutStrLn actualTmpHandle actual <* System.IO.hClose actualTmpHandle
-      (ec, out, _) <- readProcessWithExitCode "diff" ["-u", "--color=always", "--label", "expected", "--label", "actual", actualTmpPath, expectedTmpPath] ""
-      if ec == ExitSuccess 
-        then pure Nothing 
+      (ec, out, _) <- readProcessWithExitCode "diff" ["-u", "--color=always", "--label", "actual", "--label", "expected", actualTmpPath, expectedTmpPath] ""
+      if ec == ExitSuccess
+        then pure Nothing
         else pure $ Just out
 
 eqExitCode :: (Eq a, Num a) => a -> ExitCode -> Bool
@@ -42,33 +42,32 @@ eqExitCode e1 e2 =
         ExitFailure n2 -> n1 == fromIntegral n2
         _ -> False
 
-
 displayError :: String -> String -> (a, a -> Text) -> (b, b -> String) -> String
 displayError label path (expected, showExpected) (actual, showActual) =
   unlines
-    [ path <> ": " <> label <> " mismatch"
-    , "expected:"
-    , Text.unpack $ showExpected expected
-    , "actual:"
-    , showActual actual
+    [ path <> ": " <> label <> " mismatch",
+      "expected:",
+      Text.unpack $ showExpected expected,
+      "actual:",
+      showActual actual
     ]
 
 commasReader :: ReadM [String]
 commasReader = go <$> str
- where
-  go :: String -> [String]
-  go input =
-    let (prefix, suffix) = break (== ',') input
-     in prefix :
-        case suffix of
-          [] -> []
-          _ : rest ->
-            go rest
+  where
+    go :: String -> [String]
+    go input =
+      let (prefix, suffix) = break (== ',') input
+       in prefix :
+          case suffix of
+            [] -> []
+            _ : rest ->
+              go rest
 
 data Config a = Config
-  { cfgDir :: FilePath
-  , cfgOnly :: Maybe [String]
-  , cfgRest :: a
+  { cfgDir :: FilePath,
+    cfgOnly :: Maybe [String],
+    cfgRest :: a
   }
 
 configParser :: FilePath -> Parser a -> Parser (Config a)
@@ -87,10 +86,10 @@ configParser curDir restParser =
       )
     <*> restParser
 
-examplesMain :: 
-  Parser a -> 
-  (FilePath -> Dhall.Decoder example) -> 
-  (Config a -> example -> IO (Either String x)) -> 
+examplesMain ::
+  Parser a ->
+  (FilePath -> Dhall.Decoder example) ->
+  (Config a -> example -> IO (Either String x)) ->
   IO ()
 examplesMain restParser exampleDecoder runExample = do
   curDir <- getCurrentDirectory

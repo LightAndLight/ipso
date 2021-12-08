@@ -8,6 +8,93 @@ use super::Lexer;
 use crate::token::{self, Token};
 
 #[test]
+fn lex_char_1() {
+    assert_eq!(
+        {
+            let input = Rc::from("'");
+            let lexer = Lexer::new(&input);
+            lexer.collect::<Vec<Token>>()
+        },
+        vec![
+            Token {
+                data: token::Data::SingleQuote,
+                pos: 0,
+                column: 0
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 1,
+                column: 1
+            }
+        ]
+    )
+}
+
+#[test]
+fn lex_char_2() {
+    assert_eq!(
+        {
+            let input = Rc::from("'\\");
+            let lexer = Lexer::new(&input);
+            lexer.collect::<Vec<Token>>()
+        },
+        vec![
+            Token {
+                data: token::Data::SingleQuote,
+                pos: 0,
+                column: 0
+            },
+            Token {
+                data: token::Data::Unexpected('\\'),
+                pos: 1,
+                column: 1
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 2,
+                column: 2
+            }
+        ]
+    )
+}
+
+#[test]
+fn lex_char_3() {
+    assert_eq!(
+        {
+            let input = Rc::from("'\\\''");
+            let lexer = Lexer::new(&input);
+            lexer.collect::<Vec<Token>>()
+        },
+        vec![
+            Token {
+                data: token::Data::SingleQuote,
+                pos: 0,
+                column: 0
+            },
+            Token {
+                data: token::Data::Char {
+                    value: '\'',
+                    length: 2
+                },
+                pos: 1,
+                column: 1
+            },
+            Token {
+                data: token::Data::SingleQuote,
+                pos: 3,
+                column: 3
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 4,
+                column: 4
+            }
+        ]
+    )
+}
+
+#[test]
 fn lex_int_1() {
     assert_eq!(
         {
@@ -15,14 +102,21 @@ fn lex_int_1() {
             let lexer = Lexer::new(&input);
             lexer.collect::<Vec<Token>>()
         },
-        vec![Token {
-            data: token::Data::Int {
-                value: 923,
-                length: 3
+        vec![
+            Token {
+                data: token::Data::Int {
+                    value: 923,
+                    length: 3
+                },
+                pos: 0,
+                column: 0
             },
-            pos: 0,
-            column: 0
-        }]
+            Token {
+                data: token::Data::Eof,
+                pos: 3,
+                column: 3
+            }
+        ]
     )
 }
 
@@ -34,14 +128,21 @@ fn lex_int_2() {
             let lexer = Lexer::new(&input);
             lexer.collect::<Vec<Token>>()
         },
-        vec![Token {
-            data: token::Data::Int {
-                value: 923,
-                length: 5
+        vec![
+            Token {
+                data: token::Data::Int {
+                    value: 923,
+                    length: 5
+                },
+                pos: 0,
+                column: 0
             },
-            pos: 0,
-            column: 0
-        }]
+            Token {
+                data: token::Data::Eof,
+                pos: 5,
+                column: 5
+            }
+        ]
     )
 }
 
@@ -73,6 +174,11 @@ fn lex_import() {
                 data: token::Data::Ident(Rc::from("no")),
                 pos: 14,
                 column: 14
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 16,
+                column: 16
             }
         ]
     )
@@ -119,6 +225,11 @@ fn lex_definition_1() {
                 },
                 pos: 12,
                 column: 4
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 13,
+                column: 5
             }
         ]
     )
@@ -162,6 +273,11 @@ fn lex_definition_2() {
                 data: token::Data::Unexpected('~'),
                 pos: 12,
                 column: 4
+            },
+            Token {
+                data: token::Data::Eof,
+                pos: 13,
+                column: 5
             }
         ]
     )
@@ -206,6 +322,11 @@ fn lex_case_1() {
                 pos: 17,
                 column: 7
             },
+            Token {
+                data: token::Data::Eof,
+                pos: 18,
+                column: 8
+            }
         ]
     )
 }
@@ -239,6 +360,11 @@ fn lex_ann_1() {
                 pos: 10,
                 column: 10
             },
+            Token {
+                data: token::Data::Eof,
+                pos: 11,
+                column: 11
+            }
         ]
     )
 }
@@ -265,6 +391,11 @@ fn lex_string_1() {
             data: token::Data::DoubleQuote,
             pos: 6,
             column: 6,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 7,
+            column: 7,
         },
     ];
     let actual = lexer.collect::<Vec<Token>>();
@@ -312,6 +443,11 @@ fn lex_string_2() {
             pos: 7,
             column: 7,
         },
+        Token {
+            data: token::Data::Eof,
+            pos: 8,
+            column: 8,
+        },
     ];
     let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
@@ -357,6 +493,11 @@ fn lex_string_3() {
             data: token::Data::DoubleQuote,
             pos: 8,
             column: 8,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 9,
+            column: 9,
         },
     ];
     let actual = lexer.collect::<Vec<Token>>();
@@ -408,6 +549,11 @@ fn lex_string_4() {
             data: token::Data::DoubleQuote,
             pos: 10,
             column: 10,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 11,
+            column: 11,
         },
     ];
     let actual = lexer.collect::<Vec<Token>>();
@@ -470,6 +616,11 @@ fn lex_string_5() {
             pos: 13,
             column: 13,
         },
+        Token {
+            data: token::Data::Eof,
+            pos: 14,
+            column: 14,
+        },
     ];
     let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
@@ -508,6 +659,11 @@ fn lex_string_6() {
             pos: 12,
             column: 12,
         },
+        Token {
+            data: token::Data::Eof,
+            pos: 13,
+            column: 13,
+        },
     ];
     let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
@@ -535,6 +691,11 @@ fn lex_string_7() {
             data: token::Data::DoubleQuote,
             pos: 17,
             column: 17,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 18,
+            column: 18,
         },
     ];
     let actual = lexer.collect::<Vec<Token>>();
