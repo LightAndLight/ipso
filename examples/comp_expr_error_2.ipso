@@ -1,4 +1,5 @@
 main : IO ()
-main = comp
-  bind x <- 666
-  writeStdout stdout x
+main =
+  comp
+    bind x <- 666
+    writeStdout stdout x
