@@ -50,21 +50,23 @@ macro_rules! indent_scope {
 #[macro_export]
 macro_rules! indent {
     ($parser:expr, $relation:expr, $body:expr) => {{
-        $let current_indentation: Option<usize> = $parser.indentation.last().copied();
+        use ipso_lex::token::{self, Relation};
+
+        let current_indentation: Option<usize> = $parser.indentation.last().copied();
         $parser.expecting.insert(match current_indentation {
-            None => token::Name::Indent(Relation::Gte, 0),$
-            Some(current_indentation) => token::Name::Indent(relation, current_indentation),
-        });$
-        match &$parser.$current {
+            None => token::Name::Indent(Relation::Gte, 0),
+            Some(current_indentation) => token::Name::Indent($relation, current_indentation),
+        });
+        match &$parser.current {
             None => $parser.unexpected(false),
             Some(token) => {
-                let current_indent$ation_matches = match current_indentation {
-                    None => match relation {
+                let current_indentation_matches = match current_indentation {
+                    None => match $relation {
                         Relation::Gt => true,
                         Relation::Gte => true,
                         Relation::Eq => false,
-                    },$
-                    Some(current_indentation) => match relation {
+                    },
+                    Some(current_indentation) => match $relation {
                         Relation::Gt => token.column > current_indentation,
                         Relation::Gte => token.column >= current_indentation,
                         Relation::Eq => token.column == current_indentation,
@@ -72,10 +74,11 @@ macro_rules! indent {
                 };
                 if current_indentation_matches {
                     $parser.expecting.clear_indents();
-                    body()
-                } el$se {
+                    $body
+                } else {
                     $parser.unexpected(false)
                 }
             }
-     };   }
-}}
+        }
+    }};
+}
