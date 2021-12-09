@@ -1,5 +1,18 @@
 //! # Indentation parsing
 //!
+//! This module provides primitives for parsing indentation in the style of
+//! "Principled parsing for indentation-sensitive languages: revisiting landin's offside rule"[^principled].
+//!
+//! Every [Token] is annotated with its column. [indent_scope!] pushes the
+//! current token's column onto the indentation stack, evaluates its body, and
+//! pops the stack. [indent!] asserts that the current token has some
+//! [Relation]ship with the column at the top of the indentation stack.
+//!
+//! These primitives are combined to implement scoped indentation parsing,
+//! where each token's indentation is required to have some particular
+//! relationship with a previously identified token. See `ipso_parse/src/lib.rs` for
+//! examples.
+//!
 //! ## Datatypes
 //!
 //! * [Relation]
@@ -8,9 +21,11 @@
 //!
 //! * [indent_scope!]
 //! * [indent!]
+//!
+//! [^principled]: Adams, M. D. (2013). Principled parsing for indentation-sensitive languages: revisiting landin's offside rule. ACM SIGPLAN Notices, 48(1), 511-522.
 
 #[allow(unused_imports)] // Used by docs
-use ipso_lex::token::Relation;
+use ipso_lex::token::{Relation, Token};
 
 /// Evaluate an expression within a new indentation scope.
 ///
