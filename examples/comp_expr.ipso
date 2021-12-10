@@ -8,5 +8,8 @@ main : IO ()
 main = 
   comp
     bind x <- readLineStdin stdin
+    # comments are allowed between each line
+  # here's another one
     writeStdout stdout (toUtf8 x)
+         # and another
     test
