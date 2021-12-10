@@ -10,8 +10,7 @@
 //!
 //! These primitives are combined to implement scoped indentation parsing,
 //! where each token's indentation is required to have some particular
-//! relationship with a previously identified token. See `ipso_parse/src/lib.rs` for
-//! examples.
+//! relationship with a previously identified token.
 //!
 //! ## Datatypes
 //!
