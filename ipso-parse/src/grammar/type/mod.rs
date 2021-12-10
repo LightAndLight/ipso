@@ -1,3 +1,7 @@
+//! Parsing types
+
+mod test;
+
 use crate::{
     between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, ParseResult,
     Parser,
