@@ -12,9 +12,7 @@ use ipso_lex::{
     Lexer,
 };
 #[cfg(test)]
-use ipso_syntax::{Branch, Expr, Keyword, StringPart};
-#[cfg(test)]
-use ipso_syntax::{Pattern, Spanned};
+use ipso_syntax::{Branch, Expr, Keyword, Pattern, Spanned, StringPart};
 
 #[cfg(test)]
 macro_rules! parse_test {
