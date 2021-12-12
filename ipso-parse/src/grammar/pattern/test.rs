@@ -1,13 +1,13 @@
 #[cfg(test)]
-use super::{ParseError, Parser};
+use super::pattern;
 #[cfg(test)]
-use crate::{keep_left, map2};
+use crate::{keep_left, map2, Parser};
 #[cfg(test)]
 use ipso_diagnostic::Source;
 #[cfg(test)]
-use ipso_lex::{token, Lexer};
+use ipso_lex::Lexer;
 #[cfg(test)]
-use std::rc::Rc;
+use ipso_syntax::{Pattern, Spanned};
 
 #[cfg(test)]
 macro_rules! parse_test {
@@ -20,28 +20,25 @@ macro_rules! parse_test {
                 },
                 Lexer::new(&input),
             );
-            let result = keep_left!(parser.$function(), parser.eof());
+            let result = keep_left!($function(&mut parser), parser.eof());
             parser.into_parse_error(result.result)
         })
     }};
 }
 
 #[test]
-fn parse_ident_1() {
-    parse_test!("hello", ident, Ok(Rc::from("hello")))
+fn parse_pattern_1() {
+    parse_test!(
+        "a",
+        pattern,
+        Ok(Pattern::Name(Spanned {
+            pos: 0,
+            item: String::from("a")
+        }))
+    )
 }
 
 #[test]
-fn parse_ident_2() {
-    parse_test!(
-        "import",
-        ident,
-        Err(ParseError::Unexpected {
-            source: Source::Interactive {
-                label: String::from("(parser)"),
-            },
-            pos: 0,
-            expecting: vec![token::Name::Ident].into_iter().collect()
-        })
-    )
+fn parse_pattern_2() {
+    parse_test!("_", pattern, Ok(Pattern::Wildcard))
 }
