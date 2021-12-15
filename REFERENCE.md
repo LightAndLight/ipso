@@ -16,6 +16,7 @@
       - [Selective Imports](#selective-imports)
       - [Wildcard Imports](#wildcard-imports)
     - [Execution](#execution)
+  - [Pattern Matching](#pattern-matching)
   - [Let Bindings](#let-bindings)
   - [Computation Expressions](#computation-expressions)
   - [Datatypes](#datatypes)
@@ -35,7 +36,6 @@
     - [Variants](#variants)
       - [Construction](#construction)
       - [Extension](#extension)
-      - [Pattern Matching](#pattern-matching)
     - [IO](#io)
       - [Builtins](#builtins-5)
   - [Type Classes](#type-classes)
@@ -157,6 +157,46 @@ EOF
 
 $ ipso example.ipso --run sayHello
 hello
+```
+
+## Pattern Matching
+
+```ipso-repl
+> x = None
+x : forall r. < None | r >
+> case x of
+.   None -> 1
+.   _ -> 2
+.
+1
+```
+
+```ipso-repl
+> x = None
+x : forall r. < None | r >
+> case x of
+.   None -> 1
+.
+(repl):1:1 error: missing patterns
+  • _ -> ...
+```
+
+```ipso-repl
+> x = None : < None >
+x : < None >
+> case x of
+.   None -> 1
+.
+1
+```
+
+```ipso-repl
+> case 'a' of
+.   'b' -> "b"
+.   'a' -> "a"
+.   _ -> "something else"
+.
+"a"
 ```
 
 ## Let Bindings
@@ -447,37 +487,6 @@ forall r. < None | r >
 ```ipso-repl
 > :t \x -> < A | x >
 < r > -> < A : a | r >
-```
-
-#### Pattern Matching
-
-```ipso-repl
-> x = None
-x : forall r. < None | r >
-> case x of
-.   None -> 1
-.   _ -> 2
-.
-1
-```
-
-```ipso-repl
-> x = None
-x : forall r. < None | r >
-> case x of
-.   None -> 1
-.
-<repl>:1:1 error: missing patterns
-  • _ -> ...
-```
-
-```ipso-repl
-> x = None : < None >
-x : < None >
-> case x of
-.   None -> 1
-.
-1
 ```
 
 ### IO
