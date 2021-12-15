@@ -1358,6 +1358,13 @@ where {
                                 break;
                             }
                         }
+                        Pattern::Char(actual_char) => {
+                            let expected_char = expr.unpack_char();
+                            if expected_char == *actual_char {
+                                target = Some(&branch.body);
+                                break;
+                            }
+                        }
                         Pattern::Wildcard => {
                             target = Some(&branch.body);
                             break;

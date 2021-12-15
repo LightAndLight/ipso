@@ -85,6 +85,7 @@ pattern ::=
   ident
   pattern_record
   pattern_variant
+  char
   '_'
 ```
 */
@@ -94,6 +95,7 @@ pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
         spanned!(parser, parser.ident_owned()).map(Pattern::Name),
         pattern_record(parser),
         pattern_variant(parser),
+        spanned!(parser, parser.char()).map(Pattern::Char),
         map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore))
     )
 }

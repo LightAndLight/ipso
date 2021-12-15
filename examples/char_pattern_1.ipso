@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  case 1 of
+    'a' -> writeStdout stdout (toUtf8 "saw a")
+    _ -> writeStdout stdout (toUtf8 "didn't see a")

@@ -2080,9 +2080,18 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    fn infer_char_pattern(&mut self, c: &Spanned<char>) -> InferredPattern {
+        InferredPattern {
+            pattern: core::Pattern::Char(c.item),
+            r#type: core::Type::Char,
+            bindings: Vec::new(),
+        }
+    }
+
     fn infer_pattern(&mut self, arg: &syntax::Pattern) -> InferredPattern {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
+            syntax::Pattern::Char(c) => self.infer_char_pattern(c),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
             syntax::Pattern::Record { names, rest } => self.infer_record_pattern(names, rest),
             syntax::Pattern::Variant { name, arg } => {
@@ -2566,7 +2575,36 @@ impl<'modules> Typechecker<'modules> {
 
                     let expected_body_ty = self.fresh_typevar(Kind::Type);
                     let mut expected_pattern_ty = expr_ty.clone();
+
+                    /*
+                    `seen_fallthrough` tracks whether a catch-all pattern (`_ -> ...` or `var -> ...`)
+                    is present in the list of branches.
+
+                    This is used to 'close' variant types that don't have a catch-all. For example, in
+                    this code:
+
+                    ```
+                    case x of
+                      A -> ...
+                      B -> ...
+                    ```
+
+                    `x` should have an inferred type of `< A | B >`, whereas in this code:
+
+                    ```
+                    case x of
+                      A -> ...
+                      B -> ...
+                      rest -> ...
+                    ```
+
+                    `x` should have an inferred type of `< A | B | r >` and `rest` should have type
+                    `< r >`.
+
+                    `seen_fallthrough` distinguishes between these two situations.
+                    */
                     let mut seen_fallthrough = false;
+
                     let mut matching_variant = false;
                     let mut seen_ctors: HashSet<Rc<str>> = HashSet::new();
                     let mut expr_rows = None;
@@ -2600,6 +2638,7 @@ impl<'modules> Typechecker<'modules> {
                                 syntax::Pattern::Wildcard => {
                                     Ok((self.infer_wildcard_pattern(), false))
                                 }
+                                syntax::Pattern::Char(c) => Ok((self.infer_char_pattern(c), false)),
                                 syntax::Pattern::Name(n) => Ok((self.infer_name_pattern(n), false)),
                                 syntax::Pattern::Record { names, rest } => {
                                     Ok((self.infer_record_pattern(names, rest), false))
@@ -2628,6 +2667,7 @@ impl<'modules> Typechecker<'modules> {
                                 }
                             }
                             match branch.pattern.item {
+                                syntax::Pattern::Char(_) => {}
                                 syntax::Pattern::Wildcard
                                 | syntax::Pattern::Name(_)
                                 | syntax::Pattern::Record { .. } => {
