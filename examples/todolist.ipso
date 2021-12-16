@@ -1,135 +1,118 @@
-not : Bool -> Bool
-not a = if a then false else true
+import array
+import io
+import string
 
-and : Bool -> Bool -> Bool
-and a b = if a then b else false
-
-strip : String -> String
-strip = filterString (\c -> not (eqChar c '\n'))
-
-deleteAt : Int -> Array a -> Array a
-deleteAt target arr = 
-  if ltInt target (lengthArray arr)
-  then
-    generateArray 
-      (subtract (lengthArray arr) 1) 
-      (\ix ->
-        if ltInt ix target
-        then indexArray ix arr
-        else indexArray (add ix 1) arr
-      )
-  else arr
-
-readDigit : Char -> < Err : () | Ok : Int >
-readDigit c =
+parseDigit : Char -> < Err | Ok(Int) >
+parseDigit c =
   case c of
-    '0' -> Ok 0
-    '1' -> Ok 1
-    '2' -> Ok 2
-    '3' -> Ok 3
-    '4' -> Ok 4
-    '5' -> Ok 5
-    '6' -> Ok 6
-    '7' -> Ok 7
-    '8' -> Ok 8
-    '9' -> Ok 9
-    _ -> Err ()
+    '0' -> Ok(0)
+    '1' -> Ok(1)
+    '2' -> Ok(2)
+    '3' -> Ok(3)
+    '4' -> Ok(4)
+    '5' -> Ok(5)
+    '6' -> Ok(6)
+    '7' -> Ok(7)
+    '8' -> Ok(8)
+    '9' -> Ok(9)
+    _ -> Err
 
-readInt : String -> < Err : () | Ok : Int >
-readInt str =
-  if eqString "" str
-  then Err ()
+parseInt : String -> < Err | Ok(Int) >
+parseInt str =
+  if str == ""
+  then Err
   else
-    foldlString
+    string.foldl
       (\acc el ->
         case acc of
-          Err err -> Err err
+          Err -> Err
           Ok val ->
-            case readDigit el of
-              Err err -> Err err
-              Ok n -> Ok (add (multiply 10 val) n)
+            case parseDigit el of
+              Err -> Err
+              Ok(n) -> Ok(10 * val + n)
       )
-      (Ok 0)
+      Ok(0)
       str
+
+type Command =
+  < Quit
+  | Help
+  | List
+  | Add{ item : String }
+  | Delete{ index : Int }
+  | Invalid{ input : String }
+  >
 
 parseCommand :
   String ->
-  < Quit : ()
-  | Help : ()
-  | Add : String
-  | List : ()
-  | Delete : Int
-  | Invalid : String
-  >
+  Command
 parseCommand line =
-  let stripped = strip line in
-  let lines = splitString ' ' stripped in
-  if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "quit") then Quit ()
-  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
-  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "list") then List ()
-  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
-  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then
-    case readInt (indexArray 1 lines) of
-      Err err -> Invalid stripped
-      Ok n -> Delete n
-  else Invalid stripped
+  case string.rstrip line |> string.split ' ' of
+    ["quit"] -> Quit
+    ["help"] -> Help
+    ["list"] -> List
+    ["add", item] -> Add{ item } 
+    ["delete", value] -> 
+      case parseInt value of
+        Err -> Invalid{ input = stripped }
+        Ok(index) -> Delete{ index }
+    _ -> Invalid{ input = stripped }
 
 writeTodos : Array String -> IO ()
 writeTodos todos =
-  if eqArray eqString [] todos
-  then writeStdout stdout (toUtf8 "nothing to do\n")
+  if todos == []
+  then println "nothing to do"
   else
-    foldlArray
+    array.foldl
       (\acc todo ->
         comp
           acc
-          writeStdout stdout (toUtf8 "$todo\n")
+          println todo
       )
-      (pureIO ())
+      (pure ())
       todos
 
 runCommand :
-  < Quit : () | Help : () | Add : String | List : () | Delete : Int | Invalid : String > ->
+  Command ->
   Array String ->
-  IO < Continue : Array String | Quit : () >
+  IO < Continue{ todos : Array String } | Quit >
 runCommand cmd todos =
   case cmd of
-    Quit x ->
-      pureIO (Quit ())
-    Help x -> 
+    Quit ->
+      pure Quit
+    Help -> 
       comp
-        writeStdout stdout (toUtf8 "help - display this message\n")
-        writeStdout stdout (toUtf8 "quit - exit the application\n")
-        writeStdout stdout (toUtf8 "list - display the todolist\n")
-        writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
-        writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
-        return (Continue todos)
-    Add todo ->
-      pureIO (Continue (snocArray todos todo))
-    List x ->
-      mapIO
-        (\_ -> Continue todos)
-        (writeTodos todos)
-    Invalid x ->
-      mapIO
-        (\_ -> Continue todos)
-        (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
-    Delete ix ->
-      pureIO (Continue (deleteAt ix todos))
+        println "help - display this message"
+        println "quit - exit the application"
+        println "list - display the todolist"
+        println "add STRING - add a task to the list"
+        println "delete INT - delete a task from the list"
+        pure Continue{ todos }
+    Add{ item } ->
+      pure Continue{ todos = snocArray todos item }
+    List ->
+      comp
+        writeTodos todos
+        pure Continue{ todos }
+    Invalid{ input } ->
+      comp
+        println "error: invalid command \"$input\""
+        pure Continue{ todos }
+    Delete{ index } ->
+      pure Continue{ todos = array.delete index todos }
 
 loop : Array String -> IO ()
 loop todos = 
   comp
-    writeStdout stdout (toUtf8 "> ") 
-    flushStdout stdout
-    bind line <- readLineStdin stdin
+    print "> "
+    bind line <- readln
     bind next <- runCommand (parseCommand line) todos
     case next of
-      Continue newTodos -> loop newTodos
-      Quit x -> pureIO ()
+      Continue{ todos = newTodos } -> loop newTodos
+      Quit -> pure ()
 
 main : IO ()
 main = 
   comp
-    writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
+    println "Welcome to your TODO list"
     loop []
