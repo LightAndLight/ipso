@@ -26,7 +26,7 @@ parseInt str =
       (\acc el ->
         case acc of
           Err -> Err
-          Ok val ->
+          Ok(val) ->
             case parseDigit el of
               Err -> Err
               Ok(n) -> Ok(10 * val + n)
@@ -47,7 +47,7 @@ parseCommand :
   String ->
   Command
 parseCommand line =
-  case string.rstrip line |> string.split ' ' of
+  case string.rstrip line |> string.split " " of
     ["quit"] -> Quit
     ["help"] -> Help
     ["list"] -> List
@@ -89,7 +89,7 @@ runCommand cmd todos =
         println "delete INT - delete a task from the list"
         pure Continue{ todos }
     Add{ item } ->
-      pure Continue{ todos = snocArray todos item }
+      pure Continue{ todos = array.snoc todos item }
     List ->
       comp
         writeTodos todos
