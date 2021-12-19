@@ -672,67 +672,70 @@ where {
                     }
                 )
             }
-            Builtin::Stdout => Value::Stdout,
-            Builtin::Stdin => Value::Stdin,
-            Builtin::WriteStdout => {
-                function2!(
-                    write_stdout,
+            Builtin::Println => {
+                function1!(
+                    println,
                     self,
                     |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn write_stdout_2<'io, 'ctx, 'heap>(
+                        fn println<'io, 'ctx, 'heap>(
                             interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
-                            // env[0] : Stdout
-                            // env[1] : Bytes
-                            let () = env[0].unpack_stdout();
-                            let bs = env[1].unpack_bytes();
-                            let _ = interpreter.stdout.write_all(bs).unwrap();
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            writeln!(interpreter.stdout, "{}", value)
+                                .expect("writing to stdout failed");
                             Value::Unit
                         }
-
                         let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
-                        interpreter.alloc(Object::IO {
+                        let closure = interpreter.alloc(Object::IO {
                             env,
-                            body: IOBody(write_stdout_2),
-                        })
+                            body: IOBody(println),
+                        });
+                        closure
                     }
                 )
             }
-            Builtin::FlushStdout => {
-                fn flush_stdout<'io, 'ctx, 'heap>(
-                    interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                    env: &'heap [Value<'heap>],
-                ) -> Value<'heap> {
-                    // env[0] : Stdout
-                    env[0].unpack_stdout();
-                    interpreter.stdout.flush().unwrap();
-                    Value::Unit
-                }
+            Builtin::Print => {
                 function1!(
-                    flush_stdout,
+                    print,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        let env = eval.alloc_values({
+                        fn print<'io, 'ctx, 'heap>(
+                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            {
+                                write!(interpreter.stdout, "{}", value)
+                                    .expect("writing to stdout failed");
+                                interpreter.stdout.flush().expect("flushing stdout failed");
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
                             env.push(arg);
                             env
                         });
-                        eval.alloc(Object::IO {
+                        let closure = interpreter.alloc(Object::IO {
                             env,
-                            body: IOBody(flush_stdout),
-                        })
+                            body: IOBody(print),
+                        });
+                        closure
                     }
                 )
             }
+            Builtin::Stdin => Value::Stdin,
             Builtin::ReadLineStdin => {
                 function1!(
                     readline_stdin,
