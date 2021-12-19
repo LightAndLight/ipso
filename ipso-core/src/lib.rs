@@ -518,6 +518,7 @@ pub enum Pattern {
     Name,
     Record { names: Vec<Expr>, rest: bool },
     Variant { tag: Rc<Expr> },
+    Char(char),
     Wildcard,
 }
 
@@ -530,6 +531,7 @@ impl Pattern {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
+            Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -554,6 +556,7 @@ impl Pattern {
                 Ok(())
             }
             Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
+            Pattern::Char(_) => Ok(()),
             Pattern::Wildcard => Ok(()),
         }
     }
@@ -569,6 +572,7 @@ impl Pattern {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__instantiate(depth, val)),
+            Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -584,6 +588,7 @@ impl Pattern {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__abstract_evar(depth, ev)),
+            Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -620,6 +625,8 @@ impl Branch {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
+                        Pattern::Char(_) => 0,
+                        // TODO: should this be 0?
                         Pattern::Wildcard => 1,
                     },
                 val,
@@ -636,6 +643,7 @@ impl Branch {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
+                        Pattern::Char(_) => 0,
                         Pattern::Wildcard => 0,
                     },
                 ev,
@@ -916,6 +924,7 @@ impl Expr {
                             Pattern::Variant { tag: _ } => {
                                 b.map_expr(|e| go(e, &Function::Under(1, f)))
                             }
+                            Pattern::Char(_) => b.map_expr(|e| go(e, f)),
                             Pattern::Wildcard => b.map_expr(|e| go(e, f)),
                         })
                         .collect(),
@@ -1320,6 +1329,7 @@ impl<'a> Iterator for IterEVars<'a> {
                             Pattern::Name => Vec::new(),
                             Pattern::Record { names, .. } => names.iter().collect(),
                             Pattern::Variant { tag } => vec![tag],
+                            Pattern::Char(_) => Vec::new(),
                             Pattern::Wildcard => Vec::new(),
                         };
                         vals.push(&b.body);

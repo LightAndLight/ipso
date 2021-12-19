@@ -22,17 +22,18 @@ deleteAt target arr =
 
 readDigit : Char -> < Err : () | Ok : Int >
 readDigit c =
-  if eqChar c '0' then Ok 0
-  else if eqChar c '1' then Ok 1
-  else if eqChar c '2' then Ok 2
-  else if eqChar c '3' then Ok 3
-  else if eqChar c '4' then Ok 4
-  else if eqChar c '5' then Ok 5
-  else if eqChar c '6' then Ok 6
-  else if eqChar c '7' then Ok 7
-  else if eqChar c '8' then Ok 8
-  else if eqChar c '9' then Ok 9
-  else Err ()
+  case c of
+    '0' -> Ok 0
+    '1' -> Ok 1
+    '2' -> Ok 2
+    '3' -> Ok 3
+    '4' -> Ok 4
+    '5' -> Ok 5
+    '6' -> Ok 6
+    '7' -> Ok 7
+    '8' -> Ok 8
+    '9' -> Ok 9
+    _ -> Err ()
 
 readInt : String -> < Err : () | Ok : Int >
 readInt str =
@@ -79,9 +80,10 @@ writeTodos todos =
   then writeStdout stdout (toUtf8 "nothing to do\n")
   else
     foldlArray
-      (\acc todo -> comp
-        acc
-        writeStdout stdout (toUtf8 "$todo\n")
+      (\acc todo ->
+        comp
+          acc
+          writeStdout stdout (toUtf8 "$todo\n")
       )
       (pureIO ())
       todos
@@ -94,13 +96,14 @@ runCommand cmd todos =
   case cmd of
     Quit x ->
       pureIO (Quit ())
-    Help x -> comp
-      writeStdout stdout (toUtf8 "help - display this message\n")
-      writeStdout stdout (toUtf8 "quit - exit the application\n")
-      writeStdout stdout (toUtf8 "list - display the todolist\n")
-      writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
-      writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
-      return (Continue todos)
+    Help x -> 
+      comp
+        writeStdout stdout (toUtf8 "help - display this message\n")
+        writeStdout stdout (toUtf8 "quit - exit the application\n")
+        writeStdout stdout (toUtf8 "list - display the todolist\n")
+        writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
+        writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
+        return (Continue todos)
     Add todo ->
       pureIO (Continue (snocArray todos todo))
     List x ->
@@ -115,16 +118,18 @@ runCommand cmd todos =
       pureIO (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
-loop todos = comp
-  writeStdout stdout (toUtf8 "> ") 
-  flushStdout stdout
-  bind line <- readLineStdin stdin
-  bind next <- runCommand (parseCommand line) todos
-  case next of
-    Continue newTodos -> loop newTodos
-    Quit x -> pureIO ()
+loop todos = 
+  comp
+    writeStdout stdout (toUtf8 "> ") 
+    flushStdout stdout
+    bind line <- readLineStdin stdin
+    bind next <- runCommand (parseCommand line) todos
+    case next of
+      Continue newTodos -> loop newTodos
+      Quit x -> pureIO ()
 
 main : IO ()
-main = comp
-  writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
-  loop []
+main = 
+  comp
+    writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
+    loop []

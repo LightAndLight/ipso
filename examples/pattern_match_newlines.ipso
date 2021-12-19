@@ -1,0 +1,17 @@
+main : IO ()
+main =
+  case E () of
+    A x -> pureIO ()
+    
+    B x -> pureIO ()
+    
+    # a comment
+    C x -> pureIO ()
+
+    # another comment
+
+    D x -> pureIO ()
+    
+    
+    
+    _ -> pureIO ()

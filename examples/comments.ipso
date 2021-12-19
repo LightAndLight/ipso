@@ -6,4 +6,5 @@ main : IO ()
 main = # comments shouldn't interfere with indentation
   writeStdout # really
     stdout
+  # really really
     (toUtf8 "hello world!")

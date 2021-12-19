@@ -1,3 +1,4 @@
 main : IO ()
-main = comp
-  bind x <- readLineStdin stdin
+main = 
+  comp
+    bind x <- readLineStdin stdin

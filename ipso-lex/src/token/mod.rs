@@ -5,6 +5,20 @@ use quickcheck::Arbitrary;
 use std::rc::Rc;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
+pub enum Relation {
+    Gt,
+    Gte,
+    Eq,
+}
+
+impl Arbitrary for Relation {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let vals = &[Relation::Gt, Relation::Gte, Relation::Eq];
+        g.choose(vals).unwrap().clone()
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
     Comment,
@@ -31,6 +45,7 @@ pub enum Name {
     Arrow,
     FatArrow,
     Dot,
+    DotDot,
     Asterisk,
     Equals,
     Colon,
@@ -40,9 +55,9 @@ pub enum Name {
     Hyphen,
     Plus,
     Slash,
-    Indent(usize),
+    Indent(Relation, usize),
     Dedent,
-    Space,
+    Eof,
 }
 
 impl Arbitrary for Name {
@@ -73,6 +88,7 @@ impl Arbitrary for Name {
             Name::Arrow,
             Name::FatArrow,
             Name::Dot,
+            Name::DotDot,
             Name::Asterisk,
             Name::Equals,
             Name::Colon,
@@ -82,9 +98,8 @@ impl Arbitrary for Name {
             Name::Hyphen,
             Name::Plus,
             Name::Slash,
-            Name::Indent(usize::arbitrary(g)),
+            Name::Indent(Relation::arbitrary(g), usize::arbitrary(g)),
             Name::Dedent,
-            Name::Space,
         ];
         g.choose(vals).unwrap().clone()
     }
@@ -92,7 +107,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        36 + Keyword::num_variants()
+        37 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -140,18 +155,19 @@ impl Name {
             40 => Some(Self::Arrow),
             41 => Some(Self::FatArrow),
             42 => Some(Self::Dot),
-            43 => Some(Self::Asterisk),
-            44 => Some(Self::Equals),
-            45 => Some(Self::Colon),
-            46 => Some(Self::Comma),
-            47 => Some(Self::Pipe),
-            48 => Some(Self::Underscore),
-            49 => Some(Self::Hyphen),
-            50 => Some(Self::Plus),
-            51 => Some(Self::Slash),
-            // 52 => Self::Indent(_),
-            53 => Some(Self::Dedent),
-            54 => Some(Self::Space),
+            43 => Some(Self::DotDot),
+            44 => Some(Self::Asterisk),
+            45 => Some(Self::Equals),
+            46 => Some(Self::Colon),
+            47 => Some(Self::Comma),
+            48 => Some(Self::Pipe),
+            49 => Some(Self::Underscore),
+            50 => Some(Self::Hyphen),
+            51 => Some(Self::Plus),
+            52 => Some(Self::Slash),
+            // 53 => Self::Indent(_),
+            54 => Some(Self::Dedent),
+            55 => Some(Self::Eof),
             _ => None,
         }
     }
@@ -201,18 +217,19 @@ impl Name {
             Self::Arrow => 40,
             Self::FatArrow => 41,
             Self::Dot => 42,
-            Self::Asterisk => 43,
-            Self::Equals => 44,
-            Self::Colon => 45,
-            Self::Comma => 46,
-            Self::Pipe => 47,
-            Self::Underscore => 48,
-            Self::Hyphen => 49,
-            Self::Plus => 50,
-            Self::Slash => 51,
-            Self::Indent(_) => 52,
-            Self::Dedent => 53,
-            Self::Space => 54,
+            Self::DotDot => 43,
+            Self::Asterisk => 44,
+            Self::Equals => 45,
+            Self::Colon => 46,
+            Self::Comma => 47,
+            Self::Pipe => 48,
+            Self::Underscore => 49,
+            Self::Hyphen => 50,
+            Self::Plus => 51,
+            Self::Slash => 52,
+            Self::Indent(_, _) => 53,
+            Self::Dedent => 54,
+            Self::Eof => 55,
         }
     }
 
@@ -240,6 +257,7 @@ impl Name {
             Name::Arrow => String::from("'->'"),
             Name::FatArrow => String::from("'=>'"),
             Name::Dot => String::from("'.'"),
+            Name::DotDot => String::from("'..'"),
             Name::Asterisk => String::from("'*'"),
             Name::Equals => String::from("'='"),
             Name::Colon => String::from("':'"),
@@ -248,19 +266,23 @@ impl Name {
             Name::Hyphen => String::from("'-'"),
             Name::Plus => String::from("'+'"),
             Name::Slash => String::from("'/'"),
-            Name::Indent(n) => {
-                if *n == 0 {
-                    String::from("newline")
-                } else {
-                    format!("indent ({})", n)
-                }
+            Name::Indent(relation, n) => {
+                format!(
+                    "indent ({} {})",
+                    match relation {
+                        Relation::Gt => ">",
+                        Relation::Gte => ">=",
+                        Relation::Eq => "==",
+                    },
+                    n
+                )
             }
             Name::Dedent => String::from("dedent"),
-            Name::Space => String::from("space"),
             Name::Ctor => String::from("constructor"),
             Name::Pipe => String::from("'|'"),
             Name::LAngle => String::from("'<'"),
             Name::RAngle => String::from("'>'"),
+            Name::Eof => String::from("end of input"),
         }
     }
 }
@@ -268,6 +290,7 @@ impl Name {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum Data {
     Unexpected(char),
+    Eof,
 
     Comment { length: usize },
 
@@ -298,6 +321,7 @@ pub enum Data {
     FatArrow,
 
     Dot,
+    DotDot,
 
     Asterisk,
 
@@ -312,16 +336,13 @@ pub enum Data {
     Hyphen,
     Plus,
     Slash,
-
-    Indent(usize),
-    Dedent,
-    Space,
 }
 
 impl Data {
     pub fn length(&self) -> usize {
         match self {
             Data::Unexpected(_) => 1,
+            Data::Eof => 0,
             Data::Comment { length } => *length,
             Data::Ident(s) => s.len(),
             Data::Int { value: _, length } => *length,
@@ -336,6 +357,7 @@ impl Data {
             Data::Arrow => 2,
             Data::FatArrow => 2,
             Data::Dot => 1,
+            Data::DotDot => 2,
             Data::Asterisk => 1,
             Data::Equals => 1,
             Data::Colon => 1,
@@ -344,8 +366,6 @@ impl Data {
             Data::Hyphen => 1,
             Data::Plus => 1,
             Data::Slash => 1,
-            Data::Indent(n) => n + 1,
-            Data::Space => 1,
             Data::DoubleQuote => 1,
             Data::SingleQuote => 1,
             Data::Dollar => 1,
@@ -356,7 +376,6 @@ impl Data {
             Data::LAngle => 1,
             Data::RAngle => 1,
 
-            Data::Dedent => panic!("Data::Dedent.len()"),
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
     }
@@ -364,6 +383,7 @@ impl Data {
     pub fn name(&self) -> Name {
         match self {
             Data::Unexpected(_) => Name::Unexpected,
+            Data::Eof => Name::Eof,
             Data::Comment { .. } => Name::Comment,
             Data::Ctor => Name::Ctor,
             Data::Ident(_) => Name::Ident,
@@ -387,6 +407,7 @@ impl Data {
             Data::Arrow => Name::Arrow,
             Data::FatArrow => Name::FatArrow,
             Data::Dot => Name::Dot,
+            Data::DotDot => Name::DotDot,
             Data::Asterisk => Name::Asterisk,
             Data::Equals => Name::Equals,
             Data::Colon => Name::Colon,
@@ -396,15 +417,28 @@ impl Data {
             Data::Hyphen => Name::Hyphen,
             Data::Plus => Name::Plus,
             Data::Slash => Name::Slash,
-            Data::Indent(n) => Name::Indent(*n),
-            Data::Dedent => Name::Dedent,
-            Data::Space => Name::Space,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token {
+    /// The token's position in the input stream, in bytes
     pub pos: usize,
+
+    /// The token's column
+    ///
+    /// To facilitate indentation-sensitive parsing, an input stream is divided
+    /// into rows and columns. Rows are terminated by the '\\n' character. The
+    /// token's column is the position at which it can be found in the row, starting
+    /// from 0.
+    ///
+    /// References:
+    ///
+    /// > Adams, M. D. (2013).
+    /// > Principled parsing for indentation-sensitive languages: revisiting landin's offside rule.
+    /// > ACM SIGPLAN Notices, 48(1), 511-522.
+    pub column: usize,
+
     pub data: Data,
 }

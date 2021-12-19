@@ -15,9 +15,11 @@ enum Mode {
 
 pub struct Lexer<'input> {
     pos: usize,
+    column: usize,
     current: Option<char>,
     input: Chars<'input>,
     mode: Vec<Mode>,
+    is_eof: bool,
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -33,15 +35,24 @@ impl<'input> Lexer<'input> {
         let mut input = input.chars();
         Lexer {
             pos: 0,
+            column: 0,
             current: input.next(),
             input,
             mode: vec![Mode::Normal],
+            is_eof: false,
         }
     }
 
     fn consume(&mut self) {
         self.current = self.input.next();
         self.pos += 1;
+        self.column += 1;
+    }
+
+    fn consume_newline(&mut self) {
+        self.current = self.input.next();
+        self.pos += 1;
+        self.column = 0;
     }
 }
 
@@ -50,8 +61,21 @@ impl<'input> Iterator for Lexer<'input> {
 
     fn next(&mut self) -> Option<Token> {
         let pos = self.pos;
+        let column = self.column;
+
         match self.current {
-            None => None,
+            None => {
+                if self.is_eof {
+                    None
+                } else {
+                    self.is_eof = true;
+                    Some(Token {
+                        data: token::Data::Eof,
+                        pos,
+                        column,
+                    })
+                }
+            }
             Some(c) => match &self.mode[self.mode.len() - 1] {
                 Mode::Ident => {
                     if is_ident_start(c) {
@@ -71,11 +95,13 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Ident(Rc::from(ident)),
                             pos,
+                            column,
                         })
                     } else {
                         Some(Token {
                             data: token::Data::Unexpected(c),
                             pos,
+                            column,
                         })
                     }
                 }
@@ -86,6 +112,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::DoubleQuote,
                             pos,
+                            column,
                         })
                     }
                     '$' => {
@@ -98,6 +125,7 @@ impl<'input> Iterator for Lexer<'input> {
                                 Some(Token {
                                     data: token::Data::DollarLBrace,
                                     pos,
+                                    column,
                                 })
                             }
                             _ => {
@@ -105,6 +133,7 @@ impl<'input> Iterator for Lexer<'input> {
                                 Some(Token {
                                     data: token::Data::Dollar,
                                     pos,
+                                    column,
                                 })
                             }
                         }
@@ -130,6 +159,7 @@ impl<'input> Iterator for Lexer<'input> {
                                                 return Some(Token {
                                                     data: token::Data::Unexpected('\\'),
                                                     pos: self.pos,
+                                                    column: self.column,
                                                 })
                                             }
                                             Some(c) => match c {
@@ -152,6 +182,7 @@ impl<'input> Iterator for Lexer<'input> {
                                                     return Some(Token {
                                                         data: token::Data::Unexpected('\\'),
                                                         pos: self.pos,
+                                                        column: self.column,
                                                     });
                                                 }
                                             },
@@ -172,6 +203,7 @@ impl<'input> Iterator for Lexer<'input> {
                                 length: textual_len,
                             },
                             pos,
+                            column,
                         })
                     }
                 },
@@ -182,6 +214,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::SingleQuote,
                             pos,
+                            column,
                         })
                     }
                     _ => {
@@ -200,7 +233,8 @@ impl<'input> Iterator for Lexer<'input> {
                                         None => {
                                             return Some(Token {
                                                 data: token::Data::Unexpected('\\'),
-                                                pos: self.pos,
+                                                pos,
+                                                column,
                                             })
                                         }
                                         Some(c) => match c {
@@ -223,6 +257,7 @@ impl<'input> Iterator for Lexer<'input> {
                                                 return Some(Token {
                                                     data: token::Data::Unexpected('\\'),
                                                     pos: self.pos,
+                                                    column: self.column,
                                                 });
                                             }
                                         },
@@ -242,26 +277,14 @@ impl<'input> Iterator for Lexer<'input> {
                                 length: textual_len,
                             },
                             pos,
+                            column,
                         })
                     }
                 },
                 Mode::Normal => match c {
                     '\n' => {
-                        self.consume();
-                        let mut depth = 0;
-                        loop {
-                            match self.current {
-                                Some(c) if c == ' ' => {
-                                    self.consume();
-                                    depth += 1;
-                                }
-                                _ => break,
-                            }
-                        }
-                        Some(Token {
-                            data: token::Data::Indent(depth),
-                            pos,
-                        })
+                        self.consume_newline();
+                        self.next()
                     }
                     '#' => {
                         self.consume();
@@ -289,6 +312,7 @@ impl<'input> Iterator for Lexer<'input> {
                                 length: textual_length,
                             },
                             pos,
+                            column,
                         })
                     }
                     '"' => {
@@ -297,6 +321,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::DoubleQuote,
                             pos,
+                            column,
                         })
                     }
                     '\'' => {
@@ -305,14 +330,12 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::SingleQuote,
                             pos,
+                            column,
                         })
                     }
                     ' ' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::Space,
-                            pos,
-                        })
+                        self.next()
                     }
                     '{' => {
                         self.consume();
@@ -320,6 +343,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::LBrace,
                             pos,
+                            column,
                         })
                     }
                     '}' => {
@@ -328,6 +352,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::RBrace,
                             pos,
+                            column,
                         })
                     }
                     '(' => {
@@ -335,6 +360,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::LParen,
                             pos,
+                            column,
                         })
                     }
                     ')' => {
@@ -342,6 +368,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::RParen,
                             pos,
+                            column,
                         })
                     }
                     '[' => {
@@ -349,6 +376,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::LBracket,
                             pos,
+                            column,
                         })
                     }
                     ']' => {
@@ -356,6 +384,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::RBracket,
                             pos,
+                            column,
                         })
                     }
                     '<' => {
@@ -365,11 +394,13 @@ impl<'input> Iterator for Lexer<'input> {
                             Some(Token {
                                 data: token::Data::LeftArrow,
                                 pos,
+                                column,
                             })
                         } else {
                             Some(Token {
                                 data: token::Data::LAngle,
                                 pos,
+                                column,
                             })
                         }
                     }
@@ -378,6 +409,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::RAngle,
                             pos,
+                            column,
                         })
                     }
                     '|' => {
@@ -385,6 +417,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Pipe,
                             pos,
+                            column,
                         })
                     }
                     ',' => {
@@ -392,6 +425,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Comma,
                             pos,
+                            column,
                         })
                     }
                     ':' => {
@@ -399,14 +433,27 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Colon,
                             pos,
+                            column,
                         })
                     }
                     '.' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::Dot,
-                            pos,
-                        })
+
+                        match self.current {
+                            Some(c) if c == '.' => {
+                                self.consume();
+                                Some(Token {
+                                    data: token::Data::DotDot,
+                                    pos,
+                                    column,
+                                })
+                            }
+                            _ => Some(Token {
+                                data: token::Data::Dot,
+                                pos,
+                                column,
+                            }),
+                        }
                     }
                     '=' => {
                         self.consume();
@@ -417,11 +464,13 @@ impl<'input> Iterator for Lexer<'input> {
                                 Some(Token {
                                     data: token::Data::FatArrow,
                                     pos,
+                                    column,
                                 })
                             }
                             _ => Some(Token {
                                 data: token::Data::Equals,
                                 pos,
+                                column,
                             }),
                         }
                     }
@@ -434,11 +483,13 @@ impl<'input> Iterator for Lexer<'input> {
                                 Some(Token {
                                     data: token::Data::Arrow,
                                     pos,
+                                    column,
                                 })
                             }
                             _ => Some(Token {
                                 data: token::Data::Hyphen,
                                 pos,
+                                column,
                             }),
                         }
                     }
@@ -447,6 +498,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Plus,
                             pos,
+                            column,
                         })
                     }
                     '/' => {
@@ -454,6 +506,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Slash,
                             pos,
+                            column,
                         })
                     }
                     '\\' => {
@@ -461,6 +514,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Backslash,
                             pos,
+                            column,
                         })
                     }
                     '*' => {
@@ -468,6 +522,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Asterisk,
                             pos,
+                            column,
                         })
                     }
                     '_' => {
@@ -475,6 +530,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Underscore,
                             pos,
+                            column,
                         })
                     }
                     _ if is_ident_start(c) => {
@@ -493,6 +549,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Ident(Rc::from(ident)),
                             pos,
+                            column,
                         })
                     }
                     _ if c.is_digit(10) => {
@@ -508,6 +565,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Int { value, length },
                             pos,
+                            column,
                         })
                     }
                     _ => {
@@ -515,6 +573,7 @@ impl<'input> Iterator for Lexer<'input> {
                         Some(Token {
                             data: token::Data::Unexpected(c),
                             pos,
+                            column,
                         })
                     }
                 },
