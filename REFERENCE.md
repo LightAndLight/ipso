@@ -505,11 +505,6 @@ hello
 ```
 
 ```ipso-repl
-> :kind Stdout
-Type
-```
-
-```ipso-repl
 > :info IOError
 type IOError = < EBADF | EINTR | ENOSPC | EIO >
 ```
@@ -525,9 +520,9 @@ bindIO : IO a -> (a -> IO b) -> IO b
 ```
 
 ```ipso
-writeStdout : Stdout -> Bytes -> IO < Err : IOError | Ok : () >
+println : String -> IO ()
 
-flushStdout : Stdout -> IO < Err : IOError | Ok : () >
+print : String -> IO ()
 ```
 
 ## Type Classes
