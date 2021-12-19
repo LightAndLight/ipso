@@ -77,13 +77,13 @@ parseCommand line =
 writeTodos : Array String -> IO ()
 writeTodos todos =
   if eqArray eqString [] todos
-  then writeStdout stdout (toUtf8 "nothing to do\n")
+  then println "nothing to do"
   else
     foldlArray
       (\acc todo ->
         comp
           acc
-          writeStdout stdout (toUtf8 "$todo\n")
+          println todo
       )
       (pureIO ())
       todos
@@ -98,11 +98,11 @@ runCommand cmd todos =
       pureIO (Quit ())
     Help x -> 
       comp
-        writeStdout stdout (toUtf8 "help - display this message\n")
-        writeStdout stdout (toUtf8 "quit - exit the application\n")
-        writeStdout stdout (toUtf8 "list - display the todolist\n")
-        writeStdout stdout (toUtf8 "add STRING - add a task to the list\n")
-        writeStdout stdout (toUtf8 "delete INT - delete a task from the list\n")
+        println "help - display this message"
+        println "quit - exit the application"
+        println "list - display the todolist"
+        println "add STRING - add a task to the list"
+        println "delete INT - delete a task from the list"
         return (Continue todos)
     Add todo ->
       pureIO (Continue (snocArray todos todo))
@@ -113,15 +113,14 @@ runCommand cmd todos =
     Invalid x ->
       mapIO
         (\_ -> Continue todos)
-        (writeStdout stdout (toUtf8 "error: invalid command \"$x\"\n"))
+        (println "error: invalid command \"$x\"")
     Delete ix ->
       pureIO (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
 loop todos = 
   comp
-    writeStdout stdout (toUtf8 "> ") 
-    flushStdout stdout
+    print "> "
     bind line <- readLineStdin stdin
     bind next <- runCommand (parseCommand line) todos
     case next of
@@ -131,5 +130,5 @@ loop todos =
 main : IO ()
 main = 
   comp
-    writeStdout stdout (toUtf8 "Welcome to your TODO list\n")
+    println "Welcome to your TODO list"
     loop []

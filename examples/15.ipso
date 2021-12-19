@@ -9,12 +9,12 @@ val3 = C ()
 
 sayVal : < A : () | B : () | C : () > -> IO ()
 sayVal val =
-  writeStdout stdout
-  (toUtf8 (case val of 
+  print
+  (case val of 
     A x -> "A\n"
     B x -> "B\n"
     C x -> "C\n"
-  ))
+  )
 
 main : IO ()
 main =

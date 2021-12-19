@@ -1,5 +1,5 @@
 main : IO ()
 main = 
   bindIO
-    (bindIO (readLineStdin stdin) (\x -> writeStdout stdout (toUtf8 x)))
-    (\_ -> bindIO (readLineStdin stdin) (\y -> writeStdout stdout (toUtf8 y)))
+    (bindIO (readLineStdin stdin) (\x -> print x))
+    (\_ -> bindIO (readLineStdin stdin) (\y -> print y))

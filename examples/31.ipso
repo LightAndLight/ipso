@@ -1,3 +1,3 @@
 main : IO ()
 main =
-  writeStdout stdout (toUtf8 "\n")
+  print "\n"

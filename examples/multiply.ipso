@@ -1,2 +1,2 @@
 main : IO ()
-main = writeStdout stdout (toUtf8 (showInt (multiply 5 9)))
+main = print (showInt (multiply 5 9))

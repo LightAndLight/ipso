@@ -7,7 +7,7 @@
     ''
     char_pattern_1.ipso:4:5: error: expected type "Int", got type "Char"
       |
-    4 |     'a' -> writeStdout stdout (toUtf8 "saw a")
+    4 |     'a' -> print "saw a"
       |     ^
     '',
   exitcode = 1

@@ -2,4 +2,4 @@ main : IO ()
 main =
   comp
     bind x <- readLineStdin stdin
-    writeStdout stdout x
+    print 1

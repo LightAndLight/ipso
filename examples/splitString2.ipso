@@ -1,5 +1,5 @@
 main : IO ()
 main = 
   if eqArray eqString (splitString ' ' "the quick brown fox  ") ["the", "quick", "brown", "fox", "", ""]
-  then writeStdout stdout (toUtf8 "yes\n")
-  else writeStdout stdout (toUtf8 "no\n")
+  then println "yes"
+  else println "no"

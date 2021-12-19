@@ -22,8 +22,8 @@ d =
 
 main : IO ()
 main = 
-  bindIO (writeStdout stdout (toUtf8 (showInt a))) (\_ ->
-  bindIO (writeStdout stdout (toUtf8 (showInt b))) (\_ ->
-  bindIO (writeStdout stdout (toUtf8 (showInt c))) (\_ ->
-  writeStdout stdout (toUtf8 (showInt d))
+  bindIO (print (showInt a)) (\_ ->
+  bindIO (print (showInt b)) (\_ ->
+  bindIO (print (showInt c)) (\_ ->
+  print (showInt d)
   )))

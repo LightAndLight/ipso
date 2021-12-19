@@ -3,9 +3,9 @@ val = A ()
 
 main : IO ()
 main =
-  writeStdout stdout
-  (toUtf8 (case val of
+  print
+  (case val of
     A x -> "A"
     B x -> "B"
     C x -> "C"
-  ))
+  )

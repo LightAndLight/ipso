@@ -1,4 +1,4 @@
 #! /usr/bin/env ipso
 
 main : IO ()
-main = writeStdout stdout (toUtf8 "hello world!")
+main = print "hello world!"

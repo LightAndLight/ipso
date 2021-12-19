@@ -1,4 +1,4 @@
 import greeting
 
 main : IO ()
-main = writeStdout stdout (toUtf8 greeting.value)
+main = print greeting.value

@@ -1,2 +1,2 @@
 main : IO ()
-main = writeStdout stdout (toUtf8 "hello")
+main = print "hello"

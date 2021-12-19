@@ -5,7 +5,7 @@ atob val =
     r -> < B | r >
 
 sayb : < B : x > -> IO ()
-sayb _ = writeStdout stdout (toUtf8 "B")
+sayb _ = print "B"
 
 main : IO ()
 main = sayb (atob (A "hello"))

@@ -8,4 +8,4 @@ instance TypeOf Bool where
   typeOf _ = "Bool"
 
 main : IO ()
-main = writeStdout stdout (toUtf8 "${typeOf 1} ${typeOf false}")
+main = print "${typeOf 1} ${typeOf false}"
