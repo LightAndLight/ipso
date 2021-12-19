@@ -5,4 +5,4 @@ main =
     (bindIO m (\x -> print x))
     (\_ -> bindIO m (\y -> print y))
   )
-  (readLineStdin stdin)
+  readln

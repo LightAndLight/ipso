@@ -121,7 +121,7 @@ loop : Array String -> IO ()
 loop todos = 
   comp
     print "> "
-    bind line <- readLineStdin stdin
+    bind line <- readln
     bind next <- runCommand (parseCommand line) todos
     case next of
       Continue newTodos -> loop newTodos

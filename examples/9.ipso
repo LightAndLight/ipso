@@ -1,2 +1,2 @@
 main : IO ()
-main = bindIO (readLineStdin stdin) (\x -> print x)
+main = bindIO readln (\x -> print x)

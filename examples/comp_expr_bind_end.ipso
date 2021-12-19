@@ -1,4 +1,4 @@
 main : IO ()
 main = 
   comp
-    bind x <- readLineStdin stdin
+    bind x <- readln
