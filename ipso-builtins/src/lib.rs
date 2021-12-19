@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
-    let stdin_ty = Type::unsafe_mk_name(Rc::from("Stdin"), Kind::Type);
     let string_ty = Type::String;
     let bytes_ty = Type::Bytes;
     let io_ty = Type::mk_io(common_kinds);
@@ -149,32 +148,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::Print),
             },
-            // Stdin : Type
-            Declaration::BuiltinType {
-                name: String::from("Stdin"),
-                kind: Kind::Type,
-            },
-            // stdin : Stdin
+            // readln : IO String
             Declaration::Definition {
-                name: String::from("stdin"),
+                name: String::from("readln"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: stdin_ty.clone(),
+                    body: Type::mk_app(io_ty, string_ty.clone()),
                 },
-                body: Expr::alloc_builtin(Builtin::Stdin),
-            },
-            // readLineStdin : Stdin -> IO String
-            Declaration::Definition {
-                name: String::from("readLineStdin"),
-                sig: TypeSig {
-                    ty_vars: vec![],
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        stdin_ty,
-                        Type::mk_app(io_ty, string_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::ReadLineStdin),
+                body: Expr::alloc_builtin(Builtin::Readln),
             },
             // eqString : String -> String -> Bool
             Declaration::Definition {
