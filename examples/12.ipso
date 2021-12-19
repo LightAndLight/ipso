@@ -2,7 +2,7 @@ main : IO ()
 main = 
   (\m ->
   bindIO
-    (bindIO m (\x -> writeStdout stdout (toUtf8 x)))
-    (\_ -> bindIO m (\y -> writeStdout stdout (toUtf8 y)))
+    (bindIO m (\x -> print x))
+    (\_ -> bindIO m (\y -> print y))
   )
   (readLineStdin stdin)

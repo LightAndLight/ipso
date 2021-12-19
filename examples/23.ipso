@@ -18,6 +18,6 @@ instance B Int where
 
 main : IO ()
 main =
-  bindIO (writeStdout stdout (toUtf8 (a [1, 2, 3]))) (\_ ->
-  writeStdout stdout (toUtf8 (b [4, 5]))
+  bindIO (print (a [1, 2, 3])) (\_ ->
+  print (b [4, 5])
   )

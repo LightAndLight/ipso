@@ -2,7 +2,7 @@ test : IO ()
 test = 
   comp
     bind x <- readLineStdin stdin
-    writeStdout stdout (toUtf8 x)
+    print x
 
 main : IO ()
 main = 
@@ -10,6 +10,6 @@ main =
     bind x <- readLineStdin stdin
     # comments are allowed between each line
   # here's another one
-    writeStdout stdout (toUtf8 x)
+    print x
          # and another
     test

@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
-    let stdout_ty = Type::unsafe_mk_name(Rc::from("Stdout"), Kind::Type);
     let stdin_ty = Type::unsafe_mk_name(Rc::from("Stdin"), Kind::Type);
     let string_ty = Type::String;
     let bytes_ty = Type::Bytes;
@@ -120,53 +119,35 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("toUtf8"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(common_kinds, string_ty.clone(), bytes_ty.clone()),
+                    body: Type::mk_arrow(common_kinds, string_ty.clone(), bytes_ty),
                 },
                 body: Expr::alloc_builtin(Builtin::ToUtf8),
             },
-            // Stdout : Type
-            Declaration::BuiltinType {
-                name: String::from("Stdout"),
-                kind: Kind::Type,
-            },
-            // stdout : Stdout
+            // println : String -> IO ()
             Declaration::Definition {
-                name: String::from("stdout"),
-                sig: TypeSig {
-                    ty_vars: vec![],
-                    body: stdout_ty.clone(),
-                },
-                body: Expr::alloc_builtin(Builtin::Stdout),
-            },
-            // writeStdout : Stdout -> Bytes -> IO ()
-            Declaration::Definition {
-                name: String::from("writeStdout"),
+                name: String::from("println"),
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::mk_arrow(
                         common_kinds,
-                        stdout_ty.clone(),
-                        Type::mk_arrow(
-                            common_kinds,
-                            bytes_ty,
-                            Type::mk_app(io_ty.clone(), unit_ty.clone()),
-                        ),
+                        string_ty.clone(),
+                        Type::mk_app(io_ty.clone(), unit_ty.clone()),
                     ),
                 },
-                body: Expr::alloc_builtin(Builtin::WriteStdout),
+                body: Expr::alloc_builtin(Builtin::Println),
             },
-            // flushStdout : Stdout -> IO ()
+            // print : String -> IO ()
             Declaration::Definition {
-                name: String::from("flushStdout"),
+                name: String::from("print"),
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::mk_arrow(
                         common_kinds,
-                        stdout_ty,
+                        string_ty.clone(),
                         Type::mk_app(io_ty.clone(), unit_ty),
                     ),
                 },
-                body: Expr::alloc_builtin(Builtin::FlushStdout),
+                body: Expr::alloc_builtin(Builtin::Print),
             },
             // Stdin : Type
             Declaration::BuiltinType {

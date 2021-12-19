@@ -6,4 +6,4 @@ recount n =
 
 main : IO ()
 main =
-  writeStdout stdout (toUtf8 "${showInt (recount 10)}\n")
+  println (showInt (recount 10))

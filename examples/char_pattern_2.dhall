@@ -5,9 +5,9 @@
   stdout = "",
   stderr =
     ''
-    char_pattern_2.ipso:5:5: error: expected type "Char", got type "{ x : ?8 }"
+    char_pattern_2.ipso:5:5: error: expected type "Char", got type "{ x : ?4 }"
       |
-    5 |     { x } -> writeStdout stdout (toUtf8 "saw { x }")
+    5 |     { x } -> print "saw { x }"
       |     ^
     '',
   exitcode = 1

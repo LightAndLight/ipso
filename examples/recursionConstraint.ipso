@@ -12,4 +12,4 @@ showMany n x =
 
 main : IO ()
 main =
-  writeStdout stdout (toUtf8 (showMany 5 ()))
+  print (showMany 5 ())
