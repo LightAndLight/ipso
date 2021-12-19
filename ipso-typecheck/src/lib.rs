@@ -2088,10 +2088,19 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    fn infer_int_pattern(&mut self, n: &Spanned<u32>) -> InferredPattern {
+        InferredPattern {
+            pattern: core::Pattern::Int(n.item),
+            r#type: core::Type::Int,
+            bindings: Vec::new(),
+        }
+    }
+
     fn infer_pattern(&mut self, arg: &syntax::Pattern) -> InferredPattern {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
             syntax::Pattern::Char(c) => self.infer_char_pattern(c),
+            syntax::Pattern::Int(n) => self.infer_int_pattern(n),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
             syntax::Pattern::Record { names, rest } => self.infer_record_pattern(names, rest),
             syntax::Pattern::Variant { name, arg } => {
@@ -2639,6 +2648,7 @@ impl<'modules> Typechecker<'modules> {
                                     Ok((self.infer_wildcard_pattern(), false))
                                 }
                                 syntax::Pattern::Char(c) => Ok((self.infer_char_pattern(c), false)),
+                                syntax::Pattern::Int(n) => Ok((self.infer_int_pattern(n), false)),
                                 syntax::Pattern::Name(n) => Ok((self.infer_name_pattern(n), false)),
                                 syntax::Pattern::Record { names, rest } => {
                                     Ok((self.infer_record_pattern(names, rest), false))
@@ -2668,6 +2678,7 @@ impl<'modules> Typechecker<'modules> {
                             }
                             match branch.pattern.item {
                                 syntax::Pattern::Char(_) => {}
+                                syntax::Pattern::Int(_) => {}
                                 syntax::Pattern::Wildcard
                                 | syntax::Pattern::Name(_)
                                 | syntax::Pattern::Record { .. } => {

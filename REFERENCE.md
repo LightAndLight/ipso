@@ -199,6 +199,15 @@ x : < None >
 "a"
 ```
 
+```ipso-repl
+> case 1 of
+.   0 -> "0"
+.   1 -> "1"
+.   _ -> "something else"
+.
+"1"
+```
+
 ## Let Bindings
 
 ```ipso-repl
