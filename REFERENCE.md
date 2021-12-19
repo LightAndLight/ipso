@@ -525,6 +525,10 @@ println : String -> IO ()
 print : String -> IO ()
 ```
 
+```ipso
+readln : IO String
+```
+
 ## Type Classes
 
 ### Equality

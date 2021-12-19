@@ -1,11 +1,11 @@
 test : IO ()
 test = 
   comp
-  bind x <- readLineStdin stdin
+  bind x <- readln
   print x
 
 main : IO ()
 main = comp
-  bind x <- readLineStdin stdin
+  bind x <- readln
   print x
   test

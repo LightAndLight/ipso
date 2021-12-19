@@ -1,5 +1,5 @@
 main : IO ()
 main = 
   bindIO
-    (bindIO (readLineStdin stdin) (\x -> print x))
-    (\_ -> bindIO (readLineStdin stdin) (\y -> print y))
+    (bindIO readln (\x -> print x))
+    (\_ -> bindIO readln (\y -> print y))

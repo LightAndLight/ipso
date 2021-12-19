@@ -379,9 +379,6 @@ pub enum Value<'heap> {
     Char(char),
     Unit,
 
-    Stdout,
-    Stdin,
-
     Object(&'heap Object<'heap>),
 }
 
@@ -446,20 +443,6 @@ impl<'heap> Value<'heap> {
         }
     }
 
-    pub fn unpack_stdout(&self) {
-        match self {
-            Value::Stdout => (),
-            val => panic!("expected stdout, got {:?}", val),
-        }
-    }
-
-    pub fn unpack_stdin(&self) {
-        match self {
-            Value::Stdin => (),
-            val => panic!("expected stdin, got {:?}", val),
-        }
-    }
-
     pub fn unpack_record(&self) -> &'heap [Value<'heap>] {
         self.unpack_object().unpack_record()
     }
@@ -471,8 +454,6 @@ impl<'heap> Value<'heap> {
             Value::Int(n) => format!("{:?}", n),
             Value::Char(c) => format!("{:?}", c),
             Value::Unit => String::from("()"),
-            Value::Stdout => String::from("Stdout"),
-            Value::Stdin => String::from("Stdin"),
             Value::Object(o) => o.render(),
         }
     }
@@ -492,8 +473,6 @@ impl<'heap> PartialEq for Value<'heap> {
                 _ => false,
             },
             Value::Unit => matches!(other, Value::Unit),
-            Value::Stdout => matches!(other, Value::Stdout),
-            Value::Stdin => matches!(other, Value::Stdin),
             Value::Object(o1) => match other {
                 Value::Object(o2) => o1.eq(o2),
                 _ => false,
@@ -735,37 +714,22 @@ where {
                     }
                 )
             }
-            Builtin::Stdin => Value::Stdin,
-            Builtin::ReadLineStdin => {
-                function1!(
-                    readline_stdin,
-                    self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn read_line_stdin_1<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
-                            // env[0] : Stdin
-                            let () = env[0].unpack_stdin();
-                            let mut str = String::new();
-                            let _ = interpreter.stdin.read_line(&mut str).unwrap();
-                            let str = interpreter.alloc_str(&str);
-                            interpreter.alloc(Object::String(str))
-                        }
-                        let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
-                            env.push(arg);
-                            env
-                        });
-                        let closure = interpreter.alloc(Object::IO {
-                            env,
-                            body: IOBody(read_line_stdin_1),
-                        });
-                        closure
-                    }
-                )
+            Builtin::Readln => {
+                fn readln<'io, 'ctx, 'heap>(
+                    interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
+                    _: &'heap [Value<'heap>],
+                ) -> Value<'heap> {
+                    // env[0] : Stdin
+                    let mut str = String::new();
+                    let _ = interpreter.stdin.read_line(&mut str).unwrap();
+                    let str = interpreter.alloc_str(&str);
+                    interpreter.alloc(Object::String(str))
+                }
+                let closure = self.alloc(Object::IO {
+                    env: &[],
+                    body: IOBody(readln),
+                });
+                closure
             }
             Builtin::EqString => {
                 function2!(
