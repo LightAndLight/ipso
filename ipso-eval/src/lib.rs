@@ -1332,6 +1332,13 @@ where {
                                 break;
                             }
                         }
+                        Pattern::Int(actual_int) => {
+                            let expected_int = expr.unpack_int();
+                            if expected_int == *actual_int {
+                                target = Some(&branch.body);
+                                break;
+                            }
+                        }
                         Pattern::Wildcard => {
                             target = Some(&branch.body);
                             break;

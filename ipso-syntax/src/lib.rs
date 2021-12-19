@@ -148,6 +148,7 @@ pub enum Pattern {
         arg: Spanned<String>,
     },
     Char(Spanned<char>),
+    Int(Spanned<u32>),
     Wildcard,
 }
 
@@ -181,6 +182,7 @@ impl<'a> Iterator for IterNames<'a> {
                     }
                     Pattern::Variant { name: _, arg } => Some(arg),
                     Pattern::Char(_) => None,
+                    Pattern::Int(_) => None,
                     Pattern::Wildcard => None,
                 }
             }
@@ -217,6 +219,7 @@ impl Pattern {
                 arg_names.push(arg);
             }
             Pattern::Char(_) => {}
+            Pattern::Int(_) => {}
             Pattern::Wildcard => {}
         }
         arg_names

@@ -86,6 +86,7 @@ pattern ::=
   pattern_record
   pattern_variant
   char
+  int
   '_'
 ```
 */
@@ -96,6 +97,7 @@ pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
         pattern_record(parser),
         pattern_variant(parser),
         spanned!(parser, parser.char()).map(Pattern::Char),
+        spanned!(parser, parser.int()).map(Pattern::Int),
         map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore))
     )
 }
