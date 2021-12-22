@@ -208,6 +208,15 @@ x : < None >
 "1"
 ```
 
+```ipso-repl
+> case "true" of
+.   "false" -> 0
+.   "true" -> 1
+.   _ -> 2
+.
+1
+```
+
 ## Let Bindings
 
 ```ipso-repl
