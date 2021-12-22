@@ -2,6 +2,8 @@
 
 mod test;
 
+use std::rc::Rc;
+
 use crate::{
     between, choices, indent, indent_scope, keep_right, map0, optional, spanned, ParseResult,
     Parser,
@@ -87,6 +89,7 @@ pattern ::=
   pattern_variant
   char
   int
+  '"' string '"'
   '_'
 ```
 */
@@ -98,6 +101,18 @@ pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
         pattern_variant(parser),
         spanned!(parser, parser.char()).map(Pattern::Char),
         spanned!(parser, parser.int()).map(Pattern::Int),
+        spanned!(
+            parser,
+            between!(
+                parser.token(&token::Data::DoubleQuote),
+                parser.token(&token::Data::DoubleQuote),
+                parser.string()
+            )
+        )
+        .map(|s| Pattern::String(Spanned {
+            pos: s.pos,
+            item: Rc::from(s.item)
+        })),
         map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore))
     )
 }

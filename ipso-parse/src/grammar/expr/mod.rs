@@ -101,19 +101,11 @@ pub fn string_part_expr(parser: &mut Parser) -> ParseResult<StringPart> {
 }
 
 pub fn string_part_string(parser: &mut Parser) -> ParseResult<StringPart> {
-    parser.expecting.insert(token::Name::String);
-
-    indent!(parser, Relation::Gte, {
-        let str = match &parser.current {
-            Some(current) => match &current.data {
-                token::Data::String { value, .. } => value.clone(),
-                _ => return parser.unexpected(false),
-            },
-            None => return parser.unexpected(false),
-        };
-        parser.consume();
-        ParseResult::pure(StringPart::String(str))
-    })
+    indent!(
+        parser,
+        Relation::Gte,
+        parser.string().map(StringPart::String)
+    )
 }
 
 /**

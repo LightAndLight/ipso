@@ -644,4 +644,19 @@ impl<'input> Parser<'input> {
             }
         )
     }
+
+    pub fn string(&mut self) -> ParseResult<String> {
+        self.expecting.insert(token::Name::String);
+
+        let str = match &self.current {
+            Some(current) => match &current.data {
+                token::Data::String { value, .. } => value.clone(),
+                _ => return self.unexpected(false),
+            },
+            None => return self.unexpected(false),
+        };
+        self.consume();
+
+        ParseResult::pure(str)
+    }
 }
