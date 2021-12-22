@@ -1,0 +1,8 @@
+main : IO ()
+main =
+  case "goodbye" of
+    "thing" -> print "saw thing"
+    "hello" -> print "saw hello"
+    "goodbye" -> print "saw goodbye 1"
+    "goodbye" -> print "saw goodbye 2"
+    _ -> print "saw something else"

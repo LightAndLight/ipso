@@ -1339,6 +1339,13 @@ where {
                                 break;
                             }
                         }
+                        Pattern::String(actual_string) => {
+                            let expected_string = expr.unpack_string();
+                            if expected_string == actual_string.as_ref() {
+                                target = Some(&branch.body);
+                                break;
+                            }
+                        }
                         Pattern::Wildcard => {
                             target = Some(&branch.body);
                             break;

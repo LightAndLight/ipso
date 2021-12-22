@@ -2096,11 +2096,20 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    fn infer_string_pattern(&mut self, s: &Spanned<Rc<str>>) -> InferredPattern {
+        InferredPattern {
+            pattern: core::Pattern::String(s.item.clone()),
+            r#type: core::Type::String,
+            bindings: Vec::new(),
+        }
+    }
+
     fn infer_pattern(&mut self, arg: &syntax::Pattern) -> InferredPattern {
         match arg {
             syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
             syntax::Pattern::Char(c) => self.infer_char_pattern(c),
             syntax::Pattern::Int(n) => self.infer_int_pattern(n),
+            syntax::Pattern::String(s) => self.infer_string_pattern(s),
             syntax::Pattern::Name(n) => self.infer_name_pattern(n),
             syntax::Pattern::Record { names, rest } => self.infer_record_pattern(names, rest),
             syntax::Pattern::Variant { name, arg } => {
@@ -2649,6 +2658,9 @@ impl<'modules> Typechecker<'modules> {
                                 }
                                 syntax::Pattern::Char(c) => Ok((self.infer_char_pattern(c), false)),
                                 syntax::Pattern::Int(n) => Ok((self.infer_int_pattern(n), false)),
+                                syntax::Pattern::String(n) => {
+                                    Ok((self.infer_string_pattern(n), false))
+                                }
                                 syntax::Pattern::Name(n) => Ok((self.infer_name_pattern(n), false)),
                                 syntax::Pattern::Record { names, rest } => {
                                     Ok((self.infer_record_pattern(names, rest), false))
@@ -2679,6 +2691,7 @@ impl<'modules> Typechecker<'modules> {
                             match branch.pattern.item {
                                 syntax::Pattern::Char(_) => {}
                                 syntax::Pattern::Int(_) => {}
+                                syntax::Pattern::String(_) => {}
                                 syntax::Pattern::Wildcard
                                 | syntax::Pattern::Name(_)
                                 | syntax::Pattern::Record { .. } => {
