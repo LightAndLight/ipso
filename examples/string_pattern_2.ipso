@@ -1,0 +1,6 @@
+main : IO ()
+main =
+  case "hello" of
+    "yes" -> print "saw yes"
+    { x } -> print "saw { x }"
+    _ -> print "didn't see yes"
