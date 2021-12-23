@@ -138,6 +138,7 @@ type_atom ::=
   'String'
   'Array'
   'IO'
+  'Cmd'
   type_record
   type_variant
   ident
@@ -172,6 +173,10 @@ pub fn type_atom(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
                 parser.token(&token::Data::Ident(Rc::from("Array")))
             ),
             map0!(Type::IO, parser.token(&token::Data::Ident(Rc::from("IO")))),
+            map0!(
+                Type::Cmd,
+                parser.token(&token::Data::Ident(Rc::from("Cmd")))
+            ),
             type_record(parser),
             type_variant(parser),
             parser.ctor().map(Type::Name),
