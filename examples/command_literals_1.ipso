@@ -1,5 +1,5 @@
 cmd1 : Cmd
-cmd1 = `echo "hello"`
+cmd1 = `echo "hello world!"`
 
 cmd2 : Cmd
 cmd2 = `ls -laR`
@@ -8,4 +8,4 @@ cmd3 : Cmd
 cmd3 = `echo \``
 
 main : IO ()
-main = pure ()
+main = run cmd1
