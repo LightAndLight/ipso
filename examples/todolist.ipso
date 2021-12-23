@@ -103,7 +103,7 @@ runCommand cmd todos =
         println "list - display the todolist"
         println "add STRING - add a task to the list"
         println "delete INT - delete a task from the list"
-        return (Continue todos)
+        pure (Continue todos)
     Add todo ->
       pure (Continue (snocArray todos todo))
     List x ->
