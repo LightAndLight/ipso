@@ -34,7 +34,6 @@ pub enum Keyword {
     Let,
     In,
     Comp,
-    Return,
     Bind,
 }
 
@@ -58,7 +57,6 @@ impl Arbitrary for Keyword {
             Keyword::Let,
             Keyword::In,
             Keyword::Comp,
-            Keyword::Return,
             Keyword::Bind,
         ])
         .unwrap()
@@ -67,7 +65,7 @@ impl Arbitrary for Keyword {
 
 impl Keyword {
     pub fn num_variants() -> usize {
-        19
+        18
     }
 
     pub fn matches(&self, actual: &str) -> bool {
@@ -93,7 +91,6 @@ impl Keyword {
             Keyword::Let => "let",
             Keyword::In => "in",
             Keyword::Comp => "comp",
-            Keyword::Return => "return",
             Keyword::Bind => "bind",
         }
     }
@@ -247,7 +244,6 @@ impl ModuleName {
 pub enum CompLine {
     Expr(Spanned<Expr>),
     Bind(Rc<str>, Spanned<Expr>),
-    Return(Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

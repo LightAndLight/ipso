@@ -2759,7 +2759,6 @@ impl<'modules> Typechecker<'modules> {
                             vars_bound: usize,
                             value: core::Expr,
                         },
-                        Return(core::Expr),
                     }
 
                     let mut ret_ty = None;
@@ -2801,12 +2800,6 @@ impl<'modules> Typechecker<'modules> {
                                     value,
                                 })
                             }
-                            syntax::CompLine::Return(value) => {
-                                let (value, value_ty) = self.infer_expr(value)?;
-
-                                ret_ty = Some(value_ty);
-                                Ok(CheckedCompLine::Return(value))
-                            }
                         })
                         .collect::<Result<Vec<_>, _>>()?;
 
@@ -2831,10 +2824,6 @@ impl<'modules> Typechecker<'modules> {
                             let mut desugared: core::Expr = match checked_lines.pop().unwrap() {
                                 CheckedCompLine::Bind { .. } => unreachable!(),
                                 CheckedCompLine::Expr(value) => value,
-                                CheckedCompLine::Return(value) => core::Expr::mk_app(
-                                    core::Expr::Name(String::from("pureIO")),
-                                    value,
-                                ),
                             };
 
                             for checked_line in checked_lines.into_iter().rev() {
@@ -2858,19 +2847,6 @@ impl<'modules> Typechecker<'modules> {
                                             core::Expr::mk_app(
                                                 core::Expr::Name(String::from("bindIO")),
                                                 value,
-                                            ),
-                                            core::Expr::mk_lam(true, desugared),
-                                        );
-                                    }
-                                    CheckedCompLine::Return(value) => {
-                                        // Desugar[comp { return value; rest }] -> bindIO (pureIO value) (\_ -> Desugar[rest])
-                                        desugared = core::Expr::mk_app(
-                                            core::Expr::mk_app(
-                                                core::Expr::Name(String::from("bindIO")),
-                                                core::Expr::mk_app(
-                                                    core::Expr::Name(String::from("pureIO")),
-                                                    value,
-                                                ),
                                             ),
                                             core::Expr::mk_lam(true, desugared),
                                         );

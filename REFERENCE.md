@@ -530,7 +530,7 @@ type IOError = < EBADF | EINTR | ENOSPC | EIO >
 #### Builtins
 
 ```ipso
-pureIO : a -> IO a
+pure : a -> IO a
 
 mapIO : (a -> b) -> IO a -> IO b
 

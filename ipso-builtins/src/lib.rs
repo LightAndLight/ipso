@@ -42,9 +42,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::MapIO),
             },
-            // pureIO : a -> IO a
+            // pure : a -> IO a
             Declaration::Definition {
-                name: String::from("pureIO"),
+                name: String::from("pure"),
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
@@ -59,7 +59,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         ),
                     }
                 },
-                body: Expr::alloc_builtin(Builtin::PureIO),
+                body: Expr::alloc_builtin(Builtin::Pure),
             },
             // bindIO : IO a -> (a -> IO b) -> IO b
             Declaration::Definition {
