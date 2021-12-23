@@ -67,7 +67,7 @@ impl ParseError {
         diagnostic.item(
             Some(Location {
                 source: self.source(),
-                offset: self.position(),
+                offset: Some(self.position()),
             }),
             Message {
                 content: self.message(),
