@@ -244,6 +244,23 @@ IO ()
 IO String
 ```
 
+## Command Syntax
+
+```ipso-repl
+> :kind Cmd
+Type
+```
+
+```ipso-repl
+> :t `ls -laR`
+Cmd
+```
+
+```ipso-repl
+> :t run
+Cmd -> IO () 
+```
+
 ## Datatypes
 
 ### Booleans
@@ -761,6 +778,7 @@ atom ::=
   record |
   ident |
   ctor |
+  cmd |
   '(' expr ')'
   
 bool ::=
@@ -802,6 +820,20 @@ record_content ::=
   
 record_item ::=
   ident '=' expr
+
+cmd_char ::=
+  (any ascii character except '`', '$', '\')
+  '\' '`'
+  '\' '$'
+  '\' '\'
+
+cmd_part ::=
+  cmd_char+
+  '$' ident
+  '$' '{' expr '}'
+
+cmd ::= 
+  '`' cmd_part* '`'
 
 
 decl ::=
