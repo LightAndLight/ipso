@@ -58,6 +58,7 @@ pub enum Name {
     Indent(Relation, usize),
     Dedent,
     Eof,
+    Backtick,
 }
 
 impl Arbitrary for Name {
@@ -228,6 +229,7 @@ impl Name {
             Self::Indent(_, _) => 52,
             Self::Dedent => 53,
             Self::Eof => 54,
+            Self::Backtick => 55,
         }
     }
 
@@ -281,6 +283,7 @@ impl Name {
             Name::LAngle => String::from("'<'"),
             Name::RAngle => String::from("'>'"),
             Name::Eof => String::from("end of input"),
+            Name::Backtick => String::from("'`'"),
         }
     }
 }
@@ -334,6 +337,8 @@ pub enum Data {
     Hyphen,
     Plus,
     Slash,
+
+    Backtick,
 }
 
 impl Data {
@@ -373,6 +378,7 @@ impl Data {
             Data::Pipe => 1,
             Data::LAngle => 1,
             Data::RAngle => 1,
+            Data::Backtick => 1,
 
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
@@ -415,6 +421,7 @@ impl Data {
             Data::Hyphen => Name::Hyphen,
             Data::Plus => Name::Plus,
             Data::Slash => Name::Slash,
+            Data::Backtick => Name::Backtick,
         }
     }
 }
