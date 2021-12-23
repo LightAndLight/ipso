@@ -2869,6 +2869,7 @@ impl<'modules> Typechecker<'modules> {
                         }
                     }
                 }
+                syntax::Expr::Cmd(parts) => Ok((core::Expr::Cmd(parts.clone()), core::Type::Cmd)),
             }
         )
     }

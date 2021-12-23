@@ -194,6 +194,7 @@ pub enum Object<'heap> {
         env: &'heap [Value<'heap>],
         body: IOBody<'heap>,
     },
+    Cmd(Vec<Rc<str>>),
 }
 
 impl<'heap> Object<'heap> {
@@ -318,6 +319,7 @@ impl<'heap> Object<'heap> {
                 s.push(')');
                 s
             }
+            Object::Cmd(parts) => format!("Cmd({:?})", parts),
         }
     }
 }
@@ -365,6 +367,10 @@ impl<'heap> PartialEq for Object<'heap> {
             },
             Object::Variant(tag, value) => match other {
                 Object::Variant(tag2, value2) => tag == tag2 && value == value2,
+                _ => false,
+            },
+            Object::Cmd(parts) => match other {
+                Object::Cmd(parts2) => parts == parts2,
                 _ => false,
             },
         }
@@ -1359,6 +1365,7 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
+            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
         };
         out
     }

@@ -785,6 +785,8 @@ pub enum Expr {
     Embed(Rc<Expr>, Rc<Expr>),
     Case(Rc<Expr>, Vec<Branch>),
     Unit,
+
+    Cmd(Vec<Rc<str>>),
 }
 
 impl Expr {
@@ -951,6 +953,7 @@ impl Expr {
                         .collect(),
                 ),
                 Expr::Unit => Expr::Unit,
+                Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
             }
         }
 
@@ -1058,6 +1061,7 @@ impl Expr {
             ),
 
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1159,6 +1163,8 @@ impl Expr {
             }
 
             Expr::Unit => Ok(()),
+
+            Expr::Cmd(_) => Ok(()),
         }
     }
 
@@ -1236,6 +1242,7 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1361,6 +1368,7 @@ impl<'a> Iterator for IterEVars<'a> {
                     xs
                 }),
                 Expr::Unit => Step::Skip,
+                Expr::Cmd(_) => Step::Skip,
             }
         }
 

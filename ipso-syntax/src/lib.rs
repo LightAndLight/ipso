@@ -293,6 +293,8 @@ pub enum Expr {
     Unit,
 
     Comp(Vec<CompLine>),
+
+    Cmd(Vec<Rc<str>>),
 }
 
 impl Expr {
