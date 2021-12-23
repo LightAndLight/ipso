@@ -18,6 +18,8 @@ impl Arbitrary for Relation {
     }
 }
 
+pub const INDENT_TAG: usize = 52;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
@@ -168,7 +170,7 @@ impl Name {
             49 => Some(Self::Hyphen),
             50 => Some(Self::Plus),
             51 => Some(Self::Slash),
-            // 52 => Self::Indent(_),
+            // INDENT_TAG => Self::Indent(_),
             53 => Some(Self::Dedent),
             54 => Some(Self::Eof),
             55 => Some(Self::Backtick),
@@ -231,7 +233,7 @@ impl Name {
             Self::Hyphen => 49,
             Self::Plus => 50,
             Self::Slash => 51,
-            Self::Indent(_, _) => 52,
+            Self::Indent(_, _) => INDENT_TAG,
             Self::Dedent => 53,
             Self::Eof => 54,
             Self::Backtick => 55,

@@ -338,15 +338,6 @@ impl<'input> Iterator for Lexer<'input> {
                         self.consume();
                         self.mode.push(Mode::Cmd);
 
-                        // Spaces are ignored in commands
-                        while let Some(c) = self.current {
-                            if c == ' ' {
-                                self.consume();
-                            } else {
-                                break;
-                            }
-                        }
-
                         Some(Token {
                             data: token::Data::Backtick,
                             pos,
@@ -597,103 +588,110 @@ impl<'input> Iterator for Lexer<'input> {
                         })
                     }
                 },
-                Mode::Cmd => match c {
-                    '`' => {
-                        self.consume();
-                        self.mode.pop().unwrap();
-                        Some(Token {
-                            data: token::Data::Backtick,
-                            pos,
-                            column,
-                        })
+                Mode::Cmd => {
+                    // Spaces are ignored in commands
+                    while let Some(c) = self.current {
+                        if c == ' ' {
+                            self.consume();
+                        } else {
+                            break;
+                        }
                     }
-                    _ => {
-                        let mut textual_length = 0;
-                        let mut value = String::new();
 
-                        while let Some(c) = self.current {
-                            match c {
-                                '`' => {
-                                    break;
-                                }
-                                ' ' => {
-                                    break;
-                                }
-                                '"' => {
-                                    self.consume();
-                                    self.mode.push(Mode::String);
+                    let pos = self.pos;
+                    let column = self.column;
 
-                                    if textual_length == 0 {
-                                        return Some(Token {
-                                            data: token::Data::DoubleQuote,
-                                            pos,
-                                            column,
-                                        });
-                                    } else {
+                    match c {
+                        '`' => {
+                            self.consume();
+                            self.mode.pop().unwrap();
+                            Some(Token {
+                                data: token::Data::Backtick,
+                                pos,
+                                column,
+                            })
+                        }
+                        '"' => {
+                            self.consume();
+                            self.mode.push(Mode::String);
+
+                            Some(Token {
+                                data: token::Data::DoubleQuote,
+                                pos,
+                                column,
+                            })
+                        }
+                        _ => {
+                            let mut textual_length = 0;
+                            let mut value = String::new();
+
+                            while let Some(c) = self.current {
+                                match c {
+                                    '`' => {
                                         break;
                                     }
-                                }
-                                '\\' => {
-                                    self.consume();
-                                    textual_length += 1;
+                                    ' ' => {
+                                        break;
+                                    }
+                                    '"' => {
+                                        break;
+                                    }
+                                    '\\' => {
+                                        self.consume();
+                                        textual_length += 1;
 
-                                    match self.current {
-                                        Some('"') => {
-                                            self.consume();
-                                            value.write_char('"').unwrap();
-                                            textual_length += 1;
-                                        }
-                                        Some('`') => {
-                                            self.consume();
-                                            value.write_char('`').unwrap();
-                                            textual_length += 1;
-                                        }
-                                        Some('\\') => {
-                                            self.consume();
-                                            value.write_char('\\').unwrap();
-                                            textual_length += 1;
-                                        }
-                                        Some(c) => {
-                                            return Some(Token {
-                                                data: token::Data::Unexpected(c),
-                                                pos: self.pos,
-                                                column: self.column,
-                                            })
-                                        }
-                                        None => {
-                                            return Some(Token {
-                                                data: token::Data::Unexpected('\\'),
-                                                pos: self.pos,
-                                                column: self.column,
-                                            })
+                                        match self.current {
+                                            Some('"') => {
+                                                self.consume();
+                                                value.write_char('"').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some('`') => {
+                                                self.consume();
+                                                value.write_char('`').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some('\\') => {
+                                                self.consume();
+                                                value.write_char('\\').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some(c) => {
+                                                return Some(Token {
+                                                    data: token::Data::Unexpected(c),
+                                                    pos: self.pos,
+                                                    column: self.column,
+                                                })
+                                            }
+                                            None => {
+                                                return Some(Token {
+                                                    data: token::Data::Unexpected('\\'),
+                                                    pos: self.pos,
+                                                    column: self.column,
+                                                })
+                                            }
                                         }
                                     }
-                                }
-                                _ => {
-                                    self.consume();
-                                    value.write_char(c).unwrap();
-                                    textual_length += 1;
+                                    _ => {
+                                        self.consume();
+                                        value.write_char(c).unwrap();
+                                        textual_length += 1;
+                                    }
                                 }
                             }
-                        }
 
-                        // Spaces are ignored in commands
-                        while let Some(c) = self.current {
-                            if c == ' ' {
-                                self.consume();
+                            if textual_length > 0 {
+                                Some(Token {
+                                    data: token::Data::Cmd(Rc::from(value)),
+                                    pos,
+                                    column,
+                                })
                             } else {
-                                break;
+                                self.next()
                             }
                         }
-
-                        debug_assert!(textual_length != 0, "constructed empty Cmd value");
-                        Some(Token {
-                            data: token::Data::Cmd(Rc::from(value)),
-                            pos,
-                            column,
-                        })
                     }
-                },
+                }
             },
         }
     }
