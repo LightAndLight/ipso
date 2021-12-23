@@ -2832,7 +2832,7 @@ impl<'modules> Typechecker<'modules> {
                                 CheckedCompLine::Bind { .. } => unreachable!(),
                                 CheckedCompLine::Expr(value) => value,
                                 CheckedCompLine::Return(value) => core::Expr::mk_app(
-                                    core::Expr::Name(String::from("pureIO")),
+                                    core::Expr::Name(String::from("pure")),
                                     value,
                                 ),
                             };
@@ -2863,12 +2863,12 @@ impl<'modules> Typechecker<'modules> {
                                         );
                                     }
                                     CheckedCompLine::Return(value) => {
-                                        // Desugar[comp { return value; rest }] -> bindIO (pureIO value) (\_ -> Desugar[rest])
+                                        // Desugar[comp { return value; rest }] -> bindIO (pure value) (\_ -> Desugar[rest])
                                         desugared = core::Expr::mk_app(
                                             core::Expr::mk_app(
                                                 core::Expr::Name(String::from("bindIO")),
                                                 core::Expr::mk_app(
-                                                    core::Expr::Name(String::from("pureIO")),
+                                                    core::Expr::Name(String::from("pure")),
                                                     value,
                                                 ),
                                             ),

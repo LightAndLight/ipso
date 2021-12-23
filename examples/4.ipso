@@ -1,2 +1,2 @@
 main : IO Int
-main = pureIO (trace "hello" 0)
+main = pure (trace "hello" 0)

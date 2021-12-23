@@ -708,7 +708,7 @@ impl StringPart {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Builtin {
     MapIO,
-    PureIO,
+    Pure,
     BindIO,
     Trace,
     ToUtf8,

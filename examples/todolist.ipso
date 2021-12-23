@@ -85,7 +85,7 @@ writeTodos todos =
           acc
           println todo
       )
-      (pureIO ())
+      (pure ())
       todos
 
 runCommand :
@@ -95,7 +95,7 @@ runCommand :
 runCommand cmd todos =
   case cmd of
     Quit x ->
-      pureIO (Quit ())
+      pure (Quit ())
     Help x -> 
       comp
         println "help - display this message"
@@ -105,7 +105,7 @@ runCommand cmd todos =
         println "delete INT - delete a task from the list"
         return (Continue todos)
     Add todo ->
-      pureIO (Continue (snocArray todos todo))
+      pure (Continue (snocArray todos todo))
     List x ->
       mapIO
         (\_ -> Continue todos)
@@ -115,7 +115,7 @@ runCommand cmd todos =
         (\_ -> Continue todos)
         (println "error: invalid command \"$x\"")
     Delete ix ->
-      pureIO (Continue (deleteAt ix todos))
+      pure (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
 loop todos = 
@@ -125,7 +125,7 @@ loop todos =
     bind next <- runCommand (parseCommand line) todos
     case next of
       Continue newTodos -> loop newTodos
-      Quit x -> pureIO ()
+      Quit x -> pure ()
 
 main : IO ()
 main = 

@@ -541,9 +541,9 @@ where {
 
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
         match name {
-            Builtin::PureIO => {
+            Builtin::Pure => {
                 function1!(
-                    pure_io,
+                    pure,
                     self,
                     |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
