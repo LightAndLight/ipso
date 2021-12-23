@@ -35,14 +35,6 @@ pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
                 .map(|value| CompLine::Bind(name, value))
             })
         },
-        // 'return' expr
-        {
-            keep_right!(
-                parser.keyword(&Keyword::Return),
-                indent!(parser, Relation::Gt, expr(parser))
-            )
-            .map(CompLine::Return)
-        },
         expr(parser).map(CompLine::Expr)
     )
 }
