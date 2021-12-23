@@ -153,7 +153,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("readln"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_app(io_ty, string_ty.clone()),
+                    body: Type::mk_app(io_ty.clone(), string_ty.clone()),
                 },
                 body: Expr::alloc_builtin(Builtin::Readln),
             },
@@ -487,6 +487,21 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::SnocArray),
+            },
+            // run : Cmd -> IO ()
+            Declaration::Definition {
+                name: String::from("run"),
+                sig: {
+                    TypeSig {
+                        ty_vars: Vec::new(),
+                        body: Type::mk_arrow(
+                            common_kinds,
+                            Type::Cmd,
+                            Type::mk_app(io_ty, Type::Unit),
+                        ),
+                    }
+                },
+                body: Expr::alloc_builtin(Builtin::Run),
             },
         ],
     }
