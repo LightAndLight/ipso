@@ -1114,11 +1114,16 @@ where {
                                     if code == 0 {
                                         Value::Unit
                                     } else {
-                                        panic!("process {:?} exited with code {:?}", cmd[0], code)
+                                        println!(
+                                            "process {:?} exited with code {:?}",
+                                            cmd[0], code
+                                        );
+                                        process::exit(1);
                                     }
                                 }
                                 None => {
-                                    panic!("process {:?} was terminated unexpectedly", cmd[0])
+                                    println!("process {:?} terminated unexpectedly", cmd[0]);
+                                    process::exit(1);
                                 }
                             }
                         }
