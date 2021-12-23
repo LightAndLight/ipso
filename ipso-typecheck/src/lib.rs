@@ -562,6 +562,7 @@ impl<'modules> Typechecker<'modules> {
             core::Type::Char => matches!(t2, core::Type::Char),
             core::Type::String => matches!(t2, core::Type::String),
             core::Type::Bytes => matches!(t2, core::Type::Bytes),
+            core::Type::Cmd => matches!(t2, core::Type::Cmd),
             core::Type::Arrow(_) => matches!(t2, core::Type::Arrow(_)),
             core::Type::FatArrow(_) => matches!(t2, core::Type::FatArrow(_)),
             core::Type::Array(_) => matches!(t2, core::Type::Arrow(_)),
@@ -1364,6 +1365,7 @@ impl<'modules> Typechecker<'modules> {
             ),
             core::Type::RowNil => core::Type::RowNil,
             core::Type::Unit => core::Type::Unit,
+            core::Type::Cmd => core::Type::Cmd,
             core::Type::RowCons(field, ty, rest) => {
                 core::Type::mk_rowcons(field.clone(), self.zonk_type(ty), self.zonk_type(rest))
             }
@@ -1712,6 +1714,7 @@ impl<'modules> Typechecker<'modules> {
                 Ok((core::Type::mk_hasfield(field, rest), Kind::Constraint))
             }
             syntax::Type::Unit => Ok((core::Type::Unit, Kind::Type)),
+            syntax::Type::Cmd => Ok((core::Type::Cmd, Kind::Type)),
             syntax::Type::Meta(n) => {
                 let kind = self.lookup_typevar(n)?;
                 Ok((core::Type::Meta(kind.clone(), n), kind))
@@ -1932,6 +1935,11 @@ impl<'modules> Typechecker<'modules> {
             core::Type::Meta(_, n) => match actual {
                 core::Type::Meta(_, nn) if *n == nn => Ok(()),
                 _ => subst.subst_left(self, context, *n, actual),
+            },
+            core::Type::Cmd => match actual {
+                core::Type::Cmd => Ok(()),
+                core::Type::Meta(_, n) => subst.subst_right(self, context, expected, n),
+                _ => self.type_mismatch(context, expected, actual),
             },
         }
     }
