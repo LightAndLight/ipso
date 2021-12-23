@@ -822,9 +822,10 @@ record_item ::=
   ident '=' expr
 
 cmd_char ::=
-  (any ascii character except '`', '$', '\')
+  (any ascii character except '`', '$', '"', '\')
   '\' '`'
   '\' '$'
+  '\' '"'
   '\' '\'
 
 cmd_part ::=

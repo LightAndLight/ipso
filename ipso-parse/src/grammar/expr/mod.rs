@@ -233,6 +233,18 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
     })
 }
 
+pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
+    todo!()
+}
+
+pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
+    between!(
+        parser.token(&token::Data::Backtick),
+        parser.token(&token::Data::Backtick),
+        many!(parser, cmd_part(parser))
+    )
+}
+
 /**
 ```text
 expr_atom ::=
@@ -245,6 +257,7 @@ expr_atom ::=
   expr_record
   expr_embed
   expr_array
+  expr_cmd
   '(' expr ')'
   string
 ```
@@ -263,6 +276,7 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
             expr_record(parser),
             expr_embed(parser),
             expr_array(parser),
+            expr_cmd(parser).map(Expr::Cmd),
             between!(
                 parser.token(&token::Data::LParen),
                 indent!(parser, Relation::Gt, parser.token(&token::Data::RParen)),
