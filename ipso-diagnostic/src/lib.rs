@@ -177,13 +177,13 @@ impl Diagnostic {
             let result = match get_entry(&mut source_map, location.source.clone()) {
                 Err(err) => return Err(err),
                 Ok(location_entry) => match location_entry {
-                    LocationEntry::InteractiveEntry { label } => Some(Self::report_error_heading(
+                    LocationEntry::InteractiveEntry { label } => Self::report_error_heading(
                         label,
                         location.offset.map(|column| Position { line: 1, column }),
                         &message.content,
-                    )),
+                    ),
                     LocationEntry::FileEntry(file_entry) => match location.offset {
-                        None => Some(match location.source {
+                        None => match location.source {
                             Source::File { path } => Self::report_error_heading(
                                 path.to_str().unwrap(),
                                 None,
@@ -192,7 +192,7 @@ impl Diagnostic {
                             Source::Interactive { label } => {
                                 Self::report_error_heading(&label, None, &message.content)
                             }
-                        }),
+                        },
                         Some(offset) => {
                             let mut pos = offset;
                             while offset >= file_entry.offset {
@@ -214,28 +214,26 @@ impl Diagnostic {
                                 let item_bytes = &(file_entry.line_str.as_bytes())[0..pos];
                                 from_utf8(item_bytes).unwrap().chars().count() + 1
                             };
-                            Some(Diagnostic::report_located_message(
+                            Diagnostic::report_located_message(
                                 file_entry.line,
                                 col,
                                 location.source.to_str(),
                                 file_entry.line_str.trim_end_matches('\n'),
                                 &message,
-                            ))
+                            )
                         }
                     },
                 },
             };
 
-            if let Some(result) = result {
-                match io::stderr().write(result.as_bytes()) {
-                    Ok(_) => {}
-                    Err(err) => return Err(err),
-                };
-                match io::stderr().write(b"\n") {
-                    Ok(_) => {}
-                    Err(err) => return Err(err),
-                };
-            }
+            match io::stderr().write(result.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
+            match io::stderr().write(b"\n") {
+                Ok(_) => {}
+                Err(err) => return Err(err),
+            };
         }
         Ok(())
     }
