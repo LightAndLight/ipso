@@ -4,7 +4,7 @@ mod test;
 
 use crate::{
     between, choices, grammar::pattern::pattern, indent, indent_scope, keep_left, keep_right, many,
-    map2, optional, sep_by, spanned, ParseResult, Parser,
+    map0, map2, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
 use ipso_syntax::{Branch, CompLine, Expr, Keyword, Spanned, StringPart};
@@ -234,14 +234,35 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
 }
 
 pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
-    todo!()
+    parser.expecting.insert(token::Name::Cmd);
+    match &parser.current {
+        None => parser.unexpected(false),
+        Some(token) => match &token.data {
+            token::Data::Cmd(value) => {
+                let value = value.clone();
+                map0!(value, parser.consume())
+            }
+            _ => parser.unexpected(false),
+        },
+    }
 }
 
 pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
     between!(
         parser.token(&token::Data::Backtick),
         parser.token(&token::Data::Backtick),
-        many!(parser, cmd_part(parser))
+        many!(
+            parser,
+            choices!(
+                parser,
+                cmd_part(parser),
+                between!(
+                    parser.token(&token::Data::DoubleQuote),
+                    parser.token(&token::Data::DoubleQuote),
+                    parser.string().map(Rc::from)
+                )
+            )
+        )
     )
 }
 

@@ -233,6 +233,7 @@ fn parse_case_4() {
                 token::Name::Int,
                 token::Name::Indent(Relation::Eq, 2),
                 token::Name::Comment,
+                token::Name::Backtick,
                 token::Name::Eof,
             ]
             .into_iter()
