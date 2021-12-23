@@ -113,7 +113,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        38 + Keyword::num_variants()
+        39 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
