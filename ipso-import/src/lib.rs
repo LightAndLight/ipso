@@ -35,7 +35,7 @@ impl ModuleError {
             } => diagnostic.item(
                 Some(Location {
                     source: source.clone(),
-                    offset: *pos,
+                    offset: Some(*pos),
                 }),
                 Message {
                     content: String::from("module not found"),

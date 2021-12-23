@@ -1,10 +1,11 @@
-use std::str::from_utf8;
 use std::{
     collections::HashMap,
-    io::{BufRead, BufReader, Write},
+    fmt::Write as FmtWrite,
+    fs::File,
+    io::{self, BufRead, BufReader, Write as IoWrite},
     path::PathBuf,
+    str::from_utf8,
 };
-use std::{fs::File, io};
 
 mod test;
 
@@ -26,7 +27,7 @@ impl Source {
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub struct Location {
     pub source: Source,
-    pub offset: usize,
+    pub offset: Option<usize>,
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -39,6 +40,11 @@ pub struct Message {
 pub struct Diagnostic {
     items: Vec<Message>,
     located_items: Vec<(Location, Message)>,
+}
+
+pub struct Position {
+    line: usize,
+    column: usize,
 }
 
 impl Diagnostic {
@@ -64,24 +70,33 @@ impl Diagnostic {
         }
     }
 
-    pub fn report_error_heading(path: &str, line: usize, col: usize, message: &str) -> String {
-        format!("{}:{}:{}: error: {}", path, line, col, message)
+    pub fn report_error_heading(path: &str, position: Option<Position>, message: &str) -> String {
+        let mut str = String::from(path);
+        str.write_char(':').unwrap();
+        if let Some(position) = position {
+            write!(str, "{}:{}:", position.line, position.column).unwrap();
+        }
+        str.write_char(' ').unwrap();
+        str.write_str("error: ").unwrap();
+        str.write_str(message).unwrap();
+        str
     }
 
     pub fn report_located_message(
         line: usize,
-        col: usize,
+        column: usize,
         path: &str,
         line_str: &str,
         message: &Message,
     ) -> String {
         let mut result = String::new();
         let caret: String = {
-            let mut caret: String = " ".repeat(col - 1);
+            let mut caret: String = " ".repeat(column - 1);
             caret.push('^');
             caret
         };
-        let line1 = Self::report_error_heading(path, line, col, &message.content);
+        let line1 =
+            Self::report_error_heading(path, Some(Position { line, column }), &message.content);
         let pad_amount = ((line as f32).log(10.0).floor() as usize) + 1;
         let padding: String = " ".repeat(pad_amount);
 
@@ -162,48 +177,65 @@ impl Diagnostic {
             let result = match get_entry(&mut source_map, location.source.clone()) {
                 Err(err) => return Err(err),
                 Ok(location_entry) => match location_entry {
-                    LocationEntry::InteractiveEntry { label } => {
-                        Self::report_error_heading(label, 1, location.offset, &message.content)
-                    }
-                    LocationEntry::FileEntry(file_entry) => {
-                        let mut pos = location.offset;
-                        while location.offset >= file_entry.offset {
-                            pos -= file_entry.line_str.len();
-                            file_entry.line_str.clear();
-                            match file_entry.file.read_line(&mut file_entry.line_str) {
-                                Err(err) => return Err(err),
-                                Ok(bytes_read) => {
-                                    if bytes_read == 0 {
-                                        return Ok(());
-                                    } else {
-                                        file_entry.offset += bytes_read;
-                                        file_entry.line += 1;
+                    LocationEntry::InteractiveEntry { label } => Some(Self::report_error_heading(
+                        label,
+                        location.offset.map(|column| Position { line: 1, column }),
+                        &message.content,
+                    )),
+                    LocationEntry::FileEntry(file_entry) => match location.offset {
+                        None => Some(match location.source {
+                            Source::File { path } => Self::report_error_heading(
+                                path.to_str().unwrap(),
+                                None,
+                                &message.content,
+                            ),
+                            Source::Interactive { label } => {
+                                Self::report_error_heading(&label, None, &message.content)
+                            }
+                        }),
+                        Some(offset) => {
+                            let mut pos = offset;
+                            while offset >= file_entry.offset {
+                                pos -= file_entry.line_str.len();
+                                file_entry.line_str.clear();
+                                match file_entry.file.read_line(&mut file_entry.line_str) {
+                                    Err(err) => return Err(err),
+                                    Ok(bytes_read) => {
+                                        if bytes_read == 0 {
+                                            return Ok(());
+                                        } else {
+                                            file_entry.offset += bytes_read;
+                                            file_entry.line += 1;
+                                        }
                                     }
                                 }
                             }
+                            let col: usize = {
+                                let item_bytes = &(file_entry.line_str.as_bytes())[0..pos];
+                                from_utf8(item_bytes).unwrap().chars().count() + 1
+                            };
+                            Some(Diagnostic::report_located_message(
+                                file_entry.line,
+                                col,
+                                location.source.to_str(),
+                                file_entry.line_str.trim_end_matches('\n'),
+                                &message,
+                            ))
                         }
-                        let col: usize = {
-                            let item_bytes = &(file_entry.line_str.as_bytes())[0..pos];
-                            from_utf8(item_bytes).unwrap().chars().count() + 1
-                        };
-                        Diagnostic::report_located_message(
-                            file_entry.line,
-                            col,
-                            location.source.to_str(),
-                            file_entry.line_str.trim_end_matches('\n'),
-                            &message,
-                        )
-                    }
+                    },
                 },
             };
-            match io::stderr().write(result.as_bytes()) {
-                Ok(_) => {}
-                Err(err) => return Err(err),
-            };
-            match io::stderr().write(b"\n") {
-                Ok(_) => {}
-                Err(err) => return Err(err),
-            };
+
+            if let Some(result) = result {
+                match io::stderr().write(result.as_bytes()) {
+                    Ok(_) => {}
+                    Err(err) => return Err(err),
+                };
+                match io::stderr().write(b"\n") {
+                    Ok(_) => {}
+                    Err(err) => return Err(err),
+                };
+            }
         }
         Ok(())
     }

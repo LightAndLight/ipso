@@ -15,7 +15,7 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
                 source: Source::File {
                     path: PathBuf::from(filename),
                 },
-                offset: 0,
+                offset: None,
             }),
             Message {
                 content: format!("missing entrypoint {:?}", name),
