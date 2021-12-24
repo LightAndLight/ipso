@@ -7,8 +7,9 @@ use paste::paste;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    io::{BufRead, Write},
+    io::{self, BufRead},
     ops::Index,
+    process,
     rc::Rc,
 };
 use typed_arena::Arena;
@@ -194,6 +195,7 @@ pub enum Object<'heap> {
         env: &'heap [Value<'heap>],
         body: IOBody<'heap>,
     },
+    Cmd(Vec<Rc<str>>),
 }
 
 impl<'heap> Object<'heap> {
@@ -239,6 +241,13 @@ impl<'heap> Object<'heap> {
         match self {
             Object::Record(fields) => fields,
             val => panic!("expected record,got {:?}", val),
+        }
+    }
+
+    pub fn unpack_cmd(&'heap self) -> &'heap Vec<Rc<str>> {
+        match self {
+            Object::Cmd(values) => values,
+            val => panic!("expected command, got {:?}", val),
         }
     }
 
@@ -318,6 +327,7 @@ impl<'heap> Object<'heap> {
                 s.push(')');
                 s
             }
+            Object::Cmd(parts) => format!("Cmd({:?})", parts),
         }
     }
 }
@@ -367,6 +377,10 @@ impl<'heap> PartialEq for Object<'heap> {
                 Object::Variant(tag2, value2) => tag == tag2 && value == value2,
                 _ => false,
             },
+            Object::Cmd(parts) => match other {
+                Object::Cmd(parts2) => parts == parts2,
+                _ => false,
+            },
         }
     }
 }
@@ -412,6 +426,10 @@ impl<'heap> Value<'heap> {
 
     pub fn unpack_variant(&self) -> (&'heap usize, &'heap Value<'heap>) {
         self.unpack_object().unpack_variant()
+    }
+
+    pub fn unpack_cmd(&self) -> &'heap Vec<Rc<str>> {
+        self.unpack_object().unpack_cmd()
     }
 
     pub fn unpack_object(&self) -> &'heap Object<'heap> {
@@ -488,7 +506,7 @@ pub struct Module {
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
     stdin: &'io mut dyn BufRead,
-    stdout: &'io mut dyn Write,
+    stdout: &'io mut dyn io::Write,
     bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
@@ -500,7 +518,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
     pub fn new(
         stdin: &'io mut dyn BufRead,
-        stdout: &'io mut dyn Write,
+        stdout: &'io mut dyn io::Write,
         context: &'ctx HashMap<String, Rc<Expr>>,
         module_context: HashMap<ModulePath, Module>,
         bytes: &'heap Arena<u8>,
@@ -1071,6 +1089,63 @@ where {
                     }
                 )
             }
+            Builtin::Run => {
+                function1!(
+                    run,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        fn run_1<'io, 'ctx, 'heap>(
+                            _: &mut Interpreter<'io, 'ctx, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            let cmd = env[0].unpack_cmd();
+                            if cmd.is_empty() {
+                                Value::Unit
+                            } else {
+                                let status = process::Command::new(cmd[0].as_ref())
+                                    .args(
+                                        cmd[1..].iter().map(|arg| arg.as_ref()).collect::<Vec<_>>(),
+                                    )
+                                    .status()
+                                    .unwrap_or_else(|err| {
+                                        println!("failed to start process {:?}: {}", cmd[0], err);
+                                        process::exit(1);
+                                    });
+
+                                match status.code() {
+                                    Some(code) => {
+                                        if code == 0 {
+                                            Value::Unit
+                                        } else {
+                                            println!(
+                                                "process {:?} exited with code {:?}",
+                                                cmd[0], code
+                                            );
+                                            process::exit(1);
+                                        }
+                                    }
+                                    None => {
+                                        println!("process {:?} terminated unexpectedly", cmd[0]);
+                                        process::exit(1);
+                                    }
+                                }
+                            }
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env);
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(run_1),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
         }
     }
 
@@ -1359,6 +1434,7 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
+            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
         };
         out
     }

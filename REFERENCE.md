@@ -19,6 +19,7 @@
   - [Pattern Matching](#pattern-matching)
   - [Let Bindings](#let-bindings)
   - [Computation Expressions](#computation-expressions)
+  - [Command Literals](#command-literals)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
     - [Integers](#integers)
@@ -242,6 +243,32 @@ IO ()
 .   return x
 .
 IO String
+```
+
+## Command Literals
+
+```ipso-repl
+> :kind Cmd
+Type
+```
+
+```ipso-repl
+> :t `ls -laR`
+Cmd
+```
+
+```ipso-repl
+> :t run
+Cmd -> IO () 
+```
+
+```ipso-repl
+> run ``
+```
+
+```ipso-repl
+> run `echo "hello!"`
+hello!
 ```
 
 ## Datatypes
@@ -761,6 +788,7 @@ atom ::=
   record |
   ident |
   ctor |
+  cmd |
   '(' expr ')'
   
 bool ::=
@@ -802,6 +830,21 @@ record_content ::=
   
 record_item ::=
   ident '=' expr
+
+cmd_char ::=
+  (any ascii character except '`', '$', '"', '\')
+  '\' '`'
+  '\' '$'
+  '\' '"'
+  '\' '\'
+
+cmd_part ::=
+  cmd_char+
+  '$' ident
+  '$' '{' expr '}'
+
+cmd ::= 
+  '`' cmd_part* '`'
 
 
 decl ::=

@@ -275,8 +275,8 @@ impl Expecting {
         let mut set = BTreeSet::new();
         let mut has_indents = false;
         for ix in self.bitset.ones() {
-            if ix == token::Name::num_variants() - 3
-            /* Indent(_) */
+            if ix == token::INDENT_TAG
+            // Indent(_)
             {
                 has_indents = true;
             } else {

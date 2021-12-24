@@ -190,6 +190,7 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
         syntax::Expr::Comp(lines) => lines
             .iter_mut()
             .for_each(|line| desugar_module_accessors_comp_line(module_names, line)),
+        syntax::Expr::Cmd(_) => {}
     }
 }
 

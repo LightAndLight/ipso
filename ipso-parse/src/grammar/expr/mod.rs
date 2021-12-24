@@ -4,7 +4,7 @@ mod test;
 
 use crate::{
     between, choices, grammar::pattern::pattern, indent, indent_scope, keep_left, keep_right, many,
-    map2, optional, sep_by, spanned, ParseResult, Parser,
+    map0, map2, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
 use ipso_syntax::{Branch, CompLine, Expr, Keyword, Spanned, StringPart};
@@ -233,6 +233,60 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
     })
 }
 
+pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
+    parser.expecting.insert(token::Name::Cmd);
+    match &parser.current {
+        None => parser.unexpected(false),
+        Some(token) => match &token.data {
+            token::Data::Cmd(value) => {
+                let value = value.clone();
+                map0!(value, parser.consume())
+            }
+            _ => parser.unexpected(false),
+        },
+    }
+}
+
+/**
+```text
+expr_cmd ::=
+  '`' cmd_part* '`'
+```
+
+```text
+cmd_part ::=
+  cmd_char*
+  '"' string_char* '"'
+```
+
+```text
+cmd_char ::=
+  (ASCII characters excluding '\', '`', '"', '$')
+  '\' '\'
+  '\' '`'
+  '\' '"'
+  '\' '$'
+```
+*/
+pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
+    between!(
+        parser.token(&token::Data::Backtick),
+        parser.token(&token::Data::Backtick),
+        many!(
+            parser,
+            choices!(
+                parser,
+                cmd_part(parser),
+                between!(
+                    parser.token(&token::Data::DoubleQuote),
+                    parser.token(&token::Data::DoubleQuote),
+                    parser.string().map(Rc::from)
+                )
+            )
+        )
+    )
+}
+
 /**
 ```text
 expr_atom ::=
@@ -245,6 +299,7 @@ expr_atom ::=
   expr_record
   expr_embed
   expr_array
+  expr_cmd
   '(' expr ')'
   string
 ```
@@ -263,6 +318,7 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
             expr_record(parser),
             expr_embed(parser),
             expr_array(parser),
+            expr_cmd(parser).map(Expr::Cmd),
             between!(
                 parser.token(&token::Data::LParen),
                 indent!(parser, Relation::Gt, parser.token(&token::Data::RParen)),

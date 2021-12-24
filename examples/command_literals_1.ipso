@@ -1,0 +1,11 @@
+cmd1 : Cmd
+cmd1 = `echo "hello world!"`
+
+cmd2 : Cmd
+cmd2 = `ls -laR`
+
+cmd3 : Cmd
+cmd3 = `echo \``
+
+main : IO ()
+main = run cmd1

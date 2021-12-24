@@ -41,6 +41,7 @@ pub enum Type {
     Var(Kind, usize),
     App(Kind, Rc<Type>, Rc<Type>),
     Meta(Kind, usize),
+    Cmd,
 }
 
 pub struct CommonKinds {
@@ -94,6 +95,7 @@ impl Type {
             }
             Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
+            Type::Cmd => r#type::Type::Cmd,
         }
     }
 
@@ -105,6 +107,7 @@ impl Type {
             Type::String => Kind::Type,
             Type::Bytes => Kind::Type,
             Type::Unit => Kind::Type,
+            Type::Cmd => Kind::Type,
             Type::RowNil => Kind::Row,
             Type::RowCons(_, _, _) => Kind::Row,
             Type::Constraints(_) => Kind::Constraint,
@@ -245,6 +248,7 @@ impl Type {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst_metas(f)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => f(k, *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -272,6 +276,7 @@ impl Type {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst(f)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -312,6 +317,7 @@ impl Type {
             Type::HasField(a, b) => Type::mk_hasfield(a.clone(), b.instantiate_many(tys)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -468,6 +474,7 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(_, n) => Step::Yield(*n),
+                Type::Cmd => Step::Skip,
             }
         }
 
@@ -734,6 +741,7 @@ pub enum Builtin {
     SplitString,
     FoldlString,
     SnocArray,
+    Run,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -778,6 +786,8 @@ pub enum Expr {
     Embed(Rc<Expr>, Rc<Expr>),
     Case(Rc<Expr>, Vec<Branch>),
     Unit,
+
+    Cmd(Vec<Rc<str>>),
 }
 
 impl Expr {
@@ -944,6 +954,7 @@ impl Expr {
                         .collect(),
                 ),
                 Expr::Unit => Expr::Unit,
+                Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
             }
         }
 
@@ -1051,6 +1062,7 @@ impl Expr {
             ),
 
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1152,6 +1164,8 @@ impl Expr {
             }
 
             Expr::Unit => Ok(()),
+
+            Expr::Cmd(_) => Ok(()),
         }
     }
 
@@ -1229,6 +1243,7 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1354,6 +1369,7 @@ impl<'a> Iterator for IterEVars<'a> {
                     xs
                 }),
                 Expr::Unit => Step::Skip,
+                Expr::Cmd(_) => Step::Skip,
             }
         }
 

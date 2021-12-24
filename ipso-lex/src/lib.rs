@@ -3,7 +3,7 @@ mod test;
 
 pub mod token;
 
-use std::{rc::Rc, str::Chars};
+use std::{fmt::Write, rc::Rc, str::Chars};
 use token::Token;
 
 enum Mode {
@@ -11,6 +11,7 @@ enum Mode {
     Char,
     Ident,
     Normal,
+    Cmd,
 }
 
 pub struct Lexer<'input> {
@@ -333,6 +334,16 @@ impl<'input> Iterator for Lexer<'input> {
                             column,
                         })
                     }
+                    '`' => {
+                        self.consume();
+                        self.mode.push(Mode::Cmd);
+
+                        Some(Token {
+                            data: token::Data::Backtick,
+                            pos,
+                            column,
+                        })
+                    }
                     ' ' => {
                         self.consume();
                         self.next()
@@ -577,6 +588,110 @@ impl<'input> Iterator for Lexer<'input> {
                         })
                     }
                 },
+                Mode::Cmd => {
+                    // Spaces are ignored in commands
+                    while let Some(c) = self.current {
+                        if c == ' ' {
+                            self.consume();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    let pos = self.pos;
+                    let column = self.column;
+
+                    match c {
+                        '`' => {
+                            self.consume();
+                            self.mode.pop().unwrap();
+                            Some(Token {
+                                data: token::Data::Backtick,
+                                pos,
+                                column,
+                            })
+                        }
+                        '"' => {
+                            self.consume();
+                            self.mode.push(Mode::String);
+
+                            Some(Token {
+                                data: token::Data::DoubleQuote,
+                                pos,
+                                column,
+                            })
+                        }
+                        _ => {
+                            let mut textual_length = 0;
+                            let mut value = String::new();
+
+                            while let Some(c) = self.current {
+                                match c {
+                                    '`' => {
+                                        break;
+                                    }
+                                    ' ' => {
+                                        break;
+                                    }
+                                    '"' => {
+                                        break;
+                                    }
+                                    '\\' => {
+                                        self.consume();
+                                        textual_length += 1;
+
+                                        match self.current {
+                                            Some('"') => {
+                                                self.consume();
+                                                value.write_char('"').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some('`') => {
+                                                self.consume();
+                                                value.write_char('`').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some('\\') => {
+                                                self.consume();
+                                                value.write_char('\\').unwrap();
+                                                textual_length += 1;
+                                            }
+                                            Some(c) => {
+                                                return Some(Token {
+                                                    data: token::Data::Unexpected(c),
+                                                    pos: self.pos,
+                                                    column: self.column,
+                                                })
+                                            }
+                                            None => {
+                                                return Some(Token {
+                                                    data: token::Data::Unexpected('\\'),
+                                                    pos: self.pos,
+                                                    column: self.column,
+                                                })
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        self.consume();
+                                        value.write_char(c).unwrap();
+                                        textual_length += 1;
+                                    }
+                                }
+                            }
+
+                            if textual_length > 0 {
+                                Some(Token {
+                                    data: token::Data::Cmd(Rc::from(value)),
+                                    pos,
+                                    column,
+                                })
+                            } else {
+                                self.next()
+                            }
+                        }
+                    }
+                }
             },
         }
     }

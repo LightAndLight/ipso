@@ -25,6 +25,7 @@ pub enum Type<A> {
     HasField(Rc<str>, Rc<Type<A>>),
     Unit,
     Meta(usize),
+    Cmd,
 }
 
 pub struct RowParts<'a, A> {
@@ -164,6 +165,7 @@ impl<A> Type<A> {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.map(f)),
             Type::Unit => Type::Unit,
             Type::Meta(n) => Type::Meta(*n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -191,6 +193,7 @@ impl<A> Type<A> {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst(f)),
             Type::Unit => Type::Unit,
             Type::Meta(n) => Type::Meta(*n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -493,6 +496,7 @@ impl<A> Type<A> {
                     _ => {}
                 }
             }
+            Type::Cmd => s.push_str("Cmd"),
         }
         s
     }
@@ -563,6 +567,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(n) => Step::Yield(*n),
+                Type::Cmd => Step::Skip,
             }
         }
 
@@ -639,6 +644,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(_) => Step::Skip,
+                Type::Cmd => Step::Skip,
             }
         }
 

@@ -235,7 +235,8 @@ pub fn solve_constraint(
                 | core::Type::Record(_)
                 | core::Type::Variant(_)
                 | core::Type::IO(_)
-                | core::Type::Unit => panic!("impossible"),
+                | core::Type::Unit
+                | core::Type::Cmd => panic!("impossible"),
             }?;
             Ok(new_evidence)
         }
