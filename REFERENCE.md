@@ -19,6 +19,7 @@
   - [Pattern Matching](#pattern-matching)
   - [Let Bindings](#let-bindings)
   - [Computation Expressions](#computation-expressions)
+  - [Command Literals](#command-literals)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
     - [Integers](#integers)
@@ -244,7 +245,7 @@ IO ()
 IO String
 ```
 
-## Command Syntax
+## Command Literals
 
 ```ipso-repl
 > :kind Cmd
