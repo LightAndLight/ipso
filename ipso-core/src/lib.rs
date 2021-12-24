@@ -817,6 +817,13 @@ impl Expr {
         }
     }
 
+    pub fn mk_let(value: Expr, rest: Expr) -> Expr {
+        Expr::Let {
+            value: Rc::new(value),
+            rest: Rc::new(rest),
+        }
+    }
+
     pub fn mk_ifthenelse(x: Expr, y: Expr, z: Expr) -> Expr {
         Expr::IfThenElse(Rc::new(x), Rc::new(y), Rc::new(z))
     }

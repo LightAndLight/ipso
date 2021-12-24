@@ -14,6 +14,7 @@ use std::rc::Rc;
 ```text
 comp_line ::=
   'bind' ident '<-' expr
+  'let' ident '=' expr
   'return' expr
   expr
 ```
@@ -33,6 +34,20 @@ pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
                     indent!(parser, Relation::Gt, expr(parser))
                 )
                 .map(|value| CompLine::Bind(name, value))
+            })
+        },
+        // 'let' ident '=' expr
+        {
+            keep_right!(
+                parser.keyword(&Keyword::Let),
+                indent!(parser, Relation::Gt, parser.ident())
+            )
+            .and_then(|name| {
+                keep_right!(
+                    indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
+                    indent!(parser, Relation::Gt, expr(parser))
+                )
+                .map(|value| CompLine::Let(name, value))
             })
         },
         expr(parser).map(CompLine::Expr)
