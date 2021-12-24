@@ -262,6 +262,15 @@ Cmd
 Cmd -> IO () 
 ```
 
+```ipso-repl
+> run ``
+```
+
+```ipso-repl
+> run `echo "hello!"`
+hello!
+```
+
 ## Datatypes
 
 ### Booleans
