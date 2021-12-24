@@ -7,7 +7,7 @@ use crate::{
     map0, map2, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
-use ipso_syntax::{Branch, CompLine, Expr, Keyword, Spanned, StringPart};
+use ipso_syntax::{Binop, Branch, CompLine, Expr, Keyword, Spanned, StringPart};
 use std::rc::Rc;
 
 /**
@@ -431,6 +431,73 @@ pub fn expr_app(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
 
 /**
 ```text
+binop ::=
+  '||'
+  '&&'
+```
+*/
+pub fn binop(parser: &mut Parser) -> ParseResult<Spanned<Binop>> {
+    todo!()
+}
+
+/**
+```text
+expr_op ::=
+  expr_app (binop expr_app)*
+```
+*/
+pub fn expr_op(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
+    expr_app(parser).and_then(|first| {
+        many!(
+            parser,
+            binop(parser).and_then(|op| expr_app(parser).map(|expr| (op, expr)))
+        )
+        .and_then(|mut rest| {
+            rest.reverse();
+
+            let mut values: Vec<Spanned<Expr>> = {
+                let mut values = Vec::with_capacity(rest.len() + 1);
+                values.push(first);
+                values
+            };
+            let mut operators: Vec<Spanned<Binop>> = Vec::with_capacity(rest.len());
+            let mut current_pair: Option<(Spanned<Binop>, Spanned<Expr>)> = rest.pop();
+
+            loop {
+                match current_pair {
+                    None => match operators.pop() {
+                        None => {
+                            // When all operators have been exhausted, there should be a single
+                            // expression left: the fully-associated tree.
+                            debug_assert!(values.len() == 1);
+
+                            todo!("return result expression")
+                        }
+                        Some(prev_binop) => {
+                            // The operator on top of the stack must eventually be applied to 2 values.
+                            debug_assert!(values.len() >= 2);
+
+                            let rhs = values.pop().unwrap();
+                            current_pair = Some((prev_binop, rhs));
+                        }
+                    },
+                    Some((binop, rhs)) => match operators.last() {
+                        None => {
+                            values.push(rhs);
+                            operators.push(binop);
+                            current_pair = rest.pop();
+                        }
+                        Some(prev_binop) => todo!(),
+                    },
+                }
+            }
+            todo!()
+        })
+    })
+}
+
+/**
+```text
 expr_lam ::=
   '\' pattern '->' expr
 ```
@@ -512,7 +579,7 @@ expr ::=
   expr_ifthenelse
   expr_let
   expr_comp
-  expr_app
+  expr_op
 ```
 */
 pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
@@ -523,6 +590,6 @@ pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
         expr_ifthenelse(parser),
         expr_let(parser),
         expr_comp(parser),
-        expr_app(parser)
+        expr_op(parser)
     )
 }
