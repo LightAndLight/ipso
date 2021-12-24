@@ -247,6 +247,27 @@ pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
     }
 }
 
+/**
+```text
+expr_cmd ::=
+  '`' cmd_part* '`'
+```
+
+```text
+cmd_part ::=
+  cmd_char*
+  '"' string_char* '"'
+```
+
+```text
+cmd_char ::=
+  (ASCII characters excluding '\', '`', '"', '$')
+  '\' '\'
+  '\' '`'
+  '\' '"'
+  '\' '$'
+```
+*/
 pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
     between!(
         parser.token(&token::Data::Backtick),
