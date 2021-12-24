@@ -80,6 +80,9 @@ fn desugar_module_accessors_comp_line(module_names: &Rope<String>, line: &mut sy
         syntax::CompLine::Bind(_, value) => {
             desugar_module_accessors_expr(module_names, &mut value.item);
         }
+        syntax::CompLine::Let(_, value) => {
+            desugar_module_accessors_expr(module_names, &mut value.item);
+        }
     }
 }
 

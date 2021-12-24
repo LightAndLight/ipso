@@ -205,6 +205,13 @@ pub struct SolveConstraintContext {
 }
 
 #[derive(PartialEq, Eq, Debug)]
+pub enum CompExprEnd {
+    None,
+    Let,
+    Bind,
+}
+
+#[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     DuplicateArgument {
         source: Source,
@@ -272,11 +279,8 @@ pub enum TypeError {
         source: Source,
         pos: usize,
     },
-    EmptyCompExpr {
-        source: Source,
-        pos: usize,
-    },
-    CompExprEndsWithBind {
+    CompExprEndsWith {
+        end: CompExprEnd,
         source: Source,
         pos: usize,
     },
@@ -298,8 +302,7 @@ impl TypeError {
             TypeError::NotAMember { source, .. } => source.clone(),
             TypeError::CannotDeduce { source, .. } => source.clone(),
             TypeError::ShadowedModuleName { source, .. } => source.clone(),
-            TypeError::EmptyCompExpr { source, .. } => source.clone(),
-            TypeError::CompExprEndsWithBind { source, .. } => source.clone(),
+            TypeError::CompExprEndsWith { source, .. } => source.clone(),
         }
     }
 
@@ -321,8 +324,7 @@ impl TypeError {
                 Some(context) => context.pos,
             },
             TypeError::ShadowedModuleName { pos, .. } => *pos,
-            TypeError::EmptyCompExpr { pos, .. } => *pos,
-            TypeError::CompExprEndsWithBind { pos, .. } => *pos,
+            TypeError::CompExprEndsWith { pos, .. } => *pos,
         }
     }
 
@@ -382,10 +384,11 @@ impl TypeError {
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
             TypeError::ShadowedModuleName { .. } => String::from("shadowed module name"),
-            TypeError::EmptyCompExpr { .. } => String::from("empty computation expression"),
-            TypeError::CompExprEndsWithBind { .. } => {
-                String::from("computation expression ends with a bind")
-            }
+            TypeError::CompExprEndsWith { end, .. } => String::from(match end {
+                CompExprEnd::None => "empty computation expression",
+                CompExprEnd::Bind => "computation expression ends with a bind",
+                CompExprEnd::Let => "computation expression ends with a let",
+            }),
         }
     }
 
@@ -433,8 +436,7 @@ impl TypeError {
             TypeError::NotAMember { .. } => None,
             TypeError::CannotDeduce { .. } => None,
             TypeError::ShadowedModuleName { .. } => None,
-            TypeError::EmptyCompExpr { .. } => None,
-            TypeError::CompExprEndsWithBind { .. } => None,
+            TypeError::CompExprEndsWith { .. } => None,
         }
     }
 
@@ -2754,22 +2756,19 @@ impl<'modules> Typechecker<'modules> {
                     ))
                 }
                 syntax::Expr::Comp(lines) => {
-                    if lines.is_empty() {
-                        return Err(TypeError::EmptyCompExpr {
-                            source: self.source(),
-                            pos: self.current_position(),
-                        });
-                    }
-
                     enum CheckedCompLine {
                         Expr(core::Expr),
                         Bind {
                             vars_bound: usize,
                             value: core::Expr,
                         },
+                        Let {
+                            vars_bound: usize,
+                            value: core::Expr,
+                        },
                     }
 
-                    let mut ret_ty = None;
+                    let mut ret_ty = Err(CompExprEnd::None);
                     let mut checked_lines: Vec<CheckedCompLine> = lines
                         .iter()
                         .map(|line| match line {
@@ -2783,7 +2782,7 @@ impl<'modules> Typechecker<'modules> {
                                     ),
                                 )?;
 
-                                ret_ty = Some(ret_ty_var);
+                                ret_ty = Ok(ret_ty_var);
                                 Ok(CheckedCompLine::Expr(value))
                             }
                             syntax::CompLine::Bind(name, value) => {
@@ -2802,8 +2801,19 @@ impl<'modules> Typechecker<'modules> {
                                 // can be references by subsequent lines.
                                 self.bound_vars.insert(&[(name.clone(), name_ty)]);
 
-                                ret_ty = None;
+                                ret_ty = Err(CompExprEnd::Bind);
                                 Ok(CheckedCompLine::Bind {
+                                    vars_bound: 1,
+                                    value,
+                                })
+                            }
+                            syntax::CompLine::Let(name, value) => {
+                                let (value, value_ty) = self.infer_expr(value)?;
+
+                                self.bound_vars.insert(&[(name.clone(), value_ty)]);
+
+                                ret_ty = Err(CompExprEnd::Let);
+                                Ok(CheckedCompLine::Let {
                                     vars_bound: 1,
                                     value,
                                 })
@@ -2812,25 +2822,28 @@ impl<'modules> Typechecker<'modules> {
                         .collect::<Result<Vec<_>, _>>()?;
 
                     match ret_ty {
-                        None => {
+                        Err(end) => {
                             debug_assert!(matches!(
                                 checked_lines.last().unwrap(),
-                                CheckedCompLine::Bind { .. }
+                                CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. }
                             ));
 
-                            Err(TypeError::CompExprEndsWithBind {
+                            Err(TypeError::CompExprEndsWith {
+                                end,
                                 source: self.source(),
                                 pos: self.current_position(),
                             })
                         }
-                        Some(ret_ty) => {
+                        Ok(ret_ty) => {
                             debug_assert!(!matches!(
                                 checked_lines.last().unwrap(),
-                                CheckedCompLine::Bind { .. }
+                                CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. }
                             ));
 
                             let mut desugared: core::Expr = match checked_lines.pop().unwrap() {
-                                CheckedCompLine::Bind { .. } => unreachable!(),
+                                CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. } => {
+                                    unreachable!()
+                                }
                                 CheckedCompLine::Expr(value) => value,
                             };
 
@@ -2858,6 +2871,12 @@ impl<'modules> Typechecker<'modules> {
                                             ),
                                             core::Expr::mk_lam(true, desugared),
                                         );
+                                    }
+                                    CheckedCompLine::Let { vars_bound, value } => {
+                                        self.bound_vars.delete(vars_bound);
+
+                                        // Desugar[comp { let name = value; rest }] -> let x = value in Desugar[rest]
+                                        desugared = core::Expr::mk_let(value, desugared);
                                     }
                                 }
                             }
