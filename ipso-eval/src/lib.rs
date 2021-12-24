@@ -1101,29 +1101,35 @@ where {
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
                             let cmd = env[0].unpack_cmd();
-                            let status = process::Command::new(cmd[0].as_ref())
-                                .args(cmd[1..].iter().map(|arg| arg.as_ref()).collect::<Vec<_>>())
-                                .status()
-                                .unwrap_or_else(|err| {
-                                    println!("failed to start process {:?}: {}", cmd[0], err);
-                                    process::exit(1);
-                                });
+                            if cmd.is_empty() {
+                                Value::Unit
+                            } else {
+                                let status = process::Command::new(cmd[0].as_ref())
+                                    .args(
+                                        cmd[1..].iter().map(|arg| arg.as_ref()).collect::<Vec<_>>(),
+                                    )
+                                    .status()
+                                    .unwrap_or_else(|err| {
+                                        println!("failed to start process {:?}: {}", cmd[0], err);
+                                        process::exit(1);
+                                    });
 
-                            match status.code() {
-                                Some(code) => {
-                                    if code == 0 {
-                                        Value::Unit
-                                    } else {
-                                        println!(
-                                            "process {:?} exited with code {:?}",
-                                            cmd[0], code
-                                        );
+                                match status.code() {
+                                    Some(code) => {
+                                        if code == 0 {
+                                            Value::Unit
+                                        } else {
+                                            println!(
+                                                "process {:?} exited with code {:?}",
+                                                cmd[0], code
+                                            );
+                                            process::exit(1);
+                                        }
+                                    }
+                                    None => {
+                                        println!("process {:?} terminated unexpectedly", cmd[0]);
                                         process::exit(1);
                                     }
-                                }
-                                None => {
-                                    println!("process {:?} terminated unexpectedly", cmd[0]);
-                                    process::exit(1);
                                 }
                             }
                         }
