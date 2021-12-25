@@ -10,21 +10,17 @@ use std::cmp::Ordering;
 struct State<'a> {
     values: Vec<Spanned<Expr>>,
     operators: Vec<Binop>,
-    rest: &'a mut dyn ExactSizeIterator<Item = (Binop, Spanned<Expr>)>,
+    rest: &'a mut dyn Iterator<Item = (Binop, Spanned<Expr>)>,
     current_pair: Option<(Binop, Spanned<Expr>)>,
 }
 
 impl<'a> State<'a> {
     fn new(
         first: Spanned<Expr>,
-        rest: &'a mut dyn ExactSizeIterator<Item = (Binop, Spanned<Expr>)>,
+        rest: &'a mut dyn Iterator<Item = (Binop, Spanned<Expr>)>,
     ) -> Self {
-        let values = {
-            let mut values = Vec::with_capacity(rest.len() + 1);
-            values.push(first);
-            values
-        };
-        let operators = Vec::with_capacity(rest.len());
+        let values = vec![first];
+        let operators = Vec::with_capacity(1);
         let current_pair: Option<(Binop, Spanned<Expr>)> = rest.next();
 
         State {
