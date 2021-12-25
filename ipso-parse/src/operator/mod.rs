@@ -1,3 +1,5 @@
+//! Operator precedence parsing
+
 #[cfg(test)]
 mod test;
 
@@ -64,6 +66,7 @@ impl<'a> State<'a> {
     }
 }
 
+/// Parse a sequence of binary operators into a correctly associated expression tree.
 pub fn operator(
     first: Spanned<Expr>,
     rest: Vec<(Binop, Spanned<Expr>)>,
