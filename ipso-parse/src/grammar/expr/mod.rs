@@ -209,7 +209,7 @@ pub fn expr_record(parser: &mut Parser) -> ParseResult<Expr> {
 /**
 ```text
 expr_embed ::=
-  '<' ctor '|' expr '>'
+  '<' ctor '|' '..' expr_atom '>'
 ```
 */
 pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
@@ -222,7 +222,10 @@ pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
                 Relation::Gte,
                 parser.token(&token::Data::Pipe)
             )
-            .and_then(|_| expr(parser).map(|rest| Expr::mk_embed(ctor, rest))))
+            .and_then(|_| keep_right!(
+                indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
+                expr_atom(parser).map(|rest| Expr::mk_embed(ctor, rest))
+            )))
         )
     })
 }
@@ -432,12 +435,72 @@ pub fn expr_app(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
 /**
 ```text
 binop ::=
+  '+'
+  '*'
+  '-'
+  '/'
   '||'
   '&&'
+  '=='
+  '!='
+  '<'
+  '<='
+  '>'
+  '>='
 ```
 */
 pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
-    todo!()
+    choices!(
+        parser,
+        map0!(Binop::Add, parser.token(&token::Data::Plus)),
+        map0!(Binop::Multiply, parser.token(&token::Data::Asterisk)),
+        map0!(Binop::Subtract, parser.token(&token::Data::Hyphen)),
+        map0!(Binop::Divide, parser.token(&token::Data::Slash)),
+        map0!(
+            Binop::Or,
+            keep_right!(
+                parser.token(&token::Data::Pipe),
+                parser.token(&token::Data::Pipe)
+            )
+        ),
+        map0!(
+            Binop::And,
+            keep_right!(
+                parser.token(&token::Data::Ampersand),
+                parser.token(&token::Data::Ampersand)
+            )
+        ),
+        map0!(
+            Binop::Eq,
+            keep_right!(
+                parser.token(&token::Data::Equals),
+                parser.token(&token::Data::Equals)
+            )
+        ),
+        map0!(
+            Binop::Neq,
+            keep_right!(
+                parser.token(&token::Data::Bang),
+                parser.token(&token::Data::Equals)
+            )
+        ),
+        map0!(Binop::Lt, parser.token(&token::Data::LAngle)),
+        map0!(
+            Binop::Lte,
+            keep_right!(
+                parser.token(&token::Data::LAngle),
+                parser.token(&token::Data::Equals)
+            )
+        ),
+        map0!(Binop::Gt, parser.token(&token::Data::RAngle)),
+        map0!(
+            Binop::Gte,
+            keep_right!(
+                parser.token(&token::Data::RAngle),
+                parser.token(&token::Data::Equals)
+            )
+        )
+    )
 }
 
 /**
@@ -450,7 +513,11 @@ pub fn expr_op(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_app(parser).and_then(|first| {
         many!(
             parser,
-            binop(parser).and_then(|op| expr_app(parser).map(|expr| (op, expr)))
+            indent!(
+                parser,
+                Relation::Gt,
+                binop(parser).and_then(|op| expr_app(parser).map(|expr| (op, expr)))
+            )
         )
         .and_then(|rest| operator(first, rest))
     })

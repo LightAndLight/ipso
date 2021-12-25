@@ -113,7 +113,7 @@ pub enum Assoc {
     Right,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 pub enum Binop {
     Add,
     Multiply,

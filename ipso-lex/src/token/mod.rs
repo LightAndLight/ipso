@@ -62,6 +62,8 @@ pub enum Name {
     Eof,
     Backtick,
     Cmd,
+    Bang,
+    Ampersand,
 }
 
 impl Arbitrary for Name {
@@ -106,6 +108,8 @@ impl Arbitrary for Name {
             Name::Dedent,
             Name::Backtick,
             Name::Cmd,
+            Name::Bang,
+            Name::Ampersand,
         ];
         g.choose(vals).unwrap().clone()
     }
@@ -113,7 +117,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        39 + Keyword::num_variants()
+        42 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -175,6 +179,8 @@ impl Name {
             54 => Some(Self::Eof),
             55 => Some(Self::Backtick),
             56 => Some(Self::Cmd),
+            57 => Some(Self::Bang),
+            58 => Some(Self::Ampersand),
             _ => None,
         }
     }
@@ -238,6 +244,8 @@ impl Name {
             Self::Eof => 54,
             Self::Backtick => 55,
             Self::Cmd => 56,
+            Self::Bang => 57,
+            Self::Ampersand => 58,
         }
     }
 
@@ -293,6 +301,8 @@ impl Name {
             Name::Eof => String::from("end of input"),
             Name::Backtick => String::from("'`'"),
             Name::Cmd => String::from("command fragment"),
+            Name::Bang => String::from('!'),
+            Name::Ampersand => String::from('&'),
         }
     }
 }
@@ -349,6 +359,9 @@ pub enum Data {
 
     Backtick,
     Cmd(Rc<str>),
+
+    Bang,
+    Ampersand,
 }
 
 impl Data {
@@ -391,6 +404,8 @@ impl Data {
             Data::RAngle => 1,
             Data::Backtick => 1,
             Data::Cmd(value) => value.len(),
+            Data::Bang => 1,
+            Data::Ampersand => 1,
 
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
@@ -435,6 +450,8 @@ impl Data {
             Data::Slash => Name::Slash,
             Data::Backtick => Name::Backtick,
             Data::Cmd(_) => Name::Cmd,
+            Data::Bang => Name::Bang,
+            Data::Ampersand => Name::Ampersand,
         }
     }
 }

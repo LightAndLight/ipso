@@ -520,6 +520,22 @@ impl<'input> Iterator for Lexer<'input> {
                             column,
                         })
                     }
+                    '!' => {
+                        self.consume();
+                        Some(Token {
+                            data: token::Data::Bang,
+                            pos,
+                            column,
+                        })
+                    }
+                    '&' => {
+                        self.consume();
+                        Some(Token {
+                            data: token::Data::Ampersand,
+                            pos,
+                            column,
+                        })
+                    }
                     '\\' => {
                         self.consume();
                         Some(Token {
