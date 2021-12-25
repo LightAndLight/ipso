@@ -1,5 +1,6 @@
 pub mod grammar;
 pub mod indentation;
+pub mod operator;
 mod test;
 
 use fixedbitset::FixedBitSet;

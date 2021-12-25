@@ -7,7 +7,7 @@ pub use r#type::Type;
 
 use lazy_static::lazy_static;
 use quickcheck::Arbitrary;
-use std::{hash::Hash, rc::Rc};
+use std::{cmp::Ordering, hash::Hash, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Spanned<A> {
@@ -107,6 +107,12 @@ pub fn is_keyword(val: &str) -> bool {
     KEYWORDS.contains(&val)
 }
 
+pub enum Assoc {
+    None,
+    Left,
+    Right,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Binop {
     Add,
@@ -125,6 +131,51 @@ pub enum Binop {
     Gte,
     Lt,
     Lte,
+}
+
+impl Binop {
+    pub fn assoc(&self) -> Assoc {
+        match self {
+            Binop::Add => Assoc::Left,
+            Binop::Multiply => Assoc::Left,
+            Binop::Subtract => Assoc::Left,
+            Binop::Divide => Assoc::Left,
+            Binop::Append => Assoc::Left,
+            Binop::Or => Assoc::Right,
+            Binop::And => Assoc::Right,
+            Binop::Eq => Assoc::None,
+            Binop::Neq => Assoc::None,
+            Binop::Gt => Assoc::None,
+            Binop::Gte => Assoc::None,
+            Binop::Lt => Assoc::None,
+            Binop::Lte => Assoc::None,
+        }
+    }
+
+    fn precedence(&self) -> u16 {
+        match self {
+            Binop::Multiply => 7,
+            Binop::Divide => 7,
+
+            Binop::Add => 6,
+            Binop::Subtract => 6,
+            Binop::Append => 6,
+
+            Binop::Eq => 5,
+            Binop::Neq => 5,
+            Binop::Gt => 5,
+            Binop::Gte => 5,
+            Binop::Lt => 5,
+            Binop::Lte => 5,
+
+            Binop::Or => 4,
+            Binop::And => 4,
+        }
+    }
+
+    pub fn compare_precedence(&self, other: &Binop) -> Ordering {
+        self.precedence().cmp(&other.precedence())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -326,6 +377,13 @@ impl Expr {
         Spanned {
             pos: a.pos,
             item: Expr::App(Rc::new(a), Rc::new(b)),
+        }
+    }
+
+    pub fn mk_binop(op: Binop, a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
+        Spanned {
+            pos: a.pos,
+            item: Expr::Binop(op, Rc::new(a), Rc::new(b)),
         }
     }
 
