@@ -1,0 +1,2 @@
+main : IO ()
+main = print (showInt (2 * 3 + 4 - 4 / 2))
