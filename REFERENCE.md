@@ -531,7 +531,7 @@ forall r. < None | r >
 
 ```ipso-repl
 > :t \x -> < A | x >
-< r > -> < A : a | r >
+< r > -> < A : a | ..r >
 ```
 
 ### IO
