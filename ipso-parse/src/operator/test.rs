@@ -34,9 +34,31 @@ fn all_left_associative() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Add, b), (Binop::Add, c), (Binop::Add, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Add,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Add,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Add,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -71,9 +93,31 @@ fn all_right_associative() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Or, b), (Binop::Or, c), (Binop::Or, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Or,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 7,
+                    item: Binop::Or,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 12,
+                    item: Binop::Or,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -86,11 +130,11 @@ fn precedence_higher_lower() {
         item: Expr::Int(1),
     };
     let b = Spanned {
-        pos: 5,
+        pos: 4,
         item: Expr::Int(2),
     };
     let c = Spanned {
-        pos: 10,
+        pos: 8,
         item: Expr::Int(3),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
@@ -100,9 +144,24 @@ fn precedence_higher_lower() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Multiply, b), (Binop::Add, c)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Add,
+                },
+                c,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -137,9 +196,31 @@ fn precedence_higher_lower_lower() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Eq, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Add,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Eq,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -174,9 +255,31 @@ fn precedence_higher_lower_equal() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Add, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Add,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Add,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -207,9 +310,31 @@ fn precedence_higher_lower_higher() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Multiply, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Add,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Multiply,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -222,11 +347,11 @@ fn precedence_lower_higher() {
         item: Expr::Int(1),
     };
     let b = Spanned {
-        pos: 5,
+        pos: 4,
         item: Expr::Int(2),
     };
     let c = Spanned {
-        pos: 10,
+        pos: 8,
         item: Expr::Int(3),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
@@ -236,9 +361,24 @@ fn precedence_lower_higher() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Add, b), (Binop::Multiply, c)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Add,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Multiply,
+                },
+                c,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -273,9 +413,31 @@ fn precedence_lower_higher_lower() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Add, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Add,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Multiply,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Add,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -310,9 +472,74 @@ fn precedence_lower_higher_equal() {
     ));
     let actual = operator(
         a,
-        &mut vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Multiply, d)]
-            .into_iter()
-            .map(ParseResult::pure),
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Add,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 6,
+                    item: Binop::Multiply,
+                },
+                c,
+            ),
+            (
+                Spanned {
+                    pos: 10,
+                    item: Binop::Multiply,
+                },
+                d,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
+    );
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn ambiguous() {
+    // 1 == 2 == 3
+    let a = Spanned {
+        pos: 0,
+        item: Expr::Int(1),
+    };
+    let b = Spanned {
+        pos: 5,
+        item: Expr::Int(2),
+    };
+    let c = Spanned {
+        pos: 10,
+        item: Expr::Int(3),
+    };
+    let expected = ParseResult::ambiguous_use_of(&Spanned {
+        pos: 7,
+        item: Binop::Eq,
+    });
+    let actual = operator(
+        a,
+        &mut vec![
+            (
+                Spanned {
+                    pos: 2,
+                    item: Binop::Eq,
+                },
+                b,
+            ),
+            (
+                Spanned {
+                    pos: 7,
+                    item: Binop::Eq,
+                },
+                c,
+            ),
+        ]
+        .into_iter()
+        .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }

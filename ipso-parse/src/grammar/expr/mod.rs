@@ -491,13 +491,14 @@ struct Operators<'a, 'input> {
 }
 
 impl<'a, 'input> Iterator for Operators<'a, 'input> {
-    type Item = ParseResult<(Binop, Spanned<Expr>)>;
+    type Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = indent!(
             self.parser,
             Relation::Gt,
-            binop(self.parser).and_then(|op| expr_app(self.parser).map(|expr| (op, expr)))
+            spanned!(self.parser, binop(self.parser))
+                .and_then(|op| expr_app(self.parser).map(|expr| (op, expr)))
         );
         match result.result {
             Err(_) => {

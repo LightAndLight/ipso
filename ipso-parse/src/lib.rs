@@ -10,7 +10,7 @@ use ipso_lex::{
     token::{self, Relation, Token},
     Lexer,
 };
-use ipso_syntax::{self as syntax, Binop, Keyword, Module};
+use ipso_syntax::{self as syntax, Binop, Keyword, Module, Spanned};
 use std::{
     collections::BTreeSet,
     fs::File,
@@ -107,7 +107,7 @@ impl ParseError {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseErrorName {
     Unexpected,
-    AmbiguousUseOf(Binop),
+    AmbiguousUseOf(Spanned<Binop>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -151,10 +151,10 @@ impl<A> ParseResult<A> {
         }
     }
 
-    fn ambiguous_use_of(operator: &Binop) -> Self {
+    fn ambiguous_use_of(operator: &Spanned<Binop>) -> Self {
         ParseResult {
             consumed: false,
-            result: Err(ParseErrorName::AmbiguousUseOf(*operator)),
+            result: Err(ParseErrorName::AmbiguousUseOf(operator.clone())),
         }
     }
 
@@ -519,8 +519,8 @@ impl<'input> Parser<'input> {
                 },
                 ParseErrorName::AmbiguousUseOf(operator) => ParseError::AmbiguousUseOf {
                     source: self.source,
-                    pos: self.pos,
-                    operator,
+                    pos: operator.pos,
+                    operator: operator.item,
                 },
             }),
         }

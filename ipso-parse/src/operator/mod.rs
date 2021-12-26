@@ -10,14 +10,14 @@ use std::cmp::Ordering;
 struct State<'a> {
     values: Vec<Spanned<Expr>>,
     operators: Vec<Binop>,
-    rest: &'a mut dyn Iterator<Item = ParseResult<(Binop, Spanned<Expr>)>>,
-    current_pair: Option<(Binop, Spanned<Expr>)>,
+    rest: &'a mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
+    current_pair: Option<(Spanned<Binop>, Spanned<Expr>)>,
 }
 
 impl<'a> State<'a> {
     fn new(
         first: Spanned<Expr>,
-        rest: &'a mut dyn Iterator<Item = ParseResult<(Binop, Spanned<Expr>)>>,
+        rest: &'a mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
     ) -> ParseResult<Self> {
         let values = vec![first];
         let operators = Vec::with_capacity(1);
@@ -44,7 +44,7 @@ impl<'a> State<'a> {
             }
             Some((binop, rhs)) => {
                 self.values.push(rhs.clone());
-                self.operators.push(*binop);
+                self.operators.push(binop.item);
                 match self.rest.next() {
                     None => {
                         self.current_pair = None;
@@ -71,7 +71,7 @@ impl<'a> State<'a> {
         self.operators.last()
     }
 
-    fn peek_current(&self) -> Option<(&Binop, &Spanned<Expr>)> {
+    fn peek_current(&self) -> Option<(&Spanned<Binop>, &Spanned<Expr>)> {
         self.current_pair.as_ref().map(|(a, b)| (a, b))
     }
 }
@@ -79,11 +79,11 @@ impl<'a> State<'a> {
 /// Parse a sequence of binary operators into a correctly associated expression tree.
 pub fn operator(
     first: Spanned<Expr>,
-    rest: &mut dyn Iterator<Item = ParseResult<(Binop, Spanned<Expr>)>>,
+    rest: &mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
 ) -> ParseResult<Spanned<Expr>> {
     State::new(first, rest).and_then(|mut state| {
         let mut loop_result = ParseResult::pure(());
-        loop {
+        while loop_result.result.is_ok() {
             match state.peek_current() {
                 None => match state.peek_operator() {
                     None => {
@@ -97,11 +97,11 @@ pub fn operator(
                     None => {
                         loop_result = loop_result.and_then(|()| state.shift());
                     }
-                    Some(prev_binop) => match binop.compare_precedence(prev_binop) {
+                    Some(prev_binop) => match binop.item.compare_precedence(prev_binop) {
                         Ordering::Less => {
                             state.reduce();
                         }
-                        Ordering::Equal => match (binop.assoc(), prev_binop.assoc()) {
+                        Ordering::Equal => match (binop.item.assoc(), prev_binop.assoc()) {
                             (ipso_syntax::Assoc::Left, ipso_syntax::Assoc::Left) => {
                                 state.reduce();
                             }
@@ -121,8 +121,14 @@ pub fn operator(
             }
         }
 
-        debug_assert!(state.values.len() == 1);
-        debug_assert!(state.operators.is_empty());
-        loop_result.map(|()| state.values.pop().unwrap())
+        loop_result.map(|()| {
+            debug_assert!(
+                state.values.len() == 1,
+                "state.values contains more than one value: {:?}",
+                state.values
+            );
+            debug_assert!(state.operators.is_empty());
+            state.values.pop().unwrap()
+        })
     })
 }
