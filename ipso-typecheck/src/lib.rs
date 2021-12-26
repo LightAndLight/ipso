@@ -2564,7 +2564,7 @@ impl<'modules> Typechecker<'modules> {
                             let right_core = self.check_expr(right, &core::Type::Bool)?;
                             Ok((
                                 core::Expr::mk_binop(*op, left_core, right_core),
-                                core::Type::Int,
+                                core::Type::Bool,
                             ))
                         }
                         syntax::Binop::And => {
@@ -2572,7 +2572,7 @@ impl<'modules> Typechecker<'modules> {
                             let right_core = self.check_expr(right, &core::Type::Bool)?;
                             Ok((
                                 core::Expr::mk_binop(*op, left_core, right_core),
-                                core::Type::Int,
+                                core::Type::Bool,
                             ))
                         }
 
