@@ -23,7 +23,6 @@ pub fn pattern_record_fields(
     names: &mut Vec<Spanned<String>>,
 ) -> ParseResult<Option<Spanned<String>>> {
     choices!(
-        parser,
         // ident [',' pattern_record_fields]
         spanned!(parser, indent!(parser, Relation::Gte, parser.ident_owned())).and_then(|name| {
             names.push(name);
@@ -95,7 +94,6 @@ pattern ::=
 */
 pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
     choices!(
-        parser,
         spanned!(parser, parser.ident_owned()).map(Pattern::Name),
         pattern_record(parser),
         pattern_variant(parser),

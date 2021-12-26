@@ -21,7 +21,6 @@ comp_line ::=
 */
 pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
     choices!(
-        parser,
         // 'bind' ident '<-' expr
         {
             keep_right!(
@@ -89,7 +88,6 @@ string_part_expr ::=
 */
 pub fn string_part_expr(parser: &mut Parser) -> ParseResult<StringPart> {
     choices!(
-        parser,
         between!(
             indent!(
                 parser,
@@ -138,7 +136,6 @@ pub fn string(parser: &mut Parser) -> ParseResult<Vec<StringPart>> {
                 parser.token(&token::Data::DoubleQuote)
             ),
             many!(choices!(
-                parser,
                 string_part_expr(parser),
                 string_part_string(parser)
             ))
@@ -158,7 +155,6 @@ pub fn expr_record_fields(
     fields: &mut Vec<(String, Spanned<Expr>)>,
 ) -> ParseResult<Option<Spanned<Expr>>> {
     choices!(
-        parser,
         keep_left!(
             indent!(parser, Relation::Gte, parser.ident_owned()),
             indent!(parser, Relation::Gte, parser.token(&token::Data::Equals))
@@ -288,7 +284,6 @@ pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
         parser.token(&token::Data::Backtick),
         parser.token(&token::Data::Backtick),
         many!(choices!(
-            parser,
             cmd_part(parser),
             between!(
                 parser.token(&token::Data::DoubleQuote),
@@ -320,7 +315,6 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     spanned!(
         parser,
         choices!(
-            parser,
             parser.int().map(Expr::Int),
             parser.char().map(Expr::Char),
             parser.keyword(&Keyword::False).map(|_| Expr::False),
@@ -509,7 +503,6 @@ expr ::=
 */
 pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     choices!(
-        parser,
         expr_case(parser),
         expr_lam(parser),
         expr_ifthenelse(parser),

@@ -120,7 +120,6 @@ pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
                 |module| keep_right!(
                     indent!(parser, Relation::Gt, parser.keyword(&Keyword::Import)),
                     choices!(
-                        parser,
                         map0!(
                             Names::All,
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Asterisk))
@@ -300,7 +299,6 @@ pub fn declaration(parser: &mut Parser) -> ParseResult<Declaration> {
     keep_right!(
         many_!(parser.comment()),
         choices!(
-            parser,
             definition(parser),
             type_alias(parser),
             import(parser),

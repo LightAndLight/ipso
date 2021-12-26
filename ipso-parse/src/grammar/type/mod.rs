@@ -83,7 +83,6 @@ pub fn type_variant_ctors(
     ctors: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
 ) -> ParseResult<Option<Type<Rc<str>>>> {
     choices!(
-        parser,
         indent!(parser, Relation::Gte, parser.ident()).map(|x| Some(Type::Var(x))),
         indent!(parser, Relation::Gte, parser.ctor())
             .and_then(|ctor| map0!(
@@ -151,7 +150,6 @@ pub fn type_atom(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
         parser,
         Relation::Gt,
         choices!(
-            parser,
             map0!(
                 Type::Bool,
                 parser.token(&token::Data::Ident(Rc::from("Bool")))

@@ -380,37 +380,44 @@ macro_rules! many {
 }
 
 #[macro_export]
-macro_rules! sep_by {
-    ($self:expr, $x:expr, $sep:expr) => {{
-        use crate::many_with;
-        choices!(
-            $self,
-            $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),
-            ParseResult::pure(Vec::new())
-        )
-    }};
-}
-
-#[macro_export]
 macro_rules! choices {
-    ($self:expr) => {
-        ParseResult::unexpected(false)
-    };
-    ($self:expr, $x:expr $(, $y:expr)*) => {{
+    ($x:expr, $y:expr) => {{
         let first = $x;
         match first.result {
             None => {
                 if first.consumed {
                     ParseResult{ consumed: true, result: None }
                 } else {
-                    let mut rest = choices!($self $(, $y)*);
-                    rest.consumed = first.consumed || rest.consumed ;
-                    rest
+                    $y
                 }
             }
             Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
         }
-    }}
+    }};
+    ($x:expr, $y:expr $(, $ys:expr)*) => {{
+        let first = $x;
+        match first.result {
+            None => {
+                if first.consumed {
+                    ParseResult{ consumed: true, result: None }
+                } else {
+                    choices!($y $(, $ys)*)
+                }
+            }
+            Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! sep_by {
+    ($self:expr, $x:expr, $sep:expr) => {{
+        use crate::many_with;
+        choices!(
+            $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),
+            ParseResult::pure(Vec::new())
+        )
+    }};
 }
 
 #[macro_export]
