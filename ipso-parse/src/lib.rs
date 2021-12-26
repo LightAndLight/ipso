@@ -411,7 +411,7 @@ macro_rules! choices {
 
 #[macro_export]
 macro_rules! sep_by {
-    ($self:expr, $x:expr, $sep:expr) => {{
+    ($x:expr, $sep:expr) => {{
         use crate::many_with;
         choices!(
             $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),

@@ -235,7 +235,6 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
             indent!(parser, Relation::Eq, parser.token(&token::Data::LBracket)),
             indent!(parser, Relation::Gte, parser.token(&token::Data::RBracket)),
             sep_by!(
-                parser,
                 expr(parser),
                 indent!(parser, Relation::Gte, parser.token(&token::Data::Comma))
             )

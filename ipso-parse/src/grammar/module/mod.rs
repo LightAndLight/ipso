@@ -125,7 +125,6 @@ pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Asterisk))
                         ),
                         sep_by!(
-                            parser,
                             indent!(parser, Relation::Gt, parser.ident_owned()),
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Comma))
                         )
