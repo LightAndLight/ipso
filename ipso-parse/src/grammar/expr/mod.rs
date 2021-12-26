@@ -72,8 +72,7 @@ pub fn expr_comp(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                     Relation::Gt,
                     indent_scope!(
                         parser,
-                        many!(parser, indent!(parser, Relation::Eq, comp_line(parser)))
-                            .map(Expr::Comp)
+                        many!(indent!(parser, Relation::Eq, comp_line(parser))).map(Expr::Comp)
                     )
                 )
             )
@@ -138,10 +137,11 @@ pub fn string(parser: &mut Parser) -> ParseResult<Vec<StringPart>> {
                 Relation::Gte,
                 parser.token(&token::Data::DoubleQuote)
             ),
-            many!(
+            many!(choices!(
                 parser,
-                choices!(parser, string_part_expr(parser), string_part_string(parser))
-            )
+                string_part_expr(parser),
+                string_part_string(parser)
+            ))
         )
     })
 }
@@ -287,18 +287,15 @@ pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
     between!(
         parser.token(&token::Data::Backtick),
         parser.token(&token::Data::Backtick),
-        many!(
+        many!(choices!(
             parser,
-            choices!(
-                parser,
-                cmd_part(parser),
-                between!(
-                    parser.token(&token::Data::DoubleQuote),
-                    parser.token(&token::Data::DoubleQuote),
-                    parser.string().map(Rc::from)
-                )
+            cmd_part(parser),
+            between!(
+                parser.token(&token::Data::DoubleQuote),
+                parser.token(&token::Data::DoubleQuote),
+                parser.string().map(Rc::from)
             )
-        )
+        ))
     )
 }
 
@@ -357,13 +354,10 @@ expr_project ::=
 */
 pub fn expr_project(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_atom(parser).and_then(|val| {
-        many!(
-            parser,
-            keep_right!(
-                indent!(parser, Relation::Gt, parser.token(&token::Data::Dot)),
-                indent!(parser, Relation::Gt, parser.ident_owned())
-            )
-        )
+        many!(keep_right!(
+            indent!(parser, Relation::Gt, parser.token(&token::Data::Dot)),
+            indent!(parser, Relation::Gt, parser.ident_owned())
+        ))
         .map(|fields| {
             let mut expr = val;
             for field in fields {
@@ -408,7 +402,7 @@ pub fn expr_case(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                 indent!(
                     parser,
                     Relation::Gt,
-                    indent_scope!(parser, { many!(parser, case_branch(parser)) })
+                    indent_scope!(parser, { many!(case_branch(parser)) })
                 )
             )
             .map(|branches| Expr::mk_case(cond, branches))
@@ -424,7 +418,7 @@ expr_app ::=
 */
 pub fn expr_app(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_project(parser).and_then(|first| {
-        many!(parser, indent!(parser, Relation::Gt, expr_project(parser)))
+        many!(indent!(parser, Relation::Gt, expr_project(parser)))
             .map(|rest| rest.into_iter().fold(first, Expr::mk_app))
     })
 }
@@ -440,12 +434,10 @@ pub fn expr_lam(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
         parser,
         keep_right!(
             parser.token(&token::Data::Backslash),
-            many!(parser, indent!(parser, Relation::Gt, pattern(parser))).and_then(
-                |args| keep_right!(
-                    indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
-                    expr(parser).map(|body| syntax::Expr::mk_lam(args, body))
-                )
-            )
+            many!(indent!(parser, Relation::Gt, pattern(parser))).and_then(|args| keep_right!(
+                indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
+                expr(parser).map(|body| syntax::Expr::mk_lam(args, body))
+            ))
         )
     )
 }

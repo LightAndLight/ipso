@@ -199,7 +199,7 @@ type_app ::=
  */
 pub fn type_app(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
     type_atom(parser).and_then(|first| {
-        many!(parser, type_atom(parser)).map(|rest| rest.into_iter().fold(first, Type::mk_app))
+        many!(type_atom(parser)).map(|rest| rest.into_iter().fold(first, Type::mk_app))
     })
 }
 

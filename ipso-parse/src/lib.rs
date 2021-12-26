@@ -335,7 +335,7 @@ macro_rules! many_ {
 
 #[macro_export]
 macro_rules! many_with {
-    ($vec:expr, $self:expr, $x:expr) => {{
+    ($vec:expr, $x:expr) => {{
         let mut error: bool = false;
         let mut acc: Vec<_> = $vec;
         let mut consumed = false;
@@ -366,9 +366,9 @@ macro_rules! many_with {
 
 #[macro_export]
 macro_rules! many {
-    ($self:expr, $x:expr) => {{
+    ($x:expr) => {{
         use crate::many_with;
-        many_with!(Vec::new(), $self, $x)
+        many_with!(Vec::new(), $x)
     }};
 }
 
@@ -378,7 +378,7 @@ macro_rules! sep_by {
         use crate::many_with;
         choices!(
             $self,
-            $x.and_then(|first| { many_with!(vec![first], $self, keep_right!($sep, $x)) }),
+            $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),
             ParseResult::pure(Vec::new())
         )
     }};
