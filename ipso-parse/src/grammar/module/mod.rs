@@ -298,7 +298,7 @@ declaration ::=
 */
 pub fn declaration(parser: &mut Parser) -> ParseResult<Declaration> {
     keep_right!(
-        many_!(parser, parser.comment()),
+        many_!(parser.comment()),
         choices!(
             parser,
             definition(parser),

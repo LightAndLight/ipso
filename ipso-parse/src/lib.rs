@@ -306,7 +306,7 @@ pub struct Parser<'input> {
 
 #[macro_export]
 macro_rules! many_ {
-    ($self:expr, $x:expr) => {{
+    ($x:expr) => {{
         let mut error: bool = false;
         let mut consumed = false;
         loop {
@@ -528,7 +528,7 @@ impl<'input> Parser<'input> {
         match &self.current {
             Some(actual) if actual.data == *expected => self
                 .consume()
-                .and_then(|_| map0!((), many_!(self, self.comment()))),
+                .and_then(|_| map0!((), many_!(self.comment()))),
             _ => self.unexpected(false),
         }
     }
@@ -541,7 +541,7 @@ impl<'input> Parser<'input> {
                     Some(c) if c.is_lowercase() => {
                         let s = s.clone();
                         self.consume()
-                            .and_then(|_| map0!(s, many_!(self, self.comment())))
+                            .and_then(|_| map0!(s, many_!(self.comment())))
                     }
                     _ => self.unexpected(false),
                 },
@@ -563,7 +563,7 @@ impl<'input> Parser<'input> {
                     Some(c) if c.is_uppercase() => {
                         let s = s.clone();
                         self.consume()
-                            .and_then(|_| map0!(s, many_!(self, self.comment())))
+                            .and_then(|_| map0!(s, many_!(self.comment())))
                     }
                     _ => self.unexpected(false),
                 },
