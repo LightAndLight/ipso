@@ -435,7 +435,6 @@ binop ::=
 */
 pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
     choices!(
-        parser,
         map0!(Binop::Add, parser.token(&token::Data::Plus)),
         map0!(Binop::Multiply, parser.token(&token::Data::Asterisk)),
         map0!(Binop::Subtract, parser.token(&token::Data::Hyphen)),
@@ -487,6 +486,32 @@ pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
     )
 }
 
+struct Operators<'a, 'input> {
+    parser: &'a mut Parser<'input>,
+}
+
+impl<'a, 'input> Iterator for Operators<'a, 'input> {
+    type Item = ParseResult<(Binop, Spanned<Expr>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = indent!(
+            self.parser,
+            Relation::Gt,
+            binop(self.parser).and_then(|op| expr_app(self.parser).map(|expr| (op, expr)))
+        );
+        match result.result {
+            Err(_) => {
+                if result.consumed {
+                    Some(result)
+                } else {
+                    None
+                }
+            }
+            Ok(_) => Some(result),
+        }
+    }
+}
+
 /**
 ```text
 expr_op ::=
@@ -495,15 +520,8 @@ expr_op ::=
 */
 pub fn expr_op(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_app(parser).and_then(|first| {
-        many!(
-            parser,
-            indent!(
-                parser,
-                Relation::Gt,
-                binop(parser).and_then(|op| expr_app(parser).map(|expr| (op, expr)))
-            )
-        )
-        .and_then(|rest| operator(first, rest))
+        let mut operators = Operators { parser };
+        operator(first, &mut operators)
     })
 }
 

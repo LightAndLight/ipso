@@ -32,7 +32,12 @@ fn all_left_associative() {
         ),
         d.clone(),
     ));
-    let actual = operator(a, vec![(Binop::Add, b), (Binop::Add, c), (Binop::Add, d)]);
+    let actual = operator(
+        a,
+        &mut vec![(Binop::Add, b), (Binop::Add, c), (Binop::Add, d)]
+            .into_iter()
+            .map(ParseResult::pure),
+    );
     assert_eq!(expected, actual)
 }
 
@@ -64,7 +69,12 @@ fn all_right_associative() {
             Expr::mk_binop(Binop::Or, c.clone(), d.clone()),
         ),
     ));
-    let actual = operator(a, vec![(Binop::Or, b), (Binop::Or, c), (Binop::Or, d)]);
+    let actual = operator(
+        a,
+        &mut vec![(Binop::Or, b), (Binop::Or, c), (Binop::Or, d)]
+            .into_iter()
+            .map(ParseResult::pure),
+    );
     assert_eq!(expected, actual)
 }
 
@@ -88,7 +98,12 @@ fn precedence_higher_lower() {
         Expr::mk_binop(Binop::Multiply, a.clone(), b.clone()),
         c.clone(),
     ));
-    let actual = operator(a, vec![(Binop::Multiply, b), (Binop::Add, c)]);
+    let actual = operator(
+        a,
+        &mut vec![(Binop::Multiply, b), (Binop::Add, c)]
+            .into_iter()
+            .map(ParseResult::pure),
+    );
     assert_eq!(expected, actual)
 }
 
@@ -122,7 +137,9 @@ fn precedence_higher_lower_lower() {
     ));
     let actual = operator(
         a,
-        vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Eq, d)],
+        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Eq, d)]
+            .into_iter()
+            .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -157,7 +174,9 @@ fn precedence_higher_lower_equal() {
     ));
     let actual = operator(
         a,
-        vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Add, d)],
+        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Add, d)]
+            .into_iter()
+            .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -188,7 +207,9 @@ fn precedence_higher_lower_higher() {
     ));
     let actual = operator(
         a,
-        vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Multiply, d)],
+        &mut vec![(Binop::Multiply, b), (Binop::Add, c), (Binop::Multiply, d)]
+            .into_iter()
+            .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -213,7 +234,12 @@ fn precedence_lower_higher() {
         a.clone(),
         Expr::mk_binop(Binop::Multiply, b.clone(), c.clone()),
     ));
-    let actual = operator(a, vec![(Binop::Add, b), (Binop::Multiply, c)]);
+    let actual = operator(
+        a,
+        &mut vec![(Binop::Add, b), (Binop::Multiply, c)]
+            .into_iter()
+            .map(ParseResult::pure),
+    );
     assert_eq!(expected, actual)
 }
 
@@ -247,7 +273,9 @@ fn precedence_lower_higher_lower() {
     ));
     let actual = operator(
         a,
-        vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Add, d)],
+        &mut vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Add, d)]
+            .into_iter()
+            .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -282,7 +310,9 @@ fn precedence_lower_higher_equal() {
     ));
     let actual = operator(
         a,
-        vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Multiply, d)],
+        &mut vec![(Binop::Add, b), (Binop::Multiply, c), (Binop::Multiply, d)]
+            .into_iter()
+            .map(ParseResult::pure),
     );
     assert_eq!(expected, actual)
 }
