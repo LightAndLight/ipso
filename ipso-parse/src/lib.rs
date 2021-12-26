@@ -84,6 +84,8 @@ impl ParseError {
                     Binop::Gte => ">=",
                     Binop::Lt => "<",
                     Binop::Lte => "<=",
+                    Binop::LApply => "<|",
+                    Binop::RApply => "|>",
                 });
                 str
             }

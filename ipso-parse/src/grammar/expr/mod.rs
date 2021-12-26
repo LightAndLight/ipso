@@ -435,52 +435,56 @@ binop ::=
 */
 pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
     choices!(
+        // +
         map0!(Binop::Add, parser.token(&token::Data::Plus)),
+        // *
         map0!(Binop::Multiply, parser.token(&token::Data::Asterisk)),
+        // -
         map0!(Binop::Subtract, parser.token(&token::Data::Hyphen)),
+        // /
         map0!(Binop::Divide, parser.token(&token::Data::Slash)),
-        map0!(
-            Binop::Or,
-            keep_right!(
-                parser.token(&token::Data::Pipe),
-                parser.token(&token::Data::Pipe)
+        keep_right!(
+            parser.token(&token::Data::Pipe),
+            choices!(
+                // ||
+                map0!(Binop::Or, parser.token(&token::Data::Pipe)),
+                // |>
+                map0!(Binop::RApply, parser.token(&token::Data::RAngle))
             )
         ),
-        map0!(
-            Binop::And,
-            keep_right!(
-                parser.token(&token::Data::Ampersand),
-                parser.token(&token::Data::Ampersand)
+        keep_right!(
+            parser.token(&token::Data::Ampersand),
+            // &&
+            map0!(Binop::And, parser.token(&token::Data::Ampersand))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Equals),
+            // ==
+            map0!(Binop::Eq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Bang),
+            // !=
+            map0!(Binop::Neq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::LAngle),
+            choices!(
+                // <=
+                map0!(Binop::Lte, parser.token(&token::Data::Equals)),
+                // <|
+                map0!(Binop::LApply, parser.token(&token::Data::Pipe)),
+                // <
+                ParseResult::pure(Binop::Lt)
             )
         ),
-        map0!(
-            Binop::Eq,
-            keep_right!(
-                parser.token(&token::Data::Equals),
-                parser.token(&token::Data::Equals)
-            )
-        ),
-        map0!(
-            Binop::Neq,
-            keep_right!(
-                parser.token(&token::Data::Bang),
-                parser.token(&token::Data::Equals)
-            )
-        ),
-        map0!(Binop::Lt, parser.token(&token::Data::LAngle)),
-        map0!(
-            Binop::Lte,
-            keep_right!(
-                parser.token(&token::Data::LAngle),
-                parser.token(&token::Data::Equals)
-            )
-        ),
-        map0!(Binop::Gt, parser.token(&token::Data::RAngle)),
-        map0!(
-            Binop::Gte,
-            keep_right!(
-                parser.token(&token::Data::RAngle),
-                parser.token(&token::Data::Equals)
+        keep_right!(
+            parser.token(&token::Data::RAngle),
+            choices!(
+                // >=
+                map0!(Binop::Gte, parser.token(&token::Data::Equals)),
+                // >
+                ParseResult::pure(Binop::Gt)
             )
         )
     )

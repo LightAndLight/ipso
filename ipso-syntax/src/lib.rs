@@ -131,6 +131,9 @@ pub enum Binop {
     Gte,
     Lt,
     Lte,
+
+    LApply,
+    RApply,
 }
 
 impl Binop {
@@ -149,6 +152,8 @@ impl Binop {
             Binop::Gte => Assoc::None,
             Binop::Lt => Assoc::None,
             Binop::Lte => Assoc::None,
+            Binop::LApply => Assoc::Right,
+            Binop::RApply => Assoc::Left,
         }
     }
 
@@ -170,6 +175,9 @@ impl Binop {
 
             Binop::Or => 4,
             Binop::And => 4,
+
+            Binop::LApply => 3,
+            Binop::RApply => 3,
         }
     }
 

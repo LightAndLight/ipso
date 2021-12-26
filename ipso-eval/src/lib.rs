@@ -1282,6 +1282,16 @@ where {
                 Binop::Gte => todo!("eval gte"),
                 Binop::Lt => todo!("eval lt"),
                 Binop::Lte => todo!("eval lte"),
+                Binop::RApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    right.apply(self, left)
+                }
+                Binop::LApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    left.apply(self, right)
+                }
             },
 
             Expr::Char(c) => Value::Char(*c),
