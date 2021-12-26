@@ -162,13 +162,10 @@ pub fn expr_record_fields(
         .and_then(|name| {
             expr(parser).and_then(|expr| {
                 fields.push((name, expr));
-                optional!(
-                    parser,
-                    keep_right!(
-                        indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
-                        expr_record_fields(parser, fields)
-                    )
-                )
+                optional!(keep_right!(
+                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
+                    expr_record_fields(parser, fields)
+                ))
                 .map(|m_rest| match m_rest {
                     None => None,
                     Some(rest) => rest,
@@ -327,7 +324,7 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
             between!(
                 parser.token(&token::Data::LParen),
                 indent!(parser, Relation::Gt, parser.token(&token::Data::RParen)),
-                optional!(parser, indent!(parser, Relation::Gt, expr(parser))).map(|m_ty| {
+                optional!(indent!(parser, Relation::Gt, expr(parser))).map(|m_ty| {
                     match m_ty {
                         None => Expr::Unit,
                         Some(ty) => ty.item,

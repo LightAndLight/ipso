@@ -422,7 +422,7 @@ macro_rules! sep_by {
 
 #[macro_export]
 macro_rules! optional {
-    ($self:expr, $a:expr) => {{
+    ($a:expr) => {{
         let first = $a;
         match first.result {
             None => {

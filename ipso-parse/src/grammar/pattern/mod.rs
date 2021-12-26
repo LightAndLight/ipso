@@ -26,13 +26,10 @@ pub fn pattern_record_fields(
         // ident [',' pattern_record_fields]
         spanned!(parser, indent!(parser, Relation::Gte, parser.ident_owned())).and_then(|name| {
             names.push(name);
-            optional!(
-                parser,
-                keep_right!(
-                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
-                    pattern_record_fields(parser, names)
-                )
-            )
+            optional!(keep_right!(
+                indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
+                pattern_record_fields(parser, names)
+            ))
             .map(|m_rest| match m_rest {
                 None => None,
                 Some(rest) => rest,

@@ -88,13 +88,10 @@ pub fn import(parser: &mut Parser) -> ParseResult<Declaration> {
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Import)),
             spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned())).and_then(
                 |module| {
-                    optional!(
-                        parser,
-                        keep_right!(
-                            indent!(parser, Relation::Gt, parser.keyword(&Keyword::As)),
-                            spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
-                        )
-                    )
+                    optional!(keep_right!(
+                        indent!(parser, Relation::Gt, parser.keyword(&Keyword::As)),
+                        spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
+                    ))
                     .map(|name| Declaration::Import { module, name })
                 }
             )
@@ -146,17 +143,14 @@ assumptions ::=
 */
 pub fn assumptions(parser: &mut Parser) -> ParseResult<Vec<Spanned<Type<Rc<str>>>>> {
     indent_scope!(parser, {
-        optional!(
-            parser,
-            between!(
-                indent!(parser, Relation::Eq, parser.token(&token::Data::LParen)),
-                indent!(parser, Relation::Gte, parser.token(&token::Data::RParen)),
-                many!(spanned!(
-                    parser,
-                    indent!(parser, Relation::Gte, type_(parser))
-                ))
-            )
-        )
+        optional!(between!(
+            indent!(parser, Relation::Eq, parser.token(&token::Data::LParen)),
+            indent!(parser, Relation::Gte, parser.token(&token::Data::RParen)),
+            many!(spanned!(
+                parser,
+                indent!(parser, Relation::Gte, type_(parser))
+            ))
+        ))
         .and_then(|m_tys| match m_tys {
             None => ParseResult::pure(Vec::new()),
             Some(tys) => {
