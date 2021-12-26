@@ -1,2 +1,12 @@
+bools : Bool -> Bool
+bools x = false || true && x
+
+showBool : Bool -> String
+showBool b = if b then "true" else "false"
+
 main : IO ()
-main = print (showInt (2 * 3 + 4 - 4 / 2))
+main =
+  comp
+    println (showInt (2 * 3 + 4 - 4 / 2))
+    println (showBool (bools true))
+    println (showBool (bools false))
