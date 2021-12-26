@@ -117,6 +117,13 @@ impl<A> ParseResult<A> {
             result: Some(x),
         }
     }
+
+    fn unexpected(consumed: bool) -> Self {
+        ParseResult {
+            consumed,
+            result: None,
+        }
+    }
 }
 
 #[macro_export]
@@ -387,7 +394,7 @@ macro_rules! sep_by {
 #[macro_export]
 macro_rules! choices {
     ($self:expr) => {
-        $self.unexpected(false)
+        ParseResult::unexpected(false)
     };
     ($self:expr, $x:expr $(, $y:expr)*) => {{
         let first = $x;
@@ -463,20 +470,13 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn unexpected<A>(&self, consumed: bool) -> ParseResult<A> {
-        ParseResult {
-            consumed,
-            result: None,
-        }
-    }
-
     pub fn eof(&mut self) -> ParseResult<()> {
         self.token(&token::Data::Eof)
     }
 
     fn consume(&mut self) -> ParseResult<()> {
         match &self.current {
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
             Some(_) => {
                 self.current = self.input.next();
                 match &self.current {
@@ -498,10 +498,10 @@ impl<'input> Parser<'input> {
     fn comment(&mut self) -> ParseResult<()> {
         self.expecting.insert(token::Name::Comment);
         match &self.current {
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
             Some(token) => match token.data {
                 token::Data::Comment { .. } => map0!((), self.consume()),
-                _ => self.unexpected(false),
+                _ => ParseResult::unexpected(false),
             },
         }
     }
@@ -509,16 +509,16 @@ impl<'input> Parser<'input> {
     fn keyword(&mut self, expected: &Keyword) -> ParseResult<()> {
         self.expecting.insert(token::Name::Keyword(*expected));
         match &self.current {
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
             Some(actual) => match &actual.data {
                 token::Data::Ident(id) => {
                     if expected.matches(id) {
                         map0!((), self.consume())
                     } else {
-                        self.unexpected(false)
+                        ParseResult::unexpected(false)
                     }
                 }
-                _ => self.unexpected(false),
+                _ => ParseResult::unexpected(false),
             },
         }
     }
@@ -529,7 +529,7 @@ impl<'input> Parser<'input> {
             Some(actual) if actual.data == *expected => self
                 .consume()
                 .and_then(|_| map0!((), many_!(self.comment()))),
-            _ => self.unexpected(false),
+            _ => ParseResult::unexpected(false),
         }
     }
 
@@ -543,11 +543,11 @@ impl<'input> Parser<'input> {
                         self.consume()
                             .and_then(|_| map0!(s, many_!(self.comment())))
                     }
-                    _ => self.unexpected(false),
+                    _ => ParseResult::unexpected(false),
                 },
-                _ => self.unexpected(false),
+                _ => ParseResult::unexpected(false),
             },
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
         }
     }
 
@@ -565,11 +565,11 @@ impl<'input> Parser<'input> {
                         self.consume()
                             .and_then(|_| map0!(s, many_!(self.comment())))
                     }
-                    _ => self.unexpected(false),
+                    _ => ParseResult::unexpected(false),
                 },
-                _ => self.unexpected(false),
+                _ => ParseResult::unexpected(false),
             },
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
         }
     }
 
@@ -584,9 +584,9 @@ impl<'input> Parser<'input> {
                 token::Data::Int { value, length: _ } => {
                     map0!(value as u32, self.consume())
                 }
-                _ => self.unexpected(false),
+                _ => ParseResult::unexpected(false),
             },
-            None => self.unexpected(false),
+            None => ParseResult::unexpected(false),
         }
     }
 
@@ -637,9 +637,9 @@ impl<'input> Parser<'input> {
                         token::Data::Char { value, length: _ } => {
                             map0!(value, self.consume())
                         }
-                        _ => self.unexpected(false),
+                        _ => ParseResult::unexpected(false),
                     },
-                    None => self.unexpected(false),
+                    None => ParseResult::unexpected(false),
                 }
             }
         )
@@ -651,9 +651,9 @@ impl<'input> Parser<'input> {
         let str = match &self.current {
             Some(current) => match &current.data {
                 token::Data::String { value, .. } => value.clone(),
-                _ => return self.unexpected(false),
+                _ => return ParseResult::unexpected(false),
             },
-            None => return self.unexpected(false),
+            None => return ParseResult::unexpected(false),
         };
         self.consume();
 

@@ -251,13 +251,13 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
 pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
     parser.expecting.insert(token::Name::Cmd);
     match &parser.current {
-        None => parser.unexpected(false),
+        None => ParseResult::unexpected(false),
         Some(token) => match &token.data {
             token::Data::Cmd(value) => {
                 let value = value.clone();
                 map0!(value, parser.consume())
             }
-            _ => parser.unexpected(false),
+            _ => ParseResult::unexpected(false),
         },
     }
 }
