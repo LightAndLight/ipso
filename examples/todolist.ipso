@@ -44,7 +44,7 @@ readInt str =
           Ok val ->
             case readDigit el of
               Err err -> Err err
-              Ok n -> Ok (add (multiply 10 val) n)
+              Ok n -> Ok (add (10 * val) n)
       )
       (Ok 0)
       str
