@@ -22,23 +22,25 @@
   - [Command Literals](#command-literals)
   - [Datatypes](#datatypes)
     - [Booleans](#booleans)
-    - [Integers](#integers)
       - [Builtins](#builtins)
-    - [Characters](#characters)
+    - [Integers](#integers)
       - [Builtins](#builtins-1)
-    - [Strings](#strings)
+    - [Characters](#characters)
       - [Builtins](#builtins-2)
-    - [Functions](#functions)
-    - [Arrays](#arrays)
+    - [Strings](#strings)
       - [Builtins](#builtins-3)
-    - [Byte Arrays](#byte-arrays)
+    - [Functions](#functions)
       - [Builtins](#builtins-4)
+    - [Arrays](#arrays)
+      - [Builtins](#builtins-5)
+    - [Byte Arrays](#byte-arrays)
+      - [Builtins](#builtins-6)
     - [Records](#records)
     - [Variants](#variants)
       - [Construction](#construction)
       - [Extension](#extension)
     - [IO](#io)
-      - [Builtins](#builtins-5)
+      - [Builtins](#builtins-7)
   - [Type Classes](#type-classes)
     - [Equality](#equality)
     - [Comparison](#comparison)
@@ -295,6 +297,14 @@ Bool
 "no"
 ```
 
+#### Builtins
+
+```ipso
+&& : Bool -> Bool -> Bool
+
+|| : Bool -> Bool -> Bool
+```
+
 ### Integers
 
 ```ipso-repl
@@ -315,19 +325,13 @@ Int
 #### Builtins
 
 ```ipso
-(+) : Int -> Int -> Int
++ : Int -> Int -> Int
 
-add : Int -> Int -> Int
+- : Int -> Int -> Int
 
-(-) : Int -> Int -> Int
+* : Int -> Int -> Int
 
-subtract : Int -> Int -> Int
-
-(*) : Int -> Int -> Int
-
-multiply : Int -> Int -> Int
-
-(/) : Int -> Int -> Int
+/ : Int -> Int -> Int
 
 eqInt : Int -> Int -> Bool
 ```
@@ -426,6 +430,14 @@ f : { x : Int, y : Int } -> Int
 ```ipso-repl
 > :t \{ x, ..rest } -> x + rest.y + rest.z
 { x : Int, y : Int, z : Int } -> Int
+```
+
+#### Builtins
+
+```ipso
+<| : (a -> b) -> a -> b
+
+|> : a -> (a -> b) -> b
 ```
 
 ### Arrays
