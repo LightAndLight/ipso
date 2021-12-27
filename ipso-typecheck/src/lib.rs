@@ -2607,7 +2607,7 @@ impl<'modules> Typechecker<'modules> {
                                     out_ty.clone(),
                                 ),
                             )?;
-                            let right_core = self.check_expr(left, &in_ty)?;
+                            let right_core = self.check_expr(right, &in_ty)?;
 
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), out_ty))
                         }
@@ -2617,7 +2617,7 @@ impl<'modules> Typechecker<'modules> {
 
                             let left_core = self.check_expr(left, &in_ty)?;
                             let right_core = self.check_expr(
-                                left,
+                                right,
                                 &core::Type::mk_arrow(self.common_kinds, in_ty, out_ty.clone()),
                             )?;
 
