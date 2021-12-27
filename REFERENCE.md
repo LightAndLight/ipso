@@ -164,7 +164,7 @@ hello
 
 ```ipso-repl
 > x = None
-x : forall r. < None | r >
+x : forall r. (| None, r |)
 > case x of
 .   None -> 1
 .   _ -> 2
@@ -174,7 +174,7 @@ x : forall r. < None | r >
 
 ```ipso-repl
 > x = None
-x : forall r. < None | r >
+x : forall r. (| None, r |)
 > case x of
 .   None -> 1
 .
@@ -183,8 +183,8 @@ x : forall r. < None | r >
 ```
 
 ```ipso-repl
-> x = None : < None >
-x : < None >
+> x = None : (| None |)
+x : (| None |)
 > case x of
 .   None -> 1
 .
@@ -448,11 +448,11 @@ Array Int
 ```ipso
 cons : a -> Array a -> Array a
 
-uncons : Array a -> < None | Some : { first : a, rest : Array a } >
+uncons : Array a -> (| None, Some : { first : a, rest : Array a } |)
 
 snocArray : Array a -> a -> Array a
 
-unsnoc : Array a -> < None | Some : { rest : Array a, last : a } >
+unsnoc : Array a -> (| None, Some : { rest : Array a, last : a } |)
 
 lengthArray : Array a -> Int
 
@@ -524,14 +524,14 @@ b : Bool
 
 ```ipso-repl
 > :t None
-forall r. < None | r >
+forall r. (| None, r |)
 ```
 
 #### Extension
 
 ```ipso-repl
-> :t \x -> < A | x >
-< r > -> < A : a | ..r >
+> :t \x -> (| A, ..x |)
+(| r |) -> (| A : a, r |)
 ```
 
 ### IO
@@ -547,11 +547,6 @@ Type -> Type
 .   print line
 hello
 hello
-```
-
-```ipso-repl
-> :info IOError
-type IOError = < EBADF | EINTR | ENOSPC | EIO >
 ```
 
 #### Builtins
@@ -599,7 +594,7 @@ instance Fields Eq row => Eq (Variant row)
 
 ```ipso
 class Eq a => Ord a where
-  compare : a -> a -> < LT | EQ | GT >
+  compare : a -> a -> (| LT, EQ, GT |)
   
 (<=) : a -> a -> Bool
 
@@ -640,7 +635,7 @@ instance Fields ToJson row => ToJson (Record row)
 class FromJson a where
   decoder : Decoder a
   
-fromJson : FromJson a => String -> < Err : DecodeError | Ok : a >
+fromJson : FromJson a => String -> (| Err : DecodeError, Ok : a |)
 ```
 
 ```ipso
@@ -701,7 +696,7 @@ type_record_content ::=
   ident
   
 type_variant ::=
-  '<' type_variant_content '>'
+  '(|' type_variant_content '|)'
   
 type_variant_content ::=
   epsilon |
