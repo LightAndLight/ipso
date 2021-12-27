@@ -13,7 +13,7 @@ prettyArray arr =
       foldlArray 
         (\acc el -> "${acc}, ${show el}") 
         (show (indexArray 0 arr))
-        (sliceArray 1 (subtract (lengthArray arr) 1) arr)
+        (sliceArray 1 (lengthArray arr - 1) arr)
   }]"
 
 main : IO ()

@@ -9,11 +9,11 @@ deleteAt target arr =
   if ltInt target (lengthArray arr)
   then
     generateArray 
-      (subtract (lengthArray arr) 1) 
+      (lengthArray arr - 1) 
       (\ix ->
         if ltInt ix target
         then indexArray ix arr
-        else indexArray (add ix 1) arr
+        else indexArray (ix + 1) arr
       )
   else arr
 
@@ -44,7 +44,7 @@ readInt str =
           Ok val ->
             case readDigit el of
               Err err -> Err err
-              Ok n -> Ok (add (10 * val) n)
+              Ok n -> Ok (10 * val + n)
       )
       (Ok 0)
       str
