@@ -813,32 +813,6 @@ where {
                     }
                 )
             }
-            Builtin::Subtract => {
-                function2!(
-                    subtract,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a - b)
-                    }
-                )
-            }
-            Builtin::Add => {
-                function2!(
-                    add,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a + b)
-                    }
-                )
-            }
             Builtin::EqArray => {
                 function3!(
                     eq_array,
