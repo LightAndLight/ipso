@@ -1,9 +1,6 @@
 not : Bool -> Bool
 not a = if a then false else true
 
-and : Bool -> Bool -> Bool
-and a b = if a then b else false
-
 strip : String -> String
 strip = filterString (\c -> not (eqChar c '\n'))
 
@@ -65,11 +62,11 @@ parseCommand :
 parseCommand line =
   let stripped = strip line in
   let lines = splitString ' ' stripped in
-  if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "quit") then Quit ()
-  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "help") then Help ()
-  else if and (eqInt (lengthArray lines) 1) (eqString (indexArray 0 lines) "list") then List ()
-  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "add") then Add (indexArray 1 lines)
-  else if and (eqInt (lengthArray lines) 2) (eqString (indexArray 0 lines) "delete") then
+  if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "quit" then Quit ()
+  else if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "help" then Help ()
+  else if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "list" then List ()
+  else if eqInt (lengthArray lines) 2 && eqString (indexArray 0 lines) "add" then Add (indexArray 1 lines)
+  else if eqInt (lengthArray lines) 2 && eqString (indexArray 0 lines) "delete" then
     case readInt (indexArray 1 lines) of
       Err err -> Invalid stripped
       Ok n -> Delete n
