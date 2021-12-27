@@ -184,6 +184,26 @@ impl Binop {
     pub fn compare_precedence(&self, other: &Binop) -> Ordering {
         self.precedence().cmp(&other.precedence())
     }
+
+    pub fn render(&self) -> &'static str {
+        match self {
+            Binop::Add => "+",
+            Binop::Multiply => "*",
+            Binop::Subtract => "-",
+            Binop::Divide => "/",
+            Binop::Append => "++",
+            Binop::Or => "||",
+            Binop::And => "&&",
+            Binop::Eq => "==",
+            Binop::Neq => "!=",
+            Binop::Gt => ">",
+            Binop::Gte => ">=",
+            Binop::Lt => "<",
+            Binop::Lte => "<=",
+            Binop::LApply => "<|",
+            Binop::RApply => "|>",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

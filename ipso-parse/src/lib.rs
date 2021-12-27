@@ -70,23 +70,7 @@ impl ParseError {
             }
             ParseError::AmbiguousUseOf { operator, .. } => {
                 let mut str = String::from("ambiguous use of ");
-                str.push_str(match operator {
-                    Binop::Add => "+",
-                    Binop::Multiply => "*",
-                    Binop::Subtract => "-",
-                    Binop::Divide => "/",
-                    Binop::Append => "++",
-                    Binop::Or => "||",
-                    Binop::And => "&&",
-                    Binop::Eq => "==",
-                    Binop::Neq => "!=",
-                    Binop::Gt => ">",
-                    Binop::Gte => ">=",
-                    Binop::Lt => "<",
-                    Binop::Lte => "<=",
-                    Binop::LApply => "<|",
-                    Binop::RApply => "|>",
-                });
+                str.push_str(operator.render());
                 str
             }
         }
