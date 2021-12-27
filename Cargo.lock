@@ -309,8 +309,8 @@ name = "ipso-syntax"
 version = "0.1.0"
 dependencies = [
  "ipso-util",
- "lazy_static",
  "quickcheck",
+ "quickcheck_macros",
 ]
 
 [[package]]

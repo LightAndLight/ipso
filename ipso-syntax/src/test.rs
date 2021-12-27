@@ -1,7 +1,28 @@
 use std::rc::Rc;
 
 #[cfg(test)]
-use super::Type;
+use crate::{is_keyword, Keyword, Type, KEYWORDS};
+#[cfg(test)]
+use quickcheck_macros::quickcheck;
+
+#[cfg(test)]
+#[quickcheck]
+fn prop_all_keywords_in_list(keyword: Keyword) {
+    let keyword_string = keyword.to_string();
+    assert!(
+        is_keyword(keyword_string),
+        "KEYWORDS is missing {:?}",
+        keyword_string
+    );
+    assert_eq!(keyword, Keyword::from_string(keyword_string).unwrap())
+}
+
+#[test]
+fn keywords_list_valid() {
+    for keyword in KEYWORDS {
+        assert_eq!(*keyword, Keyword::from_string(keyword).unwrap().to_string())
+    }
+}
 
 #[test]
 fn iter_vars_test_1() {

@@ -3,10 +3,8 @@ pub mod kind;
 mod test;
 pub mod r#type;
 
-pub use r#type::Type;
-
-use lazy_static::lazy_static;
 use quickcheck::Arbitrary;
+pub use r#type::Type;
 use std::{cmp::Ordering, hash::Hash, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -94,14 +92,36 @@ impl Keyword {
             Keyword::Bind => "bind",
         }
     }
+
+    pub fn from_string(str: &str) -> Option<Self> {
+        match str {
+            "case" => Some(Keyword::Case),
+            "of" => Some(Keyword::Of),
+            "if" => Some(Keyword::If),
+            "then" => Some(Keyword::Then),
+            "else" => Some(Keyword::Else),
+            "true" => Some(Keyword::True),
+            "false" => Some(Keyword::False),
+            "import" => Some(Keyword::Import),
+            "as" => Some(Keyword::As),
+            "from" => Some(Keyword::From),
+            "type" => Some(Keyword::Type),
+            "class" => Some(Keyword::Class),
+            "instance" => Some(Keyword::Instance),
+            "where" => Some(Keyword::Where),
+            "let" => Some(Keyword::Let),
+            "in" => Some(Keyword::In),
+            "comp" => Some(Keyword::Comp),
+            "bind" => Some(Keyword::Bind),
+            _ => None,
+        }
+    }
 }
 
-lazy_static! {
-    static ref KEYWORDS: Vec<&'static str> = vec![
-        "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where",
-        "class", "instance", "let", "in"
-    ];
-}
+const KEYWORDS: &[&str] = &[
+    "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where", "type",
+    "class", "instance", "let", "in", "comp", "bind",
+];
 
 pub fn is_keyword(val: &str) -> bool {
     KEYWORDS.contains(&val)
