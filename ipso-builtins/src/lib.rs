@@ -196,19 +196,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::Subtract),
             },
-            // multiply : Int -> Int -> Int
-            Declaration::Definition {
-                name: String::from("multiply"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), int_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::Multiply),
-            },
             // eqInt : Int -> Int -> Bool
             Declaration::Definition {
                 name: String::from("eqInt"),
