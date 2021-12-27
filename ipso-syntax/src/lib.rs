@@ -107,6 +107,7 @@ pub fn is_keyword(val: &str) -> bool {
     KEYWORDS.contains(&val)
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Assoc {
     None,
     Left,
