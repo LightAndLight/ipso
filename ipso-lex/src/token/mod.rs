@@ -64,6 +64,8 @@ pub enum Name {
     Cmd,
     Bang,
     Ampersand,
+    LParenPipe,
+    PipeRParen,
 }
 
 impl Arbitrary for Name {
@@ -110,6 +112,8 @@ impl Arbitrary for Name {
             Name::Cmd,
             Name::Bang,
             Name::Ampersand,
+            Name::LParenPipe,
+            Name::PipeRParen,
         ];
         g.choose(vals).unwrap().clone()
     }
@@ -117,7 +121,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        42 + Keyword::num_variants()
+        44 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -181,6 +185,8 @@ impl Name {
             56 => Some(Self::Cmd),
             57 => Some(Self::Bang),
             58 => Some(Self::Ampersand),
+            59 => Some(Self::LParenPipe),
+            60 => Some(Self::PipeRParen),
             _ => None,
         }
     }
@@ -246,6 +252,8 @@ impl Name {
             Self::Cmd => 56,
             Self::Bang => 57,
             Self::Ampersand => 58,
+            Self::LParenPipe => 59,
+            Self::PipeRParen => 60,
         }
     }
 
@@ -303,6 +311,8 @@ impl Name {
             Name::Cmd => String::from("command fragment"),
             Name::Bang => String::from('!'),
             Name::Ampersand => String::from('&'),
+            Name::LParenPipe => String::from("(|"),
+            Name::PipeRParen => String::from("|)"),
         }
     }
 }
@@ -362,6 +372,9 @@ pub enum Data {
 
     Bang,
     Ampersand,
+
+    LParenPipe,
+    PipeRParen,
 }
 
 impl Data {
@@ -406,6 +419,8 @@ impl Data {
             Data::Cmd(value) => value.len(),
             Data::Bang => 1,
             Data::Ampersand => 1,
+            Data::LParenPipe => 2,
+            Data::PipeRParen => 2,
 
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
@@ -452,6 +467,8 @@ impl Data {
             Data::Cmd(_) => Name::Cmd,
             Data::Bang => Name::Bang,
             Data::Ampersand => Name::Ampersand,
+            Data::LParenPipe => Name::LParenPipe,
+            Data::PipeRParen => Name::PipeRParen,
         }
     }
 }

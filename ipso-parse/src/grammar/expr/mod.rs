@@ -202,18 +202,22 @@ pub fn expr_record(parser: &mut Parser) -> ParseResult<Expr> {
 /**
 ```text
 expr_embed ::=
-  '<' ctor '|' '..' expr_atom '>'
+  '(|' ctor ',' '..' expr_atom '|)'
 ```
 */
 pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
     indent_scope!(parser, {
         between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LAngle)),
-            indent!(parser, Relation::Gte, parser.token(&token::Data::RAngle)),
+            indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
+            indent!(
+                parser,
+                Relation::Gte,
+                parser.token(&token::Data::PipeRParen)
+            ),
             indent!(parser, Relation::Gte, parser.ctor_owned()).and_then(|ctor| indent!(
                 parser,
                 Relation::Gte,
-                parser.token(&token::Data::Pipe)
+                parser.token(&token::Data::Comma)
             )
             .and_then(|_| keep_right!(
                 indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),

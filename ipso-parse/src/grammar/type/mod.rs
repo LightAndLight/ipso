@@ -67,7 +67,7 @@ pub fn type_record(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
 ```text
 type_variant_ctors ::=
   ident
-  ctor ':' type ['|' type_variant_ctors]
+  ctor ':' type [',' type_variant_ctors]
 ```
 */
 pub fn type_variant_ctors(
@@ -85,7 +85,7 @@ pub fn type_variant_ctors(
             .and_then(|(ctor, ty)| {
                 ctors.push((ctor, ty));
                 optional!(
-                    indent!(parser, Relation::Gte, parser.token(&token::Data::Pipe))
+                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma))
                         .and_then(|_| type_variant_ctors(parser, ctors))
                 )
                 .map(|m_rest| match m_rest {
@@ -99,14 +99,18 @@ pub fn type_variant_ctors(
 /**
 ```text
 type_variant ::=
-  '<' [type_variant_ctors] '>
+  '(|' [type_variant_ctors] '|)'
 ```
  */
 pub fn type_variant(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
     indent_scope!(parser, {
         between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LAngle)),
-            indent!(parser, Relation::Gte, parser.token(&token::Data::RAngle)),
+            indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
+            indent!(
+                parser,
+                Relation::Gte,
+                parser.token(&token::Data::PipeRParen)
+            ),
             {
                 let mut ctors = Vec::new();
                 optional!(type_variant_ctors(parser, &mut ctors)).map(|m_rest| match m_rest {

@@ -244,6 +244,7 @@ fn parse_case_4() {
                 token::Name::Plus,
                 token::Name::LAngle,
                 token::Name::RAngle,
+                token::Name::LParenPipe,
                 token::Name::Eof,
             ]
             .into_iter()

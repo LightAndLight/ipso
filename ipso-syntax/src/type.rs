@@ -354,7 +354,7 @@ impl<A> Type<A> {
         }
 
         if let Some(row_parts) = self.unwrap_variant() {
-            s.push('<');
+            s.push_str("(|");
             let mut fields_iter = row_parts.fields.iter();
             match fields_iter.next() {
                 None => {}
@@ -364,7 +364,7 @@ impl<A> Type<A> {
                     s.push_str(" : ");
                     s.push_str(first_ty.render().as_str());
                     for (field, ty) in fields_iter {
-                        s.push_str(" | ");
+                        s.push_str(", ");
                         s.push_str(field);
                         s.push_str(" : ");
                         s.push_str(ty.render().as_str());
@@ -379,14 +379,14 @@ impl<A> Type<A> {
                 }
                 Some(ty) => {
                     if !row_parts.fields.is_empty() {
-                        s.push_str(" |")
+                        s.push(',')
                     }
                     s.push(' ');
                     s.push_str(ty.render().as_str());
                     s.push(' ');
                 }
             }
-            s.push('>');
+            s.push_str("|)");
             return s;
         }
 
