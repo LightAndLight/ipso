@@ -9,4 +9,4 @@ main =
   comp
     println <| showInt (2 * 3 + 4 - 4 / 2)
     println <| showBool (bools true)
-    println <| showBool (bools false)
+    println <| (bools false |> showBool)
