@@ -20,7 +20,7 @@ deleteAt target arr =
       )
   else arr
 
-readDigit : Char -> < Err : () | Ok : Int >
+readDigit : Char -> (| Err : (), Ok : Int |)
 readDigit c =
   case c of
     '0' -> Ok 0
@@ -35,7 +35,7 @@ readDigit c =
     '9' -> Ok 9
     _ -> Err ()
 
-readInt : String -> < Err : () | Ok : Int >
+readInt : String -> (| Err : (), Ok : Int |)
 readInt str =
   if eqString "" str
   then Err ()
@@ -54,13 +54,14 @@ readInt str =
 
 parseCommand :
   String ->
-  < Quit : ()
-  | Help : ()
-  | Add : String
-  | List : ()
-  | Delete : Int
-  | Invalid : String
-  >
+  (|
+    Quit : (),
+    Help : (),
+    Add : String,
+    List : (),
+    Delete : Int,
+    Invalid : String
+  |)
 parseCommand line =
   let stripped = strip line in
   let lines = splitString ' ' stripped in
@@ -89,9 +90,9 @@ writeTodos todos =
       todos
 
 runCommand :
-  < Quit : () | Help : () | Add : String | List : () | Delete : Int | Invalid : String > ->
+  (| Quit : (), Help : (), Add : String, List : (), Delete : Int, Invalid : String |) ->
   Array String ->
-  IO < Continue : Array String | Quit : () >
+  IO (| Continue : Array String, Quit : () |)
 runCommand cmd todos =
   case cmd of
     Quit x ->

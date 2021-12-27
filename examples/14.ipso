@@ -1,4 +1,4 @@
-val : < A : () | B : () | C : () >
+val : (| A : (), B : (), C : () |)
 val = A ()
 
 main : IO ()
