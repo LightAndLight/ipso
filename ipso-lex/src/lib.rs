@@ -368,11 +368,22 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '(' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::LParen,
-                            pos,
-                            column,
-                        })
+
+                        match self.current {
+                            Some('|') => {
+                                self.consume();
+                                Some(Token {
+                                    data: token::Data::LParenPipe,
+                                    pos,
+                                    column,
+                                })
+                            }
+                            _ => Some(Token {
+                                data: token::Data::LParen,
+                                pos,
+                                column,
+                            }),
+                        }
                     }
                     ')' => {
                         self.consume();
@@ -425,11 +436,22 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '|' => {
                         self.consume();
-                        Some(Token {
-                            data: token::Data::Pipe,
-                            pos,
-                            column,
-                        })
+
+                        match self.current {
+                            Some(')') => {
+                                self.consume();
+                                Some(Token {
+                                    data: token::Data::PipeRParen,
+                                    pos,
+                                    column,
+                                })
+                            }
+                            _ => Some(Token {
+                                data: token::Data::Pipe,
+                                pos,
+                                column,
+                            }),
+                        }
                     }
                     ',' => {
                         self.consume();
@@ -516,6 +538,22 @@ impl<'input> Iterator for Lexer<'input> {
                         self.consume();
                         Some(Token {
                             data: token::Data::Slash,
+                            pos,
+                            column,
+                        })
+                    }
+                    '!' => {
+                        self.consume();
+                        Some(Token {
+                            data: token::Data::Bang,
+                            pos,
+                            column,
+                        })
+                    }
+                    '&' => {
+                        self.consume();
+                        Some(Token {
+                            data: token::Data::Ampersand,
                             pos,
                             column,
                         })

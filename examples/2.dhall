@@ -5,7 +5,7 @@
   stdout = "",
   stderr = 
     ''
-    2.ipso:1:11: error: expected one of: comment, constructor, identifier, '{', '(', '<', '->', '=>', indent (== 0)
+    2.ipso:1:11: error: expected one of: comment, constructor, identifier, '{', '(', '->', '=>', indent (== 0), (|
       |
     1 | main : IO ~
       |           ^

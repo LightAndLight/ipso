@@ -4,10 +4,10 @@ mod test;
 
 use crate::{
     between, choices, grammar::pattern::pattern, indent, indent_scope, keep_left, keep_right, many,
-    map0, map2, optional, sep_by, spanned, ParseResult, Parser,
+    map0, map2, operator::operator, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
-use ipso_syntax::{Branch, CompLine, Expr, Keyword, Spanned, StringPart};
+use ipso_syntax::{Binop, Branch, CompLine, Expr, Keyword, Spanned, StringPart};
 use std::rc::Rc;
 
 /**
@@ -202,20 +202,27 @@ pub fn expr_record(parser: &mut Parser) -> ParseResult<Expr> {
 /**
 ```text
 expr_embed ::=
-  '<' ctor '|' expr '>'
+  '(|' ctor ',' '..' expr_atom '|)'
 ```
 */
 pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
     indent_scope!(parser, {
         between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LAngle)),
-            indent!(parser, Relation::Gte, parser.token(&token::Data::RAngle)),
+            indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
+            indent!(
+                parser,
+                Relation::Gte,
+                parser.token(&token::Data::PipeRParen)
+            ),
             indent!(parser, Relation::Gte, parser.ctor_owned()).and_then(|ctor| indent!(
                 parser,
                 Relation::Gte,
-                parser.token(&token::Data::Pipe)
+                parser.token(&token::Data::Comma)
             )
-            .and_then(|_| expr(parser).map(|rest| Expr::mk_embed(ctor, rest))))
+            .and_then(|_| keep_right!(
+                indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
+                expr_atom(parser).map(|rest| Expr::mk_embed(ctor, rest))
+            )))
         )
     })
 }
@@ -415,6 +422,120 @@ pub fn expr_app(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
 
 /**
 ```text
+binop ::=
+  '+'
+  '*'
+  '-'
+  '/'
+  '||'
+  '&&'
+  '=='
+  '!='
+  '<'
+  '<='
+  '>'
+  '>='
+```
+*/
+pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
+    choices!(
+        // +
+        map0!(Binop::Add, parser.token(&token::Data::Plus)),
+        // *
+        map0!(Binop::Multiply, parser.token(&token::Data::Asterisk)),
+        // -
+        map0!(Binop::Subtract, parser.token(&token::Data::Hyphen)),
+        // /
+        map0!(Binop::Divide, parser.token(&token::Data::Slash)),
+        keep_right!(
+            parser.token(&token::Data::Pipe),
+            choices!(
+                // ||
+                map0!(Binop::Or, parser.token(&token::Data::Pipe)),
+                // |>
+                map0!(Binop::RApply, parser.token(&token::Data::RAngle))
+            )
+        ),
+        keep_right!(
+            parser.token(&token::Data::Ampersand),
+            // &&
+            map0!(Binop::And, parser.token(&token::Data::Ampersand))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Equals),
+            // ==
+            map0!(Binop::Eq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Bang),
+            // !=
+            map0!(Binop::Neq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::LAngle),
+            choices!(
+                // <=
+                map0!(Binop::Lte, parser.token(&token::Data::Equals)),
+                // <|
+                map0!(Binop::LApply, parser.token(&token::Data::Pipe)),
+                // <
+                ParseResult::pure(Binop::Lt)
+            )
+        ),
+        keep_right!(
+            parser.token(&token::Data::RAngle),
+            choices!(
+                // >=
+                map0!(Binop::Gte, parser.token(&token::Data::Equals)),
+                // >
+                ParseResult::pure(Binop::Gt)
+            )
+        )
+    )
+}
+
+/**
+```text
+expr_op ::=
+  expr_app (binop expr_app)*
+```
+*/
+pub fn expr_op(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
+    struct Operators<'a, 'input> {
+        parser: &'a mut Parser<'input>,
+    }
+
+    impl<'a, 'input> Iterator for Operators<'a, 'input> {
+        type Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let result = indent!(
+                self.parser,
+                Relation::Gt,
+                spanned!(self.parser, binop(self.parser))
+                    .and_then(|op| expr_app(self.parser).map(|expr| (op, expr)))
+            );
+            match result.result {
+                Err(_) => {
+                    if result.consumed {
+                        Some(result)
+                    } else {
+                        None
+                    }
+                }
+                Ok(_) => Some(result),
+            }
+        }
+    }
+
+    expr_app(parser).and_then(|first| {
+        let mut operators = Operators { parser };
+        operator(first, &mut operators)
+    })
+}
+
+/**
+```text
 expr_lam ::=
   '\' pattern '->' expr
 ```
@@ -494,7 +615,7 @@ expr ::=
   expr_ifthenelse
   expr_let
   expr_comp
-  expr_app
+  expr_op
 ```
 */
 pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
@@ -504,6 +625,6 @@ pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
         expr_ifthenelse(parser),
         expr_let(parser),
         expr_comp(parser),
-        expr_app(parser)
+        expr_op(parser)
     )
 }

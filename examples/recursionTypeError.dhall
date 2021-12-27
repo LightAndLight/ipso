@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    recursionTypeError.ipso:5:23: error: expected type "Int", got type "String"
+    recursionTypeError.ipso:5:20: error: expected type "Int", got type "String"
       |
-    5 |   else add 1 (recount "hello")
-      |                       ^
+    5 |   else 1 + recount "hello"
+      |                    ^
     '',
   exitcode = 1
 }

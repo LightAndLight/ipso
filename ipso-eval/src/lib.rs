@@ -813,45 +813,6 @@ where {
                     }
                 )
             }
-            Builtin::Subtract => {
-                function2!(
-                    subtract,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a - b)
-                    }
-                )
-            }
-            Builtin::Add => {
-                function2!(
-                    add,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a + b)
-                    }
-                )
-            }
-            Builtin::Multiply => {
-                function2!(
-                    multiply,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a * b)
-                    }
-                )
-            }
             Builtin::EqArray => {
                 function3!(
                     eq_array,
@@ -1240,29 +1201,59 @@ where {
 
             Expr::Int(n) => Value::Int(*n),
 
-            Expr::Binop(op, a, b) => {
-                let a = self.eval(env, a);
-                let b = self.eval(env, b);
-                match op {
-                    Binop::Add => {
-                        let a = a.unpack_int();
-                        let b = b.unpack_int();
-                        Value::Int(a + b)
-                    }
-                    Binop::Multiply => todo!("eval multiply {:?} {:?}", a, b),
-                    Binop::Subtract => todo!("eval subtract {:?} {:?}", a, b),
-                    Binop::Divide => todo!("eval divide {:?} {:?}", a, b),
-                    Binop::Append => todo!("eval append {:?} {:?}", a, b),
-                    Binop::Or => todo!("eval or {:?} {:?}", a, b),
-                    Binop::And => todo!("eval and {:?} {:?}", a, b),
-                    Binop::Eq => todo!("eval eq {:?} {:?}", a, b),
-                    Binop::Neq => todo!("eval neq {:?} {:?}", a, b),
-                    Binop::Gt => todo!("eval gt {:?} {:?}", a, b),
-                    Binop::Gte => todo!("eval gte {:?} {:?}", a, b),
-                    Binop::Lt => todo!("eval lt {:?} {:?}", a, b),
-                    Binop::Lte => todo!("eval lte {:?} {:?}", a, b),
+            Expr::Binop(op, a, b) => match op {
+                Binop::Add => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a + b)
                 }
-            }
+                Binop::Multiply => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a * b)
+                }
+                Binop::Subtract => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a - b)
+                }
+                Binop::Divide => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a / b)
+                }
+                Binop::Append => todo!("eval append"),
+                Binop::Or => {
+                    if self.eval(env, a).unpack_bool() {
+                        Value::True
+                    } else {
+                        self.eval(env, b)
+                    }
+                }
+                Binop::And => {
+                    if self.eval(env, a).unpack_bool() {
+                        self.eval(env, b)
+                    } else {
+                        Value::False
+                    }
+                }
+                Binop::Eq => todo!("eval eq"),
+                Binop::Neq => todo!("eval neq"),
+                Binop::Gt => todo!("eval gt"),
+                Binop::Gte => todo!("eval gte"),
+                Binop::Lt => todo!("eval lt"),
+                Binop::Lte => todo!("eval lte"),
+                Binop::RApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    right.apply(self, left)
+                }
+                Binop::LApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    left.apply(self, right)
+                }
+            },
 
             Expr::Char(c) => Value::Char(*c),
 

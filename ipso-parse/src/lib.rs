@@ -1,5 +1,6 @@
 pub mod grammar;
 pub mod indentation;
+pub mod operator;
 mod test;
 
 use fixedbitset::FixedBitSet;
@@ -9,7 +10,7 @@ use ipso_lex::{
     token::{self, Relation, Token},
     Lexer,
 };
-use ipso_syntax::{self as syntax, Keyword, Module};
+use ipso_syntax::{self as syntax, Binop, Keyword, Module, Spanned};
 use std::{
     collections::BTreeSet,
     fs::File,
@@ -28,18 +29,25 @@ pub enum ParseError {
         pos: usize,
         expecting: BTreeSet<token::Name>,
     },
+    AmbiguousUseOf {
+        source: Source,
+        pos: usize,
+        operator: Binop,
+    },
 }
 
 impl ParseError {
     fn source(&self) -> Source {
         match self {
             ParseError::Unexpected { source, .. } => source.clone(),
+            ParseError::AmbiguousUseOf { source, .. } => source.clone(),
         }
     }
 
     fn position(&self) -> usize {
         match self {
             ParseError::Unexpected { pos, .. } => *pos,
+            ParseError::AmbiguousUseOf { pos, .. } => *pos,
         }
     }
 
@@ -60,6 +68,11 @@ impl ParseError {
                     }
                 }
             }
+            ParseError::AmbiguousUseOf { operator, .. } => {
+                let mut str = String::from("ambiguous use of ");
+                str.push_str(operator.render());
+                str
+            }
         }
     }
 
@@ -78,9 +91,15 @@ impl ParseError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum ParseErrorName {
+    Unexpected,
+    AmbiguousUseOf(Spanned<Binop>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParseResult<A> {
     pub consumed: bool,
-    pub result: Option<A>,
+    pub result: Result<A, ParseErrorName>,
 }
 
 impl<A> ParseResult<A> {
@@ -89,11 +108,11 @@ impl<A> ParseResult<A> {
         F: FnOnce(A) -> ParseResult<B>,
     {
         match self.result {
-            None => ParseResult {
+            Err(err) => ParseResult {
                 consumed: self.consumed,
-                result: None,
+                result: Err(err),
             },
-            Some(a) => {
+            Ok(a) => {
                 let mut next = f(a);
                 next.consumed = next.consumed || self.consumed;
                 next
@@ -114,14 +133,21 @@ impl<A> ParseResult<A> {
     fn pure(x: A) -> Self {
         ParseResult {
             consumed: false,
-            result: Some(x),
+            result: Ok(x),
+        }
+    }
+
+    fn ambiguous_use_of(operator: &Spanned<Binop>) -> Self {
+        ParseResult {
+            consumed: false,
+            result: Err(ParseErrorName::AmbiguousUseOf(operator.clone())),
         }
     }
 
     fn unexpected(consumed: bool) -> Self {
         ParseResult {
             consumed,
-            result: None,
+            result: Err(ParseErrorName::Unexpected),
         }
     }
 }
@@ -157,11 +183,11 @@ macro_rules! map2 {
 
         let a = $a;
         match a.result {
-            None => ParseResult {
+            Err(err) => ParseResult {
                 consumed: a.consumed,
-                result: None,
+                result: Err(err),
             },
-            Some(val1) => {
+            Ok(val1) => {
                 let b = $b;
                 ParseResult {
                     consumed: a.consumed || b.consumed,
@@ -314,18 +340,19 @@ pub struct Parser<'input> {
 #[macro_export]
 macro_rules! many_ {
     ($x:expr) => {{
-        let mut error: bool = false;
+        use crate::ParseErrorName;
+        let mut error: Option<ParseErrorName> = None;
         let mut consumed = false;
         loop {
             let next = $x;
             match next.result {
-                None => {
+                Err(err) => {
                     if next.consumed {
-                        error = true;
+                        error = Some(err);
                     };
                     break;
                 }
-                Some(_) => {
+                Ok(_) => {
                     consumed = consumed || next.consumed;
                 }
             }
@@ -333,8 +360,8 @@ macro_rules! many_ {
         ParseResult {
             consumed,
             result: match error {
-                false => Some(()),
-                true => None,
+                None => Ok(()),
+                Some(err) => Err(err),
             },
         }
     }};
@@ -343,19 +370,20 @@ macro_rules! many_ {
 #[macro_export]
 macro_rules! many_with {
     ($vec:expr, $x:expr) => {{
-        let mut error: bool = false;
+        use crate::ParseErrorName;
+        let mut error: Option<ParseErrorName> = None;
         let mut acc: Vec<_> = $vec;
         let mut consumed = false;
         loop {
             let next = $x;
             match next.result {
-                None => {
+                Err(err) => {
                     if next.consumed {
-                        error = true;
+                        error = Some(err);
                     };
                     break;
                 }
-                Some(val) => {
+                Ok(val) => {
                     consumed = consumed || next.consumed;
                     acc.push(val)
                 }
@@ -364,8 +392,8 @@ macro_rules! many_with {
         ParseResult {
             consumed,
             result: match error {
-                false => Some(acc),
-                true => None,
+                None => Ok(acc),
+                Some(err) => Err(err),
             },
         }
     }};
@@ -384,27 +412,27 @@ macro_rules! choices {
     ($x:expr, $y:expr) => {{
         let first = $x;
         match first.result {
-            None => {
+            Err(err) => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: None }
+                    ParseResult{ consumed: true, result: Err(err) }
                 } else {
                     $y
                 }
             }
-            Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
+            Ok(val) => ParseResult{consumed: first.consumed, result: Ok(val)},
         }
     }};
     ($x:expr, $y:expr $(, $ys:expr)*) => {{
         let first = $x;
         match first.result {
-            None => {
+            Err(err) => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: None }
+                    ParseResult{ consumed: true, result: Err(err) }
                 } else {
                     choices!($y $(, $ys)*)
                 }
             }
-            Some(val) => ParseResult{consumed: first.consumed, result: Some(val)},
+            Ok(val) => ParseResult{consumed: first.consumed, result: Ok(val)},
         }
     }};
 }
@@ -425,19 +453,19 @@ macro_rules! optional {
     ($a:expr) => {{
         let first = $a;
         match first.result {
-            None => {
+            Err(err) => {
                 if first.consumed {
                     ParseResult {
                         consumed: true,
-                        result: None,
+                        result: Err(err),
                     }
                 } else {
                     ParseResult::pure(None)
                 }
             }
-            Some(val) => ParseResult {
+            Ok(val) => ParseResult {
                 consumed: first.consumed,
-                result: Some(Some(val)),
+                result: Ok(Some(val)),
             },
         }
     }};
@@ -466,13 +494,20 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn into_parse_error<A>(self, result: Option<A>) -> Result<A, ParseError> {
+    pub fn into_parse_error<A>(self, result: Result<A, ParseErrorName>) -> Result<A, ParseError> {
         match result {
-            Some(a) => Ok(a),
-            None => Err(ParseError::Unexpected {
-                source: self.source,
-                pos: self.pos,
-                expecting: self.expecting.into_btreeset(),
+            Ok(a) => Ok(a),
+            Err(err) => Err(match err {
+                ParseErrorName::Unexpected => ParseError::Unexpected {
+                    source: self.source,
+                    pos: self.pos,
+                    expecting: self.expecting.into_btreeset(),
+                },
+                ParseErrorName::AmbiguousUseOf(operator) => ParseError::AmbiguousUseOf {
+                    source: self.source,
+                    pos: operator.pos,
+                    operator: operator.item,
+                },
             }),
         }
     }
@@ -496,7 +531,7 @@ impl<'input> Parser<'input> {
                 self.expecting.clear();
                 ParseResult {
                     consumed: true,
-                    result: Some(()),
+                    result: Ok(()),
                 }
             }
         }

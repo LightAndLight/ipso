@@ -1,7 +1,7 @@
 apply :
-  < Err : e | Ok : (a -> b) > ->
-  < Err : e | Ok : a > ->
-  { x : < Err : e | Ok : b > }
+  (| Err : e, Ok : (a -> b) |) ->
+  (| Err : e, Ok : a |) ->
+  { x : (| Err : e, Ok : b |) }
 apply =
   \a b ->
   { 

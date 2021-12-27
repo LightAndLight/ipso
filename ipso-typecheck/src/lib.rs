@@ -2564,7 +2564,7 @@ impl<'modules> Typechecker<'modules> {
                             let right_core = self.check_expr(right, &core::Type::Bool)?;
                             Ok((
                                 core::Expr::mk_binop(*op, left_core, right_core),
-                                core::Type::Int,
+                                core::Type::Bool,
                             ))
                         }
                         syntax::Binop::And => {
@@ -2572,7 +2572,7 @@ impl<'modules> Typechecker<'modules> {
                             let right_core = self.check_expr(right, &core::Type::Bool)?;
                             Ok((
                                 core::Expr::mk_binop(*op, left_core, right_core),
-                                core::Type::Int,
+                                core::Type::Bool,
                             ))
                         }
 
@@ -2594,6 +2594,34 @@ impl<'modules> Typechecker<'modules> {
                         }
                         syntax::Binop::Lte => {
                             todo!("<=")
+                        }
+                        syntax::Binop::LApply => {
+                            let in_ty = self.fresh_typevar(Kind::Type);
+                            let out_ty = self.fresh_typevar(Kind::Type);
+
+                            let left_core = self.check_expr(
+                                left,
+                                &core::Type::mk_arrow(
+                                    self.common_kinds,
+                                    in_ty.clone(),
+                                    out_ty.clone(),
+                                ),
+                            )?;
+                            let right_core = self.check_expr(right, &in_ty)?;
+
+                            Ok((core::Expr::mk_binop(*op, left_core, right_core), out_ty))
+                        }
+                        syntax::Binop::RApply => {
+                            let in_ty = self.fresh_typevar(Kind::Type);
+                            let out_ty = self.fresh_typevar(Kind::Type);
+
+                            let left_core = self.check_expr(left, &in_ty)?;
+                            let right_core = self.check_expr(
+                                right,
+                                &core::Type::mk_arrow(self.common_kinds, in_ty, out_ty.clone()),
+                            )?;
+
+                            Ok((core::Expr::mk_binop(*op, left_core, right_core), out_ty))
                         }
                     }
                 }

@@ -8,7 +8,7 @@ showMany : Show a => Int -> a -> String
 showMany n x =
   if eqInt n 0
   then ""
-  else "${show x}${showMany (subtract n 1) x}"
+  else "${show x}${showMany (n - 1) x}"
 
 main : IO ()
 main =

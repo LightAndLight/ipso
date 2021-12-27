@@ -5,7 +5,7 @@ pub mod r#type;
 
 use quickcheck::Arbitrary;
 pub use r#type::Type;
-use std::{hash::Hash, rc::Rc};
+use std::{cmp::Ordering, hash::Hash, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Spanned<A> {
@@ -128,6 +128,13 @@ pub fn is_keyword(val: &str) -> bool {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Assoc {
+    None,
+    Left,
+    Right,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 pub enum Binop {
     Add,
     Multiply,
@@ -145,6 +152,79 @@ pub enum Binop {
     Gte,
     Lt,
     Lte,
+
+    LApply,
+    RApply,
+}
+
+impl Binop {
+    pub fn assoc(&self) -> Assoc {
+        match self {
+            Binop::Add => Assoc::Left,
+            Binop::Multiply => Assoc::Left,
+            Binop::Subtract => Assoc::Left,
+            Binop::Divide => Assoc::Left,
+            Binop::Append => Assoc::Left,
+            Binop::Or => Assoc::Right,
+            Binop::And => Assoc::Right,
+            Binop::Eq => Assoc::None,
+            Binop::Neq => Assoc::None,
+            Binop::Gt => Assoc::None,
+            Binop::Gte => Assoc::None,
+            Binop::Lt => Assoc::None,
+            Binop::Lte => Assoc::None,
+            Binop::LApply => Assoc::Right,
+            Binop::RApply => Assoc::Left,
+        }
+    }
+
+    fn precedence(&self) -> u16 {
+        match self {
+            Binop::Multiply => 7,
+            Binop::Divide => 7,
+
+            Binop::Add => 6,
+            Binop::Subtract => 6,
+            Binop::Append => 6,
+
+            Binop::Eq => 5,
+            Binop::Neq => 5,
+            Binop::Gt => 5,
+            Binop::Gte => 5,
+            Binop::Lt => 5,
+            Binop::Lte => 5,
+
+            Binop::Or => 4,
+            Binop::And => 4,
+
+            Binop::LApply => 3,
+            Binop::RApply => 3,
+        }
+    }
+
+    pub fn compare_precedence(&self, other: &Binop) -> Ordering {
+        self.precedence().cmp(&other.precedence())
+    }
+
+    pub fn render(&self) -> &'static str {
+        match self {
+            Binop::Add => "+",
+            Binop::Multiply => "*",
+            Binop::Subtract => "-",
+            Binop::Divide => "/",
+            Binop::Append => "++",
+            Binop::Or => "||",
+            Binop::And => "&&",
+            Binop::Eq => "==",
+            Binop::Neq => "!=",
+            Binop::Gt => ">",
+            Binop::Gte => ">=",
+            Binop::Lt => "<",
+            Binop::Lte => "<=",
+            Binop::LApply => "<|",
+            Binop::RApply => "|>",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -346,6 +426,13 @@ impl Expr {
         Spanned {
             pos: a.pos,
             item: Expr::App(Rc::new(a), Rc::new(b)),
+        }
+    }
+
+    pub fn mk_binop(op: Binop, a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
+        Spanned {
+            pos: a.pos,
+            item: Expr::Binop(op, Rc::new(a), Rc::new(b)),
         }
     }
 

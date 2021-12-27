@@ -1,10 +1,10 @@
-atob : < A : x | r > -> < B : x | r >
+atob : (| A : x, r |) -> (| B : x, r |)
 atob val =
   case val of
     A x -> B x
-    r -> < B | r >
+    r -> (| B, ..r |)
 
-sayb : < B : x | r > -> IO ()
+sayb : (| B : x, r |) -> IO ()
 sayb val = 
   case val of
     B x -> print "B"
