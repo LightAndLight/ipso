@@ -1,4 +1,5 @@
 pub mod evidence;
+pub mod kind_inference;
 pub mod substitution;
 #[cfg(test)]
 mod test;
