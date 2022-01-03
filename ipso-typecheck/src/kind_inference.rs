@@ -1,6 +1,12 @@
-use std::rc::Rc;
+//! Kind checking and inference.
 
-use ipso_syntax::kind::{Kind, KindCompound};
+use crate::BoundVars;
+use ipso_core::{self as core, CommonKinds};
+use ipso_syntax::{
+    self as syntax,
+    kind::{Kind, KindCompound},
+};
+use std::{collections::HashMap, rc::Rc};
 
 /// A kind metavariable.
 pub type Meta = usize;
@@ -82,7 +88,7 @@ impl Solutions {
     /**
     Generate a new, unsolved metavariable.
     */
-    pub fn fresh(&mut self) -> Meta {
+    pub fn fresh_meta(&mut self) -> Meta {
         let m = self.solutions.len();
         self.solutions.push(Solution::Unsolved);
         m
@@ -152,21 +158,21 @@ impl Solutions {
 }
 
 /// A kind unification error.
-pub enum UnifyError {
+pub enum UnificationError {
     Mismatch { expected: Kind, actual: Kind },
     Occurs { meta: Meta, kind: Kind },
 }
 
-impl UnifyError {
+impl UnificationError {
     pub fn mismatch(expected: &Kind, actual: &Kind) -> Self {
-        UnifyError::Mismatch {
+        UnificationError::Mismatch {
             expected: expected.clone(),
             actual: actual.clone(),
         }
     }
 
     pub fn occurs(meta: Meta, kind: &Kind) -> Self {
-        UnifyError::Occurs {
+        UnificationError::Occurs {
             meta,
             kind: kind.clone(),
         }
@@ -196,10 +202,18 @@ Unify two kinds.
   { expected == actual }
   ```
 */
-pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Result<(), UnifyError> {
-    fn solve_left(solutions: &mut Solutions, meta: Meta, actual: &Kind) -> Result<(), UnifyError> {
+pub fn unify(
+    solutions: &mut Solutions,
+    expected: &Kind,
+    actual: &Kind,
+) -> Result<(), UnificationError> {
+    fn solve_left(
+        solutions: &mut Solutions,
+        meta: Meta,
+        actual: &Kind,
+    ) -> Result<(), UnificationError> {
         if solutions.occurs(meta, actual) {
-            Err(UnifyError::occurs(meta, actual))
+            Err(UnificationError::occurs(meta, actual))
         } else {
             solutions.set(meta, actual);
             Ok(())
@@ -210,9 +224,9 @@ pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Resul
         solutions: &mut Solutions,
         expected: &Kind,
         meta: Meta,
-    ) -> Result<(), UnifyError> {
+    ) -> Result<(), UnificationError> {
         if solutions.occurs(meta, expected) {
-            Err(UnifyError::occurs(meta, expected))
+            Err(UnificationError::occurs(meta, expected))
         } else {
             solutions.set(meta, expected);
             Ok(())
@@ -223,7 +237,7 @@ pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Resul
         solutions: &mut Solutions,
         meta: Meta,
         actual: &Kind,
-    ) -> Result<(), UnifyError> {
+    ) -> Result<(), UnificationError> {
         match solutions.get(meta).clone() {
             Solution::Unsolved => solve_left(solutions, meta, actual),
             Solution::Solved(expected) => unify(solutions, &expected, actual),
@@ -234,7 +248,7 @@ pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Resul
         solutions: &mut Solutions,
         expected: &Kind,
         meta: Meta,
-    ) -> Result<(), UnifyError> {
+    ) -> Result<(), UnificationError> {
         match solutions.get(meta).clone() {
             Solution::Unsolved => solve_right(solutions, expected, meta),
             Solution::Solved(actual) => unify(solutions, expected, &actual),
@@ -246,17 +260,17 @@ pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Resul
         Kind::Type => match actual {
             Kind::Meta(meta) => unify_meta_right(solutions, expected, *meta),
             Kind::Type => Ok(()),
-            _ => Err(UnifyError::mismatch(expected, actual)),
+            _ => Err(UnificationError::mismatch(expected, actual)),
         },
         Kind::Row => match actual {
             Kind::Meta(meta) => unify_meta_right(solutions, expected, *meta),
             Kind::Row => Ok(()),
-            _ => Err(UnifyError::mismatch(expected, actual)),
+            _ => Err(UnificationError::mismatch(expected, actual)),
         },
         Kind::Constraint => match actual {
             Kind::Meta(meta) => unify_meta_right(solutions, expected, *meta),
             Kind::Constraint => Ok(()),
-            _ => Err(UnifyError::mismatch(expected, actual)),
+            _ => Err(UnificationError::mismatch(expected, actual)),
         },
         Kind::Ref(expected_ref) => match expected_ref.as_ref() {
             KindCompound::Arrow(expected_a, expected_b) => match actual {
@@ -267,8 +281,157 @@ pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Resul
                         unify(solutions, expected_b, actual_b)
                     }
                 },
-                _ => Err(UnifyError::mismatch(expected, actual)),
+                _ => Err(UnificationError::mismatch(expected, actual)),
             },
         },
     }
+}
+
+/// A kind inference error.
+pub enum InferenceError {
+    NotInScope { name: Rc<str> },
+    UnificationError(UnificationError),
+}
+
+impl From<UnificationError> for InferenceError {
+    fn from(err: UnificationError) -> Self {
+        InferenceError::UnificationError(err)
+    }
+}
+
+/// Kind inference context.
+pub struct InferenceContext<'a> {
+    common_kinds: &'a CommonKinds,
+    types: &'a HashMap<Rc<str>, Kind>,
+    type_variables: &'a BoundVars<Kind>,
+    kind_solutions: &'a mut Solutions,
+}
+
+impl<'a> InferenceContext<'a> {
+    pub fn new(
+        common_kinds: &'a CommonKinds,
+        types: &'a HashMap<Rc<str>, Kind>,
+        type_variables: &'a BoundVars<Kind>,
+        kind_solutions: &'a mut Solutions,
+    ) -> Self {
+        InferenceContext {
+            common_kinds,
+            types,
+            type_variables,
+            kind_solutions,
+        }
+    }
+
+    /// Generate a fresh kind metavariable.
+    pub fn fresh_meta(&mut self) -> Kind {
+        Kind::Meta(self.kind_solutions.fresh_meta())
+    }
+
+    /// Infer a type's kind.
+    pub fn infer(
+        &mut self,
+        ty: &syntax::Type<Rc<str>>,
+    ) -> Result<(core::Type, Kind), InferenceError> {
+        match ty {
+            syntax::Type::Unit => Ok((core::Type::Unit, Kind::Type)),
+            syntax::Type::Bool => Ok((core::Type::Bool, Kind::Type)),
+            syntax::Type::Int => Ok((core::Type::Int, Kind::Type)),
+            syntax::Type::Char => Ok((core::Type::Char, Kind::Type)),
+            syntax::Type::String => Ok((core::Type::String, Kind::Type)),
+            syntax::Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
+            syntax::Type::Cmd => Ok((core::Type::Cmd, Kind::Type)),
+            syntax::Type::Arrow => {
+                let kind = self.common_kinds.type_to_type_to_type.clone();
+                Ok((core::Type::Arrow(kind.clone()), kind))
+            }
+            syntax::Type::Array => {
+                let kind = self.common_kinds.type_to_type.clone();
+                Ok((core::Type::Array(kind.clone()), kind))
+            }
+            syntax::Type::IO => {
+                let kind = self.common_kinds.type_to_type.clone();
+                Ok((core::Type::IO(kind.clone()), kind))
+            }
+
+            syntax::Type::Record => {
+                let kind = self.common_kinds.row_to_type.clone();
+                Ok((core::Type::Record(kind.clone()), kind))
+            }
+            syntax::Type::Variant => {
+                let kind = self.common_kinds.row_to_type.clone();
+                Ok((core::Type::Variant(kind.clone()), kind))
+            }
+            syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
+            syntax::Type::RowCons(field, ty, rest) => {
+                let ty = self.check(ty, &Kind::Type)?;
+                let rest = self.check(rest, &Kind::Row)?;
+                Ok((core::Type::mk_rowcons(field.clone(), ty, rest), Kind::Row))
+            }
+            syntax::Type::HasField(field, row) => {
+                let row = self.check(row, &Kind::Row)?;
+                Ok((
+                    core::Type::mk_hasfield(field.clone(), row),
+                    Kind::Constraint,
+                ))
+            }
+
+            syntax::Type::FatArrow => {
+                let kind = self.common_kinds.constraint_to_type_to_type.clone();
+                Ok((core::Type::FatArrow(kind.clone()), kind))
+            }
+            syntax::Type::Constraints(constraints) => {
+                let constraints: Vec<core::Type> = constraints
+                    .iter()
+                    .map(|constraint| self.check(constraint, &Kind::Constraint))
+                    .collect::<Result<_, _>>()?;
+                Ok((core::Type::Constraints(constraints), Kind::Constraint))
+            }
+
+            syntax::Type::App(a, b) => {
+                let in_kind = self.fresh_meta();
+                let out_kind = self.fresh_meta();
+                let a = self.check(a, &Kind::mk_arrow(&in_kind, &out_kind))?;
+                let b = self.check(b, &in_kind)?;
+                Ok((core::Type::mk_app(a, b), out_kind))
+            }
+
+            syntax::Type::Name(name) => match self.types.get(name) {
+                Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
+                None => Err(InferenceError::NotInScope { name: name.clone() }),
+            },
+            syntax::Type::Var(name) => match self.type_variables.lookup_name(name) {
+                Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
+                None => Err(InferenceError::NotInScope { name: name.clone() }),
+            },
+            syntax::Type::Meta(_) => todo!(),
+        }
+    }
+
+    /// Check a type's kind.
+    pub fn check(
+        &mut self,
+        ty: &syntax::Type<Rc<str>>,
+        expected_kind: &Kind,
+    ) -> Result<core::Type, InferenceError> {
+        let (ty, actual_kind) = self.infer(ty)?;
+        unify(self.kind_solutions, expected_kind, &actual_kind)?;
+        Ok(ty)
+    }
+}
+
+/// Infer a type's kind.
+pub fn infer(
+    ctx: &mut InferenceContext,
+    ty: &syntax::Type<Rc<str>>,
+) -> Result<(core::Type, Kind), InferenceError> {
+    ctx.infer(ty)
+}
+
+/// Check a type's kind.
+pub fn check(
+    ctx: &mut InferenceContext,
+    ty: &syntax::Type<Rc<str>>,
+    expected_kind: &Kind,
+) -> Result<core::Type, InferenceError> {
+    ctx.check(ty, expected_kind)
 }
