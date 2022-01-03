@@ -2,10 +2,10 @@ use std::rc::Rc;
 
 use ipso_syntax::kind::{Kind, KindCompound};
 
-/// The type of kind metavariables.
+/// A kind metavariable.
 pub type Meta = usize;
 
-/// The type of kind metavariable solutions.
+/// A kind metavariable solution.
 #[derive(Clone)]
 pub enum Solution {
     Unsolved,
@@ -26,6 +26,21 @@ pub struct Solutions {
     solutions: Vec<Solution>,
 }
 
+/**
+# Preconditions
+
+* [`Meta`] arguments must be valid.
+
+  `self.contains(meta)`
+
+  Applies to: [`Solutions::get`], [`Solutions::set`]
+
+* [`Kind`] arguments must contain valid metavariables.
+
+  `kind.iter_metas().all(|meta| self.contains(meta))`
+
+  Applies to: [`Solutions::set`], [`Solutions::zonk`], [`Solutions::occurs`]
+*/
 impl Solutions {
     /**
     Check whether a metavariable is in the [`Solutions`]' domain.
@@ -36,10 +51,6 @@ impl Solutions {
 
     /**
     Get a metavariable's solution.
-
-    # Preconditions
-
-    * `self.contains(meta)`
     */
     pub fn get(&self, meta: Meta) -> &Solution {
         self.solutions
@@ -54,7 +65,6 @@ impl Solutions {
 
     # Preconditions
 
-    * `self.contains(meta)`
     * `self.get(meta).is_unsolved()`
     */
     pub fn set(&mut self, meta: Meta, kind: &Kind) {
@@ -80,10 +90,6 @@ impl Solutions {
 
     /**
     Check whether the metavariable occurs in a kind.
-
-    # Preconditions
-
-    * `kind.iter_metas().all(|meta| self.contains(meta))`
     */
     pub fn occurs(&self, meta: Meta, kind: &Kind) -> bool {
         match kind {
@@ -106,15 +112,17 @@ impl Solutions {
     /**
     Substitute all solved metavariables in a kind.
 
-    # Preconditions
-
-    * `kind.iter_metas().all(|meta| self.contains(meta))`
-
     # Laws
 
-    * Idempotence
+    * All solved metavariables are substituted.
 
-      `{ self.zonk(&mut kind); self.zonk(&mut kind); kind } == { self.zonk(&mut kind); kind }`
+      ```text
+      { kind.iter_metas().all(|meta| self.contains(meta)) }
+
+      self.zonk(&mut kind)
+
+      { kind.iter_metas().all(|meta| self.contains(meta) && self.get(meta).is_unsolved()) }
+      ```
     */
     pub fn zonk(&self, kind: &mut Kind) {
         fn zonk_compound(solutions: &Solutions, kind: &mut KindCompound) {
@@ -143,6 +151,7 @@ impl Solutions {
     }
 }
 
+/// A kind unification error.
 pub enum UnifyError {
     Mismatch { expected: Kind, actual: Kind },
     Occurs { meta: Meta, kind: Kind },
@@ -164,6 +173,29 @@ impl UnifyError {
     }
 }
 
+/**
+Unify two kinds.
+
+# Preconditions
+
+* [`Kind`] arguments must contain valid metavariables.
+
+  `expected.iter_metas().all(|meta| solutions.contains(meta))`
+
+  `actual.iter_metas().all(|meta| solutions.contains(meta))`
+
+# Laws
+
+* Unified types are equalised by solving metavariables.
+
+  ```text
+  { self.unify(expected, actual).is_ok() }
+
+  self.zonk(expected); self.zonk(actual)
+
+  { expected == actual }
+  ```
+*/
 pub fn unify(solutions: &mut Solutions, expected: &Kind, actual: &Kind) -> Result<(), UnifyError> {
     fn solve_left(solutions: &mut Solutions, meta: Meta, actual: &Kind) -> Result<(), UnifyError> {
         if solutions.occurs(meta, actual) {
