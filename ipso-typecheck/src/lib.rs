@@ -26,7 +26,7 @@ use std::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-struct BoundVars<A> {
+pub struct BoundVars<A> {
     indices: HashMap<Rc<str>, Vec<usize>>,
     info: Vec<(Rc<str>, A)>,
 }
