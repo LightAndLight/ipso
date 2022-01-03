@@ -123,7 +123,7 @@ fn solve_constraint_4() {
 
         let eq_ty = core::Type::unsafe_mk_name(
             Rc::from("Eq"),
-            Kind::mk_arrow(Kind::Type, Kind::Constraint),
+            Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         tc.register_instance(
             &Vec::new(),

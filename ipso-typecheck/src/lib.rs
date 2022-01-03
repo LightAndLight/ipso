@@ -637,14 +637,14 @@ impl<'modules> Typechecker<'modules> {
             .iter()
             .rev()
             .fold(Kind::Constraint, |acc, (_, arg_kind)| {
-                Kind::mk_arrow(arg_kind.clone(), acc)
+                Kind::mk_arrow(arg_kind, &acc)
             });
         let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
 
         // generate constraint's kind
         let mut constraint_kind = Kind::Constraint;
         for (_, kind) in decl.args.iter().rev() {
-            constraint_kind = Kind::mk_arrow(kind.clone(), Kind::Constraint);
+            constraint_kind = Kind::mk_arrow(kind, &Kind::Constraint);
         }
         self.type_context.insert(decl_name.clone(), constraint_kind);
 
