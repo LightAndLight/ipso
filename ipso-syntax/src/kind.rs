@@ -27,8 +27,8 @@ impl Kind {
         KindIterMetas::One(self)
     }
 
-    pub fn mk_arrow(a: Kind, b: Kind) -> Self {
-        Kind::Ref(Rc::new(KindCompound::Arrow(a, b)))
+    pub fn mk_arrow(a: &Kind, b: &Kind) -> Self {
+        Kind::Ref(Rc::new(KindCompound::Arrow(a.clone(), b.clone())))
     }
 
     pub fn render(&self) -> String {
