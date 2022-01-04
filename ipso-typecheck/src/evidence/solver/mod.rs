@@ -1,6 +1,6 @@
 use crate::{
     substitution::Substitution, Implication, SolveConstraintContext, TypeError, Typechecker,
-    UnifyKindContextRefs, UnifyTypeContextRefs,
+    UnifyTypeContextRefs,
 };
 use ipso_core::{self as core, Expr, Placeholder};
 use ipso_syntax::{kind::Kind, Binop};
@@ -29,7 +29,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            let _ = tc.check_kind(None, constraint.to_syntax(), &Kind::Constraint)?;
+            debug_assert!(tc.zonk_kind(false, constraint.kind()) == Kind::Constraint);
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -115,15 +115,8 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            tc.unify_kind(
-                &UnifyKindContextRefs {
-                    ty: rest,
-                    has_kind: &Kind::Row,
-                    unifying_types: None,
-                },
-                &Kind::Row,
-                &rest.kind(),
-            )?;
+            debug_assert!(tc.zonk_kind(false, rest.kind()) == Kind::Row);
+
             let new_evidence = match rest {
                 core::Type::RowNil => Ok(core::Expr::Int(0)),
                 core::Type::RowCons(other_field, _, other_rest) => {
@@ -182,7 +175,7 @@ pub fn solve_constraint(
                     // will never recieve solutions
                     match sol.clone() {
                         None => {
-                            match tc.zonk_kind(false, kind) {
+                            match tc.zonk_kind(false, kind.clone()) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {

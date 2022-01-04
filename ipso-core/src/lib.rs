@@ -53,12 +53,12 @@ pub struct CommonKinds {
 
 impl Default for CommonKinds {
     fn default() -> Self {
-        let type_to_type = Kind::mk_arrow(Kind::Type, Kind::Type);
+        let type_to_type = Kind::mk_arrow(&Kind::Type, &Kind::Type);
         Self {
-            type_to_type_to_type: Kind::mk_arrow(Kind::Type, type_to_type.clone()),
-            constraint_to_type_to_type: Kind::mk_arrow(Kind::Constraint, type_to_type.clone()),
+            type_to_type_to_type: Kind::mk_arrow(&Kind::Type, &type_to_type),
+            constraint_to_type_to_type: Kind::mk_arrow(&Kind::Constraint, &type_to_type),
             type_to_type,
-            row_to_type: Kind::mk_arrow(Kind::Row, Kind::Type),
+            row_to_type: Kind::mk_arrow(&Kind::Row, &Kind::Type),
         }
     }
 }
@@ -1529,7 +1529,7 @@ impl ClassDeclaration {
             .iter()
             .rev()
             .fold(Kind::Constraint, |acc, (_, arg_kind)| {
-                Kind::mk_arrow(arg_kind.clone(), acc)
+                Kind::mk_arrow(arg_kind, &acc)
             });
         let name_ty = Type::unsafe_mk_name(self.name.clone(), name_kind);
 
