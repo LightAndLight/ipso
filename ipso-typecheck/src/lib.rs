@@ -851,7 +851,7 @@ impl<'modules> Typechecker<'modules> {
             .bound_tyvars
             .info
             .iter()
-            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind)))
+            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
             .collect();
         let sig = core::TypeSig { ty_vars, body: ty };
 
@@ -985,8 +985,8 @@ impl<'modules> Typechecker<'modules> {
         self.bound_tyvars.delete(ty_var_kinds.len());
 
         let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
-            .iter()
-            .map(|(a, b)| (a.clone(), self.zonk_kind(true, b)))
+            .into_iter()
+            .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
             .collect();
         let sig = core::TypeSig {
             ty_vars,
@@ -1047,7 +1047,7 @@ impl<'modules> Typechecker<'modules> {
             name: name.clone(),
             args: args_kinds
                 .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(true, &kind)))
+                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
                 .collect::<Vec<(Rc<str>, Kind)>>(),
             members,
         }))
@@ -1200,7 +1200,7 @@ impl<'modules> Typechecker<'modules> {
 
         let ty_vars = ty_var_kinds
             .into_iter()
-            .map(|(a, b)| (a, self.zonk_kind(true, &b)))
+            .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
             .collect();
 
         Ok(core::Declaration::Instance {
@@ -1321,8 +1321,12 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn zonk_type(&self, ty: &core::Type) -> core::Type {
         match ty {
-            core::Type::Name(k, n) => core::Type::Name(self.zonk_kind(false, k), n.clone()),
-            core::Type::Var(k, n) => core::Type::Var(self.zonk_kind(false, k), *n),
+            core::Type::Name(kind, name) => {
+                core::Type::Name(self.zonk_kind(false, kind.clone()), name.clone())
+            }
+            core::Type::Var(kind, name) => {
+                core::Type::Var(self.zonk_kind(false, kind.clone()), *name)
+            }
             core::Type::Bool => core::Type::Bool,
             core::Type::Int => core::Type::Int,
             core::Type::Char => core::Type::Char,
@@ -1331,8 +1335,8 @@ impl<'modules> Typechecker<'modules> {
             core::Type::Constraints(cs) => {
                 core::Type::Constraints(cs.iter().map(|c| self.zonk_type(c)).collect())
             }
-            core::Type::App(k, a, b) => core::Type::App(
-                self.zonk_kind(false, k),
+            core::Type::App(kind, a, b) => core::Type::App(
+                self.zonk_kind(false, kind.clone()),
                 Rc::new(self.zonk_type(a)),
                 Rc::new(self.zonk_type(b)),
             ),
@@ -1345,8 +1349,8 @@ impl<'modules> Typechecker<'modules> {
             core::Type::HasField(field, rest) => {
                 core::Type::mk_hasfield(field.clone(), self.zonk_type(rest))
             }
-            core::Type::Meta(k, n) => match &self.type_solutions[*n].1 {
-                None => core::Type::Meta(self.zonk_kind(false, k), *n),
+            core::Type::Meta(kind, n) => match &self.type_solutions[*n].1 {
+                None => core::Type::Meta(self.zonk_kind(false, kind.clone()), *n),
                 Some(ty) => self.zonk_type(ty),
             },
             // These types have known kinds that don't need to be zonked
@@ -1359,9 +1363,8 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    // TODO: make this operate on `&mut Kind`
-    pub fn zonk_kind(&self, close_unsolved: bool, kind: &Kind) -> Kind {
-        self.kind_solutions.zonk(close_unsolved, kind.clone())
+    pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {
+        self.kind_solutions.zonk(close_unsolved, kind)
     }
 
     fn fresh_kind_meta(&mut self) -> Kind {

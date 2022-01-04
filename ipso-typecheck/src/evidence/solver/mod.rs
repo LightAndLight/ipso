@@ -29,7 +29,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            debug_assert!(tc.zonk_kind(false, &constraint.kind()) == Kind::Constraint);
+            debug_assert!(tc.zonk_kind(false, constraint.kind()) == Kind::Constraint);
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -115,7 +115,7 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            debug_assert!(tc.zonk_kind(false, &rest.kind()) == Kind::Row);
+            debug_assert!(tc.zonk_kind(false, rest.kind()) == Kind::Row);
 
             let new_evidence = match rest {
                 core::Type::RowNil => Ok(core::Expr::Int(0)),
@@ -175,7 +175,7 @@ pub fn solve_constraint(
                     // will never recieve solutions
                     match sol.clone() {
                         None => {
-                            match tc.zonk_kind(false, kind) {
+                            match tc.zonk_kind(false, kind.clone()) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
