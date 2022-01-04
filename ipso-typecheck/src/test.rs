@@ -2,8 +2,7 @@ use super::SolveConstraintContext;
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    BoundVars, InferredPattern, TypeError, Typechecker, UnifyKindContext, UnifyKindContextRefs,
-    UnifyTypeContext, UnifyTypeContextRefs,
+    BoundVars, InferredPattern, TypeError, Typechecker, UnifyTypeContext, UnifyTypeContextRefs,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -17,65 +16,6 @@ use ipso_util::void::Void;
 use std::collections::HashSet;
 #[cfg(test)]
 use std::rc::Rc;
-
-#[test]
-fn infer_kind_test_1() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok((core::Type::Bool, Kind::Type));
-        let actual = tc.infer_kind(Type::Bool);
-        assert_eq!(expected, actual)
-    })
-}
-
-#[test]
-fn infer_kind_test_2() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok((core::Type::RowNil, Kind::Row));
-        let actual = tc.infer_kind(Type::RowNil);
-        assert_eq!(expected, actual)
-    })
-}
-
-#[test]
-fn infer_kind_test_3() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Err(TypeError::KindMismatch {
-            source: Source::Interactive {
-                label: String::from("(typechecker)"),
-            },
-            pos: 0,
-            context: UnifyKindContext {
-                ty: Type::RowNil,
-                has_kind: Kind::Type,
-                unifying_types: None,
-            },
-            expected: Kind::Type,
-            actual: Kind::Row,
-        });
-        let actual = tc.infer_kind(Type::mk_rowcons(Rc::from("x"), Type::RowNil, Type::RowNil));
-        assert_eq!(expected, actual)
-    })
-}
-
-#[test]
-fn infer_kind_test_4() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let expected = Ok((
-            core::Type::mk_app(
-                core::Type::mk_record_ctor(tc.common_kinds),
-                core::Type::mk_rowcons(Rc::from("x"), core::Type::Bool, core::Type::RowNil),
-            ),
-            Kind::Type,
-        ));
-        let actual = tc
-            .infer_kind(Type::mk_app(
-                Type::Record,
-                Type::mk_rowcons(Rc::from("x"), Type::Bool, Type::RowNil),
-            ))
-            .map(|(ty, kind)| (tc.zonk_type(&ty), tc.zonk_kind(false, &kind)));
-        assert_eq!(expected, actual)
-    })
-}
 
 #[test]
 fn context_test_1() {
@@ -1801,33 +1741,6 @@ fn check_definition_4() {
 }
 
 #[test]
-fn kind_occurs_1() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let v1 = tc.fresh_kindvar();
-        let v2 = tc.fresh_kindvar();
-        assert_eq!(
-            tc.unify_kind(
-                &UnifyKindContextRefs {
-                    ty: &core::Type::Unit,
-                    has_kind: &Kind::Type,
-                    unifying_types: None
-                },
-                &v1,
-                &Kind::mk_arrow(v1.clone(), v2.clone())
-            ),
-            Err(TypeError::KindOccurs {
-                source: Source::Interactive {
-                    label: String::from("(typechecker)"),
-                },
-                pos: 0,
-                meta: 0,
-                kind: Kind::mk_arrow(v1, v2)
-            })
-        )
-    })
-}
-
-#[test]
 fn type_occurs_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let v1 = tc.fresh_typevar(Kind::Type);
@@ -1939,7 +1852,7 @@ fn check_class_1() {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             let eq_ty = core::Type::unsafe_mk_name(
                 Rc::from("Eq"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             (
                 core::TypeSig {
@@ -2051,7 +1964,7 @@ fn check_class_2() {
         let expected_member = {
             let wut_ty = core::Type::unsafe_mk_name(
                 Rc::from("Wut"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             let a = core::Type::unsafe_mk_var(1, Kind::Type);
             let b = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -2088,7 +2001,7 @@ fn check_instance_1() {
         let expected = {
             let eq_ty = core::Type::unsafe_mk_name(
                 Rc::from("Eq"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             Ok(Some(core::Declaration::Instance {
                 ty_vars: Vec::new(),
@@ -2211,7 +2124,7 @@ fn class_and_instance_1() {
         {
             let eq_ty = core::Type::unsafe_mk_name(
                 Rc::from("Eq"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&core::ClassDeclaration {
@@ -2299,7 +2212,7 @@ fn class_and_instance_1() {
         let expected_instance_eq_int_result = {
             let eq_ty = core::Type::unsafe_mk_name(
                 Rc::from("Eq"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             Ok(Some(core::Declaration::Instance {
                 ty_vars: Vec::new(),
@@ -2325,7 +2238,7 @@ fn class_and_instance_1() {
         let expected_instance_ord_int_result = {
             let ord_ty = core::Type::unsafe_mk_name(
                 Rc::from("Ord"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             Ok(Some(core::Declaration::Instance {
                 ty_vars: Vec::new(),
@@ -2396,7 +2309,7 @@ fn class_and_instance_2() {
 
             let eq_ty = core::Type::unsafe_mk_name(
                 Rc::from("Eq"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             tc.register_class(&core::ClassDeclaration {
                 supers: vec![core::Type::mk_app(eq_ty, a.clone())],
@@ -2473,7 +2386,7 @@ fn class_and_instance_2() {
 
         let eq_ty = core::Type::unsafe_mk_name(
             Rc::from("Eq"),
-            Kind::mk_arrow(Kind::Type, Kind::Constraint),
+            Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         let expected_instance_eq_int_result = Ok(Some(core::Declaration::Instance {
             ty_vars: Vec::new(),
@@ -2566,7 +2479,7 @@ fn class_and_instance_2() {
         let expected_instance_ord_array_result = {
             let ord_ty = core::Type::unsafe_mk_name(
                 Rc::from("Ord"),
-                Kind::mk_arrow(Kind::Type, Kind::Constraint),
+                Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             Ok(Some(core::Declaration::Instance {
