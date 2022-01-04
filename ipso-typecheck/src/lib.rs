@@ -2622,10 +2622,10 @@ impl<'modules> Typechecker<'modules> {
 
                     match ret_ty {
                         Err(end) => {
-                            debug_assert!(matches!(
-                                checked_lines.last().unwrap(),
-                                CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. }
-                            ));
+                            debug_assert!(match checked_lines.last() {
+                                Some(_) => matches!(end, CompExprEnd::Bind | CompExprEnd::Let),
+                                None => matches!(end, CompExprEnd::None),
+                            });
 
                             Err(TypeError::CompExprEndsWith {
                                 end,
@@ -2634,9 +2634,9 @@ impl<'modules> Typechecker<'modules> {
                             })
                         }
                         Ok(ret_ty) => {
-                            debug_assert!(!matches!(
-                                checked_lines.last().unwrap(),
-                                CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. }
+                            debug_assert!(matches!(
+                                checked_lines.last(),
+                                Some(CheckedCompLine::Expr { .. })
                             ));
 
                             let mut desugared: core::Expr = match checked_lines.pop().unwrap() {
