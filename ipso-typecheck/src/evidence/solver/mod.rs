@@ -29,9 +29,7 @@ pub fn solve_constraint(
 ) -> Result<core::Expr, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            // TODO: figure out if we can assume Constraints to be well-kinded
-            //
-            // let _ = tc.check_kind(constraint, &Kind::Constraint)?;
+            debug_assert!(tc.zonk_kind(false, &constraint.kind()) == Kind::Constraint);
 
             match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
                 None => {}
@@ -117,8 +115,8 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            // TODO: figure out if we can assume Constraints to be well-kinded
-            // tc.check_kind(&rest.kind(), &Kind::Row)?;
+            debug_assert!(tc.zonk_kind(false, &rest.kind()) == Kind::Row);
+
             let new_evidence = match rest {
                 core::Type::RowNil => Ok(core::Expr::Int(0)),
                 core::Type::RowCons(other_field, _, other_rest) => {
