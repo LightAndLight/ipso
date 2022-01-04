@@ -1,6 +1,5 @@
-use std::rc::Rc;
-
 use ipso_util::iter::Step;
+use std::rc::Rc;
 
 /**
 A compound kind.
