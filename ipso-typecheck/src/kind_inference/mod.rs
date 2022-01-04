@@ -1,5 +1,8 @@
 //! Kind checking and inference.
 
+#[cfg(test)]
+mod test;
+
 use crate::BoundVars;
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{
@@ -28,6 +31,7 @@ impl Solution {
 }
 
 /// A mapping from kind metavariables to their solutions.
+#[derive(Default)]
 pub struct Solutions {
     solutions: Vec<Solution>,
 }
@@ -48,6 +52,10 @@ pub struct Solutions {
   Applies to: [`Solutions::set`], [`Solutions::zonk`], [`Solutions::occurs`]
 */
 impl Solutions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /**
     Check whether a metavariable is in the [`Solutions`]' domain.
     */
@@ -118,6 +126,8 @@ impl Solutions {
     /**
     Substitute all solved metavariables in a kind.
 
+    If `close_unsolved` is `true`, then any unsolved metavariables are replaced with [`Kind::Type`].
+
     # Laws
 
     * All solved metavariables are substituted.
@@ -125,39 +135,59 @@ impl Solutions {
       ```text
       { kind.iter_metas().all(|meta| self.contains(meta)) }
 
-      self.zonk(&mut kind)
+      let kind = self.zonk(close_unsolved, kind);
 
       { kind.iter_metas().all(|meta| self.contains(meta) && self.get(meta).is_unsolved()) }
       ```
+
+    * When `close_unsolved` is `true`, no metavariables are left in the kind.
+
+      ```text
+      { kind.iter_metas().all(|meta| self.contains(meta)) }
+
+      let kind = self.zonk(true, kind);
+
+      { kind.iter_metas().count() == 0 }
+      ```
     */
-    pub fn zonk(&self, kind: &mut Kind) {
-        fn zonk_compound(solutions: &Solutions, kind: &mut KindCompound) {
+    pub fn zonk(&self, close_unsolved: bool, mut kind: Kind) -> Kind {
+        fn zonk_compound(solutions: &Solutions, close_unsolved: bool, kind: &mut KindCompound) {
             match kind {
                 KindCompound::Arrow(a, b) => {
-                    solutions.zonk(a);
-                    solutions.zonk(b);
+                    zonk_simple(solutions, close_unsolved, a);
+                    zonk_simple(solutions, close_unsolved, b);
                 }
             }
         }
 
-        match kind {
-            Kind::Type => {}
-            Kind::Row => {}
-            Kind::Constraint => {}
-            Kind::Meta(meta) => match self.get(*meta) {
-                Solution::Unsolved => {}
-                Solution::Solved(new_kind) => {
-                    *kind = new_kind.clone();
+        fn zonk_simple(solutions: &Solutions, close_unsolved: bool, kind: &mut Kind) {
+            match kind {
+                Kind::Type => {}
+                Kind::Row => {}
+                Kind::Constraint => {}
+                Kind::Meta(meta) => match solutions.get(*meta) {
+                    Solution::Unsolved => {
+                        if close_unsolved {
+                            *kind = Kind::Type;
+                        }
+                    }
+                    Solution::Solved(new_kind) => {
+                        *kind = new_kind.clone();
+                    }
+                },
+                Kind::Ref(kind_ref) => {
+                    zonk_compound(solutions, close_unsolved, Rc::make_mut(kind_ref));
                 }
-            },
-            Kind::Ref(kind_ref) => {
-                zonk_compound(self, Rc::make_mut(kind_ref));
             }
         }
+
+        zonk_simple(self, close_unsolved, &mut kind);
+        kind
     }
 }
 
 /// A kind unification error.
+#[derive(Debug, PartialEq, Eq)]
 pub enum UnificationError {
     Mismatch { expected: Kind, actual: Kind },
     Occurs { meta: Meta, kind: Kind },
@@ -288,6 +318,7 @@ pub fn unify(
 }
 
 /// Extra context for kind inference errors.
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InferenceErrorHint {
     WhileChecking {
         ty: syntax::Type<Rc<str>>,
@@ -299,6 +330,7 @@ pub enum InferenceErrorHint {
 }
 
 /// Kind inference error information.
+#[derive(Debug, PartialEq, Eq)]
 pub enum InferenceErrorInfo {
     NotInScope { name: Rc<str> },
     UnificationError { error: UnificationError },
@@ -311,16 +343,43 @@ impl From<UnificationError> for InferenceErrorInfo {
 }
 
 /// A kind inference error.
+#[derive(Debug, PartialEq, Eq)]
 pub struct InferenceError {
     pub info: InferenceErrorInfo,
     pub hint: Option<InferenceErrorHint>,
 }
 
 impl InferenceError {
-    /// Construct a [`NotInScope`](InferenceErrorInfo) error.
+    /// Construct a [`NotInScope`](InferenceErrorInfo::NotInScope) error.
     pub fn not_in_scope(name: Rc<str>) -> Self {
         InferenceError {
             info: InferenceErrorInfo::NotInScope { name },
+            hint: None,
+        }
+    }
+
+    /// Construct a [`Mismatch`](UnificationError::Mismatch) error.
+    pub fn mismatch(expected: &Kind, actual: &Kind) -> Self {
+        InferenceError {
+            info: InferenceErrorInfo::UnificationError {
+                error: UnificationError::Mismatch {
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                },
+            },
+            hint: None,
+        }
+    }
+
+    /// Construct an [`Occurs`](UnificationError::Occurs) error.
+    pub fn occurs(meta: Meta, kind: &Kind) -> Self {
+        InferenceError {
+            info: InferenceErrorInfo::UnificationError {
+                error: UnificationError::Occurs {
+                    meta,
+                    kind: kind.clone(),
+                },
+            },
             hint: None,
         }
     }
