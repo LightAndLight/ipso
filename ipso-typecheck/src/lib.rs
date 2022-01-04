@@ -1486,27 +1486,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn unify_kind(
-        &mut self,
-        hint: &dyn Fn() -> kind_inference::InferenceErrorHint,
-        expected: &Kind,
-        actual: &Kind,
-    ) -> Result<(), TypeError> {
-        // kind_inference::unify(&mut self.kind_solutions, expected, actual).map_err(|error| todo!())
-        let mut ctx = kind_inference::InferenceContext::new(
-            self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
-            &mut self.kind_solutions,
-        );
-        ctx.unify(hint, expected, actual)
-            .map_err(|error| TypeError::KindError {
-                source: self.source(),
-                pos: self.current_position(),
-                error,
-            })
-    }
-
     pub fn unify_type_subst(
         &mut self,
         subst: &mut Substitution,
@@ -1520,21 +1499,47 @@ impl<'modules> Typechecker<'modules> {
         let expected_kind = expected.kind();
         let actual_kind = actual.kind();
 
-        // `bound_tyvars` is cloned to prevent the hint-constructing closure from borrowing `self`.
-        //
-        // TODO: figure out how to get rid the clone.
-        let bound_tyvars = self.bound_tyvars.clone();
+        /*
+        Unify the kinds of `expected` and `actual`.
 
-        self.unify_kind(
-            &|| kind_inference::InferenceErrorHint::WhileChecking {
-                ty: actual
-                    .to_syntax()
-                    .map(&mut |ix| bound_tyvars.lookup_index(*ix).unwrap().0.clone()),
-                has_kind: expected_kind.clone(),
-            },
-            &expected_kind,
-            &actual_kind,
-        )?;
+        This is an example of where 'borrowing a big struct' causes issues.
+
+        This block was originally a separate function, with the signature
+        `fn unify_kind(&mut self, hint: &dyn Fn() -> kind_inference::InferenceErrorHint, expected: &Kind, actual: &Kind)`.
+
+        Calling `self.unify_kind(...)` resulted in a borrow error, because the `hint`
+        closure mentioned `self.bound_tyvars`. The closure recieved a shared reference
+        to `self`, which meant that `unify_kind` could no longer receive an exclusive
+        reference.
+
+        Inlining the definition of `unify_kind` allows each field of `self` to be borrowed
+        individually. The fields used in the `hint` closure don't overlap with the fields
+        used in kind unification, so the borrow checker is happy.
+        */
+        {
+            // Borrow `bound_tyvars` explicitly to prevent the closure from borrowing `self`.
+            let bound_tyvars = &self.bound_tyvars;
+            let hint: &dyn Fn() -> kind_inference::InferenceErrorHint =
+                &|| kind_inference::InferenceErrorHint::WhileChecking {
+                    ty: actual
+                        .to_syntax()
+                        .map(&mut |ix| bound_tyvars.lookup_index(*ix).unwrap().0.clone()),
+                    has_kind: expected_kind.clone(),
+                };
+
+            let mut ctx = kind_inference::InferenceContext::new(
+                self.common_kinds,
+                &self.type_context,
+                &self.bound_tyvars,
+                &mut self.kind_solutions,
+            );
+            ctx.unify(hint, &expected_kind, &actual_kind)
+                .map_err(|error| TypeError::KindError {
+                    source: self.source(),
+                    pos: self.current_position(),
+                    error,
+                })
+        }?;
 
         match &expected {
             core::Type::App(_, a1, b1) => match actual {
