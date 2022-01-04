@@ -216,20 +216,19 @@ Unify two kinds.
 
 * [`Kind`] arguments must contain valid metavariables.
 
-  `expected.iter_metas().all(|meta| solutions.contains(meta))`
-
-  `actual.iter_metas().all(|meta| solutions.contains(meta))`
-
 # Laws
 
 * Unified types are equalised by solving metavariables.
 
   ```text
-  { self.unify(expected, actual).is_ok() }
+  {
+    expected.iter_metas().all(|meta| solutions.contains(meta)) &&
+    actual.iter_metas().all(|meta| solutions.contains(meta))
+  }
 
-  self.zonk(expected); self.zonk(actual)
+  let result = self.unify(expected, actual);
 
-  { expected == actual }
+  { result.is_ok() ==> self.zonk(expected) == self.zonk(actual) }
   ```
 */
 pub fn unify(
