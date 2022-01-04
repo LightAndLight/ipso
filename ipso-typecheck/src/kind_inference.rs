@@ -287,15 +287,57 @@ pub fn unify(
     }
 }
 
-/// A kind inference error.
-pub enum InferenceError {
-    NotInScope { name: Rc<str> },
-    UnificationError(UnificationError),
+/// Extra context for kind inference errors.
+pub enum InferenceErrorHint {
+    WhileChecking {
+        ty: syntax::Type<Rc<str>>,
+        has_kind: Kind,
+    },
+    WhileInferring {
+        ty: syntax::Type<Rc<str>>,
+    },
 }
 
-impl From<UnificationError> for InferenceError {
-    fn from(err: UnificationError) -> Self {
-        InferenceError::UnificationError(err)
+/// Kind inference error information.
+pub enum InferenceErrorInfo {
+    NotInScope { name: Rc<str> },
+    UnificationError { error: UnificationError },
+}
+
+impl From<UnificationError> for InferenceErrorInfo {
+    fn from(error: UnificationError) -> Self {
+        InferenceErrorInfo::UnificationError { error }
+    }
+}
+
+/// A kind inference error.
+pub struct InferenceError {
+    pub info: InferenceErrorInfo,
+    pub hint: Option<InferenceErrorHint>,
+}
+
+impl InferenceError {
+    /// Construct a [`NotInScope`](InferenceErrorInfo) error.
+    pub fn not_in_scope(name: Rc<str>) -> Self {
+        InferenceError {
+            info: InferenceErrorInfo::NotInScope { name },
+            hint: None,
+        }
+    }
+
+    /// Attach a [`hint`](InferenceErrorHint) to an [`InferenceError`].
+    pub fn with_hint(mut self, hint: InferenceErrorHint) -> Self {
+        self.hint = Some(hint);
+        self
+    }
+}
+
+impl<T: Into<InferenceErrorInfo>> From<T> for InferenceError {
+    fn from(error: T) -> Self {
+        InferenceError {
+            info: error.into(),
+            hint: None,
+        }
     }
 }
 
@@ -327,9 +369,21 @@ impl<'a> InferenceContext<'a> {
         Kind::Meta(self.kind_solutions.fresh_meta())
     }
 
+    /// Unify two kinds.
+    pub fn unify(
+        &mut self,
+        hint: &dyn Fn() -> InferenceErrorHint,
+        expected: &Kind,
+        actual: &Kind,
+    ) -> Result<(), InferenceError> {
+        unify(self.kind_solutions, expected, actual)
+            .map_err(|err| InferenceError::from(err).with_hint(hint()))
+    }
+
     /// Infer a type's kind.
     pub fn infer(
         &mut self,
+        hint: &dyn Fn() -> InferenceErrorHint,
         ty: &syntax::Type<Rc<str>>,
     ) -> Result<(core::Type, Kind), InferenceError> {
         match ty {
@@ -363,12 +417,12 @@ impl<'a> InferenceContext<'a> {
             }
             syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
             syntax::Type::RowCons(field, ty, rest) => {
-                let ty = self.check(ty, &Kind::Type)?;
-                let rest = self.check(rest, &Kind::Row)?;
+                let ty = self.check(hint, ty, &Kind::Type)?;
+                let rest = self.check(hint, rest, &Kind::Row)?;
                 Ok((core::Type::mk_rowcons(field.clone(), ty, rest), Kind::Row))
             }
             syntax::Type::HasField(field, row) => {
-                let row = self.check(row, &Kind::Row)?;
+                let row = self.check(hint, row, &Kind::Row)?;
                 Ok((
                     core::Type::mk_hasfield(field.clone(), row),
                     Kind::Constraint,
@@ -382,7 +436,7 @@ impl<'a> InferenceContext<'a> {
             syntax::Type::Constraints(constraints) => {
                 let constraints: Vec<core::Type> = constraints
                     .iter()
-                    .map(|constraint| self.check(constraint, &Kind::Constraint))
+                    .map(|constraint| self.check(hint, constraint, &Kind::Constraint))
                     .collect::<Result<_, _>>()?;
                 Ok((core::Type::Constraints(constraints), Kind::Constraint))
             }
@@ -390,18 +444,18 @@ impl<'a> InferenceContext<'a> {
             syntax::Type::App(a, b) => {
                 let in_kind = self.fresh_meta();
                 let out_kind = self.fresh_meta();
-                let a = self.check(a, &Kind::mk_arrow(&in_kind, &out_kind))?;
-                let b = self.check(b, &in_kind)?;
+                let a = self.check(hint, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
+                let b = self.check(hint, b, &in_kind)?;
                 Ok((core::Type::mk_app(a, b), out_kind))
             }
 
             syntax::Type::Name(name) => match self.types.get(name) {
                 Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
-                None => Err(InferenceError::NotInScope { name: name.clone() }),
+                None => Err(InferenceError::not_in_scope(name.clone()).with_hint(hint())),
             },
             syntax::Type::Var(name) => match self.type_variables.lookup_name(name) {
                 Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
-                None => Err(InferenceError::NotInScope { name: name.clone() }),
+                None => Err(InferenceError::not_in_scope(name.clone()).with_hint(hint())),
             },
             syntax::Type::Meta(_) => todo!(),
         }
@@ -410,11 +464,12 @@ impl<'a> InferenceContext<'a> {
     /// Check a type's kind.
     pub fn check(
         &mut self,
+        hint: &dyn Fn() -> InferenceErrorHint,
         ty: &syntax::Type<Rc<str>>,
         expected_kind: &Kind,
     ) -> Result<core::Type, InferenceError> {
-        let (ty, actual_kind) = self.infer(ty)?;
-        unify(self.kind_solutions, expected_kind, &actual_kind)?;
+        let (ty, actual_kind) = self.infer(hint, ty)?;
+        self.unify(hint, expected_kind, &actual_kind)?;
         Ok(ty)
     }
 }
@@ -424,7 +479,10 @@ pub fn infer(
     ctx: &mut InferenceContext,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), InferenceError> {
-    ctx.infer(ty)
+    ctx.infer(
+        &|| InferenceErrorHint::WhileInferring { ty: ty.clone() },
+        ty,
+    )
 }
 
 /// Check a type's kind.
@@ -433,5 +491,12 @@ pub fn check(
     ty: &syntax::Type<Rc<str>>,
     expected_kind: &Kind,
 ) -> Result<core::Type, InferenceError> {
-    ctx.check(ty, expected_kind)
+    ctx.check(
+        &|| InferenceErrorHint::WhileChecking {
+            ty: ty.clone(),
+            has_kind: expected_kind.clone(),
+        },
+        ty,
+        expected_kind,
+    )
 }
