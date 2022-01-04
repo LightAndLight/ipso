@@ -2,6 +2,14 @@ use std::rc::Rc;
 
 use ipso_util::iter::Step;
 
+/**
+A compound kind.
+
+This type is part of an implementation strategy to reduce the size of [`Kind`].
+
+[`Kind`] stores an `Rc<KindCompound>`, which costs 8 bytes. Every kind larger
+than 8 bytes is added here, so that the size of [`Kind`] remains unchanged.
+*/
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum KindCompound {
     Arrow(Kind, Kind),
@@ -13,6 +21,25 @@ impl KindCompound {
     }
 }
 
+/**
+# Size
+
+Kinds are stored in every kind-checked type, so it's important that kinds
+take up little space. This test ensured that no change increases the size of
+`Kind`:
+
+```
+use ipso_syntax::kind::Kind;
+
+assert_eq!(std::mem::size_of::<Kind>(), 16)
+```
+
+The situation could be improved by storing `&Kind` in checked types, which
+costs 8 bytes instead of the current 16. It wouldn't be worth it if it requires
+a 'viral' lifetime parameter everywhere types are used.
+
+Kinds larger than 8 bytes should be added to [`KindCompound`].
+*/
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Kind {
     Type,
