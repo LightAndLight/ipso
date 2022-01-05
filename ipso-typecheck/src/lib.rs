@@ -1,8 +1,10 @@
 pub mod evidence;
 pub mod kind_inference;
+pub mod metavariables;
 pub mod substitution;
 #[cfg(test)]
 mod test;
+pub mod type_inference;
 
 use self::substitution::Substitution;
 use diagnostic::{Location, Message};

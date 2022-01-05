@@ -3,7 +3,10 @@
 #[cfg(test)]
 mod test;
 
-use crate::BoundVars;
+use crate::{
+    metavariables::{self, Meta, Solution},
+    BoundVars,
+};
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{
     self as syntax,
@@ -11,95 +14,43 @@ use ipso_syntax::{
 };
 use std::{collections::HashMap, rc::Rc};
 
-/// A kind metavariable.
-pub type Meta = usize;
-
-/// A kind metavariable solution.
-#[derive(Clone)]
-pub enum Solution {
-    Unsolved,
-    Solved(Kind),
-}
-
-impl Solution {
-    fn is_unsolved(&self) -> bool {
-        match self {
-            Solution::Unsolved => true,
-            Solution::Solved(_) => false,
-        }
-    }
-}
-
 /// A mapping from kind metavariables to their solutions.
 #[derive(Default)]
-pub struct Solutions {
-    solutions: Vec<Solution>,
-}
+pub struct Solutions(pub metavariables::Solutions<Kind>);
 
 /**
 # Preconditions
-
-* [`Meta`] arguments must be valid.
-
-  `self.contains(meta)`
-
-  Applies to: [`Solutions::get`], [`Solutions::set`]
 
 * [`Kind`] arguments must contain valid metavariables.
 
   `kind.iter_metas().all(|meta| self.contains(meta))`
 
-  Applies to: [`Solutions::set`], [`Solutions::zonk`], [`Solutions::occurs`]
+  Applies to: [`Solutions::zonk`], [`Solutions::occurs`]
 */
 impl Solutions {
+    /// See [`metavariables::Solutions::new`]
     pub fn new() -> Self {
-        Self::default()
+        Solutions(metavariables::Solutions::new())
     }
 
-    /**
-    Check whether a metavariable is in the [`Solutions`]' domain.
-    */
+    /// See [`metavariables::Solutions::contains`]
     pub fn contains(&self, meta: Meta) -> bool {
-        meta < self.solutions.len()
+        self.0.contains(meta)
     }
 
-    /**
-    Get a metavariable's solution.
-    */
-    pub fn get(&self, meta: Meta) -> &Solution {
-        self.solutions
-            .get(meta)
-            .unwrap_or_else(|| panic!("meta {:?} not found", meta))
+    /// See [`metavariables::Solutions::get`]
+    pub fn get(&self, meta: Meta) -> &Solution<Kind> {
+        self.0.get(meta)
     }
 
-    /**
-    Set a metavariable's solution.
-
-    Each metavariable can only set once.
-
-    # Preconditions
-
-    * `self.get(meta).is_unsolved()`
-    */
+    /// See [`metavariables::Solutions::set`]
     pub fn set(&mut self, meta: Meta, kind: &Kind) {
-        let solution = self
-            .solutions
-            .get_mut(meta)
-            .unwrap_or_else(|| panic!("meta {:?} not found", meta));
-        if solution.is_unsolved() {
-            *solution = Solution::Solved(kind.clone());
-        } else {
-            panic!("meta {:?} has already been set", meta);
-        }
+        self.0.set(meta, kind)
     }
 
-    /**
-    Generate a new, unsolved metavariable.
-    */
+    /// See [`metavariables::Solutions::fresh_meta`]
     pub fn fresh_meta(&mut self) -> Meta {
-        let m = self.solutions.len();
-        self.solutions.push(Solution::Unsolved);
-        m
+        self.0.fresh_meta()
     }
 
     /**
