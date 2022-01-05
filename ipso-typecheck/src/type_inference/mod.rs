@@ -297,11 +297,6 @@ pub fn unify(
         }
     }
 
-    /*
-    This hint is why we explictly pass `type_variables` because, even though
-    `kind_inference::InferenceContext` contains a `&BoundVars<Kind>`. Borrowing
-    the `type_variables` from `kind_ctx` would cause an error.
-    */
     let hint: &dyn Fn() -> kind_inference::InferenceErrorHint =
         &|| kind_inference::InferenceErrorHint::WhileChecking {
             ty: actual.to_syntax().map(&mut |ix| {
