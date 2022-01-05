@@ -102,6 +102,14 @@ impl Solutions {
       ```
     */
     pub fn zonk(&self, close_unsolved: bool, mut kind: Kind) -> Kind {
+        self.zonk_mut(close_unsolved, &mut kind);
+        kind
+    }
+
+    /**
+    A mutable version of [`Solutions::zonk`].
+    */
+    pub fn zonk_mut(&self, close_unsolved: bool, kind: &mut Kind) {
         fn zonk_compound(solutions: &Solutions, close_unsolved: bool, kind: &mut KindCompound) {
             match kind {
                 KindCompound::Arrow(a, b) => {
@@ -132,8 +140,7 @@ impl Solutions {
             }
         }
 
-        zonk_simple(self, close_unsolved, &mut kind);
-        kind
+        zonk_simple(self, close_unsolved, kind);
     }
 }
 
