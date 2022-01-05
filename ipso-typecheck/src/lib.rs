@@ -853,7 +853,7 @@ impl<'modules> Typechecker<'modules> {
             .iter()
             .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
             .collect();
-        let sig = core::TypeSig { ty_vars, body: ty };
+        let sig = core::TypeSig::new(ty_vars, ty);
 
         Ok((expr, sig))
     }
@@ -918,10 +918,7 @@ impl<'modules> Typechecker<'modules> {
 
         let _ = self.context.insert(
             name.to_string(),
-            core::TypeSig {
-                ty_vars: ty_var_kinds.clone(),
-                body: ty.clone(),
-            },
+            core::TypeSig::new(ty_var_kinds.clone(), ty.clone()),
         );
 
         let (constraints, ty) = ty.unwrap_constraints();
@@ -958,21 +955,16 @@ impl<'modules> Typechecker<'modules> {
         name: &str,
         ty: &syntax::Type<Rc<str>>,
     ) -> Result<core::ClassMember, TypeError> {
-        let class_arg_kinds: HashMap<&str, &Kind> = class_args_kinds
-            .iter()
-            .map(|(name, kind)| (name.as_ref(), kind))
-            .collect();
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
-            let mut seen_names: HashSet<&str> = HashSet::new();
+            let mut seen_names: HashSet<&str> = class_args_kinds
+                .iter()
+                .map(|(name, _)| name.as_ref())
+                .collect();
             ty.iter_vars()
                 .filter_map(|name| {
                     if !seen_names.contains(name.as_ref()) {
                         seen_names.insert(name);
-                        let kind = match class_arg_kinds.get(name.as_ref()) {
-                            Some(kind) => (*kind).clone(),
-                            None => self.fresh_kind_meta(),
-                        };
-                        Some((name.clone(), kind))
+                        Some((name.clone(), self.fresh_kind_meta()))
                     } else {
                         None
                     }
@@ -988,10 +980,7 @@ impl<'modules> Typechecker<'modules> {
             .into_iter()
             .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
             .collect();
-        let sig = core::TypeSig {
-            ty_vars,
-            body: self.zonk_type(&ty),
-        };
+        let sig = core::TypeSig::new(ty_vars, self.zonk_type(&ty));
         Ok(core::ClassMember {
             name: name.to_string(),
             sig,
@@ -1033,14 +1022,14 @@ impl<'modules> Typechecker<'modules> {
             })
             .collect::<Result<_, _>>()?;
 
-        self.bound_tyvars.delete(args_kinds.len());
-
         let members = members
             .iter()
             .map(|(member_name, member_type)| {
                 self.check_class_member(&args_kinds, member_name, member_type)
             })
             .collect::<Result<_, _>>()?;
+
+        self.bound_tyvars.delete(args_kinds.len());
 
         Ok(core::Declaration::Class(core::ClassDeclaration {
             supers,

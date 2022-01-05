@@ -5,7 +5,7 @@ use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleName};
 use ipso_util::iter::Step;
 use std::{
     cmp,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -1421,18 +1421,28 @@ pub struct TypeSig {
 }
 
 impl TypeSig {
+    pub fn new(ty_vars: Vec<(Rc<str>, Kind)>, body: Type) -> Self {
+        debug_assert!(
+            ty_vars
+                .iter()
+                .map(|(name, _)| name.as_ref())
+                .collect::<HashSet<&str>>()
+                .len()
+                == ty_vars.len(),
+            "duplicate type variables in {:?}",
+            ty_vars
+        );
+
+        TypeSig { ty_vars, body }
+    }
+
     pub fn instantiate_many(&self, tys: &[Type]) -> TypeSig {
-        let mut ty_vars = self.ty_vars.clone();
-        for _ty in tys.iter().rev() {
-            match ty_vars.pop() {
-                None => panic!("instantiating too many variables"),
-                Some((_ty_var_name, _ty_var_kind)) => {}
-            }
-        }
-        TypeSig {
-            ty_vars,
-            body: self.body.instantiate_many(tys),
-        }
+        let ty_vars = if tys.len() >= self.ty_vars.len() {
+            Vec::new()
+        } else {
+            self.ty_vars.iter().skip(tys.len()).cloned().collect()
+        };
+        TypeSig::new(ty_vars, self.body.instantiate_many(tys))
     }
 }
 
@@ -1537,39 +1547,44 @@ impl ClassDeclaration {
             .iter()
             .enumerate()
             .map(|(ix, member)| {
-                // we need each argument in the applied type to account for the extra variables
-                // bound by the member's signature
-                //
-                // e.g.
-                //
-                // class X a where
-                //   x : a -> b -> ()
-                //
-                // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
-                // bound variable
-                //
-                // this will panic if we allow ambiguous class members
-                let adjustment = if !member.sig.ty_vars.is_empty() {
-                    member.sig.ty_vars.len() - self.args.len()
-                } else {
-                    0
-                };
-                let applied_type = self
-                    .args // (adjustment..adjustment + self.args.len())
-                    .iter()
-                    .enumerate()
-                    .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
-                        let arg_ty = Type::unsafe_mk_var(adjustment + arg_index, arg_kind.clone());
-                        Type::mk_app(acc, arg_ty)
-                    });
-                let sig = {
-                    let mut body = member.sig.body.clone();
-                    body = Type::mk_fatarrow(common_kinds, applied_type, body);
+                /*
+                Generates a type signature for each class member.
 
-                    TypeSig {
-                        ty_vars: member.sig.ty_vars.clone(),
-                        body,
-                    }
+                For example, in
+
+                ```
+                class X a where
+                  x : a -> b -> ()
+                ```
+
+                the signature `x : forall a b. X a => a -> b -> ()` is generated.
+
+                The `X a` constraint in the signature consists of type class name applied
+                to all its variables. When constructing the constraint, each variable
+                needs to account for the variables bound by the member signature.
+                */
+                let offset = member.sig.ty_vars.len();
+                let constraint_type = self.args.iter().rev().enumerate().fold(
+                    name_ty.clone(),
+                    |acc, (arg_index, (_, arg_kind))| {
+                        Type::mk_app(
+                            acc,
+                            Type::unsafe_mk_var(arg_index + offset, arg_kind.clone()),
+                        )
+                    },
+                );
+
+                let sig = {
+                    let ty_vars = {
+                        let mut ty_vars = self.args.clone();
+                        ty_vars.extend(member.sig.ty_vars.iter().cloned());
+                        ty_vars
+                    };
+
+                    let body =
+                        Type::mk_fatarrow(common_kinds, constraint_type, member.sig.body.clone());
+
+                    TypeSig::new(ty_vars, body)
                 };
                 let body: Rc<Expr> = Rc::new(Expr::mk_lam(
                     true,
