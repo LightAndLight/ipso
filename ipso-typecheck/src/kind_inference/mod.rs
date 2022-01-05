@@ -54,7 +54,7 @@ impl Solutions {
     }
 
     /**
-    Check whether the metavariable occurs in a kind.
+    Check whether a metavariable occurs in a kind.
     */
     pub fn occurs(&self, meta: Meta, kind: &Kind) -> bool {
         match kind {

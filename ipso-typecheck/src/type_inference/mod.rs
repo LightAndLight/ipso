@@ -51,7 +51,7 @@ impl Solutions {
     }
 
     /**
-    Check whether the metavariable occurs in a type.
+    Check whether a metavariable occurs in a type.
     */
     pub fn occurs(&self, meta: Meta, ty: &Type) -> bool {
         match ty {
@@ -155,6 +155,7 @@ impl Solutions {
     }
 }
 
+/// A type unification error.
 pub enum UnificationError {
     Mismatch {
         expected: syntax::Type<Rc<str>>,
@@ -201,11 +202,15 @@ impl UnificationError {
     }
 }
 
-/// Unification context.
+/**
+Type unification context.
+
+See [`unify`].
+*/
 pub struct UnificationContext<'a> {
-    common_kinds: &'a CommonKinds,
-    types: &'a HashMap<Rc<str>, Kind>,
-    type_variables: &'a BoundVars<Kind>,
+    pub common_kinds: &'a CommonKinds,
+    pub types: &'a HashMap<Rc<str>, Kind>,
+    pub type_variables: &'a BoundVars<Kind>,
 }
 
 /// Unify two types.
