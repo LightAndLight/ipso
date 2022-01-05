@@ -29,13 +29,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), b.kind()),
                         ],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(common_kinds, a.clone(), b.clone()),
-                            Type::mk_arrow(
+                            Type::arrow(common_kinds, a.clone(), b.clone()),
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_app(io_ty.clone(), a),
-                                Type::mk_app(io_ty.clone(), b),
+                                Type::app(io_ty.clone(), a),
+                                Type::app(io_ty.clone(), b),
                             ),
                         ),
                     }
@@ -52,11 +52,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // a : Type
                             (Rc::from("a"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            a.clone(),
-                            Type::mk_app(io_ty.clone(), a),
-                        ),
+                        body: Type::arrow(common_kinds, a.clone(), Type::app(io_ty.clone(), a)),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Pure),
@@ -74,17 +70,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(io_ty.clone(), a.clone()),
-                            Type::mk_arrow(
+                            Type::app(io_ty.clone(), a.clone()),
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_arrow(
-                                    common_kinds,
-                                    a,
-                                    Type::mk_app(io_ty.clone(), b.clone()),
-                                ),
-                                Type::mk_app(io_ty.clone(), b),
+                                Type::arrow(common_kinds, a, Type::app(io_ty.clone(), b.clone())),
+                                Type::app(io_ty.clone(), b),
                             ),
                         ),
                     }
@@ -104,11 +96,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            a,
-                            Type::mk_arrow(common_kinds, b.clone(), b),
-                        ),
+                        body: Type::arrow(common_kinds, a, Type::arrow(common_kinds, b.clone(), b)),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Trace),
@@ -118,7 +106,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("toUtf8"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(common_kinds, string_ty.clone(), bytes_ty),
+                    body: Type::arrow(common_kinds, string_ty.clone(), bytes_ty),
                 },
                 body: Expr::alloc_builtin(Builtin::ToUtf8),
             },
@@ -127,10 +115,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("println"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         string_ty.clone(),
-                        Type::mk_app(io_ty.clone(), unit_ty.clone()),
+                        Type::app(io_ty.clone(), unit_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::Println),
@@ -140,10 +128,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("print"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         string_ty.clone(),
-                        Type::mk_app(io_ty.clone(), unit_ty),
+                        Type::app(io_ty.clone(), unit_ty),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::Print),
@@ -153,7 +141,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("readln"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_app(io_ty.clone(), string_ty.clone()),
+                    body: Type::app(io_ty.clone(), string_ty.clone()),
                 },
                 body: Expr::alloc_builtin(Builtin::Readln),
             },
@@ -162,10 +150,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("eqString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         string_ty.clone(),
-                        Type::mk_arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqString),
@@ -175,10 +163,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("eqInt"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqInt),
@@ -188,10 +176,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("ltInt"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::LtInt),
@@ -201,7 +189,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("showInt"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(common_kinds, int_ty.clone(), string_ty.clone()),
+                    body: Type::arrow(common_kinds, int_ty.clone(), string_ty.clone()),
                 },
                 body: Expr::alloc_builtin(Builtin::ShowInt),
             },
@@ -212,19 +200,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), bool_ty.clone()),
+                                Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                Type::mk_arrow(
+                                Type::app(array_ty.clone(), a.clone()),
+                                Type::arrow(
                                     common_kinds,
-                                    Type::mk_app(array_ty.clone(), a),
+                                    Type::app(array_ty.clone(), a),
                                     bool_ty.clone(),
                                 ),
                             ),
@@ -240,19 +228,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), bool_ty.clone()),
+                                Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                Type::mk_arrow(
+                                Type::app(array_ty.clone(), a.clone()),
+                                Type::arrow(
                                     common_kinds,
-                                    Type::mk_app(array_ty.clone(), a),
+                                    Type::app(array_ty.clone(), a),
                                     bool_ty.clone(),
                                 ),
                             ),
@@ -269,17 +257,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("b"), b.kind()), (Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 b.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), b.clone()),
+                                Type::arrow(common_kinds, a.clone(), b.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 b.clone(),
-                                Type::mk_arrow(common_kinds, Type::mk_app(array_ty.clone(), a), b),
+                                Type::arrow(common_kinds, Type::app(array_ty.clone(), a), b),
                             ),
                         ),
                     }
@@ -293,13 +281,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_arrow(common_kinds, int_ty.clone(), a.clone()),
-                                Type::mk_app(array_ty.clone(), a),
+                                Type::arrow(common_kinds, int_ty.clone(), a.clone()),
+                                Type::app(array_ty.clone(), a),
                             ),
                         ),
                     }
@@ -313,9 +301,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(array_ty.clone(), a),
+                            Type::app(array_ty.clone(), a),
                             int_ty.clone(),
                         ),
                     }
@@ -329,14 +317,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
-                                common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                a,
-                            ),
+                            Type::arrow(common_kinds, Type::app(array_ty.clone(), a.clone()), a),
                         ),
                     }
                 },
@@ -349,16 +333,16 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 int_ty,
-                                Type::mk_arrow(
+                                Type::arrow(
                                     common_kinds,
-                                    Type::mk_app(array_ty.clone(), a.clone()),
-                                    Type::mk_app(array_ty.clone(), a),
+                                    Type::app(array_ty.clone(), a.clone()),
+                                    Type::app(array_ty.clone(), a),
                                 ),
                             ),
                         ),
@@ -371,10 +355,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("filterString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
-                        Type::mk_arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
-                        Type::mk_arrow(common_kinds, string_ty.clone(), string_ty.clone()),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, string_ty.clone(), string_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::FilterString),
@@ -384,10 +368,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("eqChar"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::mk_arrow(common_kinds, char_ty.clone(), bool_ty),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqChar),
@@ -397,13 +381,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("splitString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::mk_arrow(
+                        Type::arrow(
                             common_kinds,
                             string_ty.clone(),
-                            Type::mk_app(array_ty.clone(), string_ty.clone()),
+                            Type::app(array_ty.clone(), string_ty.clone()),
                         ),
                     ),
                 },
@@ -416,17 +400,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, char_ty, a.clone()),
+                                Type::arrow(common_kinds, char_ty, a.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, string_ty, a),
+                                Type::arrow(common_kinds, string_ty, a),
                             ),
                         ),
                     }
@@ -440,10 +424,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(array_ty.clone(), a.clone()),
-                            Type::mk_arrow(common_kinds, a.clone(), Type::mk_app(array_ty, a)),
+                            Type::app(array_ty.clone(), a.clone()),
+                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty, a)),
                         ),
                     }
                 },
@@ -455,11 +439,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     TypeSig {
                         ty_vars: Vec::new(),
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            Type::Cmd,
-                            Type::mk_app(io_ty, Type::Unit),
-                        ),
+                        body: Type::arrow(common_kinds, Type::Cmd, Type::app(io_ty, Type::Unit)),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Run),

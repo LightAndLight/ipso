@@ -635,7 +635,7 @@ impl<'modules> Typechecker<'modules> {
                 .iter()
                 .enumerate()
                 .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
-                    core::Type::mk_app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
+                    core::Type::app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
                 });
         self.implications
             .extend(
@@ -1929,7 +1929,7 @@ impl<'modules> Typechecker<'modules> {
         ));
 
         let pattern_ty =
-            core::Type::mk_app(core::Type::mk_variant_ctor(self.common_kinds), pattern_rows);
+            core::Type::app(core::Type::mk_variant_ctor(self.common_kinds), pattern_rows);
         let context: UnifyTypeContextRefs = UnifyTypeContextRefs {
             expected: expected_pattern_ty,
             actual: &pattern_ty,
@@ -2050,8 +2050,7 @@ impl<'modules> Typechecker<'modules> {
                     let (f_core, f_ty) = self.infer_expr(f)?;
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let expected =
-                        core::Type::mk_arrow(self.common_kinds, in_ty.clone(), out_ty.clone());
+                    let expected = core::Type::mk_arrow(self.common_kinds, &in_ty, &out_ty);
                     let actual = f_ty;
                     let context = UnifyTypeContextRefs {
                         expected: &expected,
@@ -2064,7 +2063,7 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Expr::Lam { args, body } => {
                     let in_ty = self.fresh_typevar(Kind::Type);
                     let out_ty = self.fresh_typevar(Kind::Type);
-                    let ty = core::Type::mk_arrow(self.common_kinds, in_ty, out_ty);
+                    let ty = core::Type::mk_arrow(self.common_kinds, &in_ty, &out_ty);
                     let expr_core = self.check_expr(
                         &Spanned {
                             pos: expr.pos,
@@ -2128,17 +2127,14 @@ impl<'modules> Typechecker<'modules> {
                             }
                             Ok((
                                 core::Expr::Array(items_core),
-                                core::Type::mk_app(
-                                    core::Type::mk_array(self.common_kinds),
-                                    first_ty,
-                                ),
+                                core::Type::app(core::Type::mk_array(self.common_kinds), first_ty),
                             ))
                         }
                         None => {
                             let ty_var = self.fresh_typevar(Kind::Type);
                             Ok((
                                 core::Expr::Array(Vec::new()),
-                                core::Type::mk_app(core::Type::mk_array(self.common_kinds), ty_var),
+                                core::Type::app(core::Type::mk_array(self.common_kinds), ty_var),
                             ))
                         }
                     }
@@ -2194,7 +2190,7 @@ impl<'modules> Typechecker<'modules> {
                         Some(expr) => {
                             let expr_core = self.check_expr(
                                 expr,
-                                &core::Type::mk_app(
+                                &core::Type::app(
                                     core::Type::mk_record_ctor(self.common_kinds),
                                     rest_row_var.clone(),
                                 ),
@@ -2218,7 +2214,7 @@ impl<'modules> Typechecker<'modules> {
                         core::Type::mk_rows(vec![(field.clone(), out_ty.clone())], Some(rest));
                     let expr_core = self.check_expr(
                         expr,
-                        &core::Type::mk_app(
+                        &core::Type::app(
                             core::Type::mk_record_ctor(self.common_kinds),
                             rows.clone(),
                         ),
@@ -2245,7 +2241,7 @@ impl<'modules> Typechecker<'modules> {
                     );
                     Ok((
                         core::Expr::mk_variant(core::Expr::Placeholder(tag)),
-                        core::Type::mk_arrow(
+                        core::Type::arrow(
                             self.common_kinds,
                             arg_ty.clone(),
                             core::Type::mk_variant(
@@ -2263,7 +2259,7 @@ impl<'modules> Typechecker<'modules> {
                     let rest_rows = self.fresh_typevar(Kind::Row);
                     let rest_core = self.check_expr(
                         rest,
-                        &core::Type::mk_app(
+                        &core::Type::app(
                             core::Type::mk_variant_ctor(self.common_kinds),
                             rest_rows.clone(),
                         ),
@@ -2277,7 +2273,7 @@ impl<'modules> Typechecker<'modules> {
                     ));
                     Ok((
                         core::Expr::mk_embed(tag, rest_core),
-                        core::Type::mk_app(
+                        core::Type::app(
                             core::Type::mk_variant_ctor(self.common_kinds),
                             core::Type::mk_rowcons(ctor, arg_ty, rest_rows),
                         ),
@@ -2320,10 +2316,8 @@ impl<'modules> Typechecker<'modules> {
 
                         syntax::Binop::Append => {
                             let item_ty = self.fresh_typevar(Kind::Type);
-                            let expected = core::Type::mk_app(
-                                core::Type::mk_array(self.common_kinds),
-                                item_ty,
-                            );
+                            let expected =
+                                core::Type::app(core::Type::mk_array(self.common_kinds), item_ty);
                             let left_core = self.check_expr(left, &expected)?;
                             let right_core = self.check_expr(right, &expected)?;
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), expected))
@@ -2371,11 +2365,7 @@ impl<'modules> Typechecker<'modules> {
 
                             let left_core = self.check_expr(
                                 left,
-                                &core::Type::mk_arrow(
-                                    self.common_kinds,
-                                    in_ty.clone(),
-                                    out_ty.clone(),
-                                ),
+                                &core::Type::mk_arrow(self.common_kinds, &in_ty, &out_ty),
                             )?;
                             let right_core = self.check_expr(right, &in_ty)?;
 
@@ -2388,7 +2378,7 @@ impl<'modules> Typechecker<'modules> {
                             let left_core = self.check_expr(left, &in_ty)?;
                             let right_core = self.check_expr(
                                 right,
-                                &core::Type::mk_arrow(self.common_kinds, in_ty, out_ty.clone()),
+                                &core::Type::mk_arrow(self.common_kinds, &in_ty, &out_ty),
                             )?;
 
                             Ok((core::Expr::mk_binop(*op, left_core, right_core), out_ty))
@@ -2574,7 +2564,7 @@ impl<'modules> Typechecker<'modules> {
                                 let ret_ty_var = self.fresh_typevar(Kind::Type);
                                 let value = self.check_expr(
                                     value,
-                                    &core::Type::mk_app(
+                                    &core::Type::app(
                                         core::Type::mk_io(self.common_kinds),
                                         ret_ty_var.clone(),
                                     ),
@@ -2587,7 +2577,7 @@ impl<'modules> Typechecker<'modules> {
                                 let name_ty = self.fresh_typevar(Kind::Type);
                                 let value = self.check_expr(
                                     value,
-                                    &core::Type::mk_app(
+                                    &core::Type::app(
                                         core::Type::mk_io(self.common_kinds),
                                         name_ty.clone(),
                                     ),
@@ -2681,7 +2671,7 @@ impl<'modules> Typechecker<'modules> {
 
                             Ok((
                                 desugared,
-                                core::Type::mk_app(core::Type::mk_io(self.common_kinds), ret_ty),
+                                core::Type::app(core::Type::mk_io(self.common_kinds), ret_ty),
                             ))
                         }
                     }
@@ -2710,7 +2700,7 @@ impl<'modules> Typechecker<'modules> {
                     for _ in args.iter().rev() {
                         let arg_ty = self.fresh_typevar(Kind::Type);
                         arg_tys.push(arg_ty.clone());
-                        actual = core::Type::mk_arrow(self.common_kinds, arg_ty, actual);
+                        actual = core::Type::mk_arrow(self.common_kinds, &arg_ty, &actual);
                     }
                     arg_tys.reverse();
 

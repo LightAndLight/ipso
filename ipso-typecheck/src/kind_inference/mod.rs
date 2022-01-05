@@ -462,7 +462,7 @@ impl<'a> InferenceContext<'a> {
                 let out_kind = self.fresh_meta();
                 let a = self.check(hint, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
                 let b = self.check(hint, b, &in_kind)?;
-                Ok((core::Type::mk_app(a, b), out_kind))
+                Ok((core::Type::app(a, b), out_kind))
             }
 
             syntax::Type::Name(name) => match self.types.get(name) {
