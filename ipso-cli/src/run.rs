@@ -93,7 +93,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
-        let expected = core::Type::mk_app(
+        let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
             tc.fresh_typevar(Kind::Type),
         );
