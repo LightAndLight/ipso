@@ -95,14 +95,10 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         };
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
-            tc.fresh_typevar(Kind::Type),
+            tc.fresh_type_meta(&Kind::Type),
         );
         let actual = target_sig.body;
-        let context = typecheck::UnifyTypeContextRefs {
-            expected: &expected,
-            actual: &actual,
-        };
-        let _ = tc.unify_type(&context, &expected, &actual)?;
+        let _ = tc.unify_type(&expected, &actual)?;
     }
 
     let bytes = Arena::new();

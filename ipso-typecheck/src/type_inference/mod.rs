@@ -1,5 +1,8 @@
 //! Type checking and inference.
 
+#[cfg(test)]
+mod test;
+
 use crate::{
     evidence::{self, Evidence},
     kind_inference,
@@ -7,10 +10,13 @@ use crate::{
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
-use ipso_diagnostic::{Location, Source};
+use ipso_diagnostic::Source;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, Spanned};
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 use syntax::{kind::Kind, ModuleName};
 
 /// A mapping from type metavariables to their solutions.
@@ -158,6 +164,7 @@ impl Solutions {
 }
 
 /// A type unification error.
+#[derive(PartialEq, Eq, Debug)]
 pub enum UnificationError {
     Mismatch {
         expected: syntax::Type<Rc<str>>,
@@ -766,6 +773,7 @@ pub fn unify(
 }
 
 /// An invalid ending for a computation expression.
+#[derive(PartialEq, Eq, Debug)]
 pub enum CompExprEnd {
     None,
     Let,
@@ -773,32 +781,34 @@ pub enum CompExprEnd {
 }
 
 /// Type inference error information.
+#[derive(PartialEq, Eq, Debug)]
 pub enum InferenceErrorInfo {
     UnificationError { error: UnificationError },
     CompExprEndsWith { end: CompExprEnd },
     NotInScope { name: String },
+    DuplicateArgument { name: String },
 }
 
 /// A type inference error.
+#[derive(PartialEq, Eq, Debug)]
 pub struct InferenceError {
-    pub location: Option<Location>,
+    pub source: Source,
+    pub position: Option<usize>,
     pub info: InferenceErrorInfo,
 }
 
 impl InferenceError {
-    /// Attach a [`Location`] to an [`InferenceError`].
-    pub fn with_location(mut self, source: &Source, position: usize) -> Self {
-        self.location = Some(Location {
-            source: source.clone(),
-            offset: Some(position),
-        });
+    /// Attach a position to an [`InferenceError`].
+    pub fn with_position(mut self, position: usize) -> Self {
+        self.position = Some(position);
         self
     }
 
     /// Construct an [`InferenceErrorInfo::NotInScope`].
-    pub fn not_in_scope(name: &str) -> Self {
+    pub fn not_in_scope(source: &Source, name: &str) -> Self {
         InferenceError {
-            location: None,
+            source: source.clone(),
+            position: None,
             info: InferenceErrorInfo::NotInScope {
                 name: String::from(name),
             },
@@ -806,22 +816,34 @@ impl InferenceError {
     }
 
     /// Construct an [`InferenceErrorInfo::CompExprEndsWith`]
-    pub fn comp_expr_ends_with(end: CompExprEnd) -> Self {
+    pub fn comp_expr_ends_with(source: &Source, end: CompExprEnd) -> Self {
         InferenceError {
-            location: None,
+            source: source.clone(),
+            position: None,
             info: InferenceErrorInfo::CompExprEndsWith { end },
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::UnificationError`]
-    pub fn unification_error(error: UnificationError) -> Self {
+    /// Construct an [`InferenceErrorInfo::DuplicateArgument`]
+    pub fn duplicate_argument(source: &Source, name: String) -> Self {
         InferenceError {
-            location: None,
+            source: source.clone(),
+            position: None,
+            info: InferenceErrorInfo::DuplicateArgument { name },
+        }
+    }
+
+    /// Construct an [`InferenceErrorInfo::UnificationError`]
+    pub fn unification_error(source: &Source, error: UnificationError) -> Self {
+        InferenceError {
+            source: source.clone(),
+            position: None,
             info: InferenceErrorInfo::UnificationError { error },
         }
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 struct InferredPattern {
     pattern: Pattern,
     names: Vec<(Rc<str>, Type)>,
@@ -886,6 +908,11 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Substitute all solved type and kind metavariables in a type.
+    pub fn zonk_type(&self, ty: Type) -> Type {
+        self.type_solutions.zonk(self.kind_solutions, ty)
+    }
+
+    /// A mutable version of [`InferenceContext::zonk_type`].
     pub fn zonk_type_mut(&self, ty: &mut Type) {
         self.type_solutions.zonk_mut(self.kind_solutions, ty);
     }
@@ -903,7 +930,7 @@ impl<'a> InferenceContext<'a> {
             expected,
             actual,
         )
-        .map_err(InferenceError::unification_error)
+        .map_err(|error| InferenceError::unification_error(self.source, error))
     }
 
     /**
@@ -934,6 +961,23 @@ impl<'a> InferenceContext<'a> {
         });
 
         (expr, ty.clone())
+    }
+
+    fn check_duplicate_args(&self, args: &[syntax::Pattern]) -> Result<(), InferenceError> {
+        let mut seen: HashSet<&str> = HashSet::new();
+        args.iter()
+            .flat_map(|arg| arg.get_arg_names().into_iter())
+            .try_for_each(|arg| {
+                if seen.contains(&arg.item.as_str()) {
+                    Err(
+                        InferenceError::duplicate_argument(self.source, arg.item.clone())
+                            .with_position(arg.pos),
+                    )
+                } else {
+                    seen.insert(&arg.item);
+                    Ok(())
+                }
+            })
     }
 
     fn infer_name_pattern(&mut self, name: &Spanned<String>) -> InferredPattern {
@@ -1090,7 +1134,7 @@ impl<'a> InferenceContext<'a> {
                         Ok(self.instantiate(Expr::Name(name.clone()), type_signature))
                     }
                     None => {
-                        Err(InferenceError::not_in_scope(name).with_location(self.source, expr.pos))
+                        Err(InferenceError::not_in_scope(self.source, name).with_position(expr.pos))
                     }
                 },
             },
@@ -1104,7 +1148,7 @@ impl<'a> InferenceContext<'a> {
                 }
                 Some(definitions) => match definitions.get(item) {
                     None => {
-                        Err(InferenceError::not_in_scope(item).with_location(self.source, expr.pos))
+                        Err(InferenceError::not_in_scope(self.source, item).with_position(expr.pos))
                     }
                     Some(type_signature) => {
                         Ok(self
@@ -1228,6 +1272,8 @@ impl<'a> InferenceContext<'a> {
                 Ok((Expr::mk_app(fun, arg), out_ty))
             }
             syntax::Expr::Lam { args, body } => {
+                self.check_duplicate_args(args)?;
+
                 let mut inferred_args: Vec<(Pattern, Type)> = Vec::with_capacity(args.len());
                 let bound_variables: Vec<(Rc<str>, Type)> = args
                     .iter()
@@ -1511,8 +1557,8 @@ impl<'a> InferenceContext<'a> {
                             None => matches!(end, CompExprEnd::None),
                         });
 
-                        Err(InferenceError::comp_expr_ends_with(end)
-                            .with_location(self.source, expr.pos))
+                        Err(InferenceError::comp_expr_ends_with(self.source, end)
+                            .with_position(expr.pos))
                     }
                     Ok(ret_ty) => {
                         debug_assert!(matches!(

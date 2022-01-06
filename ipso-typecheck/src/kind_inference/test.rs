@@ -58,7 +58,7 @@ fn infer_3() {
 fn infer_4() {
     with_empty_ctx(&|ctx| {
         let expected = Ok((
-            core::Type::mk_app(
+            core::Type::app(
                 core::Type::mk_record_ctor(ctx.common_kinds),
                 core::Type::mk_rowcons(Rc::from("x"), core::Type::Bool, core::Type::RowNil),
             ),
