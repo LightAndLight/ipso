@@ -1433,6 +1433,12 @@ impl<'a> InferenceContext<'a> {
                     })
                     .collect::<Result<_, _>>()?;
 
+                /*
+                When pattern matching on a variant type, the variant should be considered
+                closed if there is no 'catch-all' branch (a wildcard pattern or a name pattern).
+
+                When there is a 'catch-all' branch, the variant is allowed to be open-ended.
+                */
                 self.zonk_type_mut(&mut expr_ty);
                 match expr_ty.unwrap_variant() {
                     Some(RowParts {
