@@ -1412,7 +1412,7 @@ impl<'a> InferenceContext<'a> {
                 let (expr, mut expr_ty) = self.infer(expr)?;
 
                 let out_ty = self.fresh_type_meta(&Kind::Type);
-                let mut saw_wildcard = false;
+                let mut saw_catchall = false;
                 let branches: Vec<Branch> = branches
                     .iter()
                     .map(|branch| {
@@ -1422,8 +1422,8 @@ impl<'a> InferenceContext<'a> {
                         let body = self.check(&branch.body, &out_ty)?;
                         self.variables.delete(result.names.len());
 
-                        if let Pattern::Wildcard = result.pattern {
-                            saw_wildcard = true;
+                        if let Pattern::Wildcard | Pattern::Name = result.pattern {
+                            saw_catchall = true;
                         }
 
                         Ok(Branch {
@@ -1437,7 +1437,7 @@ impl<'a> InferenceContext<'a> {
                 match expr_ty.unwrap_variant() {
                     Some(RowParts {
                         rest: Some(rest), ..
-                    }) if !saw_wildcard => self.unify(&Type::RowNil, rest),
+                    }) if !saw_catchall => self.unify(&Type::RowNil, rest),
                     _ => Ok(()),
                 }?;
 
