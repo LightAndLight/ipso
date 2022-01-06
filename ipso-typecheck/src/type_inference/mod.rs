@@ -765,6 +765,7 @@ pub fn unify(
     }
 }
 
+/// An invalid ending for a computation expression.
 pub enum CompExprEnd {
     None,
     Let,
@@ -785,6 +786,7 @@ pub struct InferenceError {
 }
 
 impl InferenceError {
+    /// Attach a [`Location`] to an [`InferenceError`].
     pub fn with_location(mut self, source: &Source, position: usize) -> Self {
         self.location = Some(Location {
             source: source.clone(),
@@ -793,6 +795,7 @@ impl InferenceError {
         self
     }
 
+    /// Construct an [`InferenceErrorInfo::NotInScope`].
     pub fn not_in_scope(name: &str) -> Self {
         InferenceError {
             location: None,
@@ -802,6 +805,7 @@ impl InferenceError {
         }
     }
 
+    /// Construct an [`InferenceErrorInfo::CompExprEndsWith`]
     pub fn comp_expr_ends_with(end: CompExprEnd) -> Self {
         InferenceError {
             location: None,
@@ -809,6 +813,7 @@ impl InferenceError {
         }
     }
 
+    /// Construct an [`InferenceErrorInfo::UnificationError`]
     pub fn unification_error(error: UnificationError) -> Self {
         InferenceError {
             location: None,
@@ -870,18 +875,22 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
+    /// Generate a fresh kind metavariable.
     pub fn fresh_kind_meta(&mut self) -> Kind {
         Kind::Meta(self.kind_solutions.fresh_meta())
     }
 
+    /// Generate a fresh type metavariable.
     pub fn fresh_type_meta(&mut self, kind: &Kind) -> Type {
         Type::Meta(kind.clone(), self.type_solutions.fresh_meta())
     }
 
+    /// Substitute all solved type and kind metavariables in a type.
     pub fn zonk_type_mut(&self, ty: &mut Type) {
         self.type_solutions.zonk_mut(self.kind_solutions, ty);
     }
 
+    /// Unify two types.
     pub fn unify(&mut self, expected: &Type, actual: &Type) -> Result<(), InferenceError> {
         unify(
             &UnificationContext {
@@ -1557,4 +1566,21 @@ impl<'a> InferenceContext<'a> {
         self.unify(expected, &expr_ty)?;
         Ok(expr)
     }
+}
+
+/// Infer an expression's type.
+pub fn infer(
+    ctx: &mut InferenceContext,
+    expr: &Spanned<syntax::Expr>,
+) -> Result<(Expr, Type), InferenceError> {
+    ctx.infer(expr)
+}
+
+/// Check an expression's type.
+pub fn check(
+    ctx: &mut InferenceContext,
+    expr: &Spanned<syntax::Expr>,
+    expected: &Type,
+) -> Result<Expr, InferenceError> {
+    ctx.check(expr, expected)
 }
