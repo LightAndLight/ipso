@@ -110,10 +110,10 @@ fn solve_constraint_4() {
                     sig: {
                         TypeSig {
                             ty_vars: Vec::new(),
-                            body: core::Type::mk_arrow(
+                            body: core::Type::arrow(
                                 tc.common_kinds,
-                                &a,
-                                &core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
+                                a.clone(),
+                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                             ),
                         }
                     },

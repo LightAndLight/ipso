@@ -2,7 +2,7 @@ use super::SolveConstraintContext;
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    BoundVars, InferredPattern, TypeError, Typechecker, UnifyTypeContext, UnifyTypeContextRefs,
+    BoundVars, TypeError, Typechecker,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
@@ -160,6 +160,127 @@ fn context_test_6() {
 }
 
 #[test]
+fn infer_record_1() {
+    crate::current_dir_with_tc!(|mut tc: Typechecker| {
+        let expected_expr = core::Expr::mk_record(
+            vec![
+                (core::Expr::Placeholder(Placeholder(2)), core::Expr::False),
+                (
+                    core::Expr::Placeholder(Placeholder(1)),
+                    core::Expr::String(Vec::new()),
+                ),
+                (core::Expr::Placeholder(Placeholder(0)), core::Expr::Int(0)),
+            ],
+            None,
+        );
+        let expected_ty = core::Type::mk_record(
+            tc.common_kinds,
+            vec![
+                (Rc::from("z"), core::Type::Bool),
+                (Rc::from("y"), core::Type::String),
+                (Rc::from("x"), core::Type::Int),
+            ],
+            None,
+        );
+        let expected_result = Ok((expected_expr, expected_ty));
+        // { z = False, y = "", x = 0 }
+        let expr = syntax::Spanned {
+            pos: 0,
+            item: syntax::Expr::mk_record(
+                vec![
+                    (
+                        String::from("z"),
+                        syntax::Spanned {
+                            pos: 1,
+                            item: syntax::Expr::False,
+                        },
+                    ),
+                    (
+                        String::from("y"),
+                        syntax::Spanned {
+                            pos: 2,
+                            item: syntax::Expr::String(Vec::new()),
+                        },
+                    ),
+                    (
+                        String::from("x"),
+                        syntax::Spanned {
+                            pos: 3,
+                            item: syntax::Expr::Int(0),
+                        },
+                    ),
+                ],
+                None,
+            ),
+        };
+        let actual_result = tc
+            .infer_type(&expr)
+            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+        assert_eq!(expected_result, actual_result, "checking results");
+
+        let (mut actual_expr, _actual_ty) = actual_result.unwrap();
+
+        let mut placeholders: HashSet<Placeholder> = HashSet::new();
+        let _: Result<(), Void> = actual_expr.subst_placeholder(&mut |p| {
+            placeholders.insert(*p);
+            Ok(core::Expr::Placeholder(*p))
+        });
+
+        assert_eq!(3, placeholders.len(), "checking number of Placeholders");
+
+        let p0 = placeholders.get(&Placeholder(0)).unwrap();
+        let p1 = placeholders.get(&Placeholder(1)).unwrap();
+        let p2 = placeholders.get(&Placeholder(2)).unwrap();
+
+        assert_eq!(
+            Ok((
+                core::Expr::Int(0),
+                Constraint::HasField {
+                    field: Rc::from("x"),
+                    rest: core::Type::RowNil
+                }
+            )),
+            solve_placeholder(&mut tc, *p0)
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+        );
+
+        assert_eq!(
+            Ok((
+                core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0)),
+                Constraint::HasField {
+                    field: Rc::from("y"),
+                    rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
+                }
+            )),
+            solve_placeholder(&mut tc, *p1)
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+        );
+
+        assert_eq!(
+            Ok((
+                core::Expr::mk_binop(
+                    Binop::Add,
+                    core::Expr::Int(1),
+                    core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0))
+                ),
+                Constraint::HasField {
+                    field: Rc::from("z"),
+                    rest: core::Type::mk_rows(
+                        vec![
+                            (Rc::from("y"), core::Type::String),
+                            (Rc::from("x"), core::Type::Int)
+                        ],
+                        None
+                    )
+                }
+            )),
+            solve_placeholder(&mut tc, *p2)
+                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+        );
+    })
+}
+
+#[test]
 fn check_definition_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
@@ -189,7 +310,7 @@ fn check_definition_1() {
                 name: String::from("id"),
                 sig: core::TypeSig {
                     ty_vars: vec![(Rc::from("a"), a.kind())],
-                    body: core::Type::mk_arrow(tc.common_kinds, a.clone(), a)
+                    body: core::Type::arrow(tc.common_kinds, a.clone(), a)
                 },
                 body: Rc::new(core::Expr::mk_lam(true, core::Expr::Var(0)))
             }))
@@ -246,7 +367,7 @@ fn check_definition_2() {
                 body: core::Type::mk_fatarrow(
                     tc.common_kinds,
                     core::Type::mk_hasfield(Rc::from("x"), r.clone()),
-                    core::Type::mk_arrow(
+                    core::Type::arrow(
                         tc.common_kinds,
                         core::Type::mk_record(tc.common_kinds, Vec::new(), Some(r.clone())),
                         core::Type::mk_record(
@@ -396,7 +517,7 @@ fn check_definition_4() {
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
                         core::Type::mk_hasfield(Rc::from("x"), r.clone()),
-                        core::Type::mk_arrow(
+                        core::Type::arrow(
                             tc.common_kinds,
                             core::Type::mk_record(
                                 tc.common_kinds,
@@ -431,35 +552,6 @@ fn check_definition_4() {
 }
 
 #[test]
-fn type_occurs_1() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let v1 = tc.fresh_typevar(Kind::Type);
-        let v2 = tc.fresh_typevar(Kind::Type);
-        assert_eq!(
-            tc.unify_type(
-                &UnifyTypeContextRefs {
-                    expected: &core::Type::Unit,
-                    actual: &core::Type::Unit,
-                },
-                &v1,
-                &core::Type::mk_arrow(tc.common_kinds, v1.clone(), v2.clone())
-            ),
-            Err(TypeError::TypeOccurs {
-                source: Source::Interactive {
-                    label: String::from("(typechecker)"),
-                },
-                pos: 0,
-                meta: 0,
-                ty: Type::mk_arrow(
-                    tc.fill_ty_names(v1.to_syntax()),
-                    tc.fill_ty_names(v2.to_syntax())
-                )
-            })
-        )
-    })
-}
-
-#[test]
 fn check_class_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = {
@@ -472,10 +564,10 @@ fn check_class_1() {
                     name: String::from("eq"),
                     sig: TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     },
                 }],
@@ -523,10 +615,10 @@ fn check_class_1() {
                         name: String::from("eq"),
                         sig: core::TypeSig {
                             ty_vars: vec![],
-                            body: core::Type::mk_arrow(
+                            body: core::Type::arrow(
                                 tc.common_kinds,
                                 a.clone(),
-                                core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                             ),
                         },
                     }],
@@ -549,11 +641,11 @@ fn check_class_1() {
                     ty_vars: vec![(Rc::from("a"), a.kind())],
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
-                        core::Type::mk_app(eq_ty, a.clone()),
-                        core::Type::mk_arrow(
+                        core::Type::app(eq_ty, a.clone()),
+                        core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     ),
                 },
@@ -584,10 +676,10 @@ fn check_class_2() {
                     name: String::from("wut"),
                     sig: TypeSig {
                         ty_vars: vec![(Rc::from("b"), b.kind())],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a,
-                            core::Type::mk_arrow(tc.common_kinds, b, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
                         ),
                     },
                 }],
@@ -636,10 +728,10 @@ fn check_class_2() {
                         name: String::from("wut"),
                         sig: core::TypeSig {
                             ty_vars: vec![(Rc::from("b"), b.kind())],
-                            body: core::Type::mk_arrow(
+                            body: core::Type::arrow(
                                 tc.common_kinds,
                                 a,
-                                core::Type::mk_arrow(tc.common_kinds, b, core::Type::Bool),
+                                core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
                             ),
                         },
                     }],
@@ -663,11 +755,11 @@ fn check_class_2() {
                     ty_vars: vec![(Rc::from("a"), a.kind()), (Rc::from("b"), b.kind())],
                     body: core::Type::mk_fatarrow(
                         tc.common_kinds,
-                        core::Type::mk_app(wut_ty, a.clone()),
-                        core::Type::mk_arrow(
+                        core::Type::app(wut_ty, a.clone()),
+                        core::Type::arrow(
                             tc.common_kinds,
                             a,
-                            core::Type::mk_arrow(tc.common_kinds, b, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
                         ),
                     ),
                 },
@@ -697,7 +789,7 @@ fn check_instance_1() {
                 ty_vars: Vec::new(),
                 superclass_constructors: Vec::new(),
                 assumes: Vec::new(),
-                head: core::Type::mk_app(eq_ty, core::Type::Unit),
+                head: core::Type::app(eq_ty, core::Type::Unit),
                 members: vec![InstanceMember {
                     name: String::from("eq"),
                     body: core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
@@ -714,10 +806,10 @@ fn check_instance_1() {
                     name: String::from("eq"),
                     sig: TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     },
                 }],
@@ -801,10 +893,10 @@ fn class_and_instance_1() {
                     name: String::from("eq"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     },
                 }],
@@ -818,17 +910,17 @@ fn class_and_instance_1() {
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&core::ClassDeclaration {
-                supers: vec![core::Type::mk_app(eq_ty, a.clone())],
+                supers: vec![core::Type::app(eq_ty, a.clone())],
                 name: Rc::from("Ord"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![core::ClassMember {
                     name: String::from("lt"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     },
                 }],
@@ -908,7 +1000,7 @@ fn class_and_instance_1() {
                 ty_vars: Vec::new(),
                 superclass_constructors: Vec::new(),
                 assumes: Vec::new(),
-                head: core::Type::mk_app(eq_ty, core::Type::Int),
+                head: core::Type::app(eq_ty, core::Type::Int),
                 members: vec![core::InstanceMember {
                     name: String::from("eq"),
                     body: core::Expr::Name(String::from("eqInt")),
@@ -937,7 +1029,7 @@ fn class_and_instance_1() {
                     None,
                 )],
                 assumes: Vec::new(),
-                head: core::Type::mk_app(ord_ty, core::Type::Int),
+                head: core::Type::app(ord_ty, core::Type::Int),
                 members: vec![core::InstanceMember {
                     name: String::from("lt"),
                     body: core::Expr::Name(String::from("ltInt")),
@@ -988,10 +1080,10 @@ fn class_and_instance_2() {
                     name: String::from("eq"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a.clone(), core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a.clone(), core::Type::Bool),
                         ),
                     },
                 }],
@@ -1002,17 +1094,17 @@ fn class_and_instance_2() {
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             tc.register_class(&core::ClassDeclaration {
-                supers: vec![core::Type::mk_app(eq_ty, a.clone())],
+                supers: vec![core::Type::app(eq_ty, a.clone())],
                 name: Rc::from("Ord"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![core::ClassMember {
                     name: String::from("lt"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
-                        body: core::Type::mk_arrow(
+                        body: core::Type::arrow(
                             tc.common_kinds,
                             a.clone(),
-                            core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                         ),
                     },
                 }],
@@ -1082,7 +1174,7 @@ fn class_and_instance_2() {
             ty_vars: Vec::new(),
             superclass_constructors: Vec::new(),
             assumes: Vec::new(),
-            head: core::Type::mk_app(eq_ty.clone(), core::Type::Int),
+            head: core::Type::app(eq_ty.clone(), core::Type::Int),
             members: vec![core::InstanceMember {
                 name: String::from("eq"),
                 body: core::Expr::Name(String::from("eqInt")),
@@ -1104,10 +1196,10 @@ fn class_and_instance_2() {
             Ok(Some(core::Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Type)],
                 superclass_constructors: Vec::new(),
-                assumes: vec![core::Type::mk_app(eq_ty.clone(), a.clone())],
-                head: core::Type::mk_app(
+                assumes: vec![core::Type::app(eq_ty.clone(), a.clone())],
+                head: core::Type::app(
                     eq_ty,
-                    core::Type::mk_app(core::Type::mk_array(tc.common_kinds), a),
+                    core::Type::app(core::Type::mk_array(tc.common_kinds), a),
                 ),
                 members: vec![core::InstanceMember {
                     name: String::from("eq"),
@@ -1191,10 +1283,10 @@ fn class_and_instance_2() {
                         None,
                     ),
                 )],
-                assumes: vec![core::Type::mk_app(ord_ty.clone(), a.clone())],
-                head: core::Type::mk_app(
+                assumes: vec![core::Type::app(ord_ty.clone(), a.clone())],
+                head: core::Type::app(
                     ord_ty,
-                    core::Type::mk_app(core::Type::mk_array(tc.common_kinds), a),
+                    core::Type::app(core::Type::mk_array(tc.common_kinds), a),
                 ),
                 members: vec![core::InstanceMember {
                     name: String::from("lt"),
@@ -1353,37 +1445,5 @@ fn class_and_instance_2() {
             expected_array_int_lt_result, actual_array_int_lt_result,
             "comparison = lt [0, 1, 2] [4, 5] is valid"
         )
-    })
-}
-
-#[test]
-fn unify_1() {
-    crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        tc.bound_tyvars.insert(&[(Rc::from("r"), Kind::Row)]);
-        let real = core::Type::mk_arrow(
-            tc.common_kinds,
-            core::Type::mk_app(
-                core::Type::mk_record_ctor(tc.common_kinds),
-                core::Type::mk_rowcons(
-                    Rc::from("x"),
-                    core::Type::Int,
-                    core::Type::Var(Kind::Row, 0),
-                ),
-            ),
-            core::Type::Int,
-        );
-        let m_0 = tc.fresh_typevar(Kind::Type);
-        let m_1 = tc.fresh_typevar(Kind::Type);
-        let holey = core::Type::mk_arrow(tc.common_kinds, m_1, m_0);
-        let expected = Ok(real.clone());
-        let actual = {
-            let context = UnifyTypeContextRefs {
-                expected: &real,
-                actual: &holey,
-            };
-            tc.unify_type(&context, &real, &holey)
-                .map(|_| tc.zonk_type(&holey))
-        };
-        assert_eq!(expected, actual)
     })
 }

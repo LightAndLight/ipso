@@ -224,10 +224,6 @@ pub enum TypeError {
         pos: usize,
         error: kind_inference::InferenceError,
     },
-    RedundantPattern {
-        source: Source,
-        pos: usize,
-    },
     NoSuchClass {
         source: Source,
         pos: usize,
@@ -255,7 +251,6 @@ impl TypeError {
             TypeError::NotInScope { source, .. } => source.clone(),
             TypeError::NotInModule { source, .. } => source.clone(),
             TypeError::DuplicateClassArgument { source, .. } => source.clone(),
-            TypeError::RedundantPattern { source, .. } => source.clone(),
             TypeError::NoSuchClass { source, .. } => source.clone(),
             TypeError::NotAMember { source, .. } => source.clone(),
             TypeError::CannotDeduce { source, .. } => source.clone(),
@@ -270,7 +265,6 @@ impl TypeError {
             TypeError::NotInScope { pos, .. } => *pos,
             TypeError::NotInModule { pos, .. } => *pos,
             TypeError::DuplicateClassArgument { pos, .. } => *pos,
-            TypeError::RedundantPattern { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
             TypeError::CannotDeduce { context, .. } => match context {
@@ -318,6 +312,9 @@ impl TypeError {
                 type_inference::InferenceErrorInfo::DuplicateArgument { .. } => {
                     String::from("duplicate argument")
                 }
+                type_inference::InferenceErrorInfo::RedundantPattern => {
+                    String::from("redundant pattern")
+                }
             },
             TypeError::KindError { error, .. } => render_kind_inference_error(error),
             TypeError::NotInScope { .. } => String::from("not in scope"),
@@ -325,7 +322,6 @@ impl TypeError {
             TypeError::DuplicateClassArgument { .. } => {
                 String::from("duplicate type class argument")
             }
-            TypeError::RedundantPattern { .. } => String::from("redundant pattern"),
             TypeError::NoSuchClass { .. } => String::from("type class not in scope"),
             TypeError::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
@@ -345,6 +341,7 @@ impl TypeError {
                 type_inference::InferenceErrorInfo::CompExprEndsWith { .. } => None,
                 type_inference::InferenceErrorInfo::NotInScope { .. } => None,
                 type_inference::InferenceErrorInfo::DuplicateArgument { .. } => None,
+                type_inference::InferenceErrorInfo::RedundantPattern { .. } => None,
             },
             TypeError::KindError { error, .. } => match error.info {
                 kind_inference::InferenceErrorInfo::NotInScope { .. } => None,
@@ -364,7 +361,6 @@ impl TypeError {
                 }
             },
             TypeError::DuplicateClassArgument { .. } => None,
-            TypeError::RedundantPattern { .. } => None,
             TypeError::NotInScope { .. } => None,
             TypeError::NotInModule { .. } => None,
             TypeError::NoSuchClass { .. } => None,
@@ -910,7 +906,7 @@ impl<'modules> Typechecker<'modules> {
                 .assume(None, evidence::Constraint::from_type(constraint));
         }
 
-        let body = self.check_expr(
+        let body = self.check_type(
             &syntax::Spanned {
                 pos,
                 item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
@@ -1141,7 +1137,7 @@ impl<'modules> Typechecker<'modules> {
                     self.bound_tyvars.insert(&member_type.sig.ty_vars);
 
                     match self
-                        .check_expr(
+                        .check_type(
                             &Spanned {
                                 pos: member_name.pos,
                                 item: syntax::Expr::mk_lam(
@@ -1328,7 +1324,15 @@ impl<'modules> Typechecker<'modules> {
         ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
     }
 
-    fn check_expr(
+    pub fn infer_type(
+        &mut self,
+        expr: &syntax::Spanned<syntax::Expr>,
+    ) -> Result<(core::Expr, core::Type), TypeError> {
+        type_inference::infer(&mut self.type_inference_context(), expr)
+            .map_err(|error| TypeError::TypeError { error })
+    }
+
+    pub fn check_type(
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
         ty: &core::Type,

@@ -1,43 +1,81 @@
 use super::{InferenceContext, InferenceError, InferredPattern, Solutions};
-use crate::{
-    evidence::{self, solver},
-    kind_inference, BoundVars,
-};
-use ipso_core::{Branch, CommonKinds, Expr, Pattern, Placeholder, Type};
+use crate::{evidence, kind_inference, BoundVars};
+use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
-use ipso_util::void::Void;
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
-use syntax::Binop;
+use std::{collections::HashMap, rc::Rc};
 
 const SOURCE_LABEL: &str = "test";
 
-fn with_empty_ctx<A>(f: &dyn Fn(&mut InferenceContext) -> A) -> A {
+fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
+    type_variables: BoundVars<Kind>,
+    f: F,
+) -> A {
     let common_kinds = CommonKinds::default();
     let source = Source::Interactive {
         label: String::from(SOURCE_LABEL),
     };
+    let modules = HashMap::new();
+    let types = HashMap::new();
+    let mut kind_solutions = kind_inference::Solutions::new();
+    let mut type_solutions = Solutions::new();
+    let type_signatures = HashMap::new();
+    let mut variables = BoundVars::new();
+    let mut evidence = evidence::Evidence::new();
     let mut ctx = InferenceContext::new(
         &common_kinds,
         &source,
-        &HashMap::new(),
-        &HashMap::new(),
-        &BoundVars::new(),
-        &mut kind_inference::Solutions::new(),
-        &mut Solutions::new(),
-        &HashMap::new(),
-        &mut BoundVars::new(),
-        &mut evidence::Evidence::new(),
+        &modules,
+        &types,
+        &type_variables,
+        &mut kind_solutions,
+        &mut type_solutions,
+        &type_signatures,
+        &mut variables,
+        &mut evidence,
     );
     f(&mut ctx)
 }
 
+fn with_empty_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(f: F) -> A {
+    with_type_variables_ctx(BoundVars::new(), f)
+}
+
+#[test]
+fn occurs_1() {
+    with_empty_ctx(|ctx| {
+        let v1 = ctx.fresh_type_meta(&Kind::Type);
+        let v2 = ctx.fresh_type_meta(&Kind::Type);
+        assert_eq!(
+            ctx.unify(&v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2)),
+            Err(InferenceError::occurs(
+                &Source::Interactive {
+                    label: String::from(SOURCE_LABEL),
+                },
+                0,
+                syntax::Type::mk_arrow(
+                    v1.to_syntax().map(&mut |ix| ctx
+                        .type_variables
+                        .lookup_index(*ix)
+                        .unwrap()
+                        .0
+                        .clone()),
+                    v2.to_syntax().map(&mut |ix| ctx
+                        .type_variables
+                        .lookup_index(*ix)
+                        .unwrap()
+                        .0
+                        .clone()),
+                )
+            )
+            .with_position(0))
+        )
+    })
+}
+
 #[test]
 fn infer_pattern_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         let pattern = syntax::Pattern::Name(Spanned {
             pos: 0,
             item: String::from("x"),
@@ -55,7 +93,7 @@ fn infer_pattern_1() {
 
 #[test]
 fn infer_pattern_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         let pat = syntax::Pattern::Record {
             names: vec![
                 syntax::Spanned {
@@ -105,7 +143,7 @@ fn infer_pattern_2() {
 
 #[test]
 fn infer_pattern_3() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         let pat = syntax::Pattern::Record {
             names: vec![
                 syntax::Spanned {
@@ -166,7 +204,7 @@ fn infer_pattern_3() {
 
 #[test]
 fn infer_pattern_4() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         let pat = syntax::Pattern::Variant {
             name: String::from("just"),
             arg: syntax::Spanned {
@@ -191,7 +229,7 @@ fn infer_pattern_4() {
 
 #[test]
 fn infer_lam_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // \x -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -221,7 +259,7 @@ fn infer_lam_1() {
 
 #[test]
 fn infer_lam_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // \{x, y} -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -279,7 +317,7 @@ fn infer_lam_2() {
 
 #[test]
 fn infer_lam_3() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // \{x, y} -> y
         let term = syntax::Spanned {
             pos: 0,
@@ -337,7 +375,7 @@ fn infer_lam_3() {
 
 #[test]
 fn infer_lam_4() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // \{x, y, ...z} -> z
         let term = syntax::Spanned {
             pos: 0,
@@ -398,7 +436,7 @@ fn infer_lam_4() {
 
 #[test]
 fn infer_lam_5() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // \f x -> f x
         let term = syntax::Spanned {
             pos: 0,
@@ -452,7 +490,7 @@ fn infer_lam_5() {
 
 #[test]
 fn infer_array_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // [1, 2, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -483,7 +521,7 @@ fn infer_array_1() {
 
 #[test]
 fn infer_array_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // [1, true, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -508,8 +546,8 @@ fn infer_array_2() {
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL)
                 },
-                &syntax::Type::Int,
-                &syntax::Type::Bool
+                syntax::Type::Int,
+                syntax::Type::Bool
             )
             .with_position(4))
         )
@@ -517,8 +555,33 @@ fn infer_array_2() {
 }
 
 #[test]
+fn unify_1() {
+    let type_variables = {
+        let mut type_variables = BoundVars::new();
+        type_variables.insert(&[(Rc::from("r"), Kind::Row)]);
+        type_variables
+    };
+    with_type_variables_ctx(type_variables, |ctx| {
+        let real = Type::arrow(
+            ctx.common_kinds,
+            Type::app(
+                Type::mk_record_ctor(ctx.common_kinds),
+                Type::mk_rowcons(Rc::from("x"), Type::Int, Type::Var(Kind::Row, 0)),
+            ),
+            Type::Int,
+        );
+        let m_0 = ctx.fresh_type_meta(&Kind::Type);
+        let m_1 = ctx.fresh_type_meta(&Kind::Type);
+        let holey = Type::arrow(ctx.common_kinds, m_1, m_0);
+        let expected = Ok(real.clone());
+        let actual = ctx.unify(&real, &holey).map(|_| ctx.zonk_type(holey));
+        assert_eq!(expected, actual)
+    })
+}
+
+#[test]
 fn unify_rows_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
                 &Type::mk_record(
@@ -539,7 +602,7 @@ fn unify_rows_1() {
 
 #[test]
 fn unify_rows_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
                 &Type::mk_record(
@@ -568,7 +631,7 @@ fn unify_rows_2() {
 
 #[test]
 fn unify_rows_3() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
                 &Type::mk_record(
@@ -597,7 +660,7 @@ fn unify_rows_3() {
 
 #[test]
 fn unify_rows_4() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
                 &Type::mk_record(
@@ -623,8 +686,8 @@ fn unify_rows_4() {
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL)
                 },
-                &syntax::Type::Bool,
-                &syntax::Type::Int
+                syntax::Type::Bool,
+                syntax::Type::Int
             )
             .with_position(0))
         )
@@ -633,7 +696,7 @@ fn unify_rows_4() {
 
 #[test]
 fn infer_record_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // {}
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
@@ -649,7 +712,7 @@ fn infer_record_1() {
 
 #[test]
 fn infer_record_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // { x = 1, y = true }
         let term = syntax::Expr::mk_record(
             vec![
@@ -693,7 +756,7 @@ fn infer_record_2() {
 
 #[test]
 fn infer_record_3() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // { x = 1, y = true, ...{ z = 'c' } }
         let term = syntax::Expr::mk_record(
             vec![
@@ -756,7 +819,7 @@ fn infer_record_3() {
 
 #[test]
 fn infer_record_4() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         // { x = 1, y = true, ...1 }
         let term = syntax::Expr::mk_record(
             vec![
@@ -787,8 +850,8 @@ fn infer_record_4() {
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL),
                 },
-                &syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
-                &syntax::Type::Int
+                syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                syntax::Type::Int
             )
             .with_position(22))
         )
@@ -796,121 +859,8 @@ fn infer_record_4() {
 }
 
 #[test]
-fn infer_record_5() {
-    with_empty_ctx(&|ctx| {
-        let expected_expr = Expr::mk_record(
-            vec![
-                (Expr::Placeholder(Placeholder(2)), Expr::False),
-                (Expr::Placeholder(Placeholder(1)), Expr::String(Vec::new())),
-                (Expr::Placeholder(Placeholder(0)), Expr::Int(0)),
-            ],
-            None,
-        );
-        let expected_ty = Type::mk_record(
-            ctx.common_kinds,
-            vec![
-                (Rc::from("z"), Type::Bool),
-                (Rc::from("y"), Type::String),
-                (Rc::from("x"), Type::Int),
-            ],
-            None,
-        );
-        let expected_result = Ok((expected_expr, expected_ty));
-        // { z = False, y = "", x = 0 }
-        let expr = syntax::Spanned {
-            pos: 0,
-            item: syntax::Expr::mk_record(
-                vec![
-                    (
-                        String::from("z"),
-                        syntax::Spanned {
-                            pos: 1,
-                            item: syntax::Expr::False,
-                        },
-                    ),
-                    (
-                        String::from("y"),
-                        syntax::Spanned {
-                            pos: 2,
-                            item: syntax::Expr::String(Vec::new()),
-                        },
-                    ),
-                    (
-                        String::from("x"),
-                        syntax::Spanned {
-                            pos: 3,
-                            item: syntax::Expr::Int(0),
-                        },
-                    ),
-                ],
-                None,
-            ),
-        };
-        let actual_result = ctx.infer(&expr).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
-        assert_eq!(expected_result, actual_result, "checking results");
-
-        let (mut actual_expr, _actual_ty) = actual_result.unwrap();
-
-        let mut placeholders: HashSet<Placeholder> = HashSet::new();
-        let _: Result<(), Void> = actual_expr.subst_placeholder(&mut |p| {
-            placeholders.insert(*p);
-            Ok(Expr::Placeholder(*p))
-        });
-
-        assert_eq!(3, placeholders.len(), "checking number of Placeholders");
-
-        let p0 = placeholders.get(&Placeholder(0)).unwrap();
-        let p1 = placeholders.get(&Placeholder(1)).unwrap();
-        let p2 = placeholders.get(&Placeholder(2)).unwrap();
-
-        assert_eq!(
-            Ok((
-                Expr::Int(0),
-                evidence::Constraint::HasField {
-                    field: Rc::from("x"),
-                    rest: Type::RowNil
-                }
-            )),
-            solver::solve_placeholder(&mut ctx, *p0)
-                .map(|(expr, constraint)| (expr, ctx.zonk_constraint(&constraint)))
-        );
-
-        assert_eq!(
-            Ok((
-                Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0)),
-                evidence::Constraint::HasField {
-                    field: Rc::from("y"),
-                    rest: Type::mk_rows(vec![(Rc::from("x"), Type::Int)], None)
-                }
-            )),
-            solver::solve_placeholder(&mut ctx, *p1)
-                .map(|(expr, constraint)| (expr, ctx.zonk_constraint(&constraint)))
-        );
-
-        assert_eq!(
-            Ok((
-                Expr::mk_binop(
-                    Binop::Add,
-                    Expr::Int(1),
-                    Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0))
-                ),
-                evidence::Constraint::HasField {
-                    field: Rc::from("z"),
-                    rest: Type::mk_rows(
-                        vec![(Rc::from("y"), Type::String), (Rc::from("x"), Type::Int)],
-                        None
-                    )
-                }
-            )),
-            solver::solve_placeholder(&mut ctx, *p2)
-                .map(|(expr, constraint)| (expr, ctx.zonk_constraint(&constraint)))
-        );
-    })
-}
-
-#[test]
 fn infer_case_1() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         /*
         \x -> case x of
           X a -> a
@@ -977,7 +927,7 @@ fn infer_case_1() {
 
 #[test]
 fn infer_case_2() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         /*
         \x -> case x of
           Left a -> a
@@ -1072,7 +1022,7 @@ fn infer_case_2() {
 
 #[test]
 fn infer_case_3() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         /*
         \x -> case x of
           Left a -> a
@@ -1182,7 +1132,7 @@ fn infer_case_3() {
 
 #[test]
 fn infer_case_4() {
-    with_empty_ctx(&|ctx| {
+    with_empty_ctx(|ctx| {
         /*
         \x -> case x of
           Left a -> a
