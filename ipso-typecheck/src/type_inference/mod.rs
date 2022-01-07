@@ -787,6 +787,7 @@ pub enum InferenceErrorInfo {
     CompExprEndsWith { end: CompExprEnd },
     NotInScope { name: String },
     DuplicateArgument { name: String },
+    RedundantPattern,
 }
 
 /// A type inference error.
@@ -815,7 +816,7 @@ impl InferenceError {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::CompExprEndsWith`]
+    /// Construct an [`InferenceErrorInfo::CompExprEndsWith`].
     pub fn comp_expr_ends_with(source: &Source, end: CompExprEnd) -> Self {
         InferenceError {
             source: source.clone(),
@@ -824,7 +825,7 @@ impl InferenceError {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::DuplicateArgument`]
+    /// Construct an [`InferenceErrorInfo::DuplicateArgument`].
     pub fn duplicate_argument(source: &Source, name: String) -> Self {
         InferenceError {
             source: source.clone(),
@@ -833,7 +834,31 @@ impl InferenceError {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::UnificationError`]
+    /// Construct an [`InferenceErrorInfo::RedundantPattern`].
+    pub fn redundant_pattern(source: &Source) -> Self {
+        InferenceError {
+            source: source.clone(),
+            position: None,
+            info: InferenceErrorInfo::RedundantPattern,
+        }
+    }
+
+    /// Construct a [`UnificationError::Mismatch`].
+    pub fn mismatch(
+        source: &Source,
+        expected: &syntax::Type<Rc<str>>,
+        actual: &syntax::Type<Rc<str>>,
+    ) -> Self {
+        InferenceError::unification_error(
+            source,
+            UnificationError::Mismatch {
+                expected: expected.clone(),
+                actual: actual.clone(),
+            },
+        )
+    }
+
+    /// Lift a [`InferenceErrorInfo::UnificationError`].
     pub fn unification_error(source: &Source, error: UnificationError) -> Self {
         InferenceError {
             source: source.clone(),

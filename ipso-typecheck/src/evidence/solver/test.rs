@@ -53,7 +53,7 @@ fn solve_constraint_2() {
 #[test]
 fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let var = tc.fresh_typevar(Kind::Row);
+        let var = tc.fresh_type_meta(&Kind::Row);
         tc.evidence.assume(
             None,
             Constraint::HasField {
@@ -112,8 +112,8 @@ fn solve_constraint_4() {
                             ty_vars: Vec::new(),
                             body: core::Type::mk_arrow(
                                 tc.common_kinds,
-                                a.clone(),
-                                core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                                &a,
+                                &core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                             ),
                         }
                     },
@@ -129,7 +129,7 @@ fn solve_constraint_4() {
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &core::Type::mk_app(eq_ty.clone(), core::Type::Int),
+            &core::Type::app(eq_ty.clone(), core::Type::Int),
             &[InstanceMember {
                 name: String::from("Eq"),
                 body: Expr::Builtin(Builtin::EqInt),
@@ -140,10 +140,10 @@ fn solve_constraint_4() {
         tc.register_instance(
             &[(Rc::from("a"), a.kind())],
             &Vec::new(),
-            &[core::Type::mk_app(eq_ty.clone(), a.clone())],
-            &core::Type::mk_app(
+            &[core::Type::app(eq_ty.clone(), a.clone())],
+            &core::Type::app(
                 eq_ty.clone(),
-                core::Type::mk_app(core::Type::mk_array(tc.common_kinds), a),
+                core::Type::app(core::Type::mk_array(tc.common_kinds), a),
             ),
             &[InstanceMember {
                 name: String::from("Eq"),
@@ -161,9 +161,9 @@ fn solve_constraint_4() {
             )],
             None,
         ));
-        let constraint = &Constraint::from_type(&core::Type::mk_app(
+        let constraint = &Constraint::from_type(&core::Type::app(
             eq_ty,
-            core::Type::mk_app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
+            core::Type::app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
         ));
         let actual = solve_constraint(&None, &mut tc, constraint);
 
