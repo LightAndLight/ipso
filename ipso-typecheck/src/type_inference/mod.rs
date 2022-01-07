@@ -124,7 +124,7 @@ impl Solutions {
             | Type::Bytes
             | Type::RowNil
             | Type::Unit
-            | Type::Cmd => todo!(),
+            | Type::Cmd => {}
             Type::Constraints(constraints) => constraints.iter_mut().for_each(|constraint| {
                 self.zonk_mut(kind_solutions, constraint);
             }),
@@ -1353,11 +1353,20 @@ impl<'a> InferenceContext<'a> {
 
             syntax::Expr::Record { fields, rest } => {
                 let rest_row = self.fresh_type_meta(&Kind::Row);
-                let fields: Vec<(Rc<str>, Expr, Type)> = fields
+
+                let fields: Vec<(Expr, Expr, Rc<str>, Type)> = fields
                     .iter()
                     .map(|(field_name, field_value)| {
                         self.infer(field_value).map(|(field_value, field_ty)| {
-                            (Rc::from(field_name.as_str()), field_value, field_ty)
+                            let field_name: Rc<str> = Rc::from(field_name.as_str());
+                            let field_index = Expr::Placeholder(self.evidence.placeholder(
+                                None,
+                                evidence::Constraint::HasField {
+                                    field: field_name.clone(),
+                                    rest: rest_row.clone(),
+                                },
+                            ));
+                            (field_index, field_value, field_name, field_ty)
                         })
                     })
                     .collect::<Result<_, _>>()?;
@@ -1376,25 +1385,14 @@ impl<'a> InferenceContext<'a> {
                     }
                 }?;
 
-                let ty_fields: Vec<(Rc<str>, Type)> = fields
-                    .iter()
-                    .map(|(field_name, _, field_ty)| (field_name.clone(), field_ty.clone()))
-                    .collect();
-                let ty_rest: Option<Type> = rest.as_ref().map(|_| rest_row.clone());
-
-                let expr_fields: Vec<(Expr, Expr)> = fields
-                    .iter()
-                    .map(|(field_name, field_value, _)| {
-                        let index = Expr::Placeholder(self.evidence.placeholder(
-                            None,
-                            evidence::Constraint::HasField {
-                                field: field_name.clone(),
-                                rest: rest_row.clone(),
-                            },
-                        ));
-                        (index, field_value.clone())
+                let (expr_fields, ty_fields) = fields
+                    .into_iter()
+                    .map(|(field_index, field_value, field_name, field_ty)| {
+                        ((field_index, field_value), (field_name, field_ty))
                     })
-                    .collect();
+                    .unzip();
+
+                let ty_rest: Option<Type> = rest.as_ref().map(|_| rest_row.clone());
                 let expr_rest: Option<Expr> = rest;
 
                 Ok((
@@ -1638,8 +1636,10 @@ impl<'a> InferenceContext<'a> {
         expr: &Spanned<syntax::Expr>,
         expected: &Type,
     ) -> Result<Expr, InferenceError> {
+        let position = expr.pos;
         let (expr, expr_ty) = self.infer(expr)?;
-        self.unify(expected, &expr_ty)?;
+        self.unify(expected, &expr_ty)
+            .map_err(|error| error.with_position(position))?;
         Ok(expr)
     }
 }

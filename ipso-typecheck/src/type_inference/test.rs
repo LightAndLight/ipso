@@ -46,30 +46,20 @@ fn occurs_1() {
     with_empty_ctx(|ctx| {
         let v1 = ctx.fresh_type_meta(&Kind::Type);
         let v2 = ctx.fresh_type_meta(&Kind::Type);
-        assert_eq!(
-            ctx.unify(&v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2)),
-            Err(InferenceError::occurs(
-                &Source::Interactive {
-                    label: String::from(SOURCE_LABEL),
-                },
-                0,
-                syntax::Type::mk_arrow(
-                    v1.to_syntax().map(&mut |ix| ctx
-                        .type_variables
-                        .lookup_index(*ix)
-                        .unwrap()
-                        .0
-                        .clone()),
-                    v2.to_syntax().map(&mut |ix| ctx
-                        .type_variables
-                        .lookup_index(*ix)
-                        .unwrap()
-                        .0
-                        .clone()),
-                )
-            )
-            .with_position(0))
-        )
+        let expected = Err(InferenceError::occurs(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            0,
+            syntax::Type::mk_arrow(
+                v1.to_syntax()
+                    .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
+                v2.to_syntax()
+                    .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            ),
+        ));
+        let actual = ctx.unify(&v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2));
+        assert_eq!(expected, actual)
     })
 }
 
@@ -661,36 +651,34 @@ fn unify_rows_3() {
 #[test]
 fn unify_rows_4() {
     with_empty_ctx(|ctx| {
-        assert_eq!(
-            ctx.unify(
-                &Type::mk_record(
-                    ctx.common_kinds,
-                    vec![
-                        (Rc::from("x"), Type::Int),
-                        (Rc::from("x"), Type::Bool),
-                        (Rc::from("y"), Type::Bool)
-                    ],
-                    None
-                ),
-                &Type::mk_record(
-                    ctx.common_kinds,
-                    vec![
-                        (Rc::from("x"), Type::Int),
-                        (Rc::from("y"), Type::Bool),
-                        (Rc::from("x"), Type::Int)
-                    ],
-                    None
-                )
+        let expected = Err(InferenceError::mismatch(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            syntax::Type::Bool,
+            syntax::Type::Int,
+        ));
+        let actual = ctx.unify(
+            &Type::mk_record(
+                ctx.common_kinds,
+                vec![
+                    (Rc::from("x"), Type::Int),
+                    (Rc::from("x"), Type::Bool),
+                    (Rc::from("y"), Type::Bool),
+                ],
+                None,
             ),
-            Err(InferenceError::mismatch(
-                &Source::Interactive {
-                    label: String::from(SOURCE_LABEL)
-                },
-                syntax::Type::Bool,
-                syntax::Type::Int
-            )
-            .with_position(0))
-        )
+            &Type::mk_record(
+                ctx.common_kinds,
+                vec![
+                    (Rc::from("x"), Type::Int),
+                    (Rc::from("y"), Type::Bool),
+                    (Rc::from("x"), Type::Int),
+                ],
+                None,
+            ),
+        );
+        assert_eq!(expected, actual)
     })
 }
 
@@ -739,8 +727,8 @@ fn infer_record_2() {
             Ok((
                 Expr::mk_record(
                     vec![
-                        (Expr::mk_placeholder(1), Expr::Int(1)),
-                        (Expr::mk_placeholder(0), Expr::True)
+                        (Expr::mk_placeholder(0), Expr::Int(1)),
+                        (Expr::mk_placeholder(1), Expr::True)
                     ],
                     None
                 ),
@@ -789,38 +777,38 @@ fn infer_record_3() {
                 ),
             }),
         );
-        assert_eq!(
-            ctx.infer(&syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, ctx.zonk_type(ty))),
-            Ok((
-                Expr::mk_record(
-                    vec![
-                        (Expr::mk_placeholder(1), Expr::Int(1)),
-                        (Expr::mk_placeholder(0), Expr::True)
-                    ],
-                    Some(Expr::mk_record(
-                        vec![(Expr::mk_placeholder(2), Expr::Char('c'))],
-                        None
-                    ))
-                ),
-                Type::mk_record(
-                    ctx.common_kinds,
-                    vec![
-                        (Rc::from("x"), Type::Int),
-                        (Rc::from("y"), Type::Bool),
-                        (Rc::from("z"), Type::Char)
-                    ],
-                    None
-                )
-            ))
-        )
+        let expected = Ok((
+            Expr::mk_record(
+                vec![
+                    (Expr::mk_placeholder(0), Expr::Int(1)),
+                    (Expr::mk_placeholder(1), Expr::True),
+                ],
+                Some(Expr::mk_record(
+                    vec![(Expr::mk_placeholder(2), Expr::Char('c'))],
+                    None,
+                )),
+            ),
+            Type::mk_record(
+                ctx.common_kinds,
+                vec![
+                    (Rc::from("x"), Type::Int),
+                    (Rc::from("y"), Type::Bool),
+                    (Rc::from("z"), Type::Char),
+                ],
+                None,
+            ),
+        ));
+        let actual = ctx
+            .infer(&syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_record_4() {
     with_empty_ctx(|ctx| {
-        // { x = 1, y = true, ...1 }
+        // { x = 1, y = true, ..1 }
         let term = syntax::Expr::mk_record(
             vec![
                 (
@@ -843,18 +831,18 @@ fn infer_record_4() {
                 item: syntax::Expr::Int(1),
             }),
         );
-        assert_eq!(
-            ctx.infer(&syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, ctx.zonk_type(ty))),
-            Err(InferenceError::mismatch(
-                &Source::Interactive {
-                    label: String::from(SOURCE_LABEL),
-                },
-                syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
-                syntax::Type::Int
-            )
-            .with_position(22))
+        let expected = Err(InferenceError::mismatch(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+            syntax::Type::Int,
         )
+        .with_position(22));
+        let actual = ctx
+            .infer(&syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        assert_eq!(expected, actual)
     })
 }
 
