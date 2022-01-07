@@ -1046,30 +1046,25 @@ impl<'a> InferenceContext<'a> {
             Some(_) => self.fresh_type_meta(&Kind::Row),
             None => Type::RowNil,
         };
-        let names_tys: Vec<(Rc<str>, Type)> = names
+
+        let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = names
             .iter()
             .map(|name| {
-                (
-                    Rc::from(name.item.as_ref()),
-                    self.fresh_type_meta(&Kind::Type),
-                )
+                let name_str: Rc<str> = Rc::from(name.item.as_ref());
+                let placeholder = Expr::Placeholder(self.evidence.placeholder(
+                    Some(name.pos),
+                    evidence::Constraint::HasField {
+                        field: name_str.clone(),
+                        rest: rest_row.clone(),
+                    },
+                ));
+                (placeholder, (name_str, self.fresh_type_meta(&Kind::Type)))
             })
-            .collect();
+            .unzip();
+
         InferredPattern {
             pattern: Pattern::Record {
-                names: names_tys
-                    .iter()
-                    .zip(names.iter())
-                    .map(|((name, _), name_span)| {
-                        Expr::Placeholder(self.evidence.placeholder(
-                            Some(name_span.pos),
-                            evidence::Constraint::HasField {
-                                field: name.clone(),
-                                rest: rest_row.clone(),
-                            },
-                        ))
-                    })
-                    .collect(),
+                names,
                 rest: rest.is_some(),
             },
             names: {
@@ -1086,14 +1081,10 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    fn infer_variant_pattern(
-        &mut self,
-        name: &str,
-        arg: &Spanned<String>,
-        rest_row: &Type,
-    ) -> InferredPattern {
+    fn infer_variant_pattern(&mut self, name: &str, arg: &Spanned<String>) -> InferredPattern {
         let name: Rc<str> = Rc::from(name);
         let name_ty = self.fresh_type_meta(&Kind::Type);
+        let rest_row = self.fresh_type_meta(&Kind::Row);
         InferredPattern {
             pattern: Pattern::mk_variant(Expr::Placeholder(self.evidence.placeholder(
                 None,
@@ -1103,11 +1094,7 @@ impl<'a> InferenceContext<'a> {
                 },
             ))),
             names: vec![(Rc::from(arg.item.as_str()), name_ty.clone())],
-            ty: Type::mk_variant(
-                self.common_kinds,
-                vec![(name, name_ty)],
-                Some(rest_row.clone()),
-            ),
+            ty: Type::mk_variant(self.common_kinds, vec![(name, name_ty)], Some(rest_row)),
         }
     }
 
@@ -1125,9 +1112,7 @@ impl<'a> InferenceContext<'a> {
             syntax::Pattern::Record { names, rest } => {
                 self.infer_record_pattern(names, rest.as_ref())
             }
-            syntax::Pattern::Variant { name, arg } => {
-                self.infer_variant_pattern(name, arg, &Type::RowNil)
-            }
+            syntax::Pattern::Variant { name, arg } => self.infer_variant_pattern(name, arg),
             syntax::Pattern::Char(c) => self.infer_char_pattern(c),
             syntax::Pattern::Int(n) => self.infer_int_pattern(n),
             syntax::Pattern::String(s) => self.infer_string_pattern(s),
