@@ -1318,7 +1318,7 @@ impl<'a> InferenceContext<'a> {
                             ),
                             Pattern::Wildcard => Expr::mk_lam(false, body),
                         };
-                        let body_ty = Type::app(arg_ty, body_ty);
+                        let body_ty = Type::arrow(self.common_kinds, arg_ty, body_ty);
 
                         (body, body_ty)
                     },

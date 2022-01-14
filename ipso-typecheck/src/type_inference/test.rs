@@ -101,33 +101,32 @@ fn infer_pattern_2() {
             ],
             rest: None,
         };
-        assert_eq!(
-            ctx.infer_pattern(&pat),
-            InferredPattern {
-                pattern: Pattern::Record {
-                    names: vec![
-                        Expr::mk_placeholder(2),
-                        Expr::mk_placeholder(1),
-                        Expr::mk_placeholder(0)
-                    ],
-                    rest: false
-                },
-                ty: Type::mk_record(
-                    ctx.common_kinds,
-                    vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
-                        (Rc::from("z"), Type::Meta(Kind::Type, 2))
-                    ],
-                    None
-                ),
+        let expected = InferredPattern {
+            pattern: Pattern::Record {
                 names: vec![
+                    Expr::mk_placeholder(0),
+                    Expr::mk_placeholder(1),
+                    Expr::mk_placeholder(2),
+                ],
+                rest: false,
+            },
+            ty: Type::mk_record(
+                ctx.common_kinds,
+                vec![
                     (Rc::from("x"), Type::Meta(Kind::Type, 0)),
                     (Rc::from("y"), Type::Meta(Kind::Type, 1)),
                     (Rc::from("z"), Type::Meta(Kind::Type, 2)),
-                ]
-            }
-        )
+                ],
+                None,
+            ),
+            names: vec![
+                (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                (Rc::from("z"), Type::Meta(Kind::Type, 2)),
+            ],
+        };
+        let actual = ctx.infer_pattern(&pat);
+        assert_eq!(expected, actual)
     })
 }
 
@@ -232,8 +231,8 @@ fn infer_lam_1() {
             Expr::mk_lam(true, Expr::Var(0)),
             Type::arrow(
                 ctx.common_kinds,
-                Type::Meta(Kind::Type, 4),
-                Type::Meta(Kind::Type, 4),
+                Type::Meta(Kind::Type, 0),
+                Type::Meta(Kind::Type, 0),
             ),
         ));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
@@ -275,7 +274,7 @@ fn infer_lam_2() {
                     Expr::Var(0),
                     vec![Branch {
                         pattern: Pattern::Record {
-                            names: vec![Expr::mk_placeholder(1), Expr::mk_placeholder(0)],
+                            names: vec![Expr::mk_placeholder(0), Expr::mk_placeholder(1)],
                             rest: false,
                         },
                         body: Expr::Var(1),
@@ -287,12 +286,12 @@ fn infer_lam_2() {
                 Type::mk_record(
                     ctx.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 4),
+                Type::Meta(Kind::Type, 0),
             ),
         ));
         assert_eq!(expected, actual)
@@ -333,7 +332,7 @@ fn infer_lam_3() {
                     Expr::Var(0),
                     vec![Branch {
                         pattern: Pattern::Record {
-                            names: vec![Expr::mk_placeholder(1), Expr::mk_placeholder(0)],
+                            names: vec![Expr::mk_placeholder(0), Expr::mk_placeholder(1)],
                             rest: false,
                         },
                         body: Expr::Var(0),
@@ -345,12 +344,12 @@ fn infer_lam_3() {
                 Type::mk_record(
                     ctx.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 5),
+                Type::Meta(Kind::Type, 1),
             ),
         ));
         assert_eq!(expected, actual)
@@ -393,7 +392,7 @@ fn infer_lam_4() {
                     Expr::Var(0),
                     vec![Branch {
                         pattern: Pattern::Record {
-                            names: vec![Expr::mk_placeholder(1), Expr::mk_placeholder(0)],
+                            names: vec![Expr::mk_placeholder(0), Expr::mk_placeholder(1)],
                             rest: true,
                         },
                         body: Expr::Var(0),
@@ -405,12 +404,12 @@ fn infer_lam_4() {
                 Type::mk_record(
                     ctx.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 2)),
                     ],
-                    Some(Type::Meta(Kind::Row, 6)),
+                    Some(Type::Meta(Kind::Row, 0)),
                 ),
-                Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 6))),
+                Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 0))),
             ),
         ));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
@@ -457,13 +456,13 @@ fn infer_lam_5() {
                 ctx.common_kinds,
                 Type::arrow(
                     ctx.common_kinds,
-                    Type::Meta(Kind::Type, 6),
-                    Type::Meta(Kind::Type, 8),
+                    Type::Meta(Kind::Type, 1),
+                    Type::Meta(Kind::Type, 3),
                 ),
                 Type::arrow(
                     ctx.common_kinds,
-                    Type::Meta(Kind::Type, 6),
-                    Type::Meta(Kind::Type, 8),
+                    Type::Meta(Kind::Type, 1),
+                    Type::Meta(Kind::Type, 3),
                 ),
             ),
         ));
