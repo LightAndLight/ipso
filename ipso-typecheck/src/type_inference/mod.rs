@@ -232,6 +232,7 @@ pub fn unify(
     actual: &Type,
 ) -> Result<(), UnificationError> {
     fn solve_left(
+        kind_solutions: &kind_inference::Solutions,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         meta: Meta,
@@ -240,7 +241,11 @@ pub fn unify(
         debug_assert!(&Type::Meta(actual.kind(), meta) != actual);
 
         if type_solutions.occurs(meta, actual) {
-            Err(UnificationError::occurs(type_variables, meta, actual))
+            Err(UnificationError::occurs(
+                type_variables,
+                meta,
+                &type_solutions.zonk(kind_solutions, actual.clone()),
+            ))
         } else {
             type_solutions.set(meta, actual);
             Ok(())
@@ -248,6 +253,7 @@ pub fn unify(
     }
 
     fn solve_right(
+        kind_solutions: &kind_inference::Solutions,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         expected: &Type,
@@ -256,7 +262,11 @@ pub fn unify(
         debug_assert!(&Type::Meta(expected.kind(), meta) != expected);
 
         if type_solutions.occurs(meta, expected) {
-            Err(UnificationError::occurs(type_variables, meta, expected))
+            Err(UnificationError::occurs(
+                type_variables,
+                meta,
+                &type_solutions.zonk(kind_solutions, expected.clone()),
+            ))
         } else {
             type_solutions.set(meta, expected);
             Ok(())
@@ -274,6 +284,7 @@ pub fn unify(
             Type::Meta(_, actual_meta) if meta == actual_meta => Ok(()),
             _ => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_left(
+                    kind_solutions,
                     unification_ctx.type_variables,
                     type_solutions,
                     *meta,
@@ -301,6 +312,7 @@ pub fn unify(
             Type::Meta(_, expected_meta) if meta == expected_meta => Ok(()),
             _ => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_right(
+                    kind_solutions,
                     unification_ctx.type_variables,
                     type_solutions,
                     expected,
