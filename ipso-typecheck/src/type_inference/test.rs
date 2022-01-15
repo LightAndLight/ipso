@@ -58,7 +58,7 @@ fn occurs_1() {
                     .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
             ),
         ));
-        let actual = ctx.unify(&v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2));
+        let actual = ctx.unify(None, &v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2));
         assert_eq!(expected, actual)
     })
 }
@@ -556,7 +556,7 @@ fn unify_1() {
         let m_1 = ctx.fresh_type_meta(&Kind::Type);
         let holey = Type::arrow(ctx.common_kinds, m_1, m_0);
         let expected = Ok(real.clone());
-        let actual = ctx.unify(&real, &holey).map(|_| ctx.zonk_type(holey));
+        let actual = ctx.unify(None, &real, &holey).map(|_| ctx.zonk_type(holey));
         assert_eq!(expected, actual)
     })
 }
@@ -566,6 +566,7 @@ fn unify_rows_1() {
     with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
+                None,
                 &Type::mk_record(
                     ctx.common_kinds,
                     vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
@@ -587,6 +588,7 @@ fn unify_rows_2() {
     with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
+                None,
                 &Type::mk_record(
                     ctx.common_kinds,
                     vec![
@@ -616,6 +618,7 @@ fn unify_rows_3() {
     with_empty_ctx(|ctx| {
         assert_eq!(
             ctx.unify(
+                None,
                 &Type::mk_record(
                     ctx.common_kinds,
                     vec![
@@ -651,6 +654,7 @@ fn unify_rows_4() {
             syntax::Type::Int,
         ));
         let actual = ctx.unify(
+            None,
             &Type::mk_record(
                 ctx.common_kinds,
                 vec![

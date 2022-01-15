@@ -1316,7 +1316,7 @@ impl<'modules> Typechecker<'modules> {
         actual: &core::Type,
     ) -> Result<(), TypeError> {
         self.type_inference_context()
-            .unify(expected, actual)
+            .unify(None, expected, actual)
             .map_err(|error| TypeError::TypeError { error })
     }
 

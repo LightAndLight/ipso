@@ -964,7 +964,12 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Unify two types.
-    pub fn unify(&mut self, expected: &Type, actual: &Type) -> Result<(), InferenceError> {
+    pub fn unify(
+        &mut self,
+        position: Option<usize>,
+        expected: &Type,
+        actual: &Type,
+    ) -> Result<(), InferenceError> {
         unify(
             &UnificationContext {
                 common_kinds: self.common_kinds,
@@ -976,7 +981,13 @@ impl<'a> InferenceContext<'a> {
             expected,
             actual,
         )
-        .map_err(|error| InferenceError::unification_error(self.source, error))
+        .map_err(|error| {
+            let error = InferenceError::unification_error(self.source, error);
+            match position {
+                Some(position) => error.with_position(position),
+                None => error,
+            }
+        })
     }
 
     /**
@@ -1156,11 +1167,11 @@ impl<'a> InferenceContext<'a> {
 
     fn check_pattern(
         &mut self,
-        pattern: &syntax::Pattern,
+        pattern: &Spanned<syntax::Pattern>,
         expected: &Type,
     ) -> Result<CheckedPattern, InferenceError> {
-        let result = self.infer_pattern(pattern);
-        self.unify(expected, &result.ty)?;
+        let result = self.infer_pattern(&pattern.item);
+        self.unify(Some(pattern.pos), expected, &result.ty)?;
         Ok(CheckedPattern {
             pattern: result.pattern,
             names: result.names,
@@ -1417,7 +1428,7 @@ impl<'a> InferenceContext<'a> {
                         Ok((Some(rest), Some(row.clone())))
                     }
                     None => {
-                        self.unify(&Type::RowNil, row)?;
+                        self.unify(None, &Type::RowNil, row)?;
                         Ok((None, None))
                     }
                 }?;
@@ -1521,7 +1532,7 @@ impl<'a> InferenceContext<'a> {
                             seen_ctors.insert(name.as_ref());
                         }
 
-                        let result = self.check_pattern(&branch.pattern.item, &expr_ty)?;
+                        let result = self.check_pattern(&branch.pattern, &expr_ty)?;
 
                         self.variables.insert(&result.names);
                         let body = self.check(&branch.body, &out_ty)?;
@@ -1548,7 +1559,7 @@ impl<'a> InferenceContext<'a> {
                 match expr_ty.unwrap_variant() {
                     Some(RowParts {
                         rest: Some(rest), ..
-                    }) if !saw_catchall => self.unify(&Type::RowNil, rest),
+                    }) if !saw_catchall => self.unify(None, &Type::RowNil, rest),
                     _ => Ok(()),
                 }?;
 
@@ -1675,8 +1686,7 @@ impl<'a> InferenceContext<'a> {
     ) -> Result<Expr, InferenceError> {
         let position = expr.pos;
         let (expr, expr_ty) = self.infer(expr)?;
-        self.unify(expected, &expr_ty)
-            .map_err(|error| error.with_position(position))?;
+        self.unify(Some(position), expected, &expr_ty)?;
         Ok(expr)
     }
 }
