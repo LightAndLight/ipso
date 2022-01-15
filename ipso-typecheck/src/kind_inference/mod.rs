@@ -199,6 +199,8 @@ pub fn unify(
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
+        debug_assert!(&Kind::Meta(meta) != actual);
+
         if solutions.occurs(meta, actual) {
             Err(UnificationError::occurs(meta, actual))
         } else {
@@ -212,6 +214,8 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
+        debug_assert!(&Kind::Meta(meta) != expected);
+
         if solutions.occurs(meta, expected) {
             Err(UnificationError::occurs(meta, expected))
         } else {
@@ -225,9 +229,12 @@ pub fn unify(
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
-        match solutions.get(meta).clone() {
-            Solution::Unsolved => solve_left(solutions, meta, actual),
-            Solution::Solved(expected) => unify(solutions, &expected, actual),
+        match actual {
+            Kind::Meta(actual_meta) if meta == *actual_meta => Ok(()),
+            _ => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_left(solutions, meta, actual),
+                Solution::Solved(expected) => unify(solutions, &expected, actual),
+            },
         }
     }
 
@@ -236,9 +243,12 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
-        match solutions.get(meta).clone() {
-            Solution::Unsolved => solve_right(solutions, expected, meta),
-            Solution::Solved(actual) => unify(solutions, expected, &actual),
+        match expected {
+            Kind::Meta(expected_meta) if meta == *expected_meta => Ok(()),
+            _ => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_right(solutions, expected, meta),
+                Solution::Solved(actual) => unify(solutions, expected, &actual),
+            },
         }
     }
 
