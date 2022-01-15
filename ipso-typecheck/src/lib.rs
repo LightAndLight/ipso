@@ -906,13 +906,17 @@ impl<'modules> Typechecker<'modules> {
                 .assume(None, evidence::Constraint::from_type(constraint));
         }
 
-        let body = self.check_type(
-            &syntax::Spanned {
-                pos,
-                item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
-            },
-            ty,
-        )?;
+        let body = if args.is_empty() {
+            self.check_type(body, ty)
+        } else {
+            self.check_type(
+                &syntax::Spanned {
+                    pos,
+                    item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
+                },
+                ty,
+            )
+        }?;
 
         let (body, sig) = self.generalise(body, ty.clone())?;
         self.evidence = Evidence::new();
