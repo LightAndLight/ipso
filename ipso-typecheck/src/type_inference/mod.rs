@@ -238,7 +238,22 @@ pub fn unify(
         meta: Meta,
         actual: &Type,
     ) -> Result<(), UnificationError> {
-        debug_assert!(&Type::Meta(actual.kind(), meta) != actual);
+        /*
+        [note: avoiding solved metas as solutions]
+
+        If `actual` is a solved meta, then it's possible for its solution
+        to be `Type::Meta(_, meta)`. This would trigger the occurs check, even
+        though the equation is valid.
+
+        To keep the occurs check simple, we assume that if a solution is a metavariable
+        then it should be unsolved.
+        */
+        debug_assert!(match actual {
+            Type::Meta(_, actual_meta) => {
+                type_solutions.get(*actual_meta).is_unsolved()
+            }
+            _ => true,
+        });
 
         if type_solutions.occurs(meta, actual) {
             Err(UnificationError::occurs(
@@ -259,7 +274,13 @@ pub fn unify(
         expected: &Type,
         meta: Meta,
     ) -> Result<(), UnificationError> {
-        debug_assert!(&Type::Meta(expected.kind(), meta) != expected);
+        // See [note: avoiding solved metas as solutions]
+        debug_assert!(match expected {
+            Type::Meta(_, expected_meta) => {
+                type_solutions.get(*expected_meta).is_unsolved()
+            }
+            _ => true,
+        });
 
         if type_solutions.occurs(meta, expected) {
             Err(UnificationError::occurs(
@@ -273,6 +294,16 @@ pub fn unify(
         }
     }
 
+    fn walk(type_solutions: &Solutions, ty: &Type) -> Type {
+        match ty {
+            Type::Meta(_, meta) => match type_solutions.get(*meta) {
+                Solution::Unsolved => ty.clone(),
+                Solution::Solved(ty) => walk(type_solutions, ty),
+            },
+            _ => ty.clone(),
+        }
+    }
+
     fn unify_meta_left(
         unification_ctx: &UnificationContext,
         kind_solutions: &mut kind_inference::Solutions,
@@ -280,22 +311,22 @@ pub fn unify(
         meta: &usize,
         actual: &Type,
     ) -> Result<(), UnificationError> {
-        match actual {
-            Type::Meta(_, actual_meta) if meta == actual_meta => Ok(()),
-            _ => match type_solutions.get(*meta).clone() {
+        match walk(type_solutions, actual) {
+            Type::Meta(_, actual_meta) if *meta == actual_meta => Ok(()),
+            actual => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_left(
                     kind_solutions,
                     unification_ctx.type_variables,
                     type_solutions,
                     *meta,
-                    actual,
+                    &actual,
                 ),
                 Solution::Solved(expected) => unify(
                     unification_ctx,
                     kind_solutions,
                     type_solutions,
                     &expected,
-                    actual,
+                    &actual,
                 ),
             },
         }
@@ -308,21 +339,21 @@ pub fn unify(
         expected: &Type,
         meta: &usize,
     ) -> Result<(), UnificationError> {
-        match expected {
-            Type::Meta(_, expected_meta) if meta == expected_meta => Ok(()),
-            _ => match type_solutions.get(*meta).clone() {
+        match walk(type_solutions, expected) {
+            Type::Meta(_, expected_meta) if *meta == expected_meta => Ok(()),
+            expected => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_right(
                     kind_solutions,
                     unification_ctx.type_variables,
                     type_solutions,
-                    expected,
+                    &expected,
                     *meta,
                 ),
                 Solution::Solved(actual) => unify(
                     unification_ctx,
                     kind_solutions,
                     type_solutions,
-                    expected,
+                    &expected,
                     &actual,
                 ),
             },

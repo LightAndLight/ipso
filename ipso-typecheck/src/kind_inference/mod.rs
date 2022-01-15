@@ -199,7 +199,12 @@ pub fn unify(
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
-        debug_assert!(&Kind::Meta(meta) != actual);
+        debug_assert!(match actual {
+            Kind::Meta(actual_meta) => {
+                solutions.get(*actual_meta).is_unsolved()
+            }
+            _ => true,
+        });
 
         if solutions.occurs(meta, actual) {
             Err(UnificationError::occurs(meta, actual))
@@ -214,7 +219,12 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
-        debug_assert!(&Kind::Meta(meta) != expected);
+        debug_assert!(match expected {
+            Kind::Meta(expected_meta) => {
+                solutions.get(*expected_meta).is_unsolved()
+            }
+            _ => true,
+        });
 
         if solutions.occurs(meta, expected) {
             Err(UnificationError::occurs(meta, expected))
@@ -224,16 +234,26 @@ pub fn unify(
         }
     }
 
+    fn walk(solutions: &Solutions, kind: &Kind) -> Kind {
+        match kind {
+            Kind::Meta(meta) => match solutions.get(*meta) {
+                Solution::Unsolved => kind.clone(),
+                Solution::Solved(kind) => walk(solutions, kind),
+            },
+            _ => kind.clone(),
+        }
+    }
+
     fn unify_meta_left(
         solutions: &mut Solutions,
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
-        match actual {
-            Kind::Meta(actual_meta) if meta == *actual_meta => Ok(()),
-            _ => match solutions.get(meta).clone() {
-                Solution::Unsolved => solve_left(solutions, meta, actual),
-                Solution::Solved(expected) => unify(solutions, &expected, actual),
+        match walk(solutions, actual) {
+            Kind::Meta(actual_meta) if meta == actual_meta => Ok(()),
+            actual => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_left(solutions, meta, &actual),
+                Solution::Solved(expected) => unify(solutions, &expected, &actual),
             },
         }
     }
@@ -243,11 +263,11 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
-        match expected {
-            Kind::Meta(expected_meta) if meta == *expected_meta => Ok(()),
-            _ => match solutions.get(meta).clone() {
-                Solution::Unsolved => solve_right(solutions, expected, meta),
-                Solution::Solved(actual) => unify(solutions, expected, &actual),
+        match walk(solutions, expected) {
+            Kind::Meta(expected_meta) if meta == expected_meta => Ok(()),
+            expected => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_right(solutions, &expected, meta),
+                Solution::Solved(actual) => unify(solutions, &expected, &actual),
             },
         }
     }

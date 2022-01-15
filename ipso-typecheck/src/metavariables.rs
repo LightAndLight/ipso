@@ -11,7 +11,7 @@ pub enum Solution<T> {
 }
 
 impl<T> Solution<T> {
-    fn is_unsolved(&self) -> bool {
+    pub fn is_unsolved(&self) -> bool {
         match self {
             Solution::Unsolved => true,
             Solution::Solved(_) => false,
