@@ -5,7 +5,7 @@
   stdout = "",
   stderr =
     ''
-    string_pattern_2.ipso:5:5: error: expected type "String", got type "{ x : ?4 }"
+    string_pattern_2.ipso:5:5: error: expected type "String", got type "{ x : ?3 }"
       |
     5 |     { x } -> print "saw { x }"
       |     ^

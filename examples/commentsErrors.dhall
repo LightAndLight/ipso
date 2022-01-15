@@ -5,7 +5,7 @@
   stdout = "",
   stderr = 
     ''
-    commentsErrors.ipso:8:5: error: not in scope
+    commentsErrors.ipso:8:5: error: variable not in scope
       |
     8 |     stdooout
       |     ^

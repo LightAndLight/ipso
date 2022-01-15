@@ -5,7 +5,7 @@
   stdout = "",
   stderr = 
     ''
-    3.ipso:2:8: error: not in scope
+    3.ipso:2:8: error: variable not in scope
       |
     2 | main = hello
       |        ^
