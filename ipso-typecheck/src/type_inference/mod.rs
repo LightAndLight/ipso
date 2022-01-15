@@ -9,6 +9,7 @@ use crate::{
     metavariables::{self, Meta, Solution},
     BoundVars,
 };
+use fnv::FnvHashMap;
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
@@ -1042,42 +1043,54 @@ impl<'a> InferenceContext<'a> {
         names: &[Spanned<String>],
         rest: Option<&Spanned<String>>,
     ) -> InferredPattern {
-        let rest_row = match rest {
-            Some(_) => self.fresh_type_meta(&Kind::Row),
-            None => Type::RowNil,
+        let mut names_to_positions: FnvHashMap<&str, usize> =
+            FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
+        let entire_row = {
+            let fields = names
+                .iter()
+                .map(|name| {
+                    let name_item_ref = name.item.as_ref();
+                    names_to_positions.insert(name_item_ref, name.pos);
+                    (Rc::from(name_item_ref), self.fresh_type_meta(&Kind::Type))
+                })
+                .collect();
+            let rest = rest.map(|_| self.fresh_type_meta(&Kind::Row));
+            Type::mk_rows(fields, rest)
         };
 
-        let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = names
-            .iter()
-            .map(|name| {
-                let name_str: Rc<str> = Rc::from(name.item.as_ref());
-                let placeholder = Expr::Placeholder(self.evidence.placeholder(
-                    Some(name.pos),
+        let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = {
+            let mut names: Vec<Expr> = Vec::with_capacity(names.len());
+            let mut names_tys: Vec<(Rc<str>, Type)> = Vec::with_capacity(names.len());
+
+            let mut row: &Type = &entire_row;
+            while let Type::RowCons(field, ty, rest) = row {
+                names.push(Expr::Placeholder(self.evidence.placeholder(
+                    names_to_positions.get(field.as_ref()).copied(),
                     evidence::Constraint::HasField {
-                        field: name_str.clone(),
-                        rest: rest_row.clone(),
+                        field: field.clone(),
+                        rest: (**rest).clone(),
                     },
+                )));
+                names_tys.push((field.clone(), (**ty).clone()));
+                row = rest.as_ref();
+            }
+            if let Some(rest) = rest {
+                names_tys.push((
+                    Rc::from(rest.item.as_str()),
+                    Type::app(Type::mk_record_ctor(self.common_kinds), row.clone()),
                 ));
-                (placeholder, (name_str, self.fresh_type_meta(&Kind::Type)))
-            })
-            .unzip();
+            }
+
+            (names, names_tys)
+        };
 
         InferredPattern {
             pattern: Pattern::Record {
                 names,
                 rest: rest.is_some(),
             },
-            names: {
-                let mut names: Vec<(Rc<str>, Type)> = names_tys.clone();
-                if let Some(rest) = rest {
-                    names.push((
-                        Rc::from(rest.item.as_str()),
-                        Type::app(Type::mk_record_ctor(self.common_kinds), rest_row.clone()),
-                    ));
-                }
-                names
-            },
-            ty: Type::mk_record(self.common_kinds, names_tys, Some(rest_row)),
+            names: names_tys,
+            ty: Type::app(Type::mk_record_ctor(self.common_kinds), entire_row),
         }
     }
 
@@ -1337,48 +1350,56 @@ impl<'a> InferenceContext<'a> {
             }
 
             syntax::Expr::Record { fields, rest } => {
-                let rest_row = self.fresh_type_meta(&Kind::Row);
+                let mut field_to_expr: FnvHashMap<&str, Expr> =
+                    FnvHashMap::with_capacity_and_hasher(fields.len(), Default::default());
 
-                let fields: Vec<(Expr, Expr, Rc<str>, Type)> = fields
-                    .iter()
-                    .map(|(field_name, field_value)| {
-                        self.infer(field_value).map(|(field_value, field_ty)| {
-                            let field_name: Rc<str> = Rc::from(field_name.as_str());
-                            let field_index = Expr::Placeholder(self.evidence.placeholder(
-                                None,
-                                evidence::Constraint::HasField {
-                                    field: field_name.clone(),
-                                    rest: rest_row.clone(),
-                                },
-                            ));
-                            (field_index, field_value, field_name, field_ty)
+                let entire_row: Type = {
+                    let fields = fields
+                        .iter()
+                        .map(|(field_name, field_expr)| {
+                            self.infer(field_expr).map(|(field_expr, field_ty)| {
+                                let field_name_str = field_name.as_str();
+                                field_to_expr.insert(field_name_str, field_expr);
+                                (Rc::from(field_name_str), field_ty)
+                            })
                         })
-                    })
-                    .collect::<Result<_, _>>()?;
+                        .collect::<Result<_, _>>()?;
+                    let rest = rest.as_ref().map(|_| self.fresh_type_meta(&Kind::Row));
+                    Ok(Type::mk_rows(fields, rest))
+                }?;
 
-                let rest = match rest {
+                let mut expr_fields: Vec<(Expr, Expr)> = Vec::with_capacity(fields.len());
+                let mut ty_fields: Vec<(Rc<str>, Type)> = Vec::with_capacity(fields.len());
+
+                let mut row = &entire_row;
+                while let Type::RowCons(field, ty, rest) = row {
+                    let field_index = Expr::Placeholder(self.evidence.placeholder(
+                        None,
+                        evidence::Constraint::HasField {
+                            field: field.clone(),
+                            rest: (**rest).clone(),
+                        },
+                    ));
+                    let field_expr = field_to_expr.remove(field.as_ref()).unwrap();
+                    expr_fields.push((field_index, field_expr));
+                    ty_fields.push((field.clone(), (**ty).clone()));
+
+                    row = rest.as_ref()
+                }
+
+                let (expr_rest, ty_rest) = match rest {
                     Some(rest) => {
                         let rest = self.check(
                             rest,
-                            &Type::mk_app(&Type::mk_record_ctor(self.common_kinds), &rest_row),
+                            &Type::mk_app(&Type::mk_record_ctor(self.common_kinds), row),
                         )?;
-                        Ok(Some(rest))
+                        Ok((Some(rest), Some(row.clone())))
                     }
                     None => {
-                        self.unify(&Type::RowNil, &rest_row)?;
-                        Ok(None)
+                        self.unify(&Type::RowNil, row)?;
+                        Ok((None, None))
                     }
                 }?;
-
-                let (expr_fields, ty_fields) = fields
-                    .into_iter()
-                    .map(|(field_index, field_value, field_name, field_ty)| {
-                        ((field_index, field_value), (field_name, field_ty))
-                    })
-                    .unzip();
-
-                let ty_rest: Option<Type> = rest.as_ref().map(|_| rest_row.clone());
-                let expr_rest: Option<Expr> = rest;
 
                 Ok((
                     Expr::mk_record(expr_fields, expr_rest),

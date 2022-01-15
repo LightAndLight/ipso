@@ -165,19 +165,19 @@ fn infer_pattern_3() {
             ty: Type::mk_record(
                 ctx.common_kinds,
                 vec![
-                    (Rc::from("x"), Type::Meta(Kind::Type, 1)),
-                    (Rc::from("y"), Type::Meta(Kind::Type, 2)),
-                    (Rc::from("z"), Type::Meta(Kind::Type, 3)),
+                    (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                    (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                    (Rc::from("z"), Type::Meta(Kind::Type, 2)),
                 ],
-                Some(Type::Meta(Kind::Row, 0)),
+                Some(Type::Meta(Kind::Row, 3)),
             ),
             names: vec![
-                (Rc::from("x"), Type::Meta(Kind::Type, 1)),
-                (Rc::from("y"), Type::Meta(Kind::Type, 2)),
-                (Rc::from("z"), Type::Meta(Kind::Type, 3)),
+                (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                (Rc::from("z"), Type::Meta(Kind::Type, 2)),
                 (
                     Rc::from("w"),
-                    Type::mk_record(ctx.common_kinds, Vec::new(), Some(Type::Meta(Kind::Row, 0))),
+                    Type::mk_record(ctx.common_kinds, Vec::new(), Some(Type::Meta(Kind::Row, 3))),
                 ),
             ],
         };
@@ -404,12 +404,12 @@ fn infer_lam_4() {
                 Type::mk_record(
                     ctx.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 1)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
                     ],
-                    Some(Type::Meta(Kind::Row, 0)),
+                    Some(Type::Meta(Kind::Row, 2)),
                 ),
-                Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 0))),
+                Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
             ),
         ));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
@@ -492,13 +492,12 @@ fn infer_array_1() {
                 },
             ]),
         };
-        assert_eq!(
-            ctx.infer(&term),
-            Ok((
-                Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
-                Type::app(Type::mk_array(ctx.common_kinds), Type::Int)
-            ))
-        )
+        let expected = Ok((
+            Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
+            Type::app(Type::mk_array(ctx.common_kinds), Type::Int),
+        ));
+        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        assert_eq!(expected, actual)
     })
 }
 
@@ -895,10 +894,10 @@ fn infer_case_1() {
                 ctx.common_kinds,
                 &Type::mk_variant(
                     ctx.common_kinds,
-                    vec![(Rc::from("X"), Type::Meta(Kind::Type, 6))],
+                    vec![(Rc::from("X"), Type::Meta(Kind::Type, 2))],
                     None,
                 ),
-                &Type::Meta(Kind::Type, 6),
+                &Type::Meta(Kind::Type, 2),
             ),
         ));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
@@ -988,12 +987,12 @@ fn infer_case_2() {
                 &Type::mk_variant(
                     ctx.common_kinds,
                     vec![
-                        (Rc::from("Left"), Type::Meta(Kind::Type, 8)),
-                        (Rc::from("Right"), Type::Meta(Kind::Type, 8)),
+                        (Rc::from("Left"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("Right"), Type::Meta(Kind::Type, 4)),
                     ],
                     None,
                 ),
-                &Type::Meta(Kind::Type, 8),
+                &Type::Meta(Kind::Type, 4),
             ),
         ));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
@@ -1101,7 +1100,7 @@ fn infer_case_3() {
                         (Rc::from("Left"), Type::Int),
                         (Rc::from("Right"), Type::Int),
                     ],
-                    Some(Type::Meta(Kind::Row, 9)),
+                    Some(Type::Meta(Kind::Row, 6)),
                 ),
                 &Type::Int,
             ),
@@ -1182,12 +1181,11 @@ fn infer_case_4() {
                 },
             ),
         };
-        assert_eq!(
-            ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty))),
-            Err(InferenceError::redundant_pattern(&Source::Interactive {
-                label: String::from("(typechecker)"),
-            })
-            .with_position(32))
-        )
+        let expected = Err(InferenceError::redundant_pattern(&Source::Interactive {
+            label: String::from(SOURCE_LABEL),
+        })
+        .with_position(32));
+        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        assert_eq!(expected, actual)
     })
 }

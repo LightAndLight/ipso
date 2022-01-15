@@ -9,7 +9,7 @@ use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig}
 #[cfg(test)]
 use ipso_diagnostic::Source;
 #[cfg(test)]
-use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, Binop, Spanned};
+use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, Spanned};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
@@ -164,12 +164,12 @@ fn infer_record_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected_expr = core::Expr::mk_record(
             vec![
-                (core::Expr::Placeholder(Placeholder(2)), core::Expr::False),
+                (core::Expr::Placeholder(Placeholder(0)), core::Expr::False),
                 (
                     core::Expr::Placeholder(Placeholder(1)),
                     core::Expr::String(Vec::new()),
                 ),
-                (core::Expr::Placeholder(Placeholder(0)), core::Expr::Int(0)),
+                (core::Expr::Placeholder(Placeholder(2)), core::Expr::Int(0)),
             ],
             None,
         );
@@ -234,10 +234,16 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::Int(0),
+                core::Expr::Int(2),
                 Constraint::HasField {
-                    field: Rc::from("x"),
-                    rest: core::Type::RowNil
+                    field: Rc::from("z"),
+                    rest: core::Type::mk_rows(
+                        vec![
+                            (Rc::from("y"), core::Type::String),
+                            (Rc::from("x"), core::Type::Int)
+                        ],
+                        None
+                    )
                 }
             )),
             solve_placeholder(&mut tc, *p0)
@@ -246,7 +252,7 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0)),
+                core::Expr::Int(1),
                 Constraint::HasField {
                     field: Rc::from("y"),
                     rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
@@ -258,20 +264,10 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::mk_binop(
-                    Binop::Add,
-                    core::Expr::Int(1),
-                    core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), core::Expr::Int(0))
-                ),
+                core::Expr::Int(0),
                 Constraint::HasField {
-                    field: Rc::from("z"),
-                    rest: core::Type::mk_rows(
-                        vec![
-                            (Rc::from("y"), core::Type::String),
-                            (Rc::from("x"), core::Type::Int)
-                        ],
-                        None
-                    )
+                    field: Rc::from("x"),
+                    rest: core::Type::RowNil
                 }
             )),
             solve_placeholder(&mut tc, *p2)
