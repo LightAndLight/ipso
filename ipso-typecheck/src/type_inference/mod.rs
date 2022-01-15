@@ -9,7 +9,7 @@ use crate::{
     metavariables::{self, Meta, Solution},
     BoundVars,
 };
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
@@ -904,8 +904,19 @@ pub struct InferenceContext<'a> {
     evidence: &'a mut Evidence,
 }
 
+fn pattern_is_redundant(
+    seen_ctors: &FnvHashSet<&str>,
+    saw_catchall: bool,
+    pattern: &syntax::Pattern,
+) -> bool {
+    saw_catchall
+        || match pattern {
+            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_str()),
+            _ => false,
+        }
+}
+
 impl<'a> InferenceContext<'a> {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
@@ -1496,10 +1507,20 @@ impl<'a> InferenceContext<'a> {
                 let (expr, mut expr_ty) = self.infer(expr)?;
 
                 let out_ty = self.fresh_type_meta(&Kind::Type);
+                let mut seen_ctors = FnvHashSet::default();
                 let mut saw_catchall = false;
                 let branches: Vec<Branch> = branches
                     .iter()
                     .map(|branch| {
+                        if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
+                            return Err(InferenceError::redundant_pattern(self.source)
+                                .with_position(branch.pattern.pos));
+                        }
+
+                        if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
+                            seen_ctors.insert(name.as_ref());
+                        }
+
                         let result = self.check_pattern(&branch.pattern.item, &expr_ty)?;
 
                         self.variables.insert(&result.names);
