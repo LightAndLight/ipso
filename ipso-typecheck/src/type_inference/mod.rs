@@ -922,10 +922,10 @@ impl InferenceError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct InferredPattern {
-    pattern: Pattern,
-    names: Vec<(Rc<str>, Type)>,
-    ty: Type,
+pub struct InferredPattern {
+    pub pattern: Pattern,
+    pub names: Vec<(Rc<str>, Type)>,
+    pub ty: Type,
 }
 
 struct CheckedPattern {
@@ -1194,7 +1194,7 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    fn infer_pattern(&mut self, pattern: &syntax::Pattern) -> InferredPattern {
+    pub fn infer_pattern(&mut self, pattern: &syntax::Pattern) -> InferredPattern {
         match pattern {
             syntax::Pattern::Name(name) => self.infer_name_pattern(name),
             syntax::Pattern::Record { names, rest } => {

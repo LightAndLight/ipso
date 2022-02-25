@@ -871,7 +871,6 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_definition(
         &mut self,
-        pos: usize,
         name: &str,
         ty: &syntax::Type<Rc<str>>,
         args: &[syntax::Pattern],
@@ -906,17 +905,48 @@ impl<'modules> Typechecker<'modules> {
                 .assume(None, evidence::Constraint::from_type(constraint));
         }
 
-        let body = if args.is_empty() {
-            self.check_type(body, ty)
-        } else {
-            self.check_type(
-                &syntax::Spanned {
-                    pos,
-                    item: syntax::Expr::mk_lam(args.to_vec(), body.clone()),
-                },
-                ty,
-            )
-        }?;
+        let arg_tys: Vec<type_inference::InferredPattern> = args
+            .iter()
+            .map(|arg| self.type_inference_context().infer_pattern(arg))
+            .collect();
+        let out_ty = self.fresh_type_meta(&Kind::Type);
+
+        self.unify_type(
+            ty,
+            &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
+                core::Type::mk_arrow(self.common_kinds, &el.ty, &acc)
+            }),
+        )?;
+
+        let arg_bound_vars = arg_tys
+            .iter()
+            .flat_map(|arg_ty| arg_ty.names.iter().cloned())
+            .collect::<Vec<_>>();
+        self.bound_vars.insert(&arg_bound_vars);
+        let body = self.check_type(body, &out_ty)?;
+        self.bound_vars.delete(arg_bound_vars.len());
+
+        let body = arg_tys
+            .into_iter()
+            .rev()
+            .fold(body, |body, arg_ty| match &arg_ty.pattern {
+                core::Pattern::Char(_)
+                | core::Pattern::Int(_)
+                | core::Pattern::String(_)
+                | core::Pattern::Record { .. }
+                | core::Pattern::Variant { .. } => core::Expr::mk_lam(
+                    true,
+                    core::Expr::mk_case(
+                        core::Expr::Var(0),
+                        vec![core::Branch {
+                            pattern: arg_ty.pattern,
+                            body,
+                        }],
+                    ),
+                ),
+                core::Pattern::Name => core::Expr::mk_lam(true, body),
+                core::Pattern::Wildcard => core::Expr::mk_lam(false, body),
+            });
 
         let (body, sig) = self.generalise(body, ty.clone())?;
         self.evidence = Evidence::new();
@@ -1235,7 +1265,7 @@ impl<'modules> Typechecker<'modules> {
                 args,
                 body,
             } => self
-                .check_definition(decl.pos, name, ty, args, body)
+                .check_definition(name, ty, args, body)
                 .map(Option::Some),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
