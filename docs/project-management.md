@@ -21,7 +21,8 @@ Issues belong to one of 2 projects:
 
 ### Content
 
-Every issue should provide enough context as to be self-contained. We can work more efficiently when we don't need to ask person who filed the issue for more details.
+Every issue should provide enough context as to be self-contained. We can work more efficiently when
+we don't need to ask the issue creator for more details.
 
 For example, bug reports should provide replication instructions and features should provide acceptance criteria.
 
