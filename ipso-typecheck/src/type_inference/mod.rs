@@ -186,12 +186,20 @@ impl UnificationError {
 
     Uses `type_variables` to replace de Bruijn indices with names.
     */
-    pub fn mismatch(type_variables: &BoundVars<Kind>, expected: &Type, actual: &Type) -> Self {
+    pub fn mismatch(
+        kind_solutions: &kind_inference::Solutions,
+        type_solutions: &Solutions,
+        type_variables: &BoundVars<Kind>,
+        expected: Type,
+        actual: Type,
+    ) -> Self {
         UnificationError::Mismatch {
-            expected: expected
+            expected: type_solutions
+                .zonk(kind_solutions, expected)
                 .to_syntax()
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
-            actual: actual
+            actual: type_solutions
+                .zonk(kind_solutions, actual)
                 .to_syntax()
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
         }
@@ -399,9 +407,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Int => match actual {
@@ -414,9 +424,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Char => match actual {
@@ -429,9 +441,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::String => match actual {
@@ -444,9 +458,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Bytes => match actual {
@@ -459,9 +475,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::RowNil => match actual {
@@ -474,9 +492,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Unit => match actual {
@@ -489,9 +509,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Cmd => match actual {
@@ -504,9 +526,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Name(_, expected_name) => match actual {
@@ -519,9 +543,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Var(_, expected_index) => match actual {
@@ -534,9 +560,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Arrow(_) => match actual {
@@ -549,9 +577,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::FatArrow(_) => match actual {
@@ -564,9 +594,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Array(_) => match actual {
@@ -579,9 +611,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Record(_) => match actual {
@@ -594,9 +628,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Variant(_) => match actual {
@@ -609,9 +645,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::IO(_) => match actual {
@@ -624,9 +662,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::App(_, expected_a, expected_b) => match actual {
@@ -654,9 +694,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::HasField(expected_field, expected_row) => match actual {
@@ -675,9 +717,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::Constraints(expected_constraints) => match actual {
@@ -705,9 +749,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
         Type::RowCons(_, _, _) => match actual {
@@ -818,9 +864,11 @@ pub fn unify(
                 meta,
             ),
             _ => Err(UnificationError::mismatch(
+                kind_solutions,
+                type_solutions,
                 unification_ctx.type_variables,
-                expected,
-                actual,
+                expected.clone(),
+                actual.clone(),
             )),
         },
     }
