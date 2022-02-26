@@ -1,12 +1,10 @@
 # Project Management
 
-We use [GitHub issues](https://github.com/features/issues) to track project work.
-
 <!-- omit in toc -->
 ## Contents
 
 * [Issues](#issues)
-  * [Issue Content](#issue-content)
+  * [Content](#content)
   * [Branching](#branching)
 * [Projects](#projects)
   * [Design](#design)
@@ -14,12 +12,14 @@ We use [GitHub issues](https://github.com/features/issues) to track project work
 
 ## Issues
 
+We use [GitHub issues](https://github.com/features/issues) to track project work.
+
 Issues belong to one of 2 projects:
 
 * [*Design*](#design)
 * [*Features*](#features)
 
-### Issue Content
+### Content
 
 Every issue should provide enough context as to be self-contained. We can work more efficiently when we don't need to ask person who filed the issue for more details.
 
