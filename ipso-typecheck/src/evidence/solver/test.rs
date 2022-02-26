@@ -82,14 +82,14 @@ fn solve_constraint_3() {
                 field: Rc::from("z"),
                 rest: var.clone(),
             }],
-            environment: vec![(
-                Constraint::HasField {
+            environment: vec![crate::evidence::Item {
+                pos: None,
+                constraint: Constraint::HasField {
                     field: Rc::from("z"),
                     rest: var,
                 },
-                None,
-                Some(Expr::EVar(EVar(0))),
-            )],
+                expr: Some(Expr::EVar(EVar(0))),
+            }],
         };
         let actual_evidence = tc.evidence;
         assert_eq!(expected_evidence, actual_evidence)

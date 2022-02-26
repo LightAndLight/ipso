@@ -7,16 +7,19 @@ use super::Constraint;
 mod test;
 
 pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
-    tc.evidence
-        .environment
-        .iter()
-        .find_map(|(other_constraint, _, other_evidence)| {
+    tc.evidence.environment.iter().find_map(
+        |super::Item {
+             constraint: other_constraint,
+             expr: other_evidence,
+             ..
+         }| {
             if tc.eq_zonked_constraint(constraint, other_constraint) {
                 other_evidence.as_ref().cloned()
             } else {
                 None
             }
-        })
+        },
+    )
 }
 
 pub fn solve_constraint(
@@ -223,20 +226,21 @@ pub fn solve_placeholder(
     tc: &mut Typechecker,
     p: Placeholder,
 ) -> Result<(core::Expr, Constraint), TypeError> {
-    let (constraint, pos, evidence) = tc.evidence.environment[p.0].clone();
-    match evidence {
+    let item = tc.evidence.environment[p.0].clone();
+    match item.expr {
         None => {
             let expr = solve_constraint(
-                pos.unwrap_or(0),
+                item.pos.unwrap_or(0),
                 &Some(SolveConstraintContext {
-                    constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type()).to_syntax()),
+                    constraint: tc
+                        .fill_ty_names(tc.zonk_type(item.constraint.to_type()).to_syntax()),
                 }),
                 tc,
-                &constraint,
+                &item.constraint,
             )?;
-            tc.evidence.environment[p.0].2 = Some(expr.clone());
-            Ok((expr, constraint.clone()))
+            tc.evidence.environment[p.0].expr = Some(expr.clone());
+            Ok((expr, item.constraint.clone()))
         }
-        Some(evidence) => Ok((evidence, constraint.clone())),
+        Some(evidence) => Ok((evidence, item.constraint.clone())),
     }
 }
