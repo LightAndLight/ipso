@@ -7,7 +7,7 @@ use quickcheck::Arbitrary;
 pub use r#type::Type;
 use std::{cmp::Ordering, hash::Hash, rc::Rc};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
     pub pos: usize,
     pub item: A,
@@ -373,7 +373,7 @@ pub enum Expr {
 
     Int(u32),
 
-    Binop(Binop, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
+    Binop(Spanned<Binop>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
     Char(char),
 
@@ -429,7 +429,7 @@ impl Expr {
         }
     }
 
-    pub fn mk_binop(op: Binop, a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
+    pub fn mk_binop(op: Spanned<Binop>, a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
         Spanned {
             pos: a.pos,
             item: Expr::Binop(op, Rc::new(a), Rc::new(b)),
