@@ -1627,57 +1627,7 @@ impl<'a> InferenceContext<'a> {
                     ),
                 ))
             }
-            syntax::Expr::Case(expr, branches) => {
-                let (expr, mut expr_ty) = self.infer(expr)?;
-
-                let out_ty = self.fresh_type_meta(&Kind::Type);
-                let mut seen_ctors = FnvHashSet::default();
-                let mut saw_catchall = false;
-                let branches: Vec<Branch> = branches
-                    .iter()
-                    .map(|branch| {
-                        if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                            return Err(InferenceError::redundant_pattern(self.source)
-                                .with_position(branch.pattern.pos));
-                        }
-
-                        if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
-                            seen_ctors.insert(name.as_ref());
-                        }
-
-                        let result = self.check_pattern(&branch.pattern, &expr_ty)?;
-
-                        self.variables.insert(&result.names);
-                        let body = self.check(&branch.body, &out_ty)?;
-                        self.variables.delete(result.names.len());
-
-                        if let Pattern::Wildcard | Pattern::Name = result.pattern {
-                            saw_catchall = true;
-                        }
-
-                        Ok(Branch {
-                            pattern: result.pattern,
-                            body,
-                        })
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                /*
-                When pattern matching on a variant type, the variant should be considered
-                closed if there is no 'catch-all' branch (a wildcard pattern or a name pattern).
-
-                When there is a 'catch-all' branch, the variant is allowed to be open-ended.
-                */
-                self.zonk_type_mut(&mut expr_ty);
-                match expr_ty.unwrap_variant() {
-                    Some(RowParts {
-                        rest: Some(rest), ..
-                    }) if !saw_catchall => self.unify(None, &Type::RowNil, rest),
-                    _ => Ok(()),
-                }?;
-
-                Ok((Expr::mk_case(expr, branches), out_ty))
-            }
+            syntax::Expr::Case(expr, branches) => self.check_case(expr, branches),
 
             syntax::Expr::Comp(comp_lines) => {
                 enum CheckedCompLine {
@@ -1789,6 +1739,53 @@ impl<'a> InferenceContext<'a> {
                 }
             }
         }
+    }
+
+    fn check_case(
+        &mut self,
+        expr: &Spanned<syntax::Expr>,
+        branches: &[syntax::Branch],
+    ) -> Result<(Expr, Type), InferenceError> {
+        let (expr, mut expr_ty) = self.infer(expr)?;
+        let out_ty = self.fresh_type_meta(&Kind::Type);
+        let mut seen_ctors = FnvHashSet::default();
+        let mut saw_catchall = false;
+        let branches: Vec<Branch> = branches
+            .iter()
+            .map(|branch| {
+                if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
+                    return Err(InferenceError::redundant_pattern(self.source)
+                        .with_position(branch.pattern.pos));
+                }
+
+                if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
+                    seen_ctors.insert(name.as_ref());
+                }
+
+                let result = self.check_pattern(&branch.pattern, &expr_ty)?;
+
+                self.variables.insert(&result.names);
+                let body = self.check(&branch.body, &out_ty)?;
+                self.variables.delete(result.names.len());
+
+                if let Pattern::Wildcard | Pattern::Name = result.pattern {
+                    saw_catchall = true;
+                }
+
+                Ok(Branch {
+                    pattern: result.pattern,
+                    body,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        self.zonk_type_mut(&mut expr_ty);
+        match expr_ty.unwrap_variant() {
+            Some(RowParts {
+                rest: Some(rest), ..
+            }) if !saw_catchall => self.unify(None, &Type::RowNil, rest),
+            _ => Ok(()),
+        }?;
+        Ok((Expr::mk_case(expr, branches), out_ty))
     }
 
     /// Check an expression's type.
