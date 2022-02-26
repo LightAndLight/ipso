@@ -1,4 +1,6 @@
-use ipso_core::{Builtin, CommonKinds, Declaration, Expr, Module, Type, TypeSig};
+use ipso_core::{
+    Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Type, TypeSig,
+};
 use ipso_syntax::kind::Kind;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -371,7 +373,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::arrow(common_kinds, char_ty.clone(), bool_ty),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqChar),
@@ -444,6 +446,26 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::Run),
             },
+            /*
+            class Eq a where
+              eq : a -> a -> Bool
+             */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("Eq"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("eq"),
+                    sig: TypeSig {
+                        ty_vars: vec![],
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::arrow(common_kinds, Type::Var(Kind::Type, 0), bool_ty),
+                        ),
+                    },
+                }],
+            }),
         ],
     }
 }
