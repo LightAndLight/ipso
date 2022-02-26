@@ -430,7 +430,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         body: Type::arrow(
                             common_kinds,
                             Type::app(array_ty.clone(), a.clone()),
-                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty, a)),
+                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty.clone(), a)),
                         ),
                     }
                 },
@@ -485,6 +485,37 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 members: vec![InstanceMember {
                     name: String::from("eq"),
                     body: Expr::Builtin(Builtin::EqInt),
+                }],
+            },
+            /*
+            instance Eq a where Eq (Array a) where
+              eq = eqArray eq
+             */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                superclass_constructors: vec![],
+                // Eq a
+                assumes: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Var(Kind::Type, 0),
+                )],
+                // Eq (Array a)
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::mk_app(
+                        Expr::Builtin(Builtin::EqArray),
+                        Expr::Name(String::from("eq")),
+                    ),
                 }],
             },
         ],
