@@ -724,10 +724,10 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
-        let should_import = |name: &String| -> bool {
+        let should_import = |expected_name: &str| -> bool {
             match names {
                 syntax::Names::All => true,
-                syntax::Names::Names(names) => names.contains(name),
+                syntax::Names::Names(names) => names.iter().any(|name| name == expected_name),
             }
         };
         for decl in &module.decls {
@@ -755,12 +755,11 @@ impl<'modules> Typechecker<'modules> {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::Class(core::ClassDeclaration {
-                    supers,
-                    name,
-                    args,
-                    members,
-                }) => todo!("import type class {:?}", (supers, name, args, members)),
+                core::Declaration::Class(core::ClassDeclaration { name, .. }) => {
+                    if should_import(name) {
+                        self.register_declaration(decl);
+                    }
+                }
                 core::Declaration::Instance {
                     ty_vars,
                     superclass_constructors,
