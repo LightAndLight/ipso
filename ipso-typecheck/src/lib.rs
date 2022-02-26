@@ -760,16 +760,9 @@ impl<'modules> Typechecker<'modules> {
                         self.register_declaration(decl);
                     }
                 }
-                core::Declaration::Instance {
-                    ty_vars,
-                    superclass_constructors,
-                    assumes,
-                    head,
-                    members,
-                } => todo!(
-                    "import type class instance {:?}",
-                    (ty_vars, superclass_constructors, assumes, head, members)
-                ),
+                core::Declaration::Instance { .. } => {
+                    self.register_declaration(decl);
+                }
             }
         }
     }
