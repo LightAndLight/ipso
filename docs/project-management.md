@@ -17,6 +17,11 @@ For example, bug reports should provide replication instructions and features sh
 
 Each [Project](#projects) has a more specific description of how its issues should be written.
 
+### Branching
+
+When an issue requires changes to the repository, the changes are tracked in a branch
+named `issue/<ISSUE NUMBER>`.
+
 ## Projects
 
 ### Design
