@@ -2,6 +2,16 @@
 
 We use [GitHub issues](https://github.com/features/issues) to track project work.
 
+<!-- omit in toc -->
+## Contents
+
+* [Issues](#issues)
+  * [Issue Content](#issue-content)
+  * [Branching](#branching)
+* [Projects](#projects)
+  * [Design](#design)
+  * [Features](#features)
+
 ## Issues
 
 Issues belong to one of 2 projects:
