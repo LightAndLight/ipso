@@ -867,25 +867,25 @@ fn check_instance_1() {
 fn class_and_instance_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
-        class Eq a where
-          eq : a -> a -> Bool
+        class MyEq a where
+          myeq : a -> a -> Bool
 
-        class Eq a => Ord a where
-          lt : a -> a -> Bool
+        class MyEq a => MyOrd a where
+          mylt : a -> a -> Bool
 
-        instance Eq Int where
-          eq = eqInt
+        instance MyEq Int where
+          myeq = eqInt
 
-        instance Ord Int where
-          lt = ltInt
+        instance MyOrd Int where
+          mylt = ltInt
 
-        eqDictInt = {
-            eq = eqInt
+        myEqDictInt = {
+            myeq = eqInt
         }
 
-        ordDictInt = {
-            eqDict = eqDictInt
-            lt = ltInt
+        myOrdDictInt = {
+            myEqDict = myEqDictInt
+            mylt = ltInt
         }
          */
 
@@ -893,10 +893,10 @@ fn class_and_instance_1() {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&core::ClassDeclaration {
                 supers: Vec::new(),
-                name: Rc::from("Eq"),
+                name: Rc::from("MyEq"),
                 args: vec![(Rc::from("a"), Kind::Type)],
                 members: vec![core::ClassMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
                         body: core::Type::arrow(
@@ -911,16 +911,16 @@ fn class_and_instance_1() {
 
         {
             let eq_ty = core::Type::unsafe_mk_name(
-                Rc::from("Eq"),
+                Rc::from("MyEq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&core::ClassDeclaration {
                 supers: vec![core::Type::app(eq_ty, a.clone())],
-                name: Rc::from("Ord"),
+                name: Rc::from("MyOrd"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![core::ClassMember {
-                    name: String::from("lt"),
+                    name: String::from("mylt"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
                         body: core::Type::arrow(
@@ -939,13 +939,13 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Eq"),
+                    item: Rc::from("MyEq"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("eq"),
+                        item: String::from("myeq"),
                     },
                     Vec::new(),
                     Spanned {
@@ -962,13 +962,13 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Ord"),
+                    item: Rc::from("MyOrd"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("lt"),
+                        item: String::from("mylt"),
                     },
                     Vec::new(),
                     Spanned {
@@ -985,7 +985,7 @@ fn class_and_instance_1() {
             },
             pos: 0,
             context: Some(SolveConstraintContext {
-                constraint: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
+                constraint: Type::mk_app(Type::Name(Rc::from("MyEq")), Type::Int),
             }),
         });
         let actual_instance_ord_int_result =
@@ -994,12 +994,12 @@ fn class_and_instance_1() {
         assert_eq!(
         expected_instance_ord_int_result,
         actual_instance_ord_int_result,
-        "When `instance Eq Int` is not in scope, `instance Ord Int` fails to type check because `Eq` is a superclass of `Ord`"
+        "When `instance MyEq Int` is not in scope, `instance MyOrd Int` fails to type check because `MyEq` is a superclass of `MyOrd`"
     );
 
         let expected_instance_eq_int_result = {
             let eq_ty = core::Type::unsafe_mk_name(
-                Rc::from("Eq"),
+                Rc::from("MyEq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             Ok(Some(core::Declaration::Instance {
@@ -1008,7 +1008,7 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 head: core::Type::app(eq_ty, core::Type::Int),
                 members: vec![core::InstanceMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     body: core::Expr::Name(String::from("eqInt")),
                 }],
             }))
@@ -1018,14 +1018,14 @@ fn class_and_instance_1() {
 
         assert_eq!(
             expected_instance_eq_int_result, actual_instance_eq_int_result,
-            "`instance Eq Int` is valid"
+            "`instance MyEq Int` is valid"
         );
 
         tc.register_declaration(&actual_instance_eq_int_result.unwrap().unwrap());
 
         let expected_instance_ord_int_result = {
             let ord_ty = core::Type::unsafe_mk_name(
-                Rc::from("Ord"),
+                Rc::from("MyOrd"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             Ok(Some(core::Declaration::Instance {
@@ -1037,7 +1037,7 @@ fn class_and_instance_1() {
                 assumes: Vec::new(),
                 head: core::Type::app(ord_ty, core::Type::Int),
                 members: vec![core::InstanceMember {
-                    name: String::from("lt"),
+                    name: String::from("mylt"),
                     body: core::Expr::Name(String::from("ltInt")),
                 }],
             }))
@@ -1047,7 +1047,7 @@ fn class_and_instance_1() {
 
         assert_eq!(
             expected_instance_ord_int_result, actual_instance_ord_int_result,
-            "After `instance Eq Int` is brought into scope, `instance Ord Int` is valid"
+            "After `instance MyEq Int` is brought into scope, `instance MyOrd Int` is valid"
         );
     })
 }
@@ -1056,23 +1056,23 @@ fn class_and_instance_1() {
 fn class_and_instance_2() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         /*
-        class Eq a where
-          eq : a -> a -> Bool
+        class MyEq a where
+          myeq : a -> a -> Bool
 
-        instance Eq Int where
-          eq = eqInt
+        instance MyEq Int where
+          myeq = eqInt
 
-        instance Eq a => Eq (Array a) where
-          eq = eqArray eq
+        instance MyEq a => MyEq (Array a) where
+          myeq = eqArray myeq
 
-        instance Ord a => Ord (Array a) where
-          lt = ltArray lt
+        instance MyOrd a => MyOrd (Array a) where
+          mylt = ltArray mylt
 
-        instance Ord Int where
-          lt = ltInt
+        instance MyOrd Int where
+          mylt = ltInt
 
         comparison : Bool
-        comparison = lt [0, 1, 2] [3, 4]
+        comparison = mylt [0, 1, 2] [3, 4]
          */
 
         {
@@ -1080,10 +1080,10 @@ fn class_and_instance_2() {
 
             tc.register_class(&core::ClassDeclaration {
                 supers: Vec::new(),
-                name: Rc::from("Eq"),
+                name: Rc::from("MyEq"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![core::ClassMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
                         body: core::Type::arrow(
@@ -1096,15 +1096,15 @@ fn class_and_instance_2() {
             });
 
             let eq_ty = core::Type::unsafe_mk_name(
-                Rc::from("Eq"),
+                Rc::from("MyEq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             tc.register_class(&core::ClassDeclaration {
                 supers: vec![core::Type::app(eq_ty, a.clone())],
-                name: Rc::from("Ord"),
+                name: Rc::from("MyOrd"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![core::ClassMember {
-                    name: String::from("lt"),
+                    name: String::from("mylt"),
                     sig: core::TypeSig {
                         ty_vars: vec![],
                         body: core::Type::arrow(
@@ -1123,13 +1123,13 @@ fn class_and_instance_2() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Eq"),
+                    item: Rc::from("MyEq"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("eq"),
+                        item: String::from("myeq"),
                     },
                     Vec::new(),
                     Spanned {
@@ -1145,17 +1145,17 @@ fn class_and_instance_2() {
             item: syntax::Declaration::Instance {
                 assumes: vec![Spanned {
                     pos: 0,
-                    item: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Var(Rc::from("a"))),
+                    item: Type::mk_app(Type::Name(Rc::from("MyEq")), Type::Var(Rc::from("a"))),
                 }],
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Eq"),
+                    item: Rc::from("MyEq"),
                 },
                 args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("eq"),
+                        item: String::from("myeq"),
                     },
                     Vec::new(),
                     syntax::Expr::mk_app(
@@ -1165,7 +1165,7 @@ fn class_and_instance_2() {
                         },
                         Spanned {
                             pos: 0,
-                            item: syntax::Expr::Var(String::from("eq")),
+                            item: syntax::Expr::Var(String::from("myeq")),
                         },
                     ),
                 )],
@@ -1173,7 +1173,7 @@ fn class_and_instance_2() {
         };
 
         let eq_ty = core::Type::unsafe_mk_name(
-            Rc::from("Eq"),
+            Rc::from("MyEq"),
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         let expected_instance_eq_int_result = Ok(Some(core::Declaration::Instance {
@@ -1182,7 +1182,7 @@ fn class_and_instance_2() {
             assumes: Vec::new(),
             head: core::Type::app(eq_ty.clone(), core::Type::Int),
             members: vec![core::InstanceMember {
-                name: String::from("eq"),
+                name: String::from("myeq"),
                 body: core::Expr::Name(String::from("eqInt")),
             }],
         }));
@@ -1191,7 +1191,7 @@ fn class_and_instance_2() {
 
         assert_eq!(
             expected_instance_eq_int_result, actual_instance_eq_int_result,
-            "`instance Eq Int` is valid"
+            "`instance MyEq Int` is valid"
         );
 
         tc.register_declaration(&actual_instance_eq_int_result.unwrap().unwrap());
@@ -1208,13 +1208,13 @@ fn class_and_instance_2() {
                     core::Type::app(core::Type::mk_array(tc.common_kinds), a),
                 ),
                 members: vec![core::InstanceMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     body: core::Expr::mk_lam(
                         true,
                         core::Expr::mk_app(
                             core::Expr::Name(String::from("eqArray")),
                             core::Expr::mk_app(
-                                core::Expr::Name(String::from("eq")),
+                                core::Expr::Name(String::from("myeq")),
                                 core::Expr::Var(0),
                             ),
                         ),
@@ -1227,7 +1227,7 @@ fn class_and_instance_2() {
 
         assert_eq!(
             expected_instance_eq_array_result, actual_instance_eq_array_result,
-            "`instance Eq a => Eq (Array a)` is valid"
+            "`instance MyEq a => MyEq (Array a)` is valid"
         );
 
         tc.register_declaration(&actual_instance_eq_array_result.unwrap().unwrap());
@@ -1237,17 +1237,17 @@ fn class_and_instance_2() {
             item: syntax::Declaration::Instance {
                 assumes: vec![Spanned {
                     pos: 0,
-                    item: Type::mk_app(Type::Name(Rc::from("Ord")), Type::Var(Rc::from("a"))),
+                    item: Type::mk_app(Type::Name(Rc::from("MyOrd")), Type::Var(Rc::from("a"))),
                 }],
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Ord"),
+                    item: Rc::from("MyOrd"),
                 },
                 args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("lt"),
+                        item: String::from("mylt"),
                     },
                     Vec::new(),
                     syntax::Expr::mk_app(
@@ -1257,7 +1257,7 @@ fn class_and_instance_2() {
                         },
                         Spanned {
                             pos: 0,
-                            item: syntax::Expr::Var(String::from("lt")),
+                            item: syntax::Expr::Var(String::from("mylt")),
                         },
                     ),
                 )],
@@ -1266,22 +1266,22 @@ fn class_and_instance_2() {
 
         let expected_instance_ord_array_result = {
             let ord_ty = core::Type::unsafe_mk_name(
-                Rc::from("Ord"),
+                Rc::from("MyOrd"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             Ok(Some(core::Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), a.kind())],
                 superclass_constructors: vec![core::Expr::mk_lam(
-                    true, // dict : Ord a
+                    true, // dict : MyOrd a
                     core::Expr::mk_record(
                         vec![(
                             core::Expr::Int(0),
                             core::Expr::mk_app(
                                 core::Expr::Name(String::from("eqArray")),
                                 core::Expr::mk_app(
-                                    core::Expr::Name(String::from("eq")),
-                                    // dict.0 : Eq a
+                                    core::Expr::Name(String::from("myeq")),
+                                    // dict.0 : MyEq a
                                     core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
                                 ),
                             ),
@@ -1295,13 +1295,13 @@ fn class_and_instance_2() {
                     core::Type::app(core::Type::mk_array(tc.common_kinds), a),
                 ),
                 members: vec![core::InstanceMember {
-                    name: String::from("lt"),
+                    name: String::from("mylt"),
                     body: core::Expr::mk_lam(
                         true,
                         core::Expr::mk_app(
                             core::Expr::Name(String::from("ltArray")),
                             core::Expr::mk_app(
-                                core::Expr::Name(String::from("lt")),
+                                core::Expr::Name(String::from("mylt")),
                                 core::Expr::Var(0),
                             ),
                         ),
@@ -1314,7 +1314,7 @@ fn class_and_instance_2() {
 
         assert_eq!(
             expected_instance_ord_array_result, actual_instance_ord_array_result,
-            "`instance Ord a => Ord (Array a)` is valid"
+            "`instance MyOrd a => MyOrd (Array a)` is valid"
         );
 
         tc.register_declaration(&actual_instance_ord_array_result.unwrap().unwrap());
@@ -1325,13 +1325,13 @@ fn class_and_instance_2() {
                 assumes: Vec::new(),
                 name: Spanned {
                     pos: 0,
-                    item: Rc::from("Ord"),
+                    item: Rc::from("MyOrd"),
                 },
                 args: vec![Type::Int],
                 members: vec![(
                     Spanned {
                         pos: 0,
-                        item: String::from("lt"),
+                        item: String::from("mylt"),
                     },
                     Vec::new(),
                     Spanned {
@@ -1358,7 +1358,7 @@ fn class_and_instance_2() {
                     syntax::Expr::mk_app(
                         Spanned {
                             pos: 0,
-                            item: syntax::Expr::Var(String::from("lt")),
+                            item: syntax::Expr::Var(String::from("mylt")),
                         },
                         Spanned {
                             pos: 0,
@@ -1403,7 +1403,7 @@ fn class_and_instance_2() {
                 core::Expr::Int(0),
                 core::Expr::mk_app(
                     core::Expr::Name(String::from("eqArray")),
-                    core::Expr::mk_app(core::Expr::Name(String::from("eq")), eq_int_dict.clone()),
+                    core::Expr::mk_app(core::Expr::Name(String::from("myeq")), eq_int_dict.clone()),
                 ),
             )],
             None,
@@ -1417,7 +1417,7 @@ fn class_and_instance_2() {
         );
         let lt_array_int = core::Expr::mk_app(
             core::Expr::Name(String::from("ltArray")),
-            core::Expr::mk_app(core::Expr::Name(String::from("lt")), ord_int_dict),
+            core::Expr::mk_app(core::Expr::Name(String::from("mylt")), ord_int_dict),
         );
         let ord_array_int_dict = core::Expr::mk_record(
             vec![
@@ -1434,7 +1434,7 @@ fn class_and_instance_2() {
             },
             body: Rc::new(core::Expr::mk_app(
                 core::Expr::mk_app(
-                    core::Expr::mk_app(core::Expr::Name(String::from("lt")), ord_array_int_dict),
+                    core::Expr::mk_app(core::Expr::Name(String::from("mylt")), ord_array_int_dict),
                     core::Expr::Array(vec![
                         core::Expr::Int(0),
                         core::Expr::Int(1),
@@ -1449,7 +1449,7 @@ fn class_and_instance_2() {
 
         assert_eq!(
             expected_array_int_lt_result, actual_array_int_lt_result,
-            "comparison = lt [0, 1, 2] [4, 5] is valid"
+            "comparison = mylt [0, 1, 2] [4, 5] is valid"
         )
     })
 }
