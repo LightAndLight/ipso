@@ -1351,70 +1351,160 @@ where {
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, expr);
+
                 let mut target: Option<&Expr> = None;
 
-                for branch in branches {
-                    match &branch.pattern {
-                        Pattern::Name => {
-                            env.push(expr);
-                            target = Some(&branch.body);
-                            break;
-                        }
-                        Pattern::Record { names, rest } => {
-                            let fields = expr.unpack_record();
-                            let mut extracted = Vec::with_capacity(names.len());
-                            for name in names {
-                                let ix = self.eval(env, name).unpack_int() as usize;
-                                env.push(fields[ix]);
-                                extracted.push(ix);
-                            }
-                            if *rest {
-                                let mut leftover_fields = Rope::from_vec(fields);
-                                extracted.sort_unstable();
-                                for ix in extracted.iter().rev() {
-                                    leftover_fields = leftover_fields.delete(*ix).unwrap();
+                match expr {
+                    Value::Object(&Object::Variant(tag, value)) => {
+                        /*
+                        Because of the way constructors are peeled from variants during
+                        pattern matching (see [note: peeling constructors when matching on variants]),
+                        the expected tag must change as each branch is checked.
+                        */
+                        let mut expected_tag = tag;
+
+                        for branch in branches {
+                            match &branch.pattern {
+                                Pattern::Variant { tag: branch_tag } => {
+                                    let branch_tag =
+                                        self.eval(env, branch_tag).unpack_int() as usize;
+
+                                    match expected_tag.cmp(&branch_tag) {
+                                        /*
+                                        When the expected tag is less than the branch's tag, it
+                                        means that the expected constructor comes *before* the
+                                        branch's constructor in the lexicographically ordered row
+                                        type.
+
+                                        The branch's contructor has no impact on the expected constructor's
+                                        position in the row type, so the expected tag doesn't need to be adjusted.
+
+                                        An illustration with an array:
+
+                                        ```
+                                        [a, b, c, d]
+                                        ```
+
+                                        `b` is at position 1 in the array. If `c` or `d` is removed, `b`'s position
+                                        doesn't change, because it preceds `c` and `d`.
+                                        */
+                                        std::cmp::Ordering::Less => {}
+
+                                        std::cmp::Ordering::Equal => {
+                                            env.push(value);
+                                            target = Some(&branch.body);
+                                            break;
+                                        }
+
+                                        /*
+                                        When the expected tag is less than the branch's tag, it
+                                        means that the expected constructor comes *after* the
+                                        branch's constructor in the lexicographically ordered row
+                                        type.
+
+                                        The branch's contructor influences the expected constructor's
+                                        position in the row type, so the expected tag *does* need to be adjusted.
+
+                                        Another array illustration:
+
+                                        ```
+                                        [a, b, c, d]
+                                        ```
+
+                                        `c` is at position 2 in the array. If `a` or `b` is removed then `c`'s position
+                                        changes.
+                                        */
+                                        std::cmp::Ordering::Greater => {
+                                            expected_tag -= 1;
+                                        }
+                                    }
                                 }
-                                let leftover_fields =
-                                    self.alloc_values(leftover_fields.iter().copied());
-                                let leftover_record = self.alloc(Object::Record(leftover_fields));
-                                env.push(leftover_record);
-                            }
-                            target = Some(&branch.body);
-                            break;
-                        }
-                        Pattern::Variant { tag: branch_tag } => {
-                            let (tag, value) = expr.unpack_variant();
-                            let branch_tag = self.eval(env, branch_tag).unpack_int() as usize;
-                            if *tag == branch_tag {
-                                env.push(*value);
-                                target = Some(&branch.body);
-                                break;
-                            }
-                        }
-                        Pattern::Char(actual_char) => {
-                            let expected_char = expr.unpack_char();
-                            if expected_char == *actual_char {
-                                target = Some(&branch.body);
-                                break;
+                                Pattern::Name => {
+                                    env.push(self.alloc(Object::Variant(expected_tag, value)));
+
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Wildcard => {
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::String(_)
+                                | Pattern::Int(_)
+                                | Pattern::Record { .. }
+                                | Pattern::Char(_) => {
+                                    panic!("expected variant pattern, got: {:?}", branch.pattern);
+                                }
                             }
                         }
-                        Pattern::Int(actual_int) => {
-                            let expected_int = expr.unpack_int();
-                            if expected_int == *actual_int {
-                                target = Some(&branch.body);
-                                break;
+                    }
+                    _ => {
+                        for branch in branches {
+                            match &branch.pattern {
+                                Pattern::Name => {
+                                    env.push(expr);
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Record { names, rest } => {
+                                    let fields = expr.unpack_record();
+                                    let mut extracted = Vec::with_capacity(names.len());
+                                    for name in names {
+                                        let ix = self.eval(env, name).unpack_int() as usize;
+                                        env.push(fields[ix]);
+                                        extracted.push(ix);
+                                    }
+                                    if *rest {
+                                        let mut leftover_fields = Rope::from_vec(fields);
+                                        extracted.sort_unstable();
+                                        for ix in extracted.iter().rev() {
+                                            leftover_fields = leftover_fields.delete(*ix).unwrap();
+                                        }
+                                        let leftover_fields =
+                                            self.alloc_values(leftover_fields.iter().copied());
+                                        let leftover_record =
+                                            self.alloc(Object::Record(leftover_fields));
+                                        env.push(leftover_record);
+                                    }
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Variant { tag: branch_tag } => {
+                                    let (tag, value) = expr.unpack_variant();
+                                    let branch_tag =
+                                        self.eval(env, branch_tag).unpack_int() as usize;
+                                    if *tag == branch_tag {
+                                        env.push(*value);
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Char(actual_char) => {
+                                    let expected_char = expr.unpack_char();
+                                    if expected_char == *actual_char {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Int(actual_int) => {
+                                    let expected_int = expr.unpack_int();
+                                    if expected_int == *actual_int {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::String(actual_string) => {
+                                    let expected_string = expr.unpack_string();
+                                    if expected_string == actual_string.as_ref() {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Wildcard => {
+                                    target = Some(&branch.body);
+                                    break;
+                                }
                             }
-                        }
-                        Pattern::String(actual_string) => {
-                            let expected_string = expr.unpack_string();
-                            if expected_string == actual_string.as_ref() {
-                                target = Some(&branch.body);
-                                break;
-                            }
-                        }
-                        Pattern::Wildcard => {
-                            target = Some(&branch.body);
-                            break;
                         }
                     }
                 }

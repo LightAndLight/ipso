@@ -133,7 +133,11 @@ impl Type {
         Type::Var(kind, ix)
     }
 
-    pub fn mk_app(a: Type, b: Type) -> Self {
+    pub fn mk_app(a: &Type, b: &Type) -> Self {
+        Self::app(a.clone(), b.clone())
+    }
+
+    pub fn app(a: Type, b: Type) -> Self {
         Type::App(
             match a.kind() {
                 Kind::Ref(r) => match r.as_ref() {
@@ -150,8 +154,15 @@ impl Type {
         Type::Arrow(common_kinds.type_to_type_to_type.clone())
     }
 
-    pub fn mk_arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::mk_arrow_ctor(common_kinds), a), b)
+    pub fn mk_arrow(common_kinds: &CommonKinds, a: &Type, b: &Type) -> Self {
+        Type::app(
+            Type::app(Type::mk_arrow_ctor(common_kinds), a.clone()),
+            b.clone(),
+        )
+    }
+
+    pub fn arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
+        Type::app(Type::app(Type::mk_arrow_ctor(common_kinds), a), b)
     }
 
     pub fn mk_fatarrow_ctor(common_kinds: &CommonKinds) -> Self {
@@ -159,7 +170,7 @@ impl Type {
     }
 
     pub fn mk_fatarrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::mk_fatarrow_ctor(common_kinds), a), b)
+        Type::app(Type::app(Type::mk_fatarrow_ctor(common_kinds), a), b)
     }
 
     pub fn mk_io(common_kinds: &CommonKinds) -> Self {
@@ -197,7 +208,7 @@ impl Type {
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(
+        Type::app(
             Type::mk_record_ctor(common_kinds),
             Type::mk_rows(fields, rest),
         )
@@ -212,7 +223,7 @@ impl Type {
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(
+        Type::app(
             Type::mk_variant_ctor(common_kinds),
             Type::mk_rows(fields, rest),
         )
@@ -1567,7 +1578,7 @@ impl ClassDeclaration {
                 let constraint_type = self.args.iter().rev().enumerate().fold(
                     name_ty.clone(),
                     |acc, (arg_index, (_, arg_kind))| {
-                        Type::mk_app(
+                        Type::app(
                             acc,
                             Type::unsafe_mk_var(arg_index + offset, arg_kind.clone()),
                         )

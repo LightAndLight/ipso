@@ -3,7 +3,10 @@
 #[cfg(test)]
 mod test;
 
-use crate::BoundVars;
+use crate::{
+    metavariables::{self, Meta, Solution},
+    BoundVars,
+};
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{
     self as syntax,
@@ -11,99 +14,47 @@ use ipso_syntax::{
 };
 use std::{collections::HashMap, rc::Rc};
 
-/// A kind metavariable.
-pub type Meta = usize;
-
-/// A kind metavariable solution.
-#[derive(Clone)]
-pub enum Solution {
-    Unsolved,
-    Solved(Kind),
-}
-
-impl Solution {
-    fn is_unsolved(&self) -> bool {
-        match self {
-            Solution::Unsolved => true,
-            Solution::Solved(_) => false,
-        }
-    }
-}
-
 /// A mapping from kind metavariables to their solutions.
 #[derive(Default)]
-pub struct Solutions {
-    solutions: Vec<Solution>,
-}
+pub struct Solutions(pub metavariables::Solutions<Kind>);
 
 /**
 # Preconditions
-
-* [`Meta`] arguments must be valid.
-
-  `self.contains(meta)`
-
-  Applies to: [`Solutions::get`], [`Solutions::set`]
 
 * [`Kind`] arguments must contain valid metavariables.
 
   `kind.iter_metas().all(|meta| self.contains(meta))`
 
-  Applies to: [`Solutions::set`], [`Solutions::zonk`], [`Solutions::occurs`]
+  Applies to: [`Solutions::zonk`], [`Solutions::occurs`]
 */
 impl Solutions {
+    /// See [`metavariables::Solutions::new`]
     pub fn new() -> Self {
-        Self::default()
+        Solutions(metavariables::Solutions::new())
     }
 
-    /**
-    Check whether a metavariable is in the [`Solutions`]' domain.
-    */
+    /// See [`metavariables::Solutions::contains`]
     pub fn contains(&self, meta: Meta) -> bool {
-        meta < self.solutions.len()
+        self.0.contains(meta)
     }
 
-    /**
-    Get a metavariable's solution.
-    */
-    pub fn get(&self, meta: Meta) -> &Solution {
-        self.solutions
-            .get(meta)
-            .unwrap_or_else(|| panic!("meta {:?} not found", meta))
+    /// See [`metavariables::Solutions::get`]
+    pub fn get(&self, meta: Meta) -> &Solution<Kind> {
+        self.0.get(meta)
     }
 
-    /**
-    Set a metavariable's solution.
-
-    Each metavariable can only set once.
-
-    # Preconditions
-
-    * `self.get(meta).is_unsolved()`
-    */
+    /// See [`metavariables::Solutions::set`]
     pub fn set(&mut self, meta: Meta, kind: &Kind) {
-        let solution = self
-            .solutions
-            .get_mut(meta)
-            .unwrap_or_else(|| panic!("meta {:?} not found", meta));
-        if solution.is_unsolved() {
-            *solution = Solution::Solved(kind.clone());
-        } else {
-            panic!("meta {:?} has already been set", meta);
-        }
+        self.0.set(meta, kind)
     }
 
-    /**
-    Generate a new, unsolved metavariable.
-    */
+    /// See [`metavariables::Solutions::fresh_meta`]
     pub fn fresh_meta(&mut self) -> Meta {
-        let m = self.solutions.len();
-        self.solutions.push(Solution::Unsolved);
-        m
+        self.0.fresh_meta()
     }
 
     /**
-    Check whether the metavariable occurs in a kind.
+    Check whether a metavariable occurs in a kind.
     */
     pub fn occurs(&self, meta: Meta, kind: &Kind) -> bool {
         match kind {
@@ -151,6 +102,14 @@ impl Solutions {
       ```
     */
     pub fn zonk(&self, close_unsolved: bool, mut kind: Kind) -> Kind {
+        self.zonk_mut(close_unsolved, &mut kind);
+        kind
+    }
+
+    /**
+    A mutable version of [`Solutions::zonk`].
+    */
+    pub fn zonk_mut(&self, close_unsolved: bool, kind: &mut Kind) {
         fn zonk_compound(solutions: &Solutions, close_unsolved: bool, kind: &mut KindCompound) {
             match kind {
                 KindCompound::Arrow(a, b) => {
@@ -181,8 +140,7 @@ impl Solutions {
             }
         }
 
-        zonk_simple(self, close_unsolved, &mut kind);
-        kind
+        zonk_simple(self, close_unsolved, kind);
     }
 }
 
@@ -241,6 +199,13 @@ pub fn unify(
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
+        debug_assert!(match actual {
+            Kind::Meta(actual_meta) => {
+                solutions.get(*actual_meta).is_unsolved()
+            }
+            _ => true,
+        });
+
         if solutions.occurs(meta, actual) {
             Err(UnificationError::occurs(meta, actual))
         } else {
@@ -254,6 +219,13 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
+        debug_assert!(match expected {
+            Kind::Meta(expected_meta) => {
+                solutions.get(*expected_meta).is_unsolved()
+            }
+            _ => true,
+        });
+
         if solutions.occurs(meta, expected) {
             Err(UnificationError::occurs(meta, expected))
         } else {
@@ -262,14 +234,27 @@ pub fn unify(
         }
     }
 
+    fn walk(solutions: &Solutions, kind: &Kind) -> Kind {
+        match kind {
+            Kind::Meta(meta) => match solutions.get(*meta) {
+                Solution::Unsolved => kind.clone(),
+                Solution::Solved(kind) => walk(solutions, kind),
+            },
+            _ => kind.clone(),
+        }
+    }
+
     fn unify_meta_left(
         solutions: &mut Solutions,
         meta: Meta,
         actual: &Kind,
     ) -> Result<(), UnificationError> {
-        match solutions.get(meta).clone() {
-            Solution::Unsolved => solve_left(solutions, meta, actual),
-            Solution::Solved(expected) => unify(solutions, &expected, actual),
+        match walk(solutions, actual) {
+            Kind::Meta(actual_meta) if meta == actual_meta => Ok(()),
+            actual => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_left(solutions, meta, &actual),
+                Solution::Solved(expected) => unify(solutions, &expected, &actual),
+            },
         }
     }
 
@@ -278,9 +263,12 @@ pub fn unify(
         expected: &Kind,
         meta: Meta,
     ) -> Result<(), UnificationError> {
-        match solutions.get(meta).clone() {
-            Solution::Unsolved => solve_right(solutions, expected, meta),
-            Solution::Solved(actual) => unify(solutions, expected, &actual),
+        match walk(solutions, expected) {
+            Kind::Meta(expected_meta) if meta == expected_meta => Ok(()),
+            expected => match solutions.get(meta).clone() {
+                Solution::Unsolved => solve_right(solutions, &expected, meta),
+                Solution::Solved(actual) => unify(solutions, &expected, &actual),
+            },
         }
     }
 
@@ -504,7 +492,7 @@ impl<'a> InferenceContext<'a> {
                 let out_kind = self.fresh_meta();
                 let a = self.check(hint, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
                 let b = self.check(hint, b, &in_kind)?;
-                Ok((core::Type::mk_app(a, b), out_kind))
+                Ok((core::Type::app(a, b), out_kind))
             }
 
             syntax::Type::Name(name) => match self.types.get(name) {

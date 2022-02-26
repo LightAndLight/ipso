@@ -214,15 +214,14 @@ pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
                 Relation::Gte,
                 parser.token(&token::Data::PipeRParen)
             ),
-            indent!(parser, Relation::Gte, parser.ctor_owned()).and_then(|ctor| indent!(
-                parser,
-                Relation::Gte,
-                parser.token(&token::Data::Comma)
+            indent!(parser, Relation::Gte, spanned!(parser, parser.ctor_owned())).and_then(
+                |ctor| indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)).and_then(
+                    |_| keep_right!(
+                        indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
+                        expr_atom(parser).map(|rest| Expr::mk_embed(ctor, rest))
+                    )
+                )
             )
-            .and_then(|_| keep_right!(
-                indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
-                expr_atom(parser).map(|rest| Expr::mk_embed(ctor, rest))
-            )))
         )
     })
 }
@@ -323,7 +322,7 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
             parser.keyword(&Keyword::False).map(|_| Expr::False),
             parser.keyword(&Keyword::True).map(|_| Expr::True),
             parser.ident_owned().map(Expr::Var),
-            parser.ctor_owned().map(Expr::Variant),
+            spanned!(parser, parser.ctor_owned()).map(Expr::Variant),
             expr_record(parser),
             expr_embed(parser),
             expr_array(parser),
@@ -545,7 +544,12 @@ pub fn expr_lam(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
         parser,
         keep_right!(
             parser.token(&token::Data::Backslash),
-            many!(indent!(parser, Relation::Gt, pattern(parser))).and_then(|args| keep_right!(
+            many!(indent!(
+                parser,
+                Relation::Gt,
+                spanned!(parser, pattern(parser))
+            ))
+            .and_then(|args| keep_right!(
                 indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
                 expr(parser).map(|body| syntax::Expr::mk_lam(args, body))
             ))
