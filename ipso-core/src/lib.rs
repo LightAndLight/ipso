@@ -758,6 +758,22 @@ pub struct EVar(pub usize);
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Placeholder(pub usize);
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
+pub enum Binop {
+    Add,
+    Multiply,
+    Subtract,
+    Divide,
+
+    Append,
+
+    Or,
+    And,
+
+    LApply,
+    RApply,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
@@ -778,7 +794,7 @@ pub enum Expr {
 
     Int(u32),
 
-    Binop(syntax::Binop, Rc<Expr>, Rc<Expr>),
+    Binop(Binop, Rc<Expr>, Rc<Expr>),
 
     Char(char),
 
@@ -874,8 +890,8 @@ impl Expr {
         Expr::Embed(Rc::new(tag), Rc::new(rest))
     }
 
-    pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
-        if op == syntax::Binop::Add {
+    pub fn mk_binop(op: Binop, a: Expr, b: Expr) -> Expr {
+        if op == Binop::Add {
             if let (Expr::Int(a), Expr::Int(b)) = (&a, &b) {
                 return Expr::Int(*a + *b);
             }

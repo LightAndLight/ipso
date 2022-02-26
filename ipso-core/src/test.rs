@@ -1,7 +1,5 @@
 #[cfg(test)]
-use crate::Expr;
-#[cfg(test)]
-use ipso_syntax::Binop;
+use crate::{Binop, Expr};
 
 #[test]
 fn instantiate_1() {
