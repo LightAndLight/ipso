@@ -10,7 +10,7 @@ use crate::{
     BoundVars,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use ipso_core::{Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
+use ipso_core::{Binop, Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, Spanned};
@@ -1479,57 +1479,77 @@ impl<'a> InferenceContext<'a> {
             }
 
             syntax::Expr::Binop(op, left, right) => {
-                let (left, right, ty) = match op {
+                fn infer_desugared_op(
+                    this: &mut InferenceContext,
+                    expr_pos: usize,
+                    op_name: &str,
+                    op_pos: usize,
+                    left: Rc<Spanned<syntax::Expr>>,
+                    right: Rc<Spanned<syntax::Expr>>,
+                ) -> Result<(Expr, Type), InferenceError> {
+                    this.infer(&Spanned {
+                        pos: expr_pos,
+                        item: syntax::Expr::App(
+                            Rc::new(Spanned {
+                                pos: expr_pos,
+                                item: syntax::Expr::App(
+                                    Rc::new(Spanned {
+                                        pos: op_pos,
+                                        item: syntax::Expr::Var(String::from(op_name)),
+                                    }),
+                                    left,
+                                ),
+                            }),
+                            right,
+                        ),
+                    })
+                }
+
+                match op.item {
                     syntax::Binop::Add => {
                         let left = self.check(left, &Type::Int)?;
                         let right = self.check(right, &Type::Int)?;
-                        Ok((left, right, Type::Int))
+                        Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
                     }
                     syntax::Binop::Multiply => {
                         let left = self.check(left, &Type::Int)?;
                         let right = self.check(right, &Type::Int)?;
-                        Ok((left, right, Type::Int))
+                        Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
                     }
                     syntax::Binop::Subtract => {
                         let left = self.check(left, &Type::Int)?;
                         let right = self.check(right, &Type::Int)?;
-                        Ok((left, right, Type::Int))
+                        Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
                     }
                     syntax::Binop::Divide => {
                         let left = self.check(left, &Type::Int)?;
                         let right = self.check(right, &Type::Int)?;
-                        Ok((left, right, Type::Int))
+                        Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
                     }
                     syntax::Binop::Append => {
                         let item_ty = self.fresh_type_meta(&Kind::Type);
                         let array_ty = Type::app(Type::mk_array(self.common_kinds), item_ty);
                         let left = self.check(left, &array_ty)?;
                         let right = self.check(right, &array_ty)?;
-                        Ok((left, right, array_ty))
+                        Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
                     }
                     syntax::Binop::Or => {
                         let left = self.check(left, &Type::Bool)?;
                         let right = self.check(right, &Type::Bool)?;
-                        Ok((left, right, Type::Bool))
+                        Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
                     }
                     syntax::Binop::And => {
                         let left = self.check(left, &Type::Bool)?;
                         let right = self.check(right, &Type::Bool)?;
-                        Ok((left, right, Type::Bool))
+                        Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
                     }
-                    syntax::Binop::Eq => todo!("eq"),
-                    syntax::Binop::Neq => todo!("neq"),
-                    syntax::Binop::Gt => todo!("gt"),
-                    syntax::Binop::Gte => todo!("gte"),
-                    syntax::Binop::Lt => todo!("lt"),
-                    syntax::Binop::Lte => todo!("lte"),
                     syntax::Binop::LApply => {
                         let in_ty = self.fresh_type_meta(&Kind::Type);
                         let out_ty = self.fresh_type_meta(&Kind::Type);
                         let left =
                             self.check(left, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
                         let right = self.check(right, &in_ty)?;
-                        Ok((left, right, out_ty))
+                        Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
                     }
                     syntax::Binop::RApply => {
                         let in_ty = self.fresh_type_meta(&Kind::Type);
@@ -1537,10 +1557,57 @@ impl<'a> InferenceContext<'a> {
                         let left = self.check(left, &in_ty)?;
                         let right =
                             self.check(right, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
-                        Ok((left, right, out_ty))
+                        Ok((Expr::mk_binop(Binop::RApply, left, right), out_ty))
                     }
-                }?;
-                Ok((Expr::mk_binop(*op, left, right), ty))
+                    syntax::Binop::Eq => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "eq",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                    syntax::Binop::Neq => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "neq",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                    syntax::Binop::Gt => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "gt",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                    syntax::Binop::Gte => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "gte",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                    syntax::Binop::Lt => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "lt",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                    syntax::Binop::Lte => infer_desugared_op(
+                        self,
+                        expr.pos,
+                        "lte",
+                        op.pos,
+                        left.clone(),
+                        right.clone(),
+                    ),
+                }
             }
 
             syntax::Expr::App(fun, arg) => {
