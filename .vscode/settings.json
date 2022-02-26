@@ -1,3 +1,5 @@
 {
-    "rust-analyzer.checkOnSave.command": "clippy"
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "markdown.extension.toc.levels": "2..6",
+    "markdown.extension.toc.unorderedList.marker": "*",
 }
