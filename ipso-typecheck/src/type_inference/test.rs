@@ -646,34 +646,36 @@ fn unify_rows_3() {
 #[test]
 fn unify_rows_4() {
     with_empty_ctx(|ctx| {
+        let ty1 = Type::mk_record(
+            ctx.common_kinds,
+            vec![
+                (Rc::from("x"), Type::Int),
+                (Rc::from("x"), Type::Bool),
+                (Rc::from("y"), Type::Bool),
+            ],
+            None,
+        );
+        let ty2 = Type::mk_record(
+            ctx.common_kinds,
+            vec![
+                (Rc::from("x"), Type::Int),
+                (Rc::from("y"), Type::Bool),
+                (Rc::from("x"), Type::Int),
+            ],
+            None,
+        );
         let expected = Err(InferenceError::mismatch(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
-            syntax::Type::Bool,
-            syntax::Type::Int,
+            ctx.zonk_type(ty1.clone())
+                .to_syntax()
+                .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            ctx.zonk_type(ty2.clone())
+                .to_syntax()
+                .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
         ));
-        let actual = ctx.unify(
-            None,
-            &Type::mk_record(
-                ctx.common_kinds,
-                vec![
-                    (Rc::from("x"), Type::Int),
-                    (Rc::from("x"), Type::Bool),
-                    (Rc::from("y"), Type::Bool),
-                ],
-                None,
-            ),
-            &Type::mk_record(
-                ctx.common_kinds,
-                vec![
-                    (Rc::from("x"), Type::Int),
-                    (Rc::from("y"), Type::Bool),
-                    (Rc::from("x"), Type::Int),
-                ],
-                None,
-            ),
-        );
+        let actual = ctx.unify(None, &ty1, &ty2);
         assert_eq!(expected, actual)
     })
 }
@@ -1191,5 +1193,47 @@ fn infer_case_4() {
         .with_position(32));
         let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
         assert_eq!(expected, actual)
+    })
+}
+
+#[test]
+fn unify_variant_1() {
+    let type_variables = {
+        let mut type_variables = BoundVars::new();
+        type_variables.insert(&[(Rc::from("x"), Kind::Type), (Rc::from("r"), Kind::Row)]);
+        type_variables
+    };
+
+    with_type_variables_ctx(type_variables, |ctx| {
+        let x = Type::Var(Kind::Type, 1);
+        let r = Type::Var(Kind::Row, 0);
+        let b: Rc<str> = Rc::from("B");
+
+        // (| B : x, r |)
+        let ty1 = Type::mk_variant(
+            ctx.common_kinds,
+            vec![(b.clone(), x.clone())],
+            Some(r.clone()),
+        );
+
+        // (| B : x, A : x, r |)
+        let ty2 = Type::mk_variant(
+            ctx.common_kinds,
+            vec![(b, x.clone()), (Rc::from("A"), x)],
+            Some(r),
+        );
+
+        let expected = Err(InferenceError::mismatch(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            ty1.to_syntax()
+                .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            ty2.to_syntax()
+                .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
+        ));
+        let actual = ctx.unify(None, &ty1, &ty2);
+
+        assert_eq!(expected, actual);
     })
 }

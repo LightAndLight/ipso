@@ -1073,7 +1073,29 @@ impl<'a> InferenceContext<'a> {
             actual,
         )
         .map_err(|error| {
-            let error = InferenceError::unification_error(self.source, error);
+            let error = InferenceError::unification_error(
+                self.source,
+                /*
+                At the level of an `InferenceError`, a type mismatch should
+                describe full types involved, rather than the specific components
+                that don't match.
+
+                e.g. when `a -> b` and `a -> c` mismatch (because `b` != `c`),
+                `InferenceError` should report that `a -> b` != `a -> c`, instead
+                of saying `b` != `c`.
+                */
+                match error {
+                    UnificationError::Mismatch { .. } => UnificationError::Mismatch {
+                        expected: self.zonk_type(expected.clone()).to_syntax().map(&mut |ix| {
+                            self.type_variables.lookup_index(*ix).unwrap().0.clone()
+                        }),
+                        actual: self.zonk_type(actual.clone()).to_syntax().map(&mut |ix| {
+                            self.type_variables.lookup_index(*ix).unwrap().0.clone()
+                        }),
+                    },
+                    _ => error,
+                },
+            );
             match position {
                 Some(position) => error.with_position(position),
                 None => error,
