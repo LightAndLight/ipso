@@ -31,7 +31,11 @@ pub fn definition(parser: &mut Parser) -> ParseResult<Declaration> {
                         Relation::Eq,
                         parser.token(&token::Data::Ident(Rc::from(name.as_ref())))
                     ),
-                    many!(indent!(parser, Relation::Gt, pattern(parser)))
+                    many!(indent!(
+                        parser,
+                        Relation::Gt,
+                        spanned!(parser, pattern(parser))
+                    ))
                 )
                 .and_then(|args| {
                     keep_right!(
@@ -227,9 +231,14 @@ instance_member ::=
 */
 pub fn instance_member(
     parser: &mut Parser,
-) -> ParseResult<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)> {
+) -> ParseResult<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)> {
     spanned!(parser, parser.ident_owned()).and_then(|name| {
-        many!(indent!(parser, Relation::Gt, pattern(parser))).and_then(|args| {
+        many!(indent!(
+            parser,
+            Relation::Gt,
+            spanned!(parser, pattern(parser))
+        ))
+        .and_then(|args| {
             keep_right!(
                 indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
                 expr(parser).map(|body| (name, args, body))

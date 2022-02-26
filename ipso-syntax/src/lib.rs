@@ -357,7 +357,7 @@ pub enum Expr {
 
     App(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
     Lam {
-        args: Vec<Pattern>,
+        args: Vec<Spanned<Pattern>>,
         body: Rc<Spanned<Expr>>,
     },
 
@@ -387,8 +387,8 @@ pub enum Expr {
     },
     Project(Rc<Spanned<Expr>>, String),
 
-    Variant(String),
-    Embed(String, Rc<Spanned<Expr>>),
+    Variant(Spanned<String>),
+    Embed(Spanned<String>, Rc<Spanned<Expr>>),
     Case(Rc<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
@@ -411,7 +411,7 @@ impl Expr {
         Expr::Var(String::from(v))
     }
 
-    pub fn mk_lam(args: Vec<Pattern>, body: Spanned<Expr>) -> Expr {
+    pub fn mk_lam(args: Vec<Spanned<Pattern>>, body: Spanned<Expr>) -> Expr {
         Expr::Lam {
             args,
             body: Rc::new(body),
@@ -443,7 +443,7 @@ impl Expr {
         }
     }
 
-    pub fn mk_embed(ctor: String, rest: Spanned<Expr>) -> Expr {
+    pub fn mk_embed(ctor: Spanned<String>, rest: Spanned<Expr>) -> Expr {
         Expr::Embed(ctor, Rc::new(rest))
     }
 
@@ -475,7 +475,7 @@ pub enum Declaration {
     Definition {
         name: String,
         ty: Type<Rc<str>>,
-        args: Vec<Pattern>,
+        args: Vec<Spanned<Pattern>>,
         body: Spanned<Expr>,
     },
     Class {
@@ -488,7 +488,7 @@ pub enum Declaration {
         assumes: Vec<Spanned<Type<Rc<str>>>>,
         name: Spanned<Rc<str>>,
         args: Vec<Type<Rc<str>>>,
-        members: Vec<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)>,
+        members: Vec<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)>,
     },
     TypeAlias {
         name: String,

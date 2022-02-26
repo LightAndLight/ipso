@@ -55,7 +55,7 @@ fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let var = tc.fresh_type_meta(&Kind::Row);
         tc.evidence.assume(
-            None,
+            0,
             Constraint::HasField {
                 field: Rc::from("z"),
                 rest: var.clone(),
@@ -83,7 +83,7 @@ fn solve_constraint_3() {
                 rest: var.clone(),
             }],
             environment: vec![crate::evidence::Item {
-                pos: None,
+                pos: 0,
                 constraint: Constraint::HasField {
                     field: Rc::from("z"),
                     rest: var,

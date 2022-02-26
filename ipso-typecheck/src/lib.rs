@@ -870,7 +870,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         name: &str,
         ty: &syntax::Type<Rc<str>>,
-        args: &[syntax::Pattern],
+        args: &[Spanned<syntax::Pattern>],
         body: &Spanned<syntax::Expr>,
     ) -> Result<core::Declaration, TypeError> {
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
@@ -898,8 +898,14 @@ impl<'modules> Typechecker<'modules> {
 
         let (constraints, ty) = ty.unwrap_constraints();
         for constraint in constraints {
-            self.evidence
-                .assume(None, evidence::Constraint::from_type(constraint));
+            self.evidence.assume(
+                /*
+                TODO: use the constraint's textual position. unwrap constraints before
+                type checking to get those positions.
+                */
+                0,
+                evidence::Constraint::from_type(constraint),
+            );
         }
 
         let arg_tys: Vec<type_inference::InferredPattern> = args
@@ -1051,7 +1057,11 @@ impl<'modules> Typechecker<'modules> {
         assumes: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Spanned<Rc<str>>,
         args: &[syntax::Type<Rc<str>>],
-        members: &[(Spanned<String>, Vec<syntax::Pattern>, Spanned<syntax::Expr>)],
+        members: &[(
+            Spanned<String>,
+            Vec<Spanned<syntax::Pattern>>,
+            Spanned<syntax::Expr>,
+        )],
     ) -> Result<core::Declaration, TypeError> {
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
@@ -1095,15 +1105,14 @@ impl<'modules> Typechecker<'modules> {
 
         let assumes: Vec<core::Type> = assumes
             .iter()
-            .map(|assume| self.check_kind(&assume.item, &Kind::Constraint))
-            .collect::<Result<_, TypeError>>()?;
-
-        // generate evidence for assumptions
-        assumes.iter().for_each(|constraint| {
-            let _ = self
-                .evidence
-                .assume(None, evidence::Constraint::from_type(constraint));
-        });
+            .map(|assume| {
+                let constraint = self.check_kind(&assume.item, &Kind::Constraint)?;
+                let _ = self
+                    .evidence
+                    .assume(assume.pos, evidence::Constraint::from_type(&constraint));
+                Ok(constraint)
+            })
+            .collect::<Result<_, _>>()?;
 
         // locate evidence for superclasses
         let superclass_constructors: Vec<core::Expr> = {

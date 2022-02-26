@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct Item {
-    pos: Option<usize>,
+    pos: usize,
     constraint: Constraint,
     expr: Option<Expr>,
 }
@@ -52,7 +52,7 @@ impl Evidence {
         }
     }
 
-    pub fn placeholder(&mut self, pos: Option<usize>, constraint: Constraint) -> Placeholder {
+    pub fn placeholder(&mut self, pos: usize, constraint: Constraint) -> Placeholder {
         let ix = self.environment.len();
         self.environment.push(Item {
             pos,
@@ -62,7 +62,7 @@ impl Evidence {
         Placeholder(ix)
     }
 
-    pub fn assume(&mut self, pos: Option<usize>, constraint: Constraint) -> EVar {
+    pub fn assume(&mut self, pos: usize, constraint: Constraint) -> EVar {
         let ev = EVar(self.evars.len());
         self.evars.push(constraint.clone());
         self.environment.push(Item {

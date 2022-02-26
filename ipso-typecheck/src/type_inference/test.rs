@@ -66,10 +66,13 @@ fn occurs_1() {
 #[test]
 fn infer_pattern_1() {
     with_empty_ctx(|ctx| {
-        let pattern = syntax::Pattern::Name(Spanned {
+        let pattern = syntax::Spanned {
             pos: 0,
-            item: String::from("x"),
-        });
+            item: syntax::Pattern::Name(Spanned {
+                pos: 0,
+                item: String::from("x"),
+            }),
+        };
         assert_eq!(
             ctx.infer_pattern(&pattern),
             InferredPattern::Any {
@@ -84,22 +87,25 @@ fn infer_pattern_1() {
 #[test]
 fn infer_pattern_2() {
     with_empty_ctx(|ctx| {
-        let pat = syntax::Pattern::Record {
-            names: vec![
-                syntax::Spanned {
-                    pos: 0,
-                    item: String::from("x"),
-                },
-                syntax::Spanned {
-                    pos: 2,
-                    item: String::from("y"),
-                },
-                syntax::Spanned {
-                    pos: 4,
-                    item: String::from("z"),
-                },
-            ],
-            rest: None,
+        let pat = syntax::Spanned {
+            pos: 0,
+            item: syntax::Pattern::Record {
+                names: vec![
+                    syntax::Spanned {
+                        pos: 0,
+                        item: String::from("x"),
+                    },
+                    syntax::Spanned {
+                        pos: 2,
+                        item: String::from("y"),
+                    },
+                    syntax::Spanned {
+                        pos: 4,
+                        item: String::from("z"),
+                    },
+                ],
+                rest: None,
+            },
         };
         let expected = InferredPattern::Any {
             pattern: Pattern::Record {
@@ -133,25 +139,28 @@ fn infer_pattern_2() {
 #[test]
 fn infer_pattern_3() {
     with_empty_ctx(|ctx| {
-        let pat = syntax::Pattern::Record {
-            names: vec![
-                syntax::Spanned {
-                    pos: 0,
-                    item: String::from("x"),
-                },
-                syntax::Spanned {
-                    pos: 2,
-                    item: String::from("y"),
-                },
-                syntax::Spanned {
-                    pos: 4,
-                    item: String::from("z"),
-                },
-            ],
-            rest: Some(syntax::Spanned {
-                pos: 6,
-                item: String::from("w"),
-            }),
+        let pat = syntax::Spanned {
+            pos: 0,
+            item: syntax::Pattern::Record {
+                names: vec![
+                    syntax::Spanned {
+                        pos: 0,
+                        item: String::from("x"),
+                    },
+                    syntax::Spanned {
+                        pos: 2,
+                        item: String::from("y"),
+                    },
+                    syntax::Spanned {
+                        pos: 4,
+                        item: String::from("z"),
+                    },
+                ],
+                rest: Some(syntax::Spanned {
+                    pos: 6,
+                    item: String::from("w"),
+                }),
+            },
         };
         let expected = InferredPattern::Any {
             pattern: Pattern::Record {
@@ -189,11 +198,14 @@ fn infer_pattern_3() {
 #[test]
 fn infer_pattern_4() {
     with_empty_ctx(|ctx| {
-        let pat = syntax::Pattern::Variant {
-            name: String::from("just"),
-            arg: syntax::Spanned {
-                pos: 5,
-                item: String::from("x"),
+        let pat = syntax::Spanned {
+            pos: 0,
+            item: syntax::Pattern::Variant {
+                name: String::from("just"),
+                arg: syntax::Spanned {
+                    pos: 5,
+                    item: String::from("x"),
+                },
             },
         };
         let expected = InferredPattern::Variant {
@@ -215,10 +227,13 @@ fn infer_lam_1() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Name(syntax::Spanned {
+                vec![syntax::Spanned {
                     pos: 1,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 1,
+                        item: String::from("x"),
+                    }),
+                }],
                 syntax::Spanned {
                     pos: 6,
                     item: syntax::Expr::Var(String::from("x")),
@@ -245,18 +260,21 @@ fn infer_lam_2() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Record {
-                    names: vec![
-                        syntax::Spanned {
-                            pos: 2,
-                            item: String::from("x"),
-                        },
-                        syntax::Spanned {
-                            pos: 5,
-                            item: String::from("y"),
-                        },
-                    ],
-                    rest: None,
+                vec![syntax::Spanned {
+                    pos: 1,
+                    item: syntax::Pattern::Record {
+                        names: vec![
+                            syntax::Spanned {
+                                pos: 2,
+                                item: String::from("x"),
+                            },
+                            syntax::Spanned {
+                                pos: 5,
+                                item: String::from("y"),
+                            },
+                        ],
+                        rest: None,
+                    },
                 }],
                 syntax::Spanned {
                     pos: 11,
@@ -303,18 +321,21 @@ fn infer_lam_3() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Record {
-                    names: vec![
-                        syntax::Spanned {
-                            pos: 2,
-                            item: String::from("x"),
-                        },
-                        syntax::Spanned {
-                            pos: 5,
-                            item: String::from("y"),
-                        },
-                    ],
-                    rest: None,
+                vec![syntax::Spanned {
+                    pos: 1,
+                    item: syntax::Pattern::Record {
+                        names: vec![
+                            syntax::Spanned {
+                                pos: 2,
+                                item: String::from("x"),
+                            },
+                            syntax::Spanned {
+                                pos: 5,
+                                item: String::from("y"),
+                            },
+                        ],
+                        rest: None,
+                    },
                 }],
                 syntax::Spanned {
                     pos: 11,
@@ -361,21 +382,24 @@ fn infer_lam_4() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Record {
-                    names: vec![
-                        syntax::Spanned {
-                            pos: 2,
-                            item: String::from("x"),
-                        },
-                        syntax::Spanned {
-                            pos: 5,
-                            item: String::from("y"),
-                        },
-                    ],
-                    rest: Some(syntax::Spanned {
-                        pos: 11,
-                        item: String::from("z"),
-                    }),
+                vec![syntax::Spanned {
+                    pos: 1,
+                    item: syntax::Pattern::Record {
+                        names: vec![
+                            syntax::Spanned {
+                                pos: 2,
+                                item: String::from("x"),
+                            },
+                            syntax::Spanned {
+                                pos: 5,
+                                item: String::from("y"),
+                            },
+                        ],
+                        rest: Some(syntax::Spanned {
+                            pos: 11,
+                            item: String::from("z"),
+                        }),
+                    },
                 }],
                 syntax::Spanned {
                     pos: 17,
@@ -423,14 +447,20 @@ fn infer_lam_5() {
             pos: 0,
             item: syntax::Expr::mk_lam(
                 vec![
-                    syntax::Pattern::Name(syntax::Spanned {
+                    syntax::Spanned {
                         pos: 1,
-                        item: String::from("f"),
-                    }),
-                    syntax::Pattern::Name(syntax::Spanned {
-                        pos: 1,
-                        item: String::from("x"),
-                    }),
+                        item: syntax::Pattern::Name(syntax::Spanned {
+                            pos: 1,
+                            item: String::from("f"),
+                        }),
+                    },
+                    syntax::Spanned {
+                        pos: 3,
+                        item: syntax::Pattern::Name(syntax::Spanned {
+                            pos: 3,
+                            item: String::from("x"),
+                        }),
+                    },
                 ],
                 syntax::Expr::mk_app(
                     syntax::Spanned {
@@ -852,10 +882,13 @@ fn infer_case_1() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Name(syntax::Spanned {
+                vec![syntax::Spanned {
                     pos: 1,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 1,
+                        item: String::from("x"),
+                    }),
+                }],
                 syntax::Spanned {
                     pos: 6,
                     item: syntax::Expr::mk_case(
@@ -920,10 +953,13 @@ fn infer_case_2() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Name(syntax::Spanned {
+                vec![syntax::Spanned {
                     pos: 1,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 1,
+                        item: String::from("x"),
+                    }),
+                }],
                 syntax::Spanned {
                     pos: 6,
                     item: syntax::Expr::mk_case(
@@ -1016,10 +1052,13 @@ fn infer_case_3() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Name(syntax::Spanned {
+                vec![syntax::Spanned {
                     pos: 1,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 1,
+                        item: String::from("x"),
+                    }),
+                }],
                 syntax::Spanned {
                     pos: 6,
                     item: syntax::Expr::mk_case(
@@ -1126,10 +1165,13 @@ fn infer_case_4() {
         let term = syntax::Spanned {
             pos: 0,
             item: syntax::Expr::mk_lam(
-                vec![syntax::Pattern::Name(syntax::Spanned {
+                vec![syntax::Spanned {
                     pos: 1,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 1,
+                        item: String::from("x"),
+                    }),
+                }],
                 syntax::Spanned {
                     pos: 6,
                     item: syntax::Expr::mk_case(

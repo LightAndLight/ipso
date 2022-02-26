@@ -176,11 +176,17 @@ fn parse_definition_4() {
             name: String::from("x"),
             ty: Type::Int,
             args: vec![
-                Pattern::Name(Spanned {
+                Spanned {
                     pos: 10,
-                    item: String::from("y")
-                }),
-                Pattern::Wildcard
+                    item: Pattern::Name(Spanned {
+                        pos: 10,
+                        item: String::from("y")
+                    })
+                },
+                Spanned {
+                    pos: 12,
+                    item: Pattern::Wildcard
+                }
             ],
             body: Spanned {
                 pos: 16,

@@ -146,7 +146,7 @@ pub fn solve_constraint(
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
-                            let ev = tc.evidence.assume(None, constraint.clone());
+                            let ev = tc.evidence.assume(0, constraint.clone());
                             debug_assert!(tc.evidence.lookup_evar(&ev) != None);
                             Ok(core::Expr::EVar(ev))
                         }
@@ -230,7 +230,7 @@ pub fn solve_placeholder(
     match item.expr {
         None => {
             let expr = solve_constraint(
-                item.pos.unwrap_or(0),
+                item.pos,
                 &Some(SolveConstraintContext {
                     constraint: tc
                         .fill_ty_names(tc.zonk_type(item.constraint.to_type()).to_syntax()),

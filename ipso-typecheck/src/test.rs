@@ -288,10 +288,13 @@ fn check_definition_1() {
             item: syntax::Declaration::Definition {
                 name: String::from("id"),
                 ty: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
-                args: vec![syntax::Pattern::Name(syntax::Spanned {
+                args: vec![syntax::Spanned {
                     pos: 14,
-                    item: String::from("x"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 14,
+                        item: String::from("x"),
+                    }),
+                }],
                 body: syntax::Spanned {
                     pos: 18,
                     item: syntax::Expr::Var(String::from("x")),
@@ -332,10 +335,13 @@ fn check_definition_2() {
                         Some(Type::Var(Rc::from("r"))),
                     ),
                 ),
-                args: vec![syntax::Pattern::Name(syntax::Spanned {
+                args: vec![syntax::Spanned {
                     pos: 37,
-                    item: String::from("r"),
-                })],
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 37,
+                        item: String::from("r"),
+                    }),
+                }],
                 body: syntax::Spanned {
                     pos: 41,
                     item: syntax::Expr::mk_record(
@@ -488,15 +494,18 @@ fn check_definition_4() {
                     ),
                     Type::Int,
                 ),
-                args: vec![syntax::Pattern::Record {
-                    names: vec![syntax::Spanned {
-                        pos: 1,
-                        item: String::from("x"),
-                    }],
-                    rest: Some(syntax::Spanned {
-                        pos: 2,
-                        item: String::from("r"),
-                    }),
+                args: vec![syntax::Spanned {
+                    pos: 3,
+                    item: syntax::Pattern::Record {
+                        names: vec![syntax::Spanned {
+                            pos: 1,
+                            item: String::from("x"),
+                        }],
+                        rest: Some(syntax::Spanned {
+                            pos: 2,
+                            item: String::from("r"),
+                        }),
+                    },
                 }],
                 body: syntax::Spanned {
                     pos: 2,
@@ -832,14 +841,20 @@ fn check_instance_1() {
                             item: String::from("eq"),
                         },
                         vec![
-                            syntax::Pattern::Name(Spanned {
+                            syntax::Spanned {
                                 pos: 25,
-                                item: String::from("x"),
-                            }),
-                            syntax::Pattern::Name(Spanned {
+                                item: syntax::Pattern::Name(Spanned {
+                                    pos: 25,
+                                    item: String::from("x"),
+                                }),
+                            },
+                            syntax::Spanned {
                                 pos: 27,
-                                item: String::from("y"),
-                            }),
+                                item: syntax::Pattern::Name(Spanned {
+                                    pos: 27,
+                                    item: String::from("y"),
+                                }),
+                            },
                         ],
                         Spanned {
                             pos: 31,

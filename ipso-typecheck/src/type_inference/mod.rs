@@ -1191,7 +1191,12 @@ impl<'a> InferenceContext<'a> {
     Replaces `type_signature`'s type variables with metavariables, and applies `expr`
     to a placeholder for each constraint in `type_signature`.
     */
-    pub fn instantiate(&mut self, expr: Expr, type_signature: &TypeSig) -> (Expr, Type) {
+    pub fn instantiate(
+        &mut self,
+        pos: usize,
+        expr: Expr,
+        type_signature: &TypeSig,
+    ) -> (Expr, Type) {
         let metas: Vec<Type> = type_signature
             .ty_vars
             .iter()
@@ -1207,7 +1212,7 @@ impl<'a> InferenceContext<'a> {
         let expr = constraints.iter().fold(expr, |expr, constraint| {
             let placeholder = Expr::Placeholder(
                 self.evidence
-                    .placeholder(None, evidence::Constraint::from_type(constraint)),
+                    .placeholder(pos, evidence::Constraint::from_type(constraint)),
             );
             Expr::mk_app(expr, placeholder)
         });
@@ -1215,10 +1220,13 @@ impl<'a> InferenceContext<'a> {
         (expr, ty.clone())
     }
 
-    fn check_duplicate_args(&self, args: &[syntax::Pattern]) -> Result<(), InferenceError> {
+    fn check_duplicate_args(
+        &self,
+        args: &[Spanned<syntax::Pattern>],
+    ) -> Result<(), InferenceError> {
         let mut seen: HashSet<&str> = HashSet::new();
         args.iter()
-            .flat_map(|arg| arg.get_arg_names().into_iter())
+            .flat_map(|arg| arg.item.get_arg_names().into_iter())
             .try_for_each(|arg| {
                 if seen.contains(&arg.item.as_str()) {
                     Err(
@@ -1292,7 +1300,7 @@ impl<'a> InferenceContext<'a> {
             let mut row: &Type = &entire_row;
             while let Type::RowCons(field, ty, rest) = row {
                 names.push(Expr::Placeholder(self.evidence.placeholder(
-                    names_to_positions.get(field.as_ref()).copied(),
+                    names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
                     evidence::Constraint::HasField {
                         field: field.clone(),
                         rest: (**rest).clone(),
@@ -1321,12 +1329,17 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    fn infer_variant_pattern(&mut self, ctor: &str, arg: &Spanned<String>) -> InferredPattern {
+    fn infer_variant_pattern(
+        &mut self,
+        pos: usize,
+        ctor: &str,
+        arg: &Spanned<String>,
+    ) -> InferredPattern {
         let ctor: Rc<str> = Rc::from(ctor);
         let arg_ty = self.fresh_type_meta(&Kind::Type);
         let rest_row = self.fresh_type_meta(&Kind::Row);
         let tag = Expr::Placeholder(self.evidence.placeholder(
-            None,
+            pos,
             evidence::Constraint::HasField {
                 field: ctor.clone(),
                 rest: rest_row.clone(),
@@ -1349,13 +1362,15 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    pub fn infer_pattern(&mut self, pattern: &syntax::Pattern) -> InferredPattern {
-        match pattern {
+    pub fn infer_pattern(&mut self, pattern: &Spanned<syntax::Pattern>) -> InferredPattern {
+        match &pattern.item {
             syntax::Pattern::Name(name) => self.infer_name_pattern(name),
             syntax::Pattern::Record { names, rest } => {
                 self.infer_record_pattern(names, rest.as_ref())
             }
-            syntax::Pattern::Variant { name, arg } => self.infer_variant_pattern(name, arg),
+            syntax::Pattern::Variant { name, arg } => {
+                self.infer_variant_pattern(pattern.pos, name, arg)
+            }
             syntax::Pattern::Char(c) => self.infer_char_pattern(c),
             syntax::Pattern::Int(n) => self.infer_int_pattern(n),
             syntax::Pattern::String(s) => self.infer_string_pattern(s),
@@ -1368,7 +1383,7 @@ impl<'a> InferenceContext<'a> {
         pattern: &Spanned<syntax::Pattern>,
         expected: &Type,
     ) -> Result<CheckedPattern, InferenceError> {
-        let result = self.infer_pattern(&pattern.item);
+        let result = self.infer_pattern(pattern);
         self.unify(Some(pattern.pos), expected, &result.ty(self.common_kinds))?;
         Ok(match result {
             InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
@@ -1394,7 +1409,7 @@ impl<'a> InferenceContext<'a> {
                 Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
                 None => match self.type_signatures.get(name) {
                     Some(type_signature) => {
-                        Ok(self.instantiate(Expr::Name(name.clone()), type_signature))
+                        Ok(self.instantiate(expr.pos, Expr::Name(name.clone()), type_signature))
                     }
                     None => {
                         Err(InferenceError::not_in_scope(self.source, name).with_position(expr.pos))
@@ -1413,10 +1428,11 @@ impl<'a> InferenceContext<'a> {
                     None => {
                         Err(InferenceError::not_in_scope(self.source, item).with_position(expr.pos))
                     }
-                    Some(type_signature) => {
-                        Ok(self
-                            .instantiate(Expr::Module(name.clone(), item.clone()), type_signature))
-                    }
+                    Some(type_signature) => Ok(self.instantiate(
+                        expr.pos,
+                        Expr::Module(name.clone(), item.clone()),
+                        type_signature,
+                    )),
                 },
             },
 
@@ -1593,14 +1609,18 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Record { fields, rest } => {
                 let mut field_to_expr: FnvHashMap<&str, Expr> =
                     FnvHashMap::with_capacity_and_hasher(fields.len(), Default::default());
+                let mut field_to_pos: FnvHashMap<&str, usize> =
+                    FnvHashMap::with_capacity_and_hasher(fields.len(), Default::default());
 
                 let entire_row: Type = {
                     let fields = fields
                         .iter()
                         .map(|(field_name, field_expr)| {
+                            let field_pos = field_expr.pos;
                             self.infer(field_expr).map(|(field_expr, field_ty)| {
                                 let field_name_str = field_name.as_str();
                                 field_to_expr.insert(field_name_str, field_expr);
+                                field_to_pos.insert(field_name_str, field_pos);
                                 (Rc::from(field_name_str), field_ty)
                             })
                         })
@@ -1615,7 +1635,7 @@ impl<'a> InferenceContext<'a> {
                 let mut row = &entire_row;
                 while let Type::RowCons(field, ty, rest) = row {
                     let field_index = Expr::Placeholder(self.evidence.placeholder(
-                        None,
+                        field_to_pos.get(field.as_ref()).copied().unwrap_or(0),
                         evidence::Constraint::HasField {
                             field: field.clone(),
                             rest: (**rest).clone(),
@@ -1653,6 +1673,7 @@ impl<'a> InferenceContext<'a> {
 
                 let rest_row = self.fresh_type_meta(&Kind::Row);
 
+                let pos = expr.pos;
                 let expr = self.check(
                     expr,
                     &Type::mk_record(
@@ -1663,7 +1684,7 @@ impl<'a> InferenceContext<'a> {
                 )?;
 
                 let placeholder = Expr::Placeholder(self.evidence.placeholder(
-                    None,
+                    pos,
                     evidence::Constraint::HasField {
                         field: field_name,
                         rest: rest_row,
@@ -1673,11 +1694,12 @@ impl<'a> InferenceContext<'a> {
             }
 
             syntax::Expr::Variant(constructor) => {
-                let constructor: Rc<str> = Rc::from(constructor.as_str());
+                let pos = constructor.pos;
+                let constructor: Rc<str> = Rc::from(constructor.item.as_str());
 
                 let rest_row = self.fresh_type_meta(&Kind::Row);
                 let placeholder = Expr::Placeholder(self.evidence.placeholder(
-                    None,
+                    pos,
                     evidence::Constraint::HasField {
                         field: constructor.clone(),
                         rest: rest_row.clone(),
@@ -1705,10 +1727,11 @@ impl<'a> InferenceContext<'a> {
                     &Type::app(Type::mk_variant_ctor(self.common_kinds), rest_row.clone()),
                 )?;
 
-                let constructor: Rc<str> = Rc::from(constructor.as_str());
+                let constructor_pos = constructor.pos;
+                let constructor: Rc<str> = Rc::from(constructor.item.as_str());
                 let arg_ty = self.fresh_type_meta(&Kind::Type);
                 let placeholder = Expr::Placeholder(self.evidence.placeholder(
-                    None,
+                    constructor_pos,
                     evidence::Constraint::HasField {
                         field: constructor.clone(),
                         rest: rest_row.clone(),
