@@ -18,7 +18,7 @@ pub struct State<'a> {
     /// The value stack
     pub exprs: Vec<Spanned<Expr>>,
     /// The operator stack
-    pub operators: Vec<Binop>,
+    pub operators: Vec<Spanned<Binop>>,
     /// The current (operator, expression) pair
     pub current_pair: Option<(Spanned<Binop>, Spanned<Expr>)>,
     /// The (operator, expression) pair parser
@@ -53,7 +53,7 @@ impl<'a> State<'a> {
     }
 
     /// Get the top of the operator stack.
-    pub fn peek_operator(&self) -> Option<&Binop> {
+    pub fn peek_operator(&self) -> Option<&Spanned<Binop>> {
         self.operators.last()
     }
 
@@ -76,7 +76,7 @@ impl<'a> State<'a> {
             }
             Some((binop, rhs)) => {
                 self.exprs.push(rhs.clone());
-                self.operators.push(binop.item);
+                self.operators.push(*binop);
                 match self.rest.next() {
                     None => {
                         self.current_pair = None;
@@ -133,11 +133,11 @@ pub fn operator(
                     None => {
                         loop_result = loop_result.and_then(|()| state.shift());
                     }
-                    Some(prev_binop) => match binop.item.compare_precedence(prev_binop) {
+                    Some(prev_binop) => match binop.item.compare_precedence(&prev_binop.item) {
                         Ordering::Less => {
                             state.reduce();
                         }
-                        Ordering::Equal => match (binop.item.assoc(), prev_binop.assoc()) {
+                        Ordering::Equal => match (binop.item.assoc(), prev_binop.item.assoc()) {
                             (ipso_syntax::Assoc::Left, ipso_syntax::Assoc::Left) => {
                                 state.reduce();
                             }

@@ -5,10 +5,11 @@ use crate::{
 };
 #[cfg(test)]
 use ipso_core::{
-    self as core, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig,
+    self as core, Binop, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember,
+    TypeSig,
 };
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, Binop};
+use ipso_syntax::kind::Kind;
 #[cfg(test)]
 use std::rc::Rc;
 

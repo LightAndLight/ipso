@@ -1,8 +1,8 @@
 mod test;
 
-use ipso_core::{Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{Binop, Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
 use ipso_rope::Rope;
-use ipso_syntax::{Binop, ModuleName};
+use ipso_syntax::ModuleName;
 use paste::paste;
 use std::{
     collections::HashMap,
@@ -1237,12 +1237,6 @@ where {
                         Value::False
                     }
                 }
-                Binop::Eq => todo!("eval eq"),
-                Binop::Neq => todo!("eval neq"),
-                Binop::Gt => todo!("eval gt"),
-                Binop::Gte => todo!("eval gte"),
-                Binop::Lt => todo!("eval lt"),
-                Binop::Lte => todo!("eval lte"),
                 Binop::RApply => {
                     let left = self.eval(env, a);
                     let right = self.eval(env, b);

@@ -1,6 +1,6 @@
 use crate::{metavariables, Implication, SolveConstraintContext, TypeError, Typechecker};
-use ipso_core::{self as core, Expr, Placeholder};
-use ipso_syntax::{kind::Kind, Binop};
+use ipso_core::{self as core, Binop, Expr, Placeholder};
+use ipso_syntax::kind::Kind;
 
 use super::Constraint;
 

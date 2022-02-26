@@ -24,10 +24,23 @@ fn all_left_associative() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
+        Spanned {
+            pos: 10,
+            item: Binop::Add,
+        },
         Expr::mk_binop(
-            Binop::Add,
-            Expr::mk_binop(Binop::Add, a.clone(), b.clone()),
+            Spanned {
+                pos: 6,
+                item: Binop::Add,
+            },
+            Expr::mk_binop(
+                Spanned {
+                    pos: 2,
+                    item: Binop::Add,
+                },
+                a.clone(),
+                b.clone(),
+            ),
             c.clone(),
         ),
         d.clone(),
@@ -83,12 +96,25 @@ fn all_right_associative() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Or,
+        Spanned {
+            pos: 2,
+            item: Binop::Or,
+        },
         a.clone(),
         Expr::mk_binop(
-            Binop::Or,
+            Spanned {
+                pos: 7,
+                item: Binop::Or,
+            },
             b.clone(),
-            Expr::mk_binop(Binop::Or, c.clone(), d.clone()),
+            Expr::mk_binop(
+                Spanned {
+                    pos: 12,
+                    item: Binop::Or,
+                },
+                c.clone(),
+                d.clone(),
+            ),
         ),
     ));
     let actual = operator(
@@ -138,8 +164,18 @@ fn precedence_higher_lower() {
         item: Expr::Int(3),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
-        Expr::mk_binop(Binop::Multiply, a.clone(), b.clone()),
+        Spanned {
+            pos: 6,
+            item: Binop::Add,
+        },
+        Expr::mk_binop(
+            Spanned {
+                pos: 2,
+                item: Binop::Multiply,
+            },
+            a.clone(),
+            b.clone(),
+        ),
         c.clone(),
     ));
     let actual = operator(
@@ -186,10 +222,23 @@ fn precedence_higher_lower_lower() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Eq,
+        Spanned {
+            pos: 10,
+            item: Binop::Eq,
+        },
         Expr::mk_binop(
-            Binop::Add,
-            Expr::mk_binop(Binop::Multiply, a.clone(), b.clone()),
+            Spanned {
+                pos: 6,
+                item: Binop::Add,
+            },
+            Expr::mk_binop(
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                a.clone(),
+                b.clone(),
+            ),
             c.clone(),
         ),
         d.clone(),
@@ -245,10 +294,23 @@ fn precedence_higher_lower_equal() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
+        Spanned {
+            pos: 10,
+            item: Binop::Add,
+        },
         Expr::mk_binop(
-            Binop::Add,
-            Expr::mk_binop(Binop::Multiply, a.clone(), b.clone()),
+            Spanned {
+                pos: 6,
+                item: Binop::Add,
+            },
+            Expr::mk_binop(
+                Spanned {
+                    pos: 2,
+                    item: Binop::Multiply,
+                },
+                a.clone(),
+                b.clone(),
+            ),
             c.clone(),
         ),
         d.clone(),
@@ -304,9 +366,26 @@ fn precedence_higher_lower_higher() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
-        Expr::mk_binop(Binop::Multiply, a.clone(), b.clone()),
-        Expr::mk_binop(Binop::Multiply, c.clone(), d.clone()),
+        Spanned {
+            pos: 6,
+            item: Binop::Add,
+        },
+        Expr::mk_binop(
+            Spanned {
+                pos: 2,
+                item: Binop::Multiply,
+            },
+            a.clone(),
+            b.clone(),
+        ),
+        Expr::mk_binop(
+            Spanned {
+                pos: 10,
+                item: Binop::Multiply,
+            },
+            c.clone(),
+            d.clone(),
+        ),
     ));
     let actual = operator(
         a,
@@ -355,9 +434,19 @@ fn precedence_lower_higher() {
         item: Expr::Int(3),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
+        Spanned {
+            pos: 2,
+            item: Binop::Add,
+        },
         a.clone(),
-        Expr::mk_binop(Binop::Multiply, b.clone(), c.clone()),
+        Expr::mk_binop(
+            Spanned {
+                pos: 6,
+                item: Binop::Multiply,
+            },
+            b.clone(),
+            c.clone(),
+        ),
     ));
     let actual = operator(
         a,
@@ -403,11 +492,24 @@ fn precedence_lower_higher_lower() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
+        Spanned {
+            pos: 10,
+            item: Binop::Add,
+        },
         Expr::mk_binop(
-            Binop::Add,
+            Spanned {
+                pos: 2,
+                item: Binop::Add,
+            },
             a.clone(),
-            Expr::mk_binop(Binop::Multiply, b.clone(), c.clone()),
+            Expr::mk_binop(
+                Spanned {
+                    pos: 6,
+                    item: Binop::Multiply,
+                },
+                b.clone(),
+                c.clone(),
+            ),
         ),
         d.clone(),
     ));
@@ -462,11 +564,24 @@ fn precedence_lower_higher_equal() {
         item: Expr::Int(4),
     };
     let expected = ParseResult::pure(Expr::mk_binop(
-        Binop::Add,
+        Spanned {
+            pos: 2,
+            item: Binop::Add,
+        },
         a.clone(),
         Expr::mk_binop(
-            Binop::Multiply,
-            Expr::mk_binop(Binop::Multiply, b.clone(), c.clone()),
+            Spanned {
+                pos: 10,
+                item: Binop::Multiply,
+            },
+            Expr::mk_binop(
+                Spanned {
+                    pos: 6,
+                    item: Binop::Multiply,
+                },
+                b.clone(),
+                c.clone(),
+            ),
             d.clone(),
         ),
     ));
