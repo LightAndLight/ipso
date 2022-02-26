@@ -720,33 +720,28 @@ fn check_class_2() {
         let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
-        let expected_context: HashMap<Rc<str>, core::ClassDeclaration> = {
+        let expected_class_decl: core::ClassDeclaration = {
             let a = core::Type::unsafe_mk_var(1, Kind::Type);
             let b = core::Type::unsafe_mk_var(0, Kind::Type);
-            vec![(
-                Rc::from("Wut"),
-                core::ClassDeclaration {
-                    supers: Vec::new(),
-                    args: vec![(Rc::from("a"), a.kind())],
-                    name: Rc::from("Wut"),
-                    members: vec![core::ClassMember {
-                        name: String::from("wut"),
-                        sig: core::TypeSig {
-                            ty_vars: vec![(Rc::from("b"), b.kind())],
-                            body: core::Type::arrow(
-                                tc.common_kinds,
-                                a,
-                                core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
-                            ),
-                        },
-                    }],
-                },
-            )]
-            .into_iter()
-            .collect()
+            core::ClassDeclaration {
+                supers: Vec::new(),
+                args: vec![(Rc::from("a"), a.kind())],
+                name: Rc::from("Wut"),
+                members: vec![core::ClassMember {
+                    name: String::from("wut"),
+                    sig: core::TypeSig {
+                        ty_vars: vec![(Rc::from("b"), b.kind())],
+                        body: core::Type::arrow(
+                            tc.common_kinds,
+                            a,
+                            core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
+                        ),
+                    },
+                }],
+            }
         };
 
-        assert_eq!(expected_context, tc.class_context);
+        assert_eq!(&expected_class_decl, tc.class_context.get("Wut").unwrap());
 
         let expected_member = {
             let wut_ty = core::Type::unsafe_mk_name(
