@@ -1,5 +1,6 @@
 use ipso_core::{
-    Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Type, TypeSig,
+    Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember, Module,
+    Type, TypeSig,
 };
 use ipso_syntax::kind::Kind;
 use std::collections::HashMap;
@@ -466,6 +467,26 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     },
                 }],
             }),
+            /*
+            instance Eq Int where
+              eq = eqInt
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Int,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqInt),
+                }],
+            },
         ],
     }
 }
