@@ -973,8 +973,8 @@ fn class_and_instance_1() {
             source: Source::Interactive {
                 label: String::from("(typechecker)"),
             },
+            pos: 0,
             context: Some(SolveConstraintContext {
-                pos: 0,
                 constraint: Type::mk_app(Type::Name(Rc::from("Eq")), Type::Int),
             }),
         });

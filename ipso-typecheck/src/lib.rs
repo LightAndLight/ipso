@@ -196,7 +196,6 @@ pub struct UnifyTypeContextRefs<'a> {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SolveConstraintContext {
-    pub pos: usize,
     pub constraint: syntax::Type<Rc<str>>,
 }
 
@@ -235,6 +234,7 @@ pub enum TypeError {
     },
     CannotDeduce {
         source: Source,
+        pos: usize,
         context: Option<SolveConstraintContext>,
     },
     ShadowedModuleName {
@@ -267,10 +267,7 @@ impl TypeError {
             TypeError::DuplicateClassArgument { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
-            TypeError::CannotDeduce { context, .. } => match context {
-                None => 0,
-                Some(context) => context.pos,
-            },
+            TypeError::CannotDeduce { pos, .. } => *pos,
             TypeError::ShadowedModuleName { pos, .. } => *pos,
         }
     }
@@ -1116,8 +1113,8 @@ impl<'modules> Typechecker<'modules> {
                 let superclass = superclass.instantiate_many(&args);
 
                 match evidence::solver::solve_constraint(
+                    name.pos,
                     &Some(SolveConstraintContext {
-                        pos: name.pos,
                         constraint: self.fill_ty_names(superclass.to_syntax()),
                     }),
                     self,

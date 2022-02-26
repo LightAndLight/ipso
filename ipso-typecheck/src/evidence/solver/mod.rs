@@ -20,6 +20,7 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core
 }
 
 pub fn solve_constraint(
+    pos: usize,
     context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     constraint: &Constraint,
@@ -66,8 +67,12 @@ pub fn solve_constraint(
                         let mut evidence = Ok(implication.evidence);
 
                         for antecedent in &implication.antecedents {
-                            match solve_constraint(context, tc, &Constraint::from_type(antecedent))
-                            {
+                            match solve_constraint(
+                                pos,
+                                context,
+                                tc,
+                                &Constraint::from_type(antecedent),
+                            ) {
                                 Err(err) => {
                                     evidence = Err(err);
                                     break;
@@ -93,6 +98,7 @@ pub fn solve_constraint(
 
             match result {
                 None => Err(TypeError::CannotDeduce {
+                    pos,
                     source: tc.source(),
                     context: context.clone(),
                 }),
@@ -107,6 +113,7 @@ pub fn solve_constraint(
                 core::Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
+                            pos,
                             context,
                             tc,
                             &Constraint::HasField {
@@ -116,6 +123,7 @@ pub fn solve_constraint(
                         )
                     } else {
                         let ev = solve_constraint(
+                            pos,
                             context,
                             tc,
                             &Constraint::HasField {
@@ -165,7 +173,7 @@ pub fn solve_constraint(
                                 // presence of ambiguity
                                 Kind::Row => {
                                     tc.unify_type(&core::Type::RowNil, rest)?;
-                                    solve_constraint(context, tc, constraint)
+                                    solve_constraint(pos, context, tc, constraint)
                                 }
                                 _ => match lookup_evidence(tc, constraint) {
                                     None => {
@@ -179,6 +187,7 @@ pub fn solve_constraint(
                             }
                         }
                         metavariables::Solution::Solved(sol) => solve_constraint(
+                            pos,
                             context,
                             tc,
                             &Constraint::HasField {
@@ -218,8 +227,8 @@ pub fn solve_placeholder(
     match evidence {
         None => {
             let expr = solve_constraint(
+                pos.unwrap_or(0),
                 &Some(SolveConstraintContext {
-                    pos: pos.unwrap_or(0),
                     constraint: tc.fill_ty_names(tc.zonk_type(constraint.to_type()).to_syntax()),
                 }),
                 tc,

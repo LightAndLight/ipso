@@ -25,7 +25,7 @@ fn solve_constraint_1() {
                 None,
             ),
         };
-        let expected = solve_constraint(&None, &mut tc, &constraint);
+        let expected = solve_constraint(0, &None, &mut tc, &constraint);
         let actual = Ok(Expr::Int(0));
         assert_eq!(expected, actual)
     })
@@ -44,7 +44,7 @@ fn solve_constraint_2() {
                 None,
             ),
         };
-        let expected = solve_constraint(&None, &mut tc, &constraint);
+        let expected = solve_constraint(0, &None, &mut tc, &constraint);
         let actual = Ok(Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0)));
         assert_eq!(expected, actual)
     })
@@ -74,7 +74,7 @@ fn solve_constraint_3() {
         };
 
         let expected_result = Ok(Expr::Int(2));
-        let actual_result = solve_constraint(&None, &mut tc, &constraint);
+        let actual_result = solve_constraint(0, &None, &mut tc, &constraint);
         assert_eq!(expected_result, actual_result);
 
         let expected_evidence = Evidence {
@@ -165,7 +165,7 @@ fn solve_constraint_4() {
             eq_ty,
             core::Type::app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
         ));
-        let actual = solve_constraint(&None, &mut tc, constraint);
+        let actual = solve_constraint(0, &None, &mut tc, constraint);
 
         assert_eq!(expected, actual)
     })
