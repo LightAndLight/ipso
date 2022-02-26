@@ -970,15 +970,97 @@ impl InferenceError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct InferredPattern {
-    pub pattern: Pattern,
-    pub names: Vec<(Rc<str>, Type)>,
-    pub ty: Type,
+pub enum InferredPattern {
+    Any {
+        pattern: Pattern,
+        names: Vec<(Rc<str>, Type)>,
+        ty: Type,
+    },
+    Variant {
+        /// Evidence for the variant's tag.
+        tag: Rc<Expr>,
+
+        /// The variant's constructor name.
+        ctor: Rc<str>,
+
+        /// The variant's argument name.
+        arg_name: Rc<str>,
+
+        /// The variant's argument type.
+        arg_ty: Type,
+
+        /// The row corresponding to the all the other constructors of the variant.
+        rest: Type,
+    },
 }
 
-struct CheckedPattern {
-    pattern: Pattern,
-    names: Vec<(Rc<str>, Type)>,
+impl InferredPattern {
+    pub fn ty(&self, common_kinds: &CommonKinds) -> Type {
+        match self {
+            InferredPattern::Any { ty, .. } => ty.clone(),
+            InferredPattern::Variant {
+                ctor, arg_ty, rest, ..
+            } => Type::mk_variant(
+                common_kinds,
+                vec![(ctor.clone(), arg_ty.clone())],
+                Some(rest.clone()),
+            ),
+        }
+    }
+
+    pub fn pattern(&self) -> Pattern {
+        match self {
+            InferredPattern::Any { pattern, .. } => pattern.clone(),
+            InferredPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
+        }
+    }
+
+    pub fn names(&self) -> Vec<(Rc<str>, Type)> {
+        match self {
+            InferredPattern::Any { names, .. } => names.clone(),
+            InferredPattern::Variant {
+                arg_name, arg_ty, ..
+            } => vec![(arg_name.clone(), arg_ty.clone())],
+        }
+    }
+}
+
+enum CheckedPattern {
+    Any {
+        pattern: Pattern,
+        names: Vec<(Rc<str>, Type)>,
+    },
+    Variant {
+        /// Evidence for the variant's tag.
+        tag: Rc<Expr>,
+
+        /// The variant's argument name.
+        arg_name: Rc<str>,
+
+        /// The variant's argument type.
+        arg_ty: Type,
+
+        /// The row corresponding to the all the other constructors of the variant.
+        rest: Type,
+    },
+}
+
+impl CheckedPattern {
+    fn pattern(&self) -> Pattern {
+        match self {
+            CheckedPattern::Any { pattern, .. } => pattern.clone(),
+            CheckedPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
+        }
+    }
+
+    fn names(&self) -> Vec<(Rc<str>, Type)> {
+        match self {
+            CheckedPattern::Any { names, .. } => names.clone(),
+            CheckedPattern::Variant {
+                arg_name, arg_ty, ..
+            } => vec![(arg_name.clone(), arg_ty.clone())],
+        }
+    }
 }
 
 /// Type inference context.
@@ -1152,7 +1234,7 @@ impl<'a> InferenceContext<'a> {
 
     fn infer_name_pattern(&mut self, name: &Spanned<String>) -> InferredPattern {
         let name_ty = self.fresh_type_meta(&Kind::Type);
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::Name,
             names: vec![(Rc::from(name.item.as_str()), name_ty.clone())],
             ty: name_ty,
@@ -1160,7 +1242,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn infer_string_pattern(&self, s: &Spanned<Rc<str>>) -> InferredPattern {
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::String(s.item.clone()),
             names: Vec::new(),
             ty: Type::String,
@@ -1168,7 +1250,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn infer_int_pattern(&self, n: &Spanned<u32>) -> InferredPattern {
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::Int(n.item),
             names: Vec::new(),
             ty: Type::Int,
@@ -1176,7 +1258,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn infer_char_pattern(&self, c: &Spanned<char>) -> InferredPattern {
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::Char(c.item),
             names: Vec::new(),
             ty: Type::Char,
@@ -1229,7 +1311,7 @@ impl<'a> InferenceContext<'a> {
             (names, names_tys)
         };
 
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::Record {
                 names,
                 rest: rest.is_some(),
@@ -1239,25 +1321,28 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    fn infer_variant_pattern(&mut self, name: &str, arg: &Spanned<String>) -> InferredPattern {
-        let name: Rc<str> = Rc::from(name);
-        let name_ty = self.fresh_type_meta(&Kind::Type);
+    fn infer_variant_pattern(&mut self, ctor: &str, arg: &Spanned<String>) -> InferredPattern {
+        let ctor: Rc<str> = Rc::from(ctor);
+        let arg_ty = self.fresh_type_meta(&Kind::Type);
         let rest_row = self.fresh_type_meta(&Kind::Row);
-        InferredPattern {
-            pattern: Pattern::mk_variant(Expr::Placeholder(self.evidence.placeholder(
-                None,
-                evidence::Constraint::HasField {
-                    field: name.clone(),
-                    rest: rest_row.clone(),
-                },
-            ))),
-            names: vec![(Rc::from(arg.item.as_str()), name_ty.clone())],
-            ty: Type::mk_variant(self.common_kinds, vec![(name, name_ty)], Some(rest_row)),
+        let tag = Expr::Placeholder(self.evidence.placeholder(
+            None,
+            evidence::Constraint::HasField {
+                field: ctor.clone(),
+                rest: rest_row.clone(),
+            },
+        ));
+        InferredPattern::Variant {
+            tag: Rc::new(tag),
+            ctor,
+            arg_name: Rc::from(arg.item.as_str()),
+            arg_ty,
+            rest: rest_row,
         }
     }
 
     fn infer_wildcard_pattern(&mut self) -> InferredPattern {
-        InferredPattern {
+        InferredPattern::Any {
             pattern: Pattern::Wildcard,
             names: Vec::new(),
             ty: self.fresh_type_meta(&Kind::Type),
@@ -1284,10 +1369,21 @@ impl<'a> InferenceContext<'a> {
         expected: &Type,
     ) -> Result<CheckedPattern, InferenceError> {
         let result = self.infer_pattern(&pattern.item);
-        self.unify(Some(pattern.pos), expected, &result.ty)?;
-        Ok(CheckedPattern {
-            pattern: result.pattern,
-            names: result.names,
+        self.unify(Some(pattern.pos), expected, &result.ty(self.common_kinds))?;
+        Ok(match result {
+            InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
+            InferredPattern::Variant {
+                tag,
+                arg_name,
+                arg_ty,
+                rest,
+                ..
+            } => CheckedPattern::Variant {
+                tag,
+                arg_name,
+                arg_ty,
+                rest,
+            },
         })
     }
 
@@ -1446,8 +1542,8 @@ impl<'a> InferenceContext<'a> {
                     .iter()
                     .flat_map(|arg| {
                         let result = self.infer_pattern(arg);
-                        inferred_args.push((result.pattern, result.ty));
-                        result.names.into_iter()
+                        inferred_args.push((result.pattern(), result.ty(self.common_kinds)));
+                        result.names().into_iter()
                     })
                     .collect();
 
@@ -1747,6 +1843,49 @@ impl<'a> InferenceContext<'a> {
         branches: &[syntax::Branch],
     ) -> Result<(Expr, Type), InferenceError> {
         let (expr, mut expr_ty) = self.infer(expr)?;
+
+        /*
+        [note: peeling constructors when matching on variants]
+
+        As each variant constructor is checked, the constructor needs to be 'peeled'
+        off the original expression type before checking the next branch.
+
+        When a catch-all pattern is reached, it can be assigned a variant type that's
+        missing all the constructors that have already been matched.
+
+        e.g.
+
+        ```
+        # expr : (| A : a, B : b, c : C, d : D |)
+        case expr of
+          # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
+          A x -> ...
+
+          # check that `B y` has type `(| B : b, c : C, d : D |)`
+          B y -> ...
+
+          # check that `c` has type `(| c : C, d : D |)`
+          c -> ...
+        ```
+
+        A consequence of this is that the tags associated with each variant pattern
+        aren't unique. The above example gives:
+
+        ```
+        case expr of
+          # A's tag is 0
+          A x -> ...
+
+          # B's tag is also 0 (because `B` is lexicographically the first constructor
+          # in `(| B : b, c : C, d : D |)`)
+          B y -> ...
+
+          c -> ...
+
+        The interpreter needs to account for this when checking pattern matches.
+        ```
+        */
+
         let out_ty = self.fresh_type_meta(&Kind::Type);
         let mut seen_ctors = FnvHashSet::default();
         let mut saw_catchall = false;
@@ -1764,18 +1903,21 @@ impl<'a> InferenceContext<'a> {
 
                 let result = self.check_pattern(&branch.pattern, &expr_ty)?;
 
-                self.variables.insert(&result.names);
-                let body = self.check(&branch.body, &out_ty)?;
-                self.variables.delete(result.names.len());
+                if let CheckedPattern::Variant { rest, .. } = &result {
+                    expr_ty = Type::app(Type::mk_variant_ctor(self.common_kinds), rest.clone())
+                }
 
-                if let Pattern::Wildcard | Pattern::Name = result.pattern {
+                let names = result.names();
+                self.variables.insert(&names);
+                let body = self.check(&branch.body, &out_ty)?;
+                self.variables.delete(names.len());
+
+                let pattern = result.pattern();
+                if let Pattern::Wildcard | Pattern::Name = pattern {
                     saw_catchall = true;
                 }
 
-                Ok(Branch {
-                    pattern: result.pattern,
-                    body,
-                })
+                Ok(Branch { pattern, body })
             })
             .collect::<Result<_, _>>()?;
         self.zonk_type_mut(&mut expr_ty);

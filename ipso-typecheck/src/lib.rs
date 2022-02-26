@@ -914,39 +914,33 @@ impl<'modules> Typechecker<'modules> {
         self.unify_type(
             ty,
             &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
-                core::Type::mk_arrow(self.common_kinds, &el.ty, &acc)
+                core::Type::mk_arrow(self.common_kinds, &el.ty(self.common_kinds), &acc)
             }),
         )?;
 
         let arg_bound_vars = arg_tys
             .iter()
-            .flat_map(|arg_ty| arg_ty.names.iter().cloned())
+            .flat_map(|arg_ty| arg_ty.names().into_iter())
             .collect::<Vec<_>>();
         self.bound_vars.insert(&arg_bound_vars);
         let body = self.check_type(body, &out_ty)?;
         self.bound_vars.delete(arg_bound_vars.len());
 
-        let body = arg_tys
-            .into_iter()
-            .rev()
-            .fold(body, |body, arg_ty| match &arg_ty.pattern {
+        let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
+            let pattern = arg_ty.pattern();
+            match &pattern {
                 core::Pattern::Char(_)
                 | core::Pattern::Int(_)
                 | core::Pattern::String(_)
                 | core::Pattern::Record { .. }
                 | core::Pattern::Variant { .. } => core::Expr::mk_lam(
                     true,
-                    core::Expr::mk_case(
-                        core::Expr::Var(0),
-                        vec![core::Branch {
-                            pattern: arg_ty.pattern,
-                            body,
-                        }],
-                    ),
+                    core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
                 ),
                 core::Pattern::Name => core::Expr::mk_lam(true, body),
                 core::Pattern::Wildcard => core::Expr::mk_lam(false, body),
-            });
+            }
+        });
 
         let (body, sig) = self.generalise(body, ty.clone())?;
         self.evidence = Evidence::new();

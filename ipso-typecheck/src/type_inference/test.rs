@@ -72,7 +72,7 @@ fn infer_pattern_1() {
         });
         assert_eq!(
             ctx.infer_pattern(&pattern),
-            InferredPattern {
+            InferredPattern::Any {
                 pattern: Pattern::Name,
                 names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
                 ty: Type::Meta(Kind::Type, 0),
@@ -101,7 +101,7 @@ fn infer_pattern_2() {
             ],
             rest: None,
         };
-        let expected = InferredPattern {
+        let expected = InferredPattern::Any {
             pattern: Pattern::Record {
                 names: vec![
                     Expr::mk_placeholder(0),
@@ -153,7 +153,7 @@ fn infer_pattern_3() {
                 item: String::from("w"),
             }),
         };
-        let expected = InferredPattern {
+        let expected = InferredPattern::Any {
             pattern: Pattern::Record {
                 names: vec![
                     Expr::mk_placeholder(0),
@@ -196,14 +196,12 @@ fn infer_pattern_4() {
                 item: String::from("x"),
             },
         };
-        let expected = InferredPattern {
-            pattern: Pattern::mk_variant(Expr::mk_placeholder(0)),
-            ty: Type::mk_variant(
-                ctx.common_kinds,
-                vec![(Rc::from("just"), Type::Meta(Kind::Type, 0))],
-                Some(Type::Meta(Kind::Row, 1)),
-            ),
-            names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
+        let expected = InferredPattern::Variant {
+            tag: Rc::new(Expr::mk_placeholder(0)),
+            ctor: Rc::from("just"),
+            arg_name: Rc::from("x"),
+            arg_ty: Type::Meta(Kind::Type, 0),
+            rest: Type::Meta(Kind::Row, 1),
         };
         let actual = ctx.infer_pattern(&pat);
         assert_eq!(expected, actual)
@@ -1106,7 +1104,7 @@ fn infer_case_3() {
                         (Rc::from("Left"), Type::Int),
                         (Rc::from("Right"), Type::Int),
                     ],
-                    Some(Type::Meta(Kind::Row, 6)),
+                    Some(Type::Meta(Kind::Row, 5)),
                 ),
                 &Type::Int,
             ),
