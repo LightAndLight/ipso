@@ -19,27 +19,24 @@
 * [Let Bindings](#let-bindings)
 * [Computation Expressions](#computation-expressions)
 * [Command Literals](#command-literals)
+* [Operators](#operators)
 * [Datatypes](#datatypes)
   * [Booleans](#booleans)
-    * [Builtins](#builtins)
   * [Integers](#integers)
-    * [Builtins](#builtins-1)
   * [Characters](#characters)
-    * [Builtins](#builtins-2)
+    * [Builtins](#builtins)
   * [Strings](#strings)
-    * [Builtins](#builtins-3)
+    * [Builtins](#builtins-1)
   * [Functions](#functions)
-    * [Builtins](#builtins-4)
   * [Arrays](#arrays)
-    * [Builtins](#builtins-5)
+    * [Builtins](#builtins-2)
   * [Byte Arrays](#byte-arrays)
-    * [Builtins](#builtins-6)
   * [Records](#records)
   * [Variants](#variants)
     * [Construction](#construction)
     * [Extension](#extension)
   * [IO](#io)
-    * [Builtins](#builtins-7)
+    * [Builtins](#builtins-3)
 * [Type Classes](#type-classes)
   * [Equality](#equality)
   * [Comparison](#comparison)
@@ -272,6 +269,40 @@ Cmd -> IO ()
 hello!
 ```
 
+## Operators
+
+```ipso
+== : Eq a => a -> a -> Bool
+
+!= : Eq a => a -> a -> Bool
+
+<= : Ord a => a -> a -> Bool
+
+< : Ord a => a -> a -> Bool
+
+>= : Ord a => a -> a -> Bool
+
+> : Ord a => a -> a -> Bool
+
+&& : Bool -> Bool -> Bool
+
+|| : Bool -> Bool -> Bool
+
++ : Int -> Int -> Int
+
+- : Int -> Int -> Int
+
+* : Int -> Int -> Int
+
+/ : Int -> Int -> Int
+
+++ : Array a -> Array a -> Array a
+
+<| : (a -> b) -> a -> b
+
+|> : a -> (a -> b) -> b
+```
+
 ## Datatypes
 
 ### Booleans
@@ -296,14 +327,6 @@ Bool
 "no"
 ```
 
-#### Builtins
-
-```ipso
-&& : Bool -> Bool -> Bool
-
-|| : Bool -> Bool -> Bool
-```
-
 ### Integers
 
 ```ipso-repl
@@ -319,20 +342,6 @@ Int
 ```ipso-repl
 > :type -1
 Int
-```
-
-#### Builtins
-
-```ipso
-+ : Int -> Int -> Int
-
-- : Int -> Int -> Int
-
-* : Int -> Int -> Int
-
-/ : Int -> Int -> Int
-
-eqInt : Int -> Int -> Bool
 ```
 
 ### Characters
@@ -352,8 +361,6 @@ Char
 #### Builtins
 
 ```ipso
-eqChar : Char -> Char -> Bool
-
 prev : Char -> Char
 
 next : Char -> Char
@@ -378,8 +385,6 @@ x : String
 #### Builtins
 
 ```ipso
-eqString : String -> String -> Bool
-
 foldr : (Char -> a -> a) -> a -> String -> a
 
 foldlString : (a -> Char -> a) -> a -> String -> a
@@ -431,14 +436,6 @@ f : { x : Int, y : Int } -> Int
 { x : Int, y : Int, z : Int } -> Int
 ```
 
-#### Builtins
-
-```ipso
-<| : (a -> b) -> a -> b
-
-|> : a -> (a -> b) -> b
-```
-
 ### Arrays
 
 ```ipso-repl
@@ -471,15 +468,11 @@ indexArray : Int -> Array a -> a
 
 sliceArray : Int -> Int -> Array a -> Array a
 
-(++) : Array a -> Array a -> Array a
-
 foldr : (a -> b -> b) -> b -> Array a -> b
 
 foldlArray : (b -> a -> b) -> b -> Array a -> b
 
 map : (a -> b) -> Array a -> Array b
-
-eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
 
 generateArray : Int -> (Int -> a) -> Array a
 ```
@@ -489,12 +482,6 @@ generateArray : Int -> (Int -> a) -> Array a
 ```ipso-repl
 > :kind Bytes
 Type
-```
-
-#### Builtins
-
-```ipso
-(++) : Bytes -> Bytes -> Bytes
 ```
 
 ### Records
@@ -586,9 +573,9 @@ readln : IO String
 
 ```ipso
 class Eq a where
-  (==) : a -> a -> Bool
+  eq : a -> a -> Bool
   
-(!=) : Eq a => a -> a -> Bool
+neq : Eq a => a -> a -> Bool
 ```
 
 ```ipso
@@ -607,13 +594,13 @@ instance Fields Eq row => Eq (Variant row)
 class Eq a => Ord a where
   compare : a -> a -> (| LT, EQ, GT |)
   
-(<=) : a -> a -> Bool
+lte : a -> a -> Bool
 
-(<) : a -> a -> Bool
+lt : a -> a -> Bool
 
-(>=) : a -> a -> Bool
+gte : a -> a -> Bool
 
-(>) : a -> a -> Bool
+gt : a -> a -> Bool
 ```
 
 ```ipso
