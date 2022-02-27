@@ -104,10 +104,10 @@ fn solve_constraint_4() {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&ClassDeclaration {
                 supers: Vec::new(),
-                name: Rc::from("Eq"),
+                name: Rc::from("MyEq"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![ClassMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     sig: {
                         TypeSig {
                             ty_vars: Vec::new(),
@@ -123,7 +123,7 @@ fn solve_constraint_4() {
         }
 
         let eq_ty = core::Type::unsafe_mk_name(
-            Rc::from("Eq"),
+            Rc::from("MyEq"),
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         tc.register_instance(
@@ -132,7 +132,7 @@ fn solve_constraint_4() {
             &Vec::new(),
             &core::Type::app(eq_ty.clone(), core::Type::Int),
             &[InstanceMember {
-                name: String::from("Eq"),
+                name: String::from("MyEq"),
                 body: Expr::Builtin(Builtin::EqInt),
             }],
         );
@@ -147,7 +147,7 @@ fn solve_constraint_4() {
                 core::Type::app(core::Type::mk_array(tc.common_kinds), a),
             ),
             &[InstanceMember {
-                name: String::from("Eq"),
+                name: String::from("MyEq"),
                 body: Expr::Builtin(Builtin::EqArray),
             }],
         );

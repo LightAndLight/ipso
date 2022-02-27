@@ -1,4 +1,7 @@
-use ipso_core::{Builtin, CommonKinds, Declaration, Expr, Module, Type, TypeSig};
+use ipso_core::{
+    Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember, Module,
+    Type, TypeSig,
+};
 use ipso_syntax::kind::Kind;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -371,7 +374,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::arrow(common_kinds, char_ty.clone(), bool_ty),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqChar),
@@ -427,7 +430,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         body: Type::arrow(
                             common_kinds,
                             Type::app(array_ty.clone(), a.clone()),
-                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty, a)),
+                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty.clone(), a)),
                         ),
                     }
                 },
@@ -443,6 +446,140 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Run),
+            },
+            /*
+            class Eq a where
+              eq : a -> a -> Bool
+             */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("Eq"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("eq"),
+                    sig: TypeSig {
+                        ty_vars: vec![],
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::arrow(common_kinds, Type::Var(Kind::Type, 0), bool_ty),
+                        ),
+                    },
+                }],
+            }),
+            /*
+            instance Eq Int where
+              eq = eqInt
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Int,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqInt),
+                }],
+            },
+            /*
+            instance Eq Char where
+              eq = eqChar
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Char,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqChar),
+                }],
+            },
+            /*
+            instance Eq String where
+              eq = eqString
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqString),
+                }],
+            },
+            /*
+            instance Eq Bool where
+              eq = eqBool
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Bool,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqBool),
+                }],
+            },
+            /*
+            instance Eq a where Eq (Array a) where
+              eq = eqArray eq
+             */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                superclass_constructors: vec![],
+                // Eq a
+                assumes: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Var(Kind::Type, 0),
+                )],
+                // Eq (Array a)
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::EqArray),
+                            Expr::mk_app(Expr::Name(String::from("eq")), Expr::Var(0)),
+                        ),
+                    ),
+                }],
             },
         ],
     }

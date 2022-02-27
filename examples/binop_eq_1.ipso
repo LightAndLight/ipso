@@ -1,0 +1,4 @@
+main : IO ()
+main =
+  comp
+    println (if 1 == 2 then "true" else "false")

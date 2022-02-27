@@ -2,7 +2,7 @@ not : Bool -> Bool
 not a = if a then false else true
 
 strip : String -> String
-strip = filterString (\c -> not (eqChar c '\n'))
+strip = filterString (\c -> not (c == '\n'))
 
 deleteAt : Int -> Array a -> Array a
 deleteAt target arr = 
@@ -34,7 +34,7 @@ readDigit c =
 
 readInt : String -> (| Err : (), Ok : Int |)
 readInt str =
-  if eqString "" str
+  if str == ""
   then Err ()
   else
     foldlString
@@ -62,11 +62,11 @@ parseCommand :
 parseCommand line =
   let stripped = strip line in
   let lines = splitString ' ' stripped in
-  if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "quit" then Quit ()
-  else if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "help" then Help ()
-  else if eqInt (lengthArray lines) 1 && eqString (indexArray 0 lines) "list" then List ()
-  else if eqInt (lengthArray lines) 2 && eqString (indexArray 0 lines) "add" then Add (indexArray 1 lines)
-  else if eqInt (lengthArray lines) 2 && eqString (indexArray 0 lines) "delete" then
+  if lengthArray lines == 1 && indexArray 0 lines == "quit" then Quit ()
+  else if lengthArray lines == 1 && indexArray 0 lines == "help" then Help ()
+  else if lengthArray lines == 1 && indexArray 0 lines == "list" then List ()
+  else if lengthArray lines == 2 && indexArray 0 lines == "add" then Add (indexArray 1 lines)
+  else if lengthArray lines == 2 && indexArray 0 lines == "delete" then
     case readInt (indexArray 1 lines) of
       Err err -> Invalid stripped
       Ok n -> Delete n
@@ -74,7 +74,7 @@ parseCommand line =
 
 writeTodos : Array String -> IO ()
 writeTodos todos =
-  if eqArray eqString [] todos
+  if todos == []
   then println "nothing to do"
   else
     foldlArray
