@@ -750,6 +750,7 @@ pub enum Builtin {
     FoldlString,
     SnocArray,
     Run,
+    EqBool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

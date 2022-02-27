@@ -1107,6 +1107,21 @@ where {
                     }
                 )
             }
+            Builtin::EqBool => function2!(
+                eq_bool,
+                self,
+                |_: &mut Interpreter<'_, '_, 'heap>,
+                 env: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let a = env[0].unpack_bool();
+                    let b = arg.unpack_bool();
+                    if a == b {
+                        Value::True
+                    } else {
+                        Value::False
+                    }
+                }
+            ),
         }
     }
 
