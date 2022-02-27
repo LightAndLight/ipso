@@ -852,7 +852,11 @@ impl<'modules> Typechecker<'modules> {
         })
     }
 
-    fn infer_kind(&mut self, ty: &syntax::Type<Rc<str>>) -> Result<(core::Type, Kind), TypeError> {
+    fn infer_kind(
+        &mut self,
+        pos: usize,
+        ty: &syntax::Type<Rc<str>>,
+    ) -> Result<(core::Type, Kind), TypeError> {
         let mut ctx = kind_inference::InferenceContext::new(
             self.common_kinds,
             &self.type_context,
@@ -861,7 +865,7 @@ impl<'modules> Typechecker<'modules> {
         );
         kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
             source: self.source(),
-            pos: self.current_position(),
+            pos,
             error,
         })
     }
@@ -1056,7 +1060,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         assumes: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Spanned<Rc<str>>,
-        args: &[syntax::Type<Rc<str>>],
+        args: &[Spanned<syntax::Type<Rc<str>>>],
         members: &[(
             Spanned<String>,
             Vec<Spanned<syntax::Pattern>>,
@@ -1075,13 +1079,13 @@ impl<'modules> Typechecker<'modules> {
         let name_item: Rc<str> = Rc::from(name.item.as_ref());
 
         let head = args.iter().fold(syntax::Type::Name(name_item), |acc, el| {
-            syntax::Type::mk_app(acc, el.clone())
+            syntax::Type::mk_app(acc, el.item.clone())
         });
 
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
             let mut seen_names: HashSet<&str> = HashSet::new();
             args.iter()
-                .flat_map(|arg| arg.iter_vars())
+                .flat_map(|arg| arg.item.iter_vars())
                 .filter_map(|name| {
                     if !seen_names.contains(name.as_ref()) {
                         seen_names.insert(name);
@@ -1098,7 +1102,7 @@ impl<'modules> Typechecker<'modules> {
         let args: Vec<core::Type> = args
             .iter()
             .map(|arg| {
-                let res = self.infer_kind(arg)?;
+                let res = self.infer_kind(arg.pos, &arg.item)?;
                 Ok(res.0)
             })
             .collect::<Result<_, TypeError>>()?;

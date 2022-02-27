@@ -4,7 +4,11 @@ mod test;
 
 use crate::{
     between, choices,
-    grammar::{expr::expr, pattern::pattern, r#type::type_},
+    grammar::{
+        expr::expr,
+        pattern::pattern,
+        r#type::{type_, type_atom},
+    },
     indent, indent_scope, keep_left, keep_right, many, many_, map0, optional, sep_by, spanned,
     ParseResult, Parser,
 };
@@ -250,7 +254,7 @@ pub fn instance_member(
 /**
 ```text
 instance ::=
-  'instance' assumptions ctor type* 'where' instance_member*
+  'instance' assumptions ctor type_atom* 'where' instance_member*
 ```
 */
 pub fn instance(parser: &mut Parser) -> ParseResult<Declaration> {
@@ -259,7 +263,12 @@ pub fn instance(parser: &mut Parser) -> ParseResult<Declaration> {
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Instance)),
             indent!(parser, Relation::Gt, assumptions(parser)).and_then(|assumes| {
                 spanned!(parser, indent!(parser, Relation::Gt, parser.ctor())).and_then(|name| {
-                    many!(indent!(parser, Relation::Gt, type_(parser))).and_then(|args| {
+                    many!(indent!(
+                        parser,
+                        Relation::Gt,
+                        spanned!(parser, type_atom(parser))
+                    ))
+                    .and_then(|args| {
                         keep_right!(
                             indent!(parser, Relation::Gt, parser.keyword(&Keyword::Where)),
                             indent!(
