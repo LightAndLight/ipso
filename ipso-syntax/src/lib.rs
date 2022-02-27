@@ -487,7 +487,7 @@ pub enum Declaration {
     Instance {
         assumes: Vec<Spanned<Type<Rc<str>>>>,
         name: Spanned<Rc<str>>,
-        args: Vec<Type<Rc<str>>>,
+        args: Vec<Spanned<Type<Rc<str>>>>,
         members: Vec<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)>,
     },
     TypeAlias {

@@ -259,7 +259,12 @@ pub fn instance(parser: &mut Parser) -> ParseResult<Declaration> {
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Instance)),
             indent!(parser, Relation::Gt, assumptions(parser)).and_then(|assumes| {
                 spanned!(parser, indent!(parser, Relation::Gt, parser.ctor())).and_then(|name| {
-                    many!(indent!(parser, Relation::Gt, type_(parser))).and_then(|args| {
+                    many!(indent!(
+                        parser,
+                        Relation::Gt,
+                        spanned!(parser, type_(parser))
+                    ))
+                    .and_then(|args| {
                         keep_right!(
                             indent!(parser, Relation::Gt, parser.keyword(&Keyword::Where)),
                             indent!(
