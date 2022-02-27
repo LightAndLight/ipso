@@ -508,6 +508,26 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 }],
             },
             /*
+            instance Eq String where
+              eq = eqString
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqString),
+                }],
+            },
+            /*
             instance Eq a where Eq (Array a) where
               eq = eqArray eq
              */
