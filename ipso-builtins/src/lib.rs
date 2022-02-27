@@ -512,9 +512,12 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 ),
                 members: vec![InstanceMember {
                     name: String::from("eq"),
-                    body: Expr::mk_app(
-                        Expr::Builtin(Builtin::EqArray),
-                        Expr::Name(String::from("eq")),
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::EqArray),
+                            Expr::mk_app(Expr::Name(String::from("eq")), Expr::Var(0)),
+                        ),
                     ),
                 }],
             },
