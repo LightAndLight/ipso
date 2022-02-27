@@ -1,21 +1,37 @@
 # Project Management
 
-We use [GitHub issues](https://github.com/features/issues) to track project work.
+<!-- omit in toc -->
+## Contents
+
+* [Issues](#issues)
+  * [Content](#content)
+  * [Branching](#branching)
+* [Projects](#projects)
+  * [Design](#design)
+  * [Features](#features)
 
 ## Issues
+
+We use [GitHub issues](https://github.com/features/issues) to track project work.
 
 Issues belong to one of 2 projects:
 
 * [*Design*](#design)
 * [*Features*](#features)
 
-### Issue Content
+### Content
 
-Every issue should provide enough context as to be self-contained. We can work more efficiently when we don't need to ask person who filed the issue for more details.
+Every issue should provide enough context as to be self-contained. We can work more efficiently when
+we don't need to ask the issue creator for more details.
 
 For example, bug reports should provide replication instructions and features should provide acceptance criteria.
 
 Each [Project](#projects) has a more specific description of how its issues should be written.
+
+### Branching
+
+When an issue requires changes to the repository, the changes are tracked in a branch
+named `issue/<ISSUE NUMBER>`.
 
 ## Projects
 

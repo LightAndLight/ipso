@@ -829,7 +829,10 @@ fn check_instance_1() {
                         pos: 9,
                         item: Rc::from("Eq"),
                     },
-                    args: vec![Type::Unit],
+                    args: vec![Spanned {
+                        pos: 11,
+                        item: Type::Unit,
+                    }],
                     members: vec![(
                         Spanned {
                             pos: 22,
@@ -941,7 +944,10 @@ fn class_and_instance_1() {
                     pos: 0,
                     item: Rc::from("MyEq"),
                 },
-                args: vec![Type::Int],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::Int,
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -964,7 +970,10 @@ fn class_and_instance_1() {
                     pos: 0,
                     item: Rc::from("MyOrd"),
                 },
-                args: vec![Type::Int],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::Int,
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -1125,7 +1134,10 @@ fn class_and_instance_2() {
                     pos: 0,
                     item: Rc::from("MyEq"),
                 },
-                args: vec![Type::Int],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::Int,
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -1151,7 +1163,10 @@ fn class_and_instance_2() {
                     pos: 0,
                     item: Rc::from("MyEq"),
                 },
-                args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::mk_app(Type::Array, Type::Var(Rc::from("a"))),
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -1243,7 +1258,10 @@ fn class_and_instance_2() {
                     pos: 0,
                     item: Rc::from("MyOrd"),
                 },
-                args: vec![Type::mk_app(Type::Array, Type::Var(Rc::from("a")))],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::mk_app(Type::Array, Type::Var(Rc::from("a"))),
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
@@ -1327,7 +1345,10 @@ fn class_and_instance_2() {
                     pos: 0,
                     item: Rc::from("MyOrd"),
                 },
-                args: vec![Type::Int],
+                args: vec![Spanned {
+                    pos: 0,
+                    item: Type::Int,
+                }],
                 members: vec![(
                     Spanned {
                         pos: 0,
