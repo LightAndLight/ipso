@@ -581,6 +581,44 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                 }],
             },
+            /*
+            class Eq a => Ord a where
+              compare : a -> a -> (| Less : (), Equal : (), Greater : () |)
+             */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Name(Kind::Type, Rc::from("a")),
+                )],
+                name: Rc::from("Ord"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("compare"),
+                    sig: TypeSig {
+                        ty_vars: vec![],
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::arrow(
+                                common_kinds,
+                                Type::Var(Kind::Type, 0),
+                                Type::mk_variant(
+                                    common_kinds,
+                                    vec![
+                                        (Rc::from("Less"), Type::Unit),
+                                        (Rc::from("Equal"), Type::Unit),
+                                        (Rc::from("Greater"), Type::Unit),
+                                    ],
+                                    None,
+                                ),
+                            ),
+                        ),
+                    },
+                }],
+            }),
         ],
     }
 }
