@@ -1,4 +1,3 @@
 #! /usr/bin/env bash
 
-ipso_path=$(nix develop .#tests -c which ipso)
-nix develop .#tests -c ipso-golden --bin $ipso_path --dir examples "$@"
+nix develop .#tests -c ipso-golden --dir examples "$@"
