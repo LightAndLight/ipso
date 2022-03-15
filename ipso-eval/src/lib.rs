@@ -1000,6 +1000,32 @@ where {
                     }
                 )
             }
+            Builtin::CompareChar => {
+                function2!(
+                    compare_char,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let c1 = env[0].unpack_char();
+                        let c2 = arg.unpack_char();
+                        match c1.cmp(&c2) {
+                            std::cmp::Ordering::Less => {
+                                // Less () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(2, Value::Unit))
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(0, Value::Unit))
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(1, Value::Unit))
+                            }
+                        }
+                    }
+                )
+            }
             Builtin::SplitString => {
                 function2!(
                     split_string,

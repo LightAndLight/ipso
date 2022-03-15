@@ -667,6 +667,29 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                 }],
             },
+            /*
+            instance Ord Char where
+              compare = compareChar
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq Char
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Char,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::Builtin(Builtin::CompareChar),
+                }],
+            },
         ],
     }
 }
