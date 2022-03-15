@@ -619,6 +619,54 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     },
                 }],
             }),
+            /*
+            instance Ord Bool where
+              compare a b =
+                if a
+                then if b then EQ () else GT ()
+                else if b then LT () else EQ ()
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq Bool
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Bool,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_ifthenelse(
+                                Expr::Var(1),
+                                Expr::mk_ifthenelse(
+                                    Expr::Var(0),
+                                    // EQ () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
+                                    // GT () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(1)), Expr::Unit),
+                                ),
+                                Expr::mk_ifthenelse(
+                                    Expr::Var(0),
+                                    // LT () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(2)), Expr::Unit),
+                                    // EQ () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
+                                ),
+                            ),
+                        ),
+                    ),
+                }],
+            },
         ],
     }
 }
