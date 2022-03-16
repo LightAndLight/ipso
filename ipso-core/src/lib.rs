@@ -744,6 +744,7 @@ pub enum Builtin {
     IndexArray,
     SliceArray,
     EqString,
+    CompareString,
     FilterString,
     EqChar,
     CompareChar,

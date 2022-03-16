@@ -766,6 +766,32 @@ where {
                     }
                 )
             }
+            Builtin::CompareString => {
+                function2!(
+                    compare_string,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let a = env[0].unpack_string();
+                        let b = arg.unpack_string();
+                        match a.cmp(b) {
+                            std::cmp::Ordering::Less => {
+                                // Less () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(2, Value::Unit))
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(0, Value::Unit))
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(1, Value::Unit))
+                            }
+                        }
+                    }
+                )
+            }
             Builtin::EqInt => {
                 function2!(
                     eq_int,
