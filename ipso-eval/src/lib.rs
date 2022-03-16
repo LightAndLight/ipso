@@ -5,6 +5,7 @@ use ipso_rope::Rope;
 use ipso_syntax::ModuleName;
 use paste::paste;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fmt::Debug,
     io::{self, BufRead},
@@ -557,6 +558,23 @@ where {
         self.values.alloc_extend(vals)
     }
 
+    pub fn alloc_ordering(&self, ordering: Ordering) -> Value<'heap> {
+        match ordering {
+            std::cmp::Ordering::Less => {
+                // Less () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(2, Value::Unit))
+            }
+            std::cmp::Ordering::Equal => {
+                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(0, Value::Unit))
+            }
+            std::cmp::Ordering::Greater => {
+                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(1, Value::Unit))
+            }
+        }
+    }
+
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
         match name {
             Builtin::Pure => {
@@ -766,6 +784,19 @@ where {
                     }
                 )
             }
+            Builtin::CompareString => {
+                function2!(
+                    compare_string,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let a = env[0].unpack_string();
+                        let b = arg.unpack_string();
+                        interpreter.alloc_ordering(a.cmp(b))
+                    }
+                )
+            }
             Builtin::EqInt => {
                 function2!(
                     eq_int,
@@ -780,6 +811,19 @@ where {
                         } else {
                             Value::False
                         }
+                    }
+                )
+            }
+            Builtin::CompareInt => {
+                function2!(
+                    compare_int,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        interpreter.alloc_ordering(a.cmp(&b))
                     }
                 )
             }
@@ -837,6 +881,77 @@ where {
                             acc = Value::False;
                         }
                         acc
+                    }
+                )
+            }
+            Builtin::CompareArray => {
+                function3!(
+                    compare_array,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let f = env[0];
+                        let a = env[1].unpack_array();
+                        let b = arg.unpack_array();
+
+                        let a_len = a.len();
+                        let b_len = b.len();
+                        let mut index = 0;
+                        let mut ordering = Ordering::Equal;
+
+                        loop {
+                            fn unpack_ordering(value: &Value) -> Ordering {
+                                let (tag, _) = value.unpack_variant();
+                                match tag {
+                                    // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                    0 => Ordering::Equal,
+                                    // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                    1 => Ordering::Greater,
+                                    // Less () : (| Equal : (), Greater : (), Less : () |)
+                                    2 => Ordering::Less,
+                                    tag => panic!("unexpected tag {}", tag),
+                                }
+                            }
+
+                            if index < a_len {
+                                if index < b_len {
+                                    // precondition: a[0..index] == b[0..index]
+                                    match unpack_ordering(
+                                        &f.apply(interpreter, a[index])
+                                            .apply(interpreter, b[index]),
+                                    ) {
+                                        Ordering::Less => {
+                                            ordering = Ordering::Less;
+                                            break;
+                                        }
+                                        Ordering::Equal => {
+                                            index += 1;
+                                            continue;
+                                        }
+                                        Ordering::Greater => {
+                                            ordering = Ordering::Greater;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // `a` contains more elements than `b` and we have reached the
+                                    // end of `b`
+                                    ordering = Ordering::Greater;
+                                    break;
+                                }
+                            } else {
+                                // we have reached the end of `a`
+                                if index < b_len {
+                                    // and `b` still has more elements
+                                    ordering = Ordering::Less;
+                                } else {
+                                    // and we have reached the end of `b`
+                                }
+                                break;
+                            }
+                        }
+                        interpreter.alloc_ordering(ordering)
                     }
                 )
             }
@@ -997,6 +1112,19 @@ where {
                         } else {
                             Value::False
                         }
+                    }
+                )
+            }
+            Builtin::CompareChar => {
+                function2!(
+                    compare_char,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let c1 = env[0].unpack_char();
+                        let c2 = arg.unpack_char();
+                        interpreter.alloc_ordering(c1.cmp(&c2))
                     }
                 )
             }

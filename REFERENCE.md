@@ -592,7 +592,7 @@ instance Fields Eq row => Eq (Variant row)
 
 ```ipso
 class Eq a => Ord a where
-  compare : a -> a -> (| LT, EQ, GT |)
+  compare : a -> a -> (| Less : (), Equal : (), Greater : () |)
   
 lte : a -> a -> Bool
 

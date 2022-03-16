@@ -1,0 +1,14 @@
+showCompare : (| Less : (), Equal : (), Greater : () |) -> String
+showCompare c =
+  case c of
+    Less x -> "Less"
+    Equal x -> "Equal"
+    Greater x -> "Greater"
+
+main : IO ()
+main =
+  comp
+    println <| showCompare (compare 0 0)
+    println <| showCompare (compare 0 10)
+    println <| showCompare (compare 10 0)
+    println <| showCompare (compare 10 10)

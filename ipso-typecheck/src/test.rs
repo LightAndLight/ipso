@@ -563,10 +563,10 @@ fn check_class_1() {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             Ok(Some(core::Declaration::Class(core::ClassDeclaration {
                 supers: Vec::new(),
-                name: Rc::from("Eq"),
+                name: Rc::from("MyEq"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![ClassMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     sig: TypeSig {
                         ty_vars: vec![],
                         body: core::Type::arrow(
@@ -579,8 +579,8 @@ fn check_class_1() {
             })))
         };
         /*
-        class Eq a where
-          eq : a -> a -> Bool
+        class MyEq a where
+          myeq : a -> a -> Bool
         */
         let actual = tc.check_declaration(
             &mut HashMap::new(),
@@ -588,13 +588,13 @@ fn check_class_1() {
                 pos: 0,
                 item: syntax::Declaration::Class {
                     supers: Vec::new(),
-                    name: Rc::from("Eq"),
+                    name: Rc::from("MyEq"),
                     args: vec![Spanned {
                         pos: 9,
                         item: Rc::from("a"),
                     }],
                     members: vec![(
-                        String::from("eq"),
+                        String::from("myeq"),
                         Type::mk_arrow(
                             Type::Var(Rc::from("a")),
                             Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
@@ -608,37 +608,32 @@ fn check_class_1() {
         let decl = actual.unwrap().unwrap();
         tc.register_declaration(&decl);
 
-        let expected_context: HashMap<Rc<str>, core::ClassDeclaration> = {
+        let expected_class: core::ClassDeclaration = {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
-            vec![(
-                Rc::from("Eq"),
-                core::ClassDeclaration {
-                    supers: Vec::new(),
-                    args: vec![(Rc::from("a"), a.kind())],
-                    name: Rc::from("Eq"),
-                    members: vec![core::ClassMember {
-                        name: String::from("eq"),
-                        sig: core::TypeSig {
-                            ty_vars: vec![],
-                            body: core::Type::arrow(
-                                tc.common_kinds,
-                                a.clone(),
-                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
-                            ),
-                        },
-                    }],
-                },
-            )]
-            .into_iter()
-            .collect()
+            core::ClassDeclaration {
+                supers: Vec::new(),
+                args: vec![(Rc::from("a"), a.kind())],
+                name: Rc::from("MyEq"),
+                members: vec![core::ClassMember {
+                    name: String::from("myeq"),
+                    sig: core::TypeSig {
+                        ty_vars: vec![],
+                        body: core::Type::arrow(
+                            tc.common_kinds,
+                            a.clone(),
+                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
+                        ),
+                    },
+                }],
+            }
         };
 
-        assert_eq!(expected_context, tc.class_context);
+        assert_eq!(&expected_class, tc.class_context.get("MyEq").unwrap());
 
         let expected_member = {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             let eq_ty = core::Type::unsafe_mk_name(
-                Rc::from("Eq"),
+                Rc::from("MyEq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
             (
@@ -662,7 +657,7 @@ fn check_class_1() {
         };
         assert_eq!(
             Some(&expected_member),
-            tc.registered_bindings.get(&String::from("eq"))
+            tc.registered_bindings.get(&String::from("myeq"))
         );
     })
 }
