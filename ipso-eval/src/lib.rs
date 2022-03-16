@@ -5,6 +5,7 @@ use ipso_rope::Rope;
 use ipso_syntax::ModuleName;
 use paste::paste;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fmt::Debug,
     io::{self, BufRead},
@@ -557,6 +558,23 @@ where {
         self.values.alloc_extend(vals)
     }
 
+    pub fn alloc_ordering(&self, ordering: Ordering) -> Value<'heap> {
+        match ordering {
+            std::cmp::Ordering::Less => {
+                // Less () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(2, Value::Unit))
+            }
+            std::cmp::Ordering::Equal => {
+                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(0, Value::Unit))
+            }
+            std::cmp::Ordering::Greater => {
+                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(1, Value::Unit))
+            }
+        }
+    }
+
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
         match name {
             Builtin::Pure => {
@@ -775,20 +793,7 @@ where {
                      arg: Value<'heap>| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
-                        match a.cmp(b) {
-                            std::cmp::Ordering::Less => {
-                                // Less () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(2, Value::Unit))
-                            }
-                            std::cmp::Ordering::Equal => {
-                                // Equal () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(0, Value::Unit))
-                            }
-                            std::cmp::Ordering::Greater => {
-                                // Greater () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(1, Value::Unit))
-                            }
-                        }
+                        interpreter.alloc_ordering(a.cmp(b))
                     }
                 )
             }
@@ -818,20 +823,7 @@ where {
                      arg: Value<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
-                        match a.cmp(&b) {
-                            std::cmp::Ordering::Less => {
-                                // Less () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(2, Value::Unit))
-                            }
-                            std::cmp::Ordering::Equal => {
-                                // Equal () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(0, Value::Unit))
-                            }
-                            std::cmp::Ordering::Greater => {
-                                // Greater () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(1, Value::Unit))
-                            }
-                        }
+                        interpreter.alloc_ordering(a.cmp(&b))
                     }
                 )
             }
@@ -1061,20 +1053,7 @@ where {
                      arg: Value<'heap>| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
-                        match c1.cmp(&c2) {
-                            std::cmp::Ordering::Less => {
-                                // Less () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(2, Value::Unit))
-                            }
-                            std::cmp::Ordering::Equal => {
-                                // Equal () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(0, Value::Unit))
-                            }
-                            std::cmp::Ordering::Greater => {
-                                // Greater () : (| Equal : (), Greater : (), Less : () |)
-                                interpreter.alloc(Object::Variant(1, Value::Unit))
-                            }
-                        }
+                        interpreter.alloc_ordering(c1.cmp(&c2))
                     }
                 )
             }
