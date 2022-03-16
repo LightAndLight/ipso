@@ -809,6 +809,32 @@ where {
                     }
                 )
             }
+            Builtin::CompareInt => {
+                function2!(
+                    compare_int,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        match a.cmp(&b) {
+                            std::cmp::Ordering::Less => {
+                                // Less () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(2, Value::Unit))
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(0, Value::Unit))
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                interpreter.alloc(Object::Variant(1, Value::Unit))
+                            }
+                        }
+                    }
+                )
+            }
             Builtin::LtInt => {
                 function2!(
                     lt_int,
