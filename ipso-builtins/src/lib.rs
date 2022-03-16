@@ -736,6 +736,64 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     body: Expr::Builtin(Builtin::CompareInt),
                 }],
             },
+            /*
+            instance Ord a => Ord (Array a) where
+              compare = compareArray compare
+             */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                superclass_constructors: vec![
+                    /*
+                    dict : Ord a -> Eq (Array a)
+                    dict = \ordDict -> { 0 = eqArray (eq ordDict.0) }
+                    */
+                    Expr::mk_lam(
+                        true,
+                        Expr::mk_record(
+                            vec![(
+                                Expr::Int(0),
+                                Expr::mk_app(
+                                    Expr::Builtin(Builtin::EqArray),
+                                    Expr::mk_app(
+                                        Expr::Name(String::from("eq")),
+                                        Expr::mk_project(Expr::Var(0), Expr::Int(0)),
+                                    ),
+                                ),
+                            )],
+                            None,
+                        )
+                    ),
+                ],
+                assumes: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Var(Kind::Type, 0),
+                )],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::app(
+                        Type::Array(Kind::mk_arrow(&Kind::Type, &Kind::Type)),
+                        Type::Var(Kind::Type, 0),
+                    ),
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: 
+                    // \ordDict -> compareArray (compare ordDict)
+                    Expr::mk_lam(
+                        true,
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::CompareArray),
+                            Expr::mk_app(Expr::Name(String::from("compare")), Expr::Var(0)),
+                        ),
+                    ),
+                }],
+            },
         ],
     }
 }

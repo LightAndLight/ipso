@@ -884,6 +884,77 @@ where {
                     }
                 )
             }
+            Builtin::CompareArray => {
+                function3!(
+                    compare_array,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let f = env[0];
+                        let a = env[1].unpack_array();
+                        let b = arg.unpack_array();
+
+                        let a_len = a.len();
+                        let b_len = b.len();
+                        let mut index = 0;
+                        let mut ordering = Ordering::Equal;
+
+                        loop {
+                            fn unpack_ordering(value: &Value) -> Ordering {
+                                let (tag, _) = value.unpack_variant();
+                                match tag {
+                                    // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                    0 => Ordering::Equal,
+                                    // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                    1 => Ordering::Greater,
+                                    // Less () : (| Equal : (), Greater : (), Less : () |)
+                                    2 => Ordering::Less,
+                                    tag => panic!("unexpected tag {}", tag),
+                                }
+                            }
+
+                            if index < a_len {
+                                if index < b_len {
+                                    // precondition: a[0..index] == b[0..index]
+                                    match unpack_ordering(
+                                        &f.apply(interpreter, a[index])
+                                            .apply(interpreter, b[index]),
+                                    ) {
+                                        Ordering::Less => {
+                                            ordering = Ordering::Less;
+                                            break;
+                                        }
+                                        Ordering::Equal => {
+                                            index += 1;
+                                            continue;
+                                        }
+                                        Ordering::Greater => {
+                                            ordering = Ordering::Greater;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // `a` contains more elements than `b` and we have reached the
+                                    // end of `b`
+                                    ordering = Ordering::Greater;
+                                    break;
+                                }
+                            } else {
+                                // we have reached the end of `a`
+                                if index < b_len {
+                                    // and `b` still has more elements
+                                    ordering = Ordering::Less;
+                                } else {
+                                    // and we have reached the end of `b`
+                                }
+                                break;
+                            }
+                        }
+                        interpreter.alloc_ordering(ordering)
+                    }
+                )
+            }
             Builtin::LtArray => {
                 function3!(
                     lt_array,
