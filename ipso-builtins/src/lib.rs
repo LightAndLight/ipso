@@ -761,7 +761,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                 ),
                             )],
                             None,
-                        )
+                        ),
                     ),
                 ],
                 assumes: vec![Type::app(
@@ -783,9 +783,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 ),
                 members: vec![InstanceMember {
                     name: String::from("compare"),
-                    body: 
                     // \ordDict -> compareArray (compare ordDict)
-                    Expr::mk_lam(
+                    body: Expr::mk_lam(
                         true,
                         Expr::mk_app(
                             Expr::Builtin(Builtin::CompareArray),
@@ -793,6 +792,54 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         ),
                     ),
                 }],
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("neq"),
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Eq"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    // \eqDict a b -> if eq eqDict a b then false else true
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_ifthenelse(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("eq")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    Expr::False,
+                                    Expr::True,
+                                ),
+                            ),
+                        ),
+                    )),
+                }
             },
         ],
     }
