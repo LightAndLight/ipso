@@ -1,8 +1,5 @@
-not : Bool -> Bool
-not a = if a then false else true
-
 strip : String -> String
-strip = filterString (\c -> not (c == '\n'))
+strip = filterString (\c -> c != '\n')
 
 deleteAt : Int -> Array a -> Array a
 deleteAt target arr = 
