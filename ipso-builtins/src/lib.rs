@@ -174,19 +174,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::EqInt),
             },
-            // ltInt : Int -> Int -> Bool
-            Declaration::Definition {
-                name: String::from("ltInt"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::LtInt),
-            },
             // showInt : Int -> String
             Declaration::Definition {
                 name: String::from("showInt"),
@@ -223,34 +210,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::EqArray),
-            },
-            // ltArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
-            Declaration::Definition {
-                name: String::from("ltArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::arrow(
-                                common_kinds,
-                                a.clone(),
-                                Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
-                            ),
-                            Type::arrow(
-                                common_kinds,
-                                Type::app(array_ty.clone(), a.clone()),
-                                Type::arrow(
-                                    common_kinds,
-                                    Type::app(array_ty.clone(), a),
-                                    bool_ty.clone(),
-                                ),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::LtArray),
             },
             // foldlArray : (b -> a -> b) -> b -> Array a -> b
             Declaration::Definition {
