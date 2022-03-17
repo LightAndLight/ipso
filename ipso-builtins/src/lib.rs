@@ -1036,6 +1036,71 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     )),
                 }
             },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("gte"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Less () -> False
+                        _ -> True
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Less () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(2)),
+                                            },
+                                            body: Expr::False,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::True,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
         ],
     }
 }
