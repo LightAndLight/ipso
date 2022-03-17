@@ -6,12 +6,12 @@ strip = filterString (\c -> not (c == '\n'))
 
 deleteAt : Int -> Array a -> Array a
 deleteAt target arr = 
-  if ltInt target (lengthArray arr)
+  if target < lengthArray arr
   then
     generateArray 
       (lengthArray arr - 1) 
       (\ix ->
-        if ltInt ix target
+        if ix < target
         then indexArray ix arr
         else indexArray (ix + 1) arr
       )

@@ -174,19 +174,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::EqInt),
             },
-            // ltInt : Int -> Int -> Bool
-            Declaration::Definition {
-                name: String::from("ltInt"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::LtInt),
-            },
             // showInt : Int -> String
             Declaration::Definition {
                 name: String::from("showInt"),

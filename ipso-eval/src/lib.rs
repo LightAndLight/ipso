@@ -827,23 +827,6 @@ where {
                     }
                 )
             }
-            Builtin::LtInt => {
-                function2!(
-                    lt_int,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        if a < b {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
-                    }
-                )
-            }
             Builtin::ShowInt => {
                 function1!(
                     show_int,

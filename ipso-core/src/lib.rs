@@ -735,7 +735,6 @@ pub enum Builtin {
     Readln,
     EqInt,
     CompareInt,
-    LtInt,
     ShowInt,
     FoldlArray,
     EqArray,
