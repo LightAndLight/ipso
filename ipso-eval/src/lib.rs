@@ -938,46 +938,6 @@ where {
                     }
                 )
             }
-            Builtin::LtArray => {
-                function3!(
-                    lt_array,
-                    self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let lt = env[0];
-                        let a = env[1].unpack_array();
-                        let b = arg.unpack_array();
-
-                        let mut ix = 0;
-                        let a_len = a.len();
-                        let b_len = b.len();
-                        loop {
-                            // the prefix of a matches the prefix of b
-                            if ix < a_len {
-                                if ix < b_len {
-                                    let a_val = a[ix];
-                                    let b_val = b[ix];
-                                    if lt.apply(eval, a_val).apply(eval, b_val).unpack_bool() {
-                                        ix += 1;
-                                    } else {
-                                        return Value::False;
-                                    }
-                                } else {
-                                    // a is longer than b
-                                    return Value::False;
-                                }
-                            } else if ix < b_len {
-                                // a is shorter than b
-                                return Value::True;
-                            } else {
-                                // a is the same length as b
-                                return Value::False;
-                            }
-                        }
-                    }
-                )
-            }
             Builtin::FoldlArray => {
                 function3!(
                     foldl_array,
