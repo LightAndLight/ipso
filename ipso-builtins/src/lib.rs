@@ -1,6 +1,6 @@
 use ipso_core::{
-    Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember, Module,
-    Type, TypeSig,
+    Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember,
+    Module, Pattern, Type, TypeSig,
 };
 use ipso_syntax::kind::Kind;
 use std::collections::HashMap;
@@ -761,7 +761,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                 ),
                             )],
                             None,
-                        )
+                        ),
                     ),
                 ],
                 assumes: vec![Type::app(
@@ -783,9 +783,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 ),
                 members: vec![InstanceMember {
                     name: String::from("compare"),
-                    body: 
                     // \ordDict -> compareArray (compare ordDict)
-                    Expr::mk_lam(
+                    body: Expr::mk_lam(
                         true,
                         Expr::mk_app(
                             Expr::Builtin(Builtin::CompareArray),
@@ -793,6 +792,314 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         ),
                     ),
                 }],
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("neq"),
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Eq"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    // \eqDict a b -> if eq eqDict a b then false else true
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_ifthenelse(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("eq")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    Expr::False,
+                                    Expr::True,
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("lt"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Less () -> True
+                        _ -> False
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Less () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(2)),
+                                            },
+                                            body: Expr::True,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::False,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("lte"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Greater () -> False
+                        _ -> True
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(1)),
+                                            },
+                                            body: Expr::False,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::True,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("gt"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Greater () -> True
+                        _ -> False
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(1)),
+                                            },
+                                            body: Expr::True,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::False,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("gte"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Less () -> False
+                        _ -> True
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Less () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(2)),
+                                            },
+                                            body: Expr::False,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::True,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
             },
         ],
     }
