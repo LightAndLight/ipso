@@ -1,0 +1,9 @@
+showBool : Bool -> String
+showBool b = if b then "true" else "false"
+
+main : IO ()
+main =
+  comp
+    println <| showBool (0 > 1)
+    println <| showBool (1 > 1)
+    println <| showBool (1 > 0)
