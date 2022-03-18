@@ -245,7 +245,7 @@ impl<'heap> Object<'heap> {
         }
     }
 
-    pub fn unpack_cmd(&'heap self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&'heap self) -> &'heap [Rc<str>] {
         match self {
             Object::Cmd(values) => values,
             val => panic!("expected command, got {:?}", val),
@@ -429,7 +429,7 @@ impl<'heap> Value<'heap> {
         self.unpack_object().unpack_variant()
     }
 
-    pub fn unpack_cmd(&self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&self) -> &'heap [Rc<str>] {
         self.unpack_object().unpack_cmd()
     }
 
