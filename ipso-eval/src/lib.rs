@@ -10,10 +10,26 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
-    process,
+    process::{self, ExitStatus},
     rc::Rc,
 };
 use typed_arena::Arena;
+
+fn check_exit_status(cmd: &str, status: &ExitStatus) {
+    match status.code() {
+        Some(code) => {
+            if code == 0 {
+            } else {
+                println!("process {:?} exited with code {:?}", cmd, code);
+                process::exit(1);
+            }
+        }
+        None => {
+            println!("process {:?} terminated unexpectedly", cmd);
+            process::exit(1);
+        }
+    }
+}
 
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
@@ -1146,23 +1162,9 @@ where {
                                         process::exit(1);
                                     });
 
-                                match status.code() {
-                                    Some(code) => {
-                                        if code == 0 {
-                                            Value::Unit
-                                        } else {
-                                            println!(
-                                                "process {:?} exited with code {:?}",
-                                                cmd[0], code
-                                            );
-                                            process::exit(1);
-                                        }
-                                    }
-                                    None => {
-                                        println!("process {:?} terminated unexpectedly", cmd[0]);
-                                        process::exit(1);
-                                    }
-                                }
+                                check_exit_status(&cmd[0], &status);
+
+                                Value::Unit
                             }
                         }
                         let env = interpreter.alloc_values({
