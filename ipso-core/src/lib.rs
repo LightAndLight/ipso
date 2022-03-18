@@ -753,6 +753,7 @@ pub enum Builtin {
     SnocArray,
     Run,
     EqBool,
+    Lines,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
