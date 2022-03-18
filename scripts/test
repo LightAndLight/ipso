@@ -1,5 +1,6 @@
 #! /usr/bin/env bash
+set -e
 
 nix develop -c cargo test
-nix develop .#tests -c ./scripts/golden
-nix develop .#tests -c ./scripts/shebang
+./scripts/golden
+./scripts/shebang

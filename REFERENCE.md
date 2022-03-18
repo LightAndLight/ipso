@@ -1,48 +1,47 @@
 # `ipso` language reference
 
+<!-- omit in toc -->
 ## Contents
 
-- [`ipso` language reference](#ipso-language-reference)
-  - [Contents](#contents)
-  - [Packages](#packages)
-    - [Using Packages](#using-packages)
-  - [Modules](#modules)
-    - [Comments](#comments)
-    - [Declarations](#declarations)
-    - [Type Aliases](#type-aliases)
-    - [Imports](#imports)
-      - [Basic Imports](#basic-imports)
-      - [Renaming Imports](#renaming-imports)
-      - [Selective Imports](#selective-imports)
-      - [Wildcard Imports](#wildcard-imports)
-    - [Execution](#execution)
-  - [Pattern Matching](#pattern-matching)
-  - [Let Bindings](#let-bindings)
-  - [Computation Expressions](#computation-expressions)
-  - [Datatypes](#datatypes)
-    - [Booleans](#booleans)
-    - [Integers](#integers)
-      - [Builtins](#builtins)
-    - [Characters](#characters)
-      - [Builtins](#builtins-1)
-    - [Strings](#strings)
-      - [Builtins](#builtins-2)
-    - [Functions](#functions)
-    - [Arrays](#arrays)
-      - [Builtins](#builtins-3)
-    - [Byte Arrays](#byte-arrays)
-      - [Builtins](#builtins-4)
-    - [Records](#records)
-    - [Variants](#variants)
-      - [Construction](#construction)
-      - [Extension](#extension)
-    - [IO](#io)
-      - [Builtins](#builtins-5)
-  - [Type Classes](#type-classes)
-    - [Equality](#equality)
-    - [Comparison](#comparison)
-    - [JSON](#json)
-  - [Grammar](#grammar)
+* [Packages](#packages)
+  * [Using Packages](#using-packages)
+* [Modules](#modules)
+  * [Comments](#comments)
+  * [Declarations](#declarations)
+  * [Type Aliases](#type-aliases)
+  * [Imports](#imports)
+    * [Basic Imports](#basic-imports)
+    * [Renaming Imports](#renaming-imports)
+    * [Selective Imports](#selective-imports)
+    * [Wildcard Imports](#wildcard-imports)
+  * [Execution](#execution)
+* [Pattern Matching](#pattern-matching)
+* [Let Bindings](#let-bindings)
+* [Computation Expressions](#computation-expressions)
+* [Command Literals](#command-literals)
+* [Operators](#operators)
+* [Datatypes](#datatypes)
+  * [Booleans](#booleans)
+  * [Integers](#integers)
+  * [Characters](#characters)
+    * [Builtins](#builtins)
+  * [Strings](#strings)
+    * [Builtins](#builtins-1)
+  * [Functions](#functions)
+  * [Arrays](#arrays)
+    * [Builtins](#builtins-2)
+  * [Byte Arrays](#byte-arrays)
+  * [Records](#records)
+  * [Variants](#variants)
+    * [Construction](#construction)
+    * [Extension](#extension)
+  * [IO](#io)
+    * [Builtins](#builtins-3)
+* [Type Classes](#type-classes)
+  * [Equality](#equality)
+  * [Comparison](#comparison)
+  * [JSON](#json)
+* [Grammar](#grammar)
     
 ## Packages
 
@@ -163,7 +162,7 @@ hello
 
 ```ipso-repl
 > x = None
-x : forall r. < None | r >
+x : forall r. (| None, r |)
 > case x of
 .   None -> 1
 .   _ -> 2
@@ -173,7 +172,7 @@ x : forall r. < None | r >
 
 ```ipso-repl
 > x = None
-x : forall r. < None | r >
+x : forall r. (| None, r |)
 > case x of
 .   None -> 1
 .
@@ -182,8 +181,8 @@ x : forall r. < None | r >
 ```
 
 ```ipso-repl
-> x = None : < None >
-x : < None >
+> x = None : (| None |)
+x : (| None |)
 > case x of
 .   None -> 1
 .
@@ -197,6 +196,24 @@ x : < None >
 .   _ -> "something else"
 .
 "a"
+```
+
+```ipso-repl
+> case 1 of
+.   0 -> "0"
+.   1 -> "1"
+.   _ -> "something else"
+.
+"1"
+```
+
+```ipso-repl
+> case "true" of
+.   "false" -> 0
+.   "true" -> 1
+.   _ -> 2
+.
+1
 ```
 
 ## Let Bindings
@@ -224,6 +241,66 @@ IO ()
 .   return x
 .
 IO String
+```
+
+## Command Literals
+
+```ipso-repl
+> :kind Cmd
+Type
+```
+
+```ipso-repl
+> :t `ls -laR`
+Cmd
+```
+
+```ipso-repl
+> :t run
+Cmd -> IO () 
+```
+
+```ipso-repl
+> run ``
+```
+
+```ipso-repl
+> run `echo "hello!"`
+hello!
+```
+
+## Operators
+
+```ipso
+== : Eq a => a -> a -> Bool
+
+!= : Eq a => a -> a -> Bool
+
+<= : Ord a => a -> a -> Bool
+
+< : Ord a => a -> a -> Bool
+
+>= : Ord a => a -> a -> Bool
+
+> : Ord a => a -> a -> Bool
+
+&& : Bool -> Bool -> Bool
+
+|| : Bool -> Bool -> Bool
+
++ : Int -> Int -> Int
+
+- : Int -> Int -> Int
+
+* : Int -> Int -> Int
+
+/ : Int -> Int -> Int
+
+++ : Array a -> Array a -> Array a
+
+<| : (a -> b) -> a -> b
+
+|> : a -> (a -> b) -> b
 ```
 
 ## Datatypes
@@ -267,26 +344,6 @@ Int
 Int
 ```
 
-#### Builtins
-
-```ipso
-(+) : Int -> Int -> Int
-
-add : Int -> Int -> Int
-
-(-) : Int -> Int -> Int
-
-subtract : Int -> Int -> Int
-
-(*) : Int -> Int -> Int
-
-multiply : Int -> Int -> Int
-
-(/) : Int -> Int -> Int
-
-eqInt : Int -> Int -> Bool
-```
-
 ### Characters
 
 The `Char` type represents a unicode code point.
@@ -304,8 +361,6 @@ Char
 #### Builtins
 
 ```ipso
-eqChar : Char -> Char -> Bool
-
 prev : Char -> Char
 
 next : Char -> Char
@@ -330,8 +385,6 @@ x : String
 #### Builtins
 
 ```ipso
-eqString : String -> String -> Bool
-
 foldr : (Char -> a -> a) -> a -> String -> a
 
 foldlString : (a -> Char -> a) -> a -> String -> a
@@ -403,11 +456,11 @@ Array Int
 ```ipso
 cons : a -> Array a -> Array a
 
-uncons : Array a -> < None | Some : { first : a, rest : Array a } >
+uncons : Array a -> (| None, Some : { first : a, rest : Array a } |)
 
 snocArray : Array a -> a -> Array a
 
-unsnoc : Array a -> < None | Some : { rest : Array a, last : a } >
+unsnoc : Array a -> (| None, Some : { rest : Array a, last : a } |)
 
 lengthArray : Array a -> Int
 
@@ -415,15 +468,11 @@ indexArray : Int -> Array a -> a
 
 sliceArray : Int -> Int -> Array a -> Array a
 
-(++) : Array a -> Array a -> Array a
-
 foldr : (a -> b -> b) -> b -> Array a -> b
 
 foldlArray : (b -> a -> b) -> b -> Array a -> b
 
 map : (a -> b) -> Array a -> Array b
-
-eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
 
 generateArray : Int -> (Int -> a) -> Array a
 ```
@@ -433,12 +482,6 @@ generateArray : Int -> (Int -> a) -> Array a
 ```ipso-repl
 > :kind Bytes
 Type
-```
-
-#### Builtins
-
-```ipso
-(++) : Bytes -> Bytes -> Bytes
 ```
 
 ### Records
@@ -479,14 +522,14 @@ b : Bool
 
 ```ipso-repl
 > :t None
-forall r. < None | r >
+forall r. (| None, r |)
 ```
 
 #### Extension
 
 ```ipso-repl
-> :t \x -> < A | x >
-< r > -> < A : a | r >
+> :t \x -> (| A, ..x |)
+(| r |) -> (| A : a, r |)
 ```
 
 ### IO
@@ -504,20 +547,10 @@ hello
 hello
 ```
 
-```ipso-repl
-> :kind Stdout
-Type
-```
-
-```ipso-repl
-> :info IOError
-type IOError = < EBADF | EINTR | ENOSPC | EIO >
-```
-
 #### Builtins
 
 ```ipso
-pureIO : a -> IO a
+pure : a -> IO a
 
 mapIO : (a -> b) -> IO a -> IO b
 
@@ -525,9 +558,13 @@ bindIO : IO a -> (a -> IO b) -> IO b
 ```
 
 ```ipso
-writeStdout : Stdout -> Bytes -> IO < Err : IOError | Ok : () >
+println : String -> IO ()
 
-flushStdout : Stdout -> IO < Err : IOError | Ok : () >
+print : String -> IO ()
+```
+
+```ipso
+readln : IO String
 ```
 
 ## Type Classes
@@ -536,9 +573,9 @@ flushStdout : Stdout -> IO < Err : IOError | Ok : () >
 
 ```ipso
 class Eq a where
-  (==) : a -> a -> Bool
+  eq : a -> a -> Bool
   
-(!=) : Eq a => a -> a -> Bool
+neq : Eq a => a -> a -> Bool
 ```
 
 ```ipso
@@ -555,15 +592,15 @@ instance Fields Eq row => Eq (Variant row)
 
 ```ipso
 class Eq a => Ord a where
-  compare : a -> a -> < LT | EQ | GT >
+  compare : a -> a -> (| Less : (), Equal : (), Greater : () |)
   
-(<=) : a -> a -> Bool
+lte : a -> a -> Bool
 
-(<) : a -> a -> Bool
+lt : a -> a -> Bool
 
-(>=) : a -> a -> Bool
+gte : a -> a -> Bool
 
-(>) : a -> a -> Bool
+gt : a -> a -> Bool
 ```
 
 ```ipso
@@ -596,7 +633,7 @@ instance Fields ToJson row => ToJson (Record row)
 class FromJson a where
   decoder : Decoder a
   
-fromJson : FromJson a => String -> < Err : DecodeError | Ok : a >
+fromJson : FromJson a => String -> (| Err : DecodeError, Ok : a |)
 ```
 
 ```ipso
@@ -657,7 +694,7 @@ type_record_content ::=
   ident
   
 type_variant ::=
-  '<' type_variant_content '>'
+  '(|' type_variant_content '|)'
   
 type_variant_content ::=
   epsilon |
@@ -744,6 +781,7 @@ atom ::=
   record |
   ident |
   ctor |
+  cmd |
   '(' expr ')'
   
 bool ::=
@@ -785,6 +823,21 @@ record_content ::=
   
 record_item ::=
   ident '=' expr
+
+cmd_char ::=
+  (any ascii character except '`', '$', '"', '\')
+  '\' '`'
+  '\' '$'
+  '\' '"'
+  '\' '\'
+
+cmd_part ::=
+  cmd_char+
+  '$' ident
+  '$' '{' expr '}'
+
+cmd ::= 
+  '`' cmd_part* '`'
 
 
 decl ::=

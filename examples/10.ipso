@@ -1,6 +1,6 @@
 main : IO ()
 main = 
-  bindIO (readLineStdin stdin) (\x -> 
-  bindIO (readLineStdin stdin) (\y ->
-  writeStdout stdout (toUtf8 "$x$y")
+  bindIO readln (\x -> 
+  bindIO readln (\y ->
+  print "$x$y"
   ))

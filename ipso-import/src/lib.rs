@@ -35,7 +35,7 @@ impl ModuleError {
             } => diagnostic.item(
                 Some(Location {
                     source: source.clone(),
-                    offset: *pos,
+                    offset: Some(*pos),
                 }),
                 Message {
                     content: String::from("module not found"),
@@ -80,7 +80,7 @@ fn desugar_module_accessors_comp_line(module_names: &Rope<String>, line: &mut sy
         syntax::CompLine::Bind(_, value) => {
             desugar_module_accessors_expr(module_names, &mut value.item);
         }
-        syntax::CompLine::Return(value) => {
+        syntax::CompLine::Let(_, value) => {
             desugar_module_accessors_expr(module_names, &mut value.item);
         }
     }
@@ -97,7 +97,7 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
         syntax::Expr::Lam { args, body } => {
             let module_names = {
                 let mut module_names = module_names.clone();
-                for name in args.iter().flat_map(|pattern| pattern.iter_names()) {
+                for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
                     module_names = module_names
                         .delete_first(|x| x == &name.item)
                         .unwrap_or_else(|x| x);
@@ -193,6 +193,7 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
         syntax::Expr::Comp(lines) => lines
             .iter_mut()
             .for_each(|line| desugar_module_accessors_comp_line(module_names, line)),
+        syntax::Expr::Cmd(_) => {}
     }
 }
 
@@ -208,7 +209,7 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
                 let mut module_names = module_names
                     .delete_first(|x| x == name)
                     .unwrap_or_else(|x| x);
-                for name in args.iter().flat_map(|pattern| pattern.iter_names()) {
+                for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
                     module_names = module_names
                         .delete_first(|x| x == &name.item)
                         .unwrap_or_else(|x| x);
@@ -230,7 +231,7 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
                         .clone()
                         .delete_first(|x| x == &name.item)
                         .unwrap_or_else(|x| x);
-                    for name in args.iter().flat_map(|pattern| pattern.iter_names()) {
+                    for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
                         module_names = module_names
                             .delete_first(|x| x == &name.item)
                             .unwrap_or_else(|x| x);

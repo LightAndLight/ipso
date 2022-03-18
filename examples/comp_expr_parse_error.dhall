@@ -7,7 +7,7 @@
     ''
     comp_expr_parse_error.ipso:4:3: error: expected one of: indent (> 2)
       |
-    4 |   bind x <- readLineStdin stdin
+    4 |   bind x <- readln
       |   ^
     '',
   exitcode = 1

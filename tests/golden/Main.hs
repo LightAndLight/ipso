@@ -3,9 +3,11 @@
 module Main where
 
 import Test.Ipso.Common (Config(..), displayError, examplesMain, eqExitCode, runDiff)
+import Control.Applicative (optional)
 import Control.Monad (unless)
 import Data.IORef (modifyIORef, newIORef, readIORef)
 import Data.Foldable (for_)
+import Data.Maybe (fromMaybe)
 import Data.Semigroup (Option (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -35,12 +37,13 @@ exampleDecoder path =
         <*> Dhall.field "stderr" Dhall.strictText
         <*> Dhall.field "exitcode" Dhall.natural
 
-runExample :: Config String -> Example -> IO (Either String ())
+runExample :: Config (Maybe FilePath) -> Example -> IO (Either String ())
 runExample config example = do
   let args = foldr ((:) . Text.unpack) [] $ exArgs example
+  let ipsoPath = fromMaybe "ipso" (cfgRest config)
   (exitCode, stdout, stderr) <-
     readProcessWithExitCode
-      (cfgRest config)
+      ipsoPath
       args
       (maybe "" Text.unpack $ exStdin example)
 
@@ -73,13 +76,14 @@ runExample config example = do
       Just err -> Left err
       Nothing -> Right ()
 
-binParser :: Parser String
+binParser :: Parser (Maybe FilePath)
 binParser =
-    strOption
+  optional
+    (strOption
       ( long "bin"
           <> help "path to binary"
           <> metavar "PATH"
-      )
+      ))
 
 main :: IO ()
 main = examplesMain binParser exampleDecoder runExample

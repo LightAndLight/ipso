@@ -3,13 +3,11 @@ pub mod kind;
 mod test;
 pub mod r#type;
 
-pub use r#type::Type;
-
-use lazy_static::lazy_static;
 use quickcheck::Arbitrary;
-use std::{hash::Hash, rc::Rc};
+pub use r#type::Type;
+use std::{cmp::Ordering, hash::Hash, rc::Rc};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
     pub pos: usize,
     pub item: A,
@@ -34,7 +32,6 @@ pub enum Keyword {
     Let,
     In,
     Comp,
-    Return,
     Bind,
 }
 
@@ -58,7 +55,6 @@ impl Arbitrary for Keyword {
             Keyword::Let,
             Keyword::In,
             Keyword::Comp,
-            Keyword::Return,
             Keyword::Bind,
         ])
         .unwrap()
@@ -67,7 +63,7 @@ impl Arbitrary for Keyword {
 
 impl Keyword {
     pub fn num_variants() -> usize {
-        19
+        18
     }
 
     pub fn matches(&self, actual: &str) -> bool {
@@ -93,24 +89,52 @@ impl Keyword {
             Keyword::Let => "let",
             Keyword::In => "in",
             Keyword::Comp => "comp",
-            Keyword::Return => "return",
             Keyword::Bind => "bind",
+        }
+    }
+
+    pub fn from_string(str: &str) -> Option<Self> {
+        match str {
+            "case" => Some(Keyword::Case),
+            "of" => Some(Keyword::Of),
+            "if" => Some(Keyword::If),
+            "then" => Some(Keyword::Then),
+            "else" => Some(Keyword::Else),
+            "true" => Some(Keyword::True),
+            "false" => Some(Keyword::False),
+            "import" => Some(Keyword::Import),
+            "as" => Some(Keyword::As),
+            "from" => Some(Keyword::From),
+            "type" => Some(Keyword::Type),
+            "class" => Some(Keyword::Class),
+            "instance" => Some(Keyword::Instance),
+            "where" => Some(Keyword::Where),
+            "let" => Some(Keyword::Let),
+            "in" => Some(Keyword::In),
+            "comp" => Some(Keyword::Comp),
+            "bind" => Some(Keyword::Bind),
+            _ => None,
         }
     }
 }
 
-lazy_static! {
-    static ref KEYWORDS: Vec<&'static str> = vec![
-        "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where",
-        "class", "instance", "let", "in"
-    ];
-}
+const KEYWORDS: &[&str] = &[
+    "case", "of", "if", "then", "else", "true", "false", "import", "as", "from", "where", "type",
+    "class", "instance", "let", "in", "comp", "bind",
+];
 
 pub fn is_keyword(val: &str) -> bool {
     KEYWORDS.contains(&val)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Assoc {
+    None,
+    Left,
+    Right,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 pub enum Binop {
     Add,
     Multiply,
@@ -128,6 +152,79 @@ pub enum Binop {
     Gte,
     Lt,
     Lte,
+
+    LApply,
+    RApply,
+}
+
+impl Binop {
+    pub fn assoc(&self) -> Assoc {
+        match self {
+            Binop::Add => Assoc::Left,
+            Binop::Multiply => Assoc::Left,
+            Binop::Subtract => Assoc::Left,
+            Binop::Divide => Assoc::Left,
+            Binop::Append => Assoc::Left,
+            Binop::Or => Assoc::Right,
+            Binop::And => Assoc::Right,
+            Binop::Eq => Assoc::None,
+            Binop::Neq => Assoc::None,
+            Binop::Gt => Assoc::None,
+            Binop::Gte => Assoc::None,
+            Binop::Lt => Assoc::None,
+            Binop::Lte => Assoc::None,
+            Binop::LApply => Assoc::Right,
+            Binop::RApply => Assoc::Left,
+        }
+    }
+
+    fn precedence(&self) -> u16 {
+        match self {
+            Binop::Multiply => 7,
+            Binop::Divide => 7,
+
+            Binop::Add => 6,
+            Binop::Subtract => 6,
+            Binop::Append => 6,
+
+            Binop::Eq => 5,
+            Binop::Neq => 5,
+            Binop::Gt => 5,
+            Binop::Gte => 5,
+            Binop::Lt => 5,
+            Binop::Lte => 5,
+
+            Binop::Or => 4,
+            Binop::And => 4,
+
+            Binop::LApply => 3,
+            Binop::RApply => 3,
+        }
+    }
+
+    pub fn compare_precedence(&self, other: &Binop) -> Ordering {
+        self.precedence().cmp(&other.precedence())
+    }
+
+    pub fn render(&self) -> &'static str {
+        match self {
+            Binop::Add => "+",
+            Binop::Multiply => "*",
+            Binop::Subtract => "-",
+            Binop::Divide => "/",
+            Binop::Append => "++",
+            Binop::Or => "||",
+            Binop::And => "&&",
+            Binop::Eq => "==",
+            Binop::Neq => "!=",
+            Binop::Gt => ">",
+            Binop::Gte => ">=",
+            Binop::Lt => "<",
+            Binop::Lte => "<=",
+            Binop::LApply => "<|",
+            Binop::RApply => "|>",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -148,6 +245,8 @@ pub enum Pattern {
         arg: Spanned<String>,
     },
     Char(Spanned<char>),
+    Int(Spanned<u32>),
+    String(Spanned<Rc<str>>),
     Wildcard,
 }
 
@@ -181,6 +280,8 @@ impl<'a> Iterator for IterNames<'a> {
                     }
                     Pattern::Variant { name: _, arg } => Some(arg),
                     Pattern::Char(_) => None,
+                    Pattern::Int(_) => None,
+                    Pattern::String(_) => None,
                     Pattern::Wildcard => None,
                 }
             }
@@ -217,6 +318,8 @@ impl Pattern {
                 arg_names.push(arg);
             }
             Pattern::Char(_) => {}
+            Pattern::Int(_) => {}
+            Pattern::String(_) => {}
             Pattern::Wildcard => {}
         }
         arg_names
@@ -241,7 +344,7 @@ impl ModuleName {
 pub enum CompLine {
     Expr(Spanned<Expr>),
     Bind(Rc<str>, Spanned<Expr>),
-    Return(Spanned<Expr>),
+    Let(Rc<str>, Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -254,7 +357,7 @@ pub enum Expr {
 
     App(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
     Lam {
-        args: Vec<Pattern>,
+        args: Vec<Spanned<Pattern>>,
         body: Rc<Spanned<Expr>>,
     },
 
@@ -270,7 +373,7 @@ pub enum Expr {
 
     Int(u32),
 
-    Binop(Binop, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
+    Binop(Spanned<Binop>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
     Char(char),
 
@@ -284,13 +387,15 @@ pub enum Expr {
     },
     Project(Rc<Spanned<Expr>>, String),
 
-    Variant(String),
-    Embed(String, Rc<Spanned<Expr>>),
+    Variant(Spanned<String>),
+    Embed(Spanned<String>, Rc<Spanned<Expr>>),
     Case(Rc<Spanned<Expr>>, Vec<Branch>),
 
     Unit,
 
     Comp(Vec<CompLine>),
+
+    Cmd(Vec<Rc<str>>),
 }
 
 impl Expr {
@@ -306,7 +411,7 @@ impl Expr {
         Expr::Var(String::from(v))
     }
 
-    pub fn mk_lam(args: Vec<Pattern>, body: Spanned<Expr>) -> Expr {
+    pub fn mk_lam(args: Vec<Spanned<Pattern>>, body: Spanned<Expr>) -> Expr {
         Expr::Lam {
             args,
             body: Rc::new(body),
@@ -324,6 +429,13 @@ impl Expr {
         }
     }
 
+    pub fn mk_binop(op: Spanned<Binop>, a: Spanned<Expr>, b: Spanned<Expr>) -> Spanned<Expr> {
+        Spanned {
+            pos: a.pos,
+            item: Expr::Binop(op, Rc::new(a), Rc::new(b)),
+        }
+    }
+
     pub fn mk_record(fields: Vec<(String, Spanned<Expr>)>, rest: Option<Spanned<Expr>>) -> Expr {
         Expr::Record {
             fields,
@@ -331,7 +443,7 @@ impl Expr {
         }
     }
 
-    pub fn mk_embed(ctor: String, rest: Spanned<Expr>) -> Expr {
+    pub fn mk_embed(ctor: Spanned<String>, rest: Spanned<Expr>) -> Expr {
         Expr::Embed(ctor, Rc::new(rest))
     }
 
@@ -363,7 +475,7 @@ pub enum Declaration {
     Definition {
         name: String,
         ty: Type<Rc<str>>,
-        args: Vec<Pattern>,
+        args: Vec<Spanned<Pattern>>,
         body: Spanned<Expr>,
     },
     Class {
@@ -375,8 +487,8 @@ pub enum Declaration {
     Instance {
         assumes: Vec<Spanned<Type<Rc<str>>>>,
         name: Spanned<Rc<str>>,
-        args: Vec<Type<Rc<str>>>,
-        members: Vec<(Spanned<String>, Vec<Pattern>, Spanned<Expr>)>,
+        args: Vec<Spanned<Type<Rc<str>>>>,
+        members: Vec<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)>,
     },
     TypeAlias {
         name: String,

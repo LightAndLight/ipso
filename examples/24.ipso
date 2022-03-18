@@ -12,4 +12,4 @@ instance B String where
 
 main : IO ()
 main =
-  writeStdout stdout (toUtf8 b)
+  print b

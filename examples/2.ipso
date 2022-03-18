@@ -1,2 +1,2 @@
 main : IO ~
-main = pureIO ()
+main = pure ()

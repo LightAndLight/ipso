@@ -701,3 +701,86 @@ fn lex_string_7() {
     let actual = lexer.collect::<Vec<Token>>();
     assert_eq!(expected, actual)
 }
+
+#[test]
+fn lex_cmd_1() {
+    let input = Rc::from("`  ls  -laR   `");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            data: token::Data::Backtick,
+            pos: 0,
+            column: 0,
+        },
+        Token {
+            data: token::Data::Cmd(Rc::from("ls")),
+            pos: 3,
+            column: 3,
+        },
+        Token {
+            data: token::Data::Cmd(Rc::from("-laR")),
+            pos: 7,
+            column: 7,
+        },
+        Token {
+            data: token::Data::Backtick,
+            pos: 14,
+            column: 14,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 15,
+            column: 15,
+        },
+    ];
+    let actual = lexer.collect::<Vec<Token>>();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_cmd_2() {
+    let input = Rc::from("`echo \"hello\"`");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            data: token::Data::Backtick,
+            pos: 0,
+            column: 0,
+        },
+        Token {
+            data: token::Data::Cmd(Rc::from("echo")),
+            pos: 1,
+            column: 1,
+        },
+        Token {
+            data: token::Data::DoubleQuote,
+            pos: 6,
+            column: 6,
+        },
+        Token {
+            data: token::Data::String {
+                value: String::from("hello"),
+                length: 5,
+            },
+            pos: 7,
+            column: 7,
+        },
+        Token {
+            data: token::Data::DoubleQuote,
+            pos: 12,
+            column: 12,
+        },
+        Token {
+            data: token::Data::Backtick,
+            pos: 13,
+            column: 13,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 14,
+            column: 14,
+        },
+    ];
+    let actual = lexer.collect::<Vec<Token>>();
+    assert_eq!(expected, actual)
+}

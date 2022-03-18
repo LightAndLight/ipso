@@ -4,23 +4,23 @@ mod test;
 
 use crate::{
     between, choices, grammar::pattern::pattern, indent, indent_scope, keep_left, keep_right, many,
-    map2, optional, sep_by, spanned, ParseResult, Parser,
+    map0, map2, operator::operator, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
-use ipso_syntax::{Branch, CompLine, Expr, Keyword, Spanned, StringPart};
+use ipso_syntax::{Binop, Branch, CompLine, Expr, Keyword, Spanned, StringPart};
 use std::rc::Rc;
 
 /**
 ```text
 comp_line ::=
   'bind' ident '<-' expr
+  'let' ident '=' expr
   'return' expr
   expr
 ```
 */
 pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
     choices!(
-        parser,
         // 'bind' ident '<-' expr
         {
             keep_right!(
@@ -35,13 +35,19 @@ pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
                 .map(|value| CompLine::Bind(name, value))
             })
         },
-        // 'return' expr
+        // 'let' ident '=' expr
         {
             keep_right!(
-                parser.keyword(&Keyword::Return),
-                indent!(parser, Relation::Gt, expr(parser))
+                parser.keyword(&Keyword::Let),
+                indent!(parser, Relation::Gt, parser.ident())
             )
-            .map(CompLine::Return)
+            .and_then(|name| {
+                keep_right!(
+                    indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
+                    indent!(parser, Relation::Gt, expr(parser))
+                )
+                .map(|value| CompLine::Let(name, value))
+            })
         },
         expr(parser).map(CompLine::Expr)
     )
@@ -65,8 +71,7 @@ pub fn expr_comp(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                     Relation::Gt,
                     indent_scope!(
                         parser,
-                        many!(parser, indent!(parser, Relation::Eq, comp_line(parser)))
-                            .map(Expr::Comp)
+                        many!(indent!(parser, Relation::Eq, comp_line(parser))).map(Expr::Comp)
                     )
                 )
             )
@@ -83,7 +88,6 @@ string_part_expr ::=
 */
 pub fn string_part_expr(parser: &mut Parser) -> ParseResult<StringPart> {
     choices!(
-        parser,
         between!(
             indent!(
                 parser,
@@ -101,19 +105,11 @@ pub fn string_part_expr(parser: &mut Parser) -> ParseResult<StringPart> {
 }
 
 pub fn string_part_string(parser: &mut Parser) -> ParseResult<StringPart> {
-    parser.expecting.insert(token::Name::String);
-
-    indent!(parser, Relation::Gte, {
-        let str = match &parser.current {
-            Some(current) => match &current.data {
-                token::Data::String { value, .. } => value.clone(),
-                _ => return parser.unexpected(false),
-            },
-            None => return parser.unexpected(false),
-        };
-        parser.consume();
-        ParseResult::pure(StringPart::String(str))
-    })
+    indent!(
+        parser,
+        Relation::Gte,
+        parser.string().map(StringPart::String)
+    )
 }
 
 /**
@@ -139,10 +135,10 @@ pub fn string(parser: &mut Parser) -> ParseResult<Vec<StringPart>> {
                 Relation::Gte,
                 parser.token(&token::Data::DoubleQuote)
             ),
-            many!(
-                parser,
-                choices!(parser, string_part_expr(parser), string_part_string(parser))
-            )
+            many!(choices!(
+                string_part_expr(parser),
+                string_part_string(parser)
+            ))
         )
     })
 }
@@ -159,7 +155,6 @@ pub fn expr_record_fields(
     fields: &mut Vec<(String, Spanned<Expr>)>,
 ) -> ParseResult<Option<Spanned<Expr>>> {
     choices!(
-        parser,
         keep_left!(
             indent!(parser, Relation::Gte, parser.ident_owned()),
             indent!(parser, Relation::Gte, parser.token(&token::Data::Equals))
@@ -167,13 +162,10 @@ pub fn expr_record_fields(
         .and_then(|name| {
             expr(parser).and_then(|expr| {
                 fields.push((name, expr));
-                optional!(
-                    parser,
-                    keep_right!(
-                        indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
-                        expr_record_fields(parser, fields)
-                    )
-                )
+                optional!(keep_right!(
+                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
+                    expr_record_fields(parser, fields)
+                ))
                 .map(|m_rest| match m_rest {
                     None => None,
                     Some(rest) => rest,
@@ -210,20 +202,26 @@ pub fn expr_record(parser: &mut Parser) -> ParseResult<Expr> {
 /**
 ```text
 expr_embed ::=
-  '<' ctor '|' expr '>'
+  '(|' ctor ',' '..' expr_atom '|)'
 ```
 */
 pub fn expr_embed(parser: &mut Parser) -> ParseResult<Expr> {
     indent_scope!(parser, {
         between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LAngle)),
-            indent!(parser, Relation::Gte, parser.token(&token::Data::RAngle)),
-            indent!(parser, Relation::Gte, parser.ctor_owned()).and_then(|ctor| indent!(
+            indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
+            indent!(
                 parser,
                 Relation::Gte,
-                parser.token(&token::Data::Pipe)
+                parser.token(&token::Data::PipeRParen)
+            ),
+            indent!(parser, Relation::Gte, spanned!(parser, parser.ctor_owned())).and_then(
+                |ctor| indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)).and_then(
+                    |_| keep_right!(
+                        indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
+                        expr_atom(parser).map(|rest| Expr::mk_embed(ctor, rest))
+                    )
+                )
             )
-            .and_then(|_| expr(parser).map(|rest| Expr::mk_embed(ctor, rest))))
         )
     })
 }
@@ -240,13 +238,62 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
             indent!(parser, Relation::Eq, parser.token(&token::Data::LBracket)),
             indent!(parser, Relation::Gte, parser.token(&token::Data::RBracket)),
             sep_by!(
-                parser,
                 expr(parser),
                 indent!(parser, Relation::Gte, parser.token(&token::Data::Comma))
             )
         )
         .map(Expr::Array)
     })
+}
+
+pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
+    parser.expecting.insert(token::Name::Cmd);
+    match &parser.current {
+        None => ParseResult::unexpected(false),
+        Some(token) => match &token.data {
+            token::Data::Cmd(value) => {
+                let value = value.clone();
+                map0!(value, parser.consume())
+            }
+            _ => ParseResult::unexpected(false),
+        },
+    }
+}
+
+/**
+```text
+expr_cmd ::=
+  '`' cmd_part* '`'
+```
+
+```text
+cmd_part ::=
+  cmd_char*
+  '"' string_char* '"'
+```
+
+```text
+cmd_char ::=
+  (ASCII characters excluding '\', '`', '"', '$')
+  '\' '\'
+  '\' '`'
+  '\' '"'
+  '\' '$'
+```
+*/
+pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
+    between!(
+        parser.token(&token::Data::Backtick),
+        parser.token(&token::Data::Backtick),
+        many!(choices!(
+            cmd_part(parser),
+            between!(
+                parser.token(&token::Data::DoubleQuote),
+                parser.token(&token::Data::DoubleQuote),
+                parser.string().map(Rc::from)
+            )
+        ))
+    )
 }
 
 /**
@@ -261,6 +308,7 @@ expr_atom ::=
   expr_record
   expr_embed
   expr_array
+  expr_cmd
   '(' expr ')'
   string
 ```
@@ -269,20 +317,20 @@ pub fn expr_atom(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     spanned!(
         parser,
         choices!(
-            parser,
             parser.int().map(Expr::Int),
             parser.char().map(Expr::Char),
             parser.keyword(&Keyword::False).map(|_| Expr::False),
             parser.keyword(&Keyword::True).map(|_| Expr::True),
             parser.ident_owned().map(Expr::Var),
-            parser.ctor_owned().map(Expr::Variant),
+            spanned!(parser, parser.ctor_owned()).map(Expr::Variant),
             expr_record(parser),
             expr_embed(parser),
             expr_array(parser),
+            expr_cmd(parser).map(Expr::Cmd),
             between!(
                 parser.token(&token::Data::LParen),
                 indent!(parser, Relation::Gt, parser.token(&token::Data::RParen)),
-                optional!(parser, indent!(parser, Relation::Gt, expr(parser))).map(|m_ty| {
+                optional!(indent!(parser, Relation::Gt, expr(parser))).map(|m_ty| {
                     match m_ty {
                         None => Expr::Unit,
                         Some(ty) => ty.item,
@@ -302,13 +350,10 @@ expr_project ::=
 */
 pub fn expr_project(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_atom(parser).and_then(|val| {
-        many!(
-            parser,
-            keep_right!(
-                indent!(parser, Relation::Gt, parser.token(&token::Data::Dot)),
-                indent!(parser, Relation::Gt, parser.ident_owned())
-            )
-        )
+        many!(keep_right!(
+            indent!(parser, Relation::Gt, parser.token(&token::Data::Dot)),
+            indent!(parser, Relation::Gt, parser.ident_owned())
+        ))
         .map(|fields| {
             let mut expr = val;
             for field in fields {
@@ -353,7 +398,7 @@ pub fn expr_case(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                 indent!(
                     parser,
                     Relation::Gt,
-                    indent_scope!(parser, { many!(parser, case_branch(parser)) })
+                    indent_scope!(parser, { many!(case_branch(parser)) })
                 )
             )
             .map(|branches| Expr::mk_case(cond, branches))
@@ -369,8 +414,122 @@ expr_app ::=
 */
 pub fn expr_app(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_project(parser).and_then(|first| {
-        many!(parser, indent!(parser, Relation::Gt, expr_project(parser)))
+        many!(indent!(parser, Relation::Gt, expr_project(parser)))
             .map(|rest| rest.into_iter().fold(first, Expr::mk_app))
+    })
+}
+
+/**
+```text
+binop ::=
+  '+'
+  '*'
+  '-'
+  '/'
+  '||'
+  '&&'
+  '=='
+  '!='
+  '<'
+  '<='
+  '>'
+  '>='
+```
+*/
+pub fn binop(parser: &mut Parser) -> ParseResult<Binop> {
+    choices!(
+        // +
+        map0!(Binop::Add, parser.token(&token::Data::Plus)),
+        // *
+        map0!(Binop::Multiply, parser.token(&token::Data::Asterisk)),
+        // -
+        map0!(Binop::Subtract, parser.token(&token::Data::Hyphen)),
+        // /
+        map0!(Binop::Divide, parser.token(&token::Data::Slash)),
+        keep_right!(
+            parser.token(&token::Data::Pipe),
+            choices!(
+                // ||
+                map0!(Binop::Or, parser.token(&token::Data::Pipe)),
+                // |>
+                map0!(Binop::RApply, parser.token(&token::Data::RAngle))
+            )
+        ),
+        keep_right!(
+            parser.token(&token::Data::Ampersand),
+            // &&
+            map0!(Binop::And, parser.token(&token::Data::Ampersand))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Equals),
+            // ==
+            map0!(Binop::Eq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::Bang),
+            // !=
+            map0!(Binop::Neq, parser.token(&token::Data::Equals))
+        ),
+        keep_right!(
+            parser.token(&token::Data::LAngle),
+            choices!(
+                // <=
+                map0!(Binop::Lte, parser.token(&token::Data::Equals)),
+                // <|
+                map0!(Binop::LApply, parser.token(&token::Data::Pipe)),
+                // <
+                ParseResult::pure(Binop::Lt)
+            )
+        ),
+        keep_right!(
+            parser.token(&token::Data::RAngle),
+            choices!(
+                // >=
+                map0!(Binop::Gte, parser.token(&token::Data::Equals)),
+                // >
+                ParseResult::pure(Binop::Gt)
+            )
+        )
+    )
+}
+
+/**
+```text
+expr_op ::=
+  expr_app (binop expr_app)*
+```
+*/
+pub fn expr_op(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
+    struct Operators<'a, 'input> {
+        parser: &'a mut Parser<'input>,
+    }
+
+    impl<'a, 'input> Iterator for Operators<'a, 'input> {
+        type Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let result = indent!(
+                self.parser,
+                Relation::Gt,
+                spanned!(self.parser, binop(self.parser))
+                    .and_then(|op| expr_app(self.parser).map(|expr| (op, expr)))
+            );
+            match result.result {
+                Err(_) => {
+                    if result.consumed {
+                        Some(result)
+                    } else {
+                        None
+                    }
+                }
+                Ok(_) => Some(result),
+            }
+        }
+    }
+
+    expr_app(parser).and_then(|first| {
+        let mut operators = Operators { parser };
+        operator(first, &mut operators)
     })
 }
 
@@ -385,12 +544,15 @@ pub fn expr_lam(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
         parser,
         keep_right!(
             parser.token(&token::Data::Backslash),
-            many!(parser, indent!(parser, Relation::Gt, pattern(parser))).and_then(
-                |args| keep_right!(
-                    indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
-                    expr(parser).map(|body| syntax::Expr::mk_lam(args, body))
-                )
-            )
+            many!(indent!(
+                parser,
+                Relation::Gt,
+                spanned!(parser, pattern(parser))
+            ))
+            .and_then(|args| keep_right!(
+                indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
+                expr(parser).map(|body| syntax::Expr::mk_lam(args, body))
+            ))
         )
     )
 }
@@ -457,17 +619,16 @@ expr ::=
   expr_ifthenelse
   expr_let
   expr_comp
-  expr_app
+  expr_op
 ```
 */
 pub fn expr(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     choices!(
-        parser,
         expr_case(parser),
         expr_lam(parser),
         expr_ifthenelse(parser),
         expr_let(parser),
         expr_comp(parser),
-        expr_app(parser)
+        expr_op(parser)
     )
 }

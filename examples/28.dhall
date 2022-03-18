@@ -5,10 +5,10 @@
   stdout = "",
   stderr = 
     ''
-    28/main.ipso:4:35: error: expected type "String", got type "Int"
+    28/main.ipso:4:14: error: expected type "String", got type "Int"
       |
-    4 | main = writeStdout stdout (toUtf8 greeting.value)
-      |                                   ^
+    4 | main = print greeting.value
+      |              ^
     '',
   exitcode = 1
 }

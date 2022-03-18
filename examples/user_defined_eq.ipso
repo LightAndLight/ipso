@@ -1,0 +1,14 @@
+class MyEq a where
+  myeq : a -> a -> Bool
+
+instance MyEq Int where
+  myeq = eqInt
+
+instance (MyEq a) => MyEq (Array a) where
+  myeq = eqArray myeq
+
+main : IO ()
+main =
+  comp
+    println (if myeq [1, 2, 3] [2, 4, 5] then "true" else "false")
+    println (if myeq [1, 2, 3] [1, 2, 3] then "true" else "false")

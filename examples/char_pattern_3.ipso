@@ -1,8 +1,8 @@
 main : IO ()
 main =
   case 'c' of
-    'a' -> writeStdout stdout (toUtf8 "saw a")
-    'b' -> writeStdout stdout (toUtf8 "saw b")
-    'c' -> writeStdout stdout (toUtf8 "saw c 1")
-    'c' -> writeStdout stdout (toUtf8 "saw c 2")
-    _ -> writeStdout stdout (toUtf8 "saw something else")
+    'a' -> print "saw a"
+    'b' -> print "saw b"
+    'c' -> print "saw c 1"
+    'c' -> print "saw c 2"
+    _ -> print "saw something else"

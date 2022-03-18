@@ -4,4 +4,4 @@ f x y =
     _ -> y
 
 main : IO ()
-main = writeStdout stdout (toUtf8 (showInt (f 0 1)))
+main = print (showInt (f 0 1))

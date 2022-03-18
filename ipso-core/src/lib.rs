@@ -5,7 +5,7 @@ use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleName};
 use ipso_util::iter::Step;
 use std::{
     cmp,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -41,6 +41,7 @@ pub enum Type {
     Var(Kind, usize),
     App(Kind, Rc<Type>, Rc<Type>),
     Meta(Kind, usize),
+    Cmd,
 }
 
 pub struct CommonKinds {
@@ -52,12 +53,12 @@ pub struct CommonKinds {
 
 impl Default for CommonKinds {
     fn default() -> Self {
-        let type_to_type = Kind::mk_arrow(Kind::Type, Kind::Type);
+        let type_to_type = Kind::mk_arrow(&Kind::Type, &Kind::Type);
         Self {
-            type_to_type_to_type: Kind::mk_arrow(Kind::Type, type_to_type.clone()),
-            constraint_to_type_to_type: Kind::mk_arrow(Kind::Constraint, type_to_type.clone()),
+            type_to_type_to_type: Kind::mk_arrow(&Kind::Type, &type_to_type),
+            constraint_to_type_to_type: Kind::mk_arrow(&Kind::Constraint, &type_to_type),
             type_to_type,
-            row_to_type: Kind::mk_arrow(Kind::Row, Kind::Type),
+            row_to_type: Kind::mk_arrow(&Kind::Row, &Kind::Type),
         }
     }
 }
@@ -94,6 +95,7 @@ impl Type {
             }
             Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
+            Type::Cmd => r#type::Type::Cmd,
         }
     }
 
@@ -105,6 +107,7 @@ impl Type {
             Type::String => Kind::Type,
             Type::Bytes => Kind::Type,
             Type::Unit => Kind::Type,
+            Type::Cmd => Kind::Type,
             Type::RowNil => Kind::Row,
             Type::RowCons(_, _, _) => Kind::Row,
             Type::Constraints(_) => Kind::Constraint,
@@ -130,7 +133,11 @@ impl Type {
         Type::Var(kind, ix)
     }
 
-    pub fn mk_app(a: Type, b: Type) -> Self {
+    pub fn mk_app(a: &Type, b: &Type) -> Self {
+        Self::app(a.clone(), b.clone())
+    }
+
+    pub fn app(a: Type, b: Type) -> Self {
         Type::App(
             match a.kind() {
                 Kind::Ref(r) => match r.as_ref() {
@@ -147,8 +154,15 @@ impl Type {
         Type::Arrow(common_kinds.type_to_type_to_type.clone())
     }
 
-    pub fn mk_arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::mk_arrow_ctor(common_kinds), a), b)
+    pub fn mk_arrow(common_kinds: &CommonKinds, a: &Type, b: &Type) -> Self {
+        Type::app(
+            Type::app(Type::mk_arrow_ctor(common_kinds), a.clone()),
+            b.clone(),
+        )
+    }
+
+    pub fn arrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
+        Type::app(Type::app(Type::mk_arrow_ctor(common_kinds), a), b)
     }
 
     pub fn mk_fatarrow_ctor(common_kinds: &CommonKinds) -> Self {
@@ -156,7 +170,7 @@ impl Type {
     }
 
     pub fn mk_fatarrow(common_kinds: &CommonKinds, a: Type, b: Type) -> Self {
-        Type::mk_app(Type::mk_app(Type::mk_fatarrow_ctor(common_kinds), a), b)
+        Type::app(Type::app(Type::mk_fatarrow_ctor(common_kinds), a), b)
     }
 
     pub fn mk_io(common_kinds: &CommonKinds) -> Self {
@@ -194,7 +208,7 @@ impl Type {
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(
+        Type::app(
             Type::mk_record_ctor(common_kinds),
             Type::mk_rows(fields, rest),
         )
@@ -209,7 +223,7 @@ impl Type {
         fields: Vec<(Rc<str>, Type)>,
         rest: Option<Type>,
     ) -> Self {
-        Type::mk_app(
+        Type::app(
             Type::mk_variant_ctor(common_kinds),
             Type::mk_rows(fields, rest),
         )
@@ -245,6 +259,7 @@ impl Type {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst_metas(f)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => f(k, *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -272,6 +287,7 @@ impl Type {
             Type::HasField(field, rest) => Type::mk_hasfield(field.clone(), rest.subst(f)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -312,6 +328,7 @@ impl Type {
             Type::HasField(a, b) => Type::mk_hasfield(a.clone(), b.instantiate_many(tys)),
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
+            Type::Cmd => Type::Cmd,
         }
     }
 
@@ -468,6 +485,7 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(_, n) => Step::Yield(*n),
+                Type::Cmd => Step::Skip,
             }
         }
 
@@ -519,6 +537,8 @@ pub enum Pattern {
     Record { names: Vec<Expr>, rest: bool },
     Variant { tag: Rc<Expr> },
     Char(char),
+    Int(u32),
+    String(Rc<str>),
     Wildcard,
 }
 
@@ -532,6 +552,8 @@ impl Pattern {
             },
             Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
             Pattern::Char(c) => Pattern::Char(*c),
+            Pattern::Int(n) => Pattern::Int(*n),
+            Pattern::String(s) => Pattern::String(s.clone()),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -557,6 +579,8 @@ impl Pattern {
             }
             Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
             Pattern::Char(_) => Ok(()),
+            Pattern::Int(_) => Ok(()),
+            Pattern::String(_) => Ok(()),
             Pattern::Wildcard => Ok(()),
         }
     }
@@ -573,6 +597,8 @@ impl Pattern {
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__instantiate(depth, val)),
             Pattern::Char(c) => Pattern::Char(*c),
+            Pattern::Int(n) => Pattern::Int(*n),
+            Pattern::String(s) => Pattern::String(s.clone()),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -589,6 +615,8 @@ impl Pattern {
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__abstract_evar(depth, ev)),
             Pattern::Char(c) => Pattern::Char(*c),
+            Pattern::Int(n) => Pattern::Int(*n),
+            Pattern::String(s) => Pattern::String(s.clone()),
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -626,6 +654,8 @@ impl Branch {
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
                         Pattern::Char(_) => 0,
+                        Pattern::Int(_) => 0,
+                        Pattern::String(_) => 0,
                         // TODO: should this be 0?
                         Pattern::Wildcard => 1,
                     },
@@ -644,6 +674,8 @@ impl Branch {
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
                         Pattern::Char(_) => 0,
+                        Pattern::Int(_) => 0,
+                        Pattern::String(_) => 0,
                         Pattern::Wildcard => 0,
                     },
                 ev,
@@ -694,34 +726,33 @@ impl StringPart {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Builtin {
     MapIO,
-    PureIO,
+    Pure,
     BindIO,
     Trace,
     ToUtf8,
-    Stdout,
-    Stdin,
-    WriteStdout,
-    FlushStdout,
-    ReadLineStdin,
+    Println,
+    Print,
+    Readln,
     EqInt,
-    LtInt,
-    Add,
-    Subtract,
-    Multiply,
+    CompareInt,
     ShowInt,
     FoldlArray,
     EqArray,
-    LtArray,
+    CompareArray,
     GenerateArray,
     LengthArray,
     IndexArray,
     SliceArray,
     EqString,
+    CompareString,
     FilterString,
     EqChar,
+    CompareChar,
     SplitString,
     FoldlString,
     SnocArray,
+    Run,
+    EqBool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -729,6 +760,22 @@ pub struct EVar(pub usize);
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Placeholder(pub usize);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
+pub enum Binop {
+    Add,
+    Multiply,
+    Subtract,
+    Divide,
+
+    Append,
+
+    Or,
+    And,
+
+    LApply,
+    RApply,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
@@ -750,7 +797,7 @@ pub enum Expr {
 
     Int(u32),
 
-    Binop(syntax::Binop, Rc<Expr>, Rc<Expr>),
+    Binop(Binop, Rc<Expr>, Rc<Expr>),
 
     Char(char),
 
@@ -766,6 +813,8 @@ pub enum Expr {
     Embed(Rc<Expr>, Rc<Expr>),
     Case(Rc<Expr>, Vec<Branch>),
     Unit,
+
+    Cmd(Vec<Rc<str>>),
 }
 
 impl Expr {
@@ -792,6 +841,13 @@ impl Expr {
         Expr::Lam {
             arg,
             body: Rc::new(body),
+        }
+    }
+
+    pub fn mk_let(value: Expr, rest: Expr) -> Expr {
+        Expr::Let {
+            value: Rc::new(value),
+            rest: Rc::new(rest),
         }
     }
 
@@ -837,8 +893,8 @@ impl Expr {
         Expr::Embed(Rc::new(tag), Rc::new(rest))
     }
 
-    pub fn mk_binop(op: syntax::Binop, a: Expr, b: Expr) -> Expr {
-        if op == syntax::Binop::Add {
+    pub fn mk_binop(op: Binop, a: Expr, b: Expr) -> Expr {
+        if op == Binop::Add {
             if let (Expr::Int(a), Expr::Int(b)) = (&a, &b) {
                 return Expr::Int(*a + *b);
             }
@@ -925,11 +981,14 @@ impl Expr {
                                 b.map_expr(|e| go(e, &Function::Under(1, f)))
                             }
                             Pattern::Char(_) => b.map_expr(|e| go(e, f)),
+                            Pattern::Int(_) => b.map_expr(|e| go(e, f)),
+                            Pattern::String(_) => b.map_expr(|e| go(e, f)),
                             Pattern::Wildcard => b.map_expr(|e| go(e, f)),
                         })
                         .collect(),
                 ),
                 Expr::Unit => Expr::Unit,
+                Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
             }
         }
 
@@ -1037,6 +1096,7 @@ impl Expr {
             ),
 
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1138,6 +1198,8 @@ impl Expr {
             }
 
             Expr::Unit => Ok(()),
+
+            Expr::Cmd(_) => Ok(()),
         }
     }
 
@@ -1215,6 +1277,7 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
+            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
         }
     }
 
@@ -1330,6 +1393,8 @@ impl<'a> Iterator for IterEVars<'a> {
                             Pattern::Record { names, .. } => names.iter().collect(),
                             Pattern::Variant { tag } => vec![tag],
                             Pattern::Char(_) => Vec::new(),
+                            Pattern::Int(_) => Vec::new(),
+                            Pattern::String(_) => Vec::new(),
                             Pattern::Wildcard => Vec::new(),
                         };
                         vals.push(&b.body);
@@ -1338,6 +1403,7 @@ impl<'a> Iterator for IterEVars<'a> {
                     xs
                 }),
                 Expr::Unit => Step::Skip,
+                Expr::Cmd(_) => Step::Skip,
             }
         }
 
@@ -1385,18 +1451,28 @@ pub struct TypeSig {
 }
 
 impl TypeSig {
+    pub fn new(ty_vars: Vec<(Rc<str>, Kind)>, body: Type) -> Self {
+        debug_assert!(
+            ty_vars
+                .iter()
+                .map(|(name, _)| name.as_ref())
+                .collect::<HashSet<&str>>()
+                .len()
+                == ty_vars.len(),
+            "duplicate type variables in {:?}",
+            ty_vars
+        );
+
+        TypeSig { ty_vars, body }
+    }
+
     pub fn instantiate_many(&self, tys: &[Type]) -> TypeSig {
-        let mut ty_vars = self.ty_vars.clone();
-        for _ty in tys.iter().rev() {
-            match ty_vars.pop() {
-                None => panic!("instantiating too many variables"),
-                Some((_ty_var_name, _ty_var_kind)) => {}
-            }
-        }
-        TypeSig {
-            ty_vars,
-            body: self.body.instantiate_many(tys),
-        }
+        let ty_vars = if tys.len() >= self.ty_vars.len() {
+            Vec::new()
+        } else {
+            self.ty_vars.iter().skip(tys.len()).cloned().collect()
+        };
+        TypeSig::new(ty_vars, self.body.instantiate_many(tys))
     }
 }
 
@@ -1493,7 +1569,7 @@ impl ClassDeclaration {
             .iter()
             .rev()
             .fold(Kind::Constraint, |acc, (_, arg_kind)| {
-                Kind::mk_arrow(arg_kind.clone(), acc)
+                Kind::mk_arrow(arg_kind, &acc)
             });
         let name_ty = Type::unsafe_mk_name(self.name.clone(), name_kind);
 
@@ -1501,39 +1577,44 @@ impl ClassDeclaration {
             .iter()
             .enumerate()
             .map(|(ix, member)| {
-                // we need each argument in the applied type to account for the extra variables
-                // bound by the member's signature
-                //
-                // e.g.
-                //
-                // class X a where
-                //   x : a -> b -> ()
-                //
-                // the variable 'a' should recieve the de bruijn index '1', because 'b' is the innermost
-                // bound variable
-                //
-                // this will panic if we allow ambiguous class members
-                let adjustment = if !member.sig.ty_vars.is_empty() {
-                    member.sig.ty_vars.len() - self.args.len()
-                } else {
-                    0
-                };
-                let applied_type = self
-                    .args // (adjustment..adjustment + self.args.len())
-                    .iter()
-                    .enumerate()
-                    .fold(name_ty.clone(), |acc, (arg_index, (_, arg_kind))| {
-                        let arg_ty = Type::unsafe_mk_var(adjustment + arg_index, arg_kind.clone());
-                        Type::mk_app(acc, arg_ty)
-                    });
-                let sig = {
-                    let mut body = member.sig.body.clone();
-                    body = Type::mk_fatarrow(common_kinds, applied_type, body);
+                /*
+                Generates a type signature for each class member.
 
-                    TypeSig {
-                        ty_vars: member.sig.ty_vars.clone(),
-                        body,
-                    }
+                For example, in
+
+                ```
+                class X a where
+                  x : a -> b -> ()
+                ```
+
+                the signature `x : forall a b. X a => a -> b -> ()` is generated.
+
+                The `X a` constraint in the signature consists of type class name applied
+                to all its variables. When constructing the constraint, each variable
+                needs to account for the variables bound by the member signature.
+                */
+                let offset = member.sig.ty_vars.len();
+                let constraint_type = self.args.iter().rev().enumerate().fold(
+                    name_ty.clone(),
+                    |acc, (arg_index, (_, arg_kind))| {
+                        Type::app(
+                            acc,
+                            Type::unsafe_mk_var(arg_index + offset, arg_kind.clone()),
+                        )
+                    },
+                );
+
+                let sig = {
+                    let ty_vars = {
+                        let mut ty_vars = self.args.clone();
+                        ty_vars.extend(member.sig.ty_vars.iter().cloned());
+                        ty_vars
+                    };
+
+                    let body =
+                        Type::mk_fatarrow(common_kinds, constraint_type, member.sig.body.clone());
+
+                    TypeSig::new(ty_vars, body)
                 };
                 let body: Rc<Expr> = Rc::new(Expr::mk_lam(
                     true,

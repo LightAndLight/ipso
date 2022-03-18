@@ -57,7 +57,7 @@ macro_rules! indent {
             Some(current_indentation) => token::Name::Indent($relation, current_indentation),
         });
         match &$parser.current {
-            None => $parser.unexpected(false),
+            None => ParseResult::unexpected(false),
             Some(token) => {
                 let current_indentation_matches = match current_indentation {
                     None => match $relation {
@@ -75,7 +75,7 @@ macro_rules! indent {
                     $parser.expecting.clear_indents();
                     $body
                 } else {
-                    $parser.unexpected(false)
+                    ParseResult::unexpected(false)
                 }
             }
         }

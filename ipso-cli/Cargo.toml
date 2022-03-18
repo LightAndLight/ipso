@@ -27,7 +27,8 @@ lazy_static = "1.4.0"
 typed-arena = "2.0.1"
 
 [dev-dependencies]
-criterion = "0.3"
+# Development build of v0.4, which has fewer dependencies.
+criterion = { git = "https://github.com/bheisler/criterion.rs", rev = "412591edec4a0e8e05093c7f9ca0ba9611e5c17f", default_features = false }
 
 [[bench]]
 name = "todolist_1"

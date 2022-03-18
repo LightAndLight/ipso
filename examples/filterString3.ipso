@@ -3,6 +3,4 @@ not x = if x then false else true
 
 main : IO ()
 main = 
-  writeStdout 
-    stdout 
-    (toUtf8 ("${filterString (\c -> not (eqChar c ' ')) "the quick brown fox"}\n"))
+  println (filterString (\c -> not (eqChar c ' ')) "the quick brown fox")

@@ -1,8 +1,7 @@
 import array
-import io
 import string
 
-parseDigit : Char -> < Err | Ok(Int) >
+parseDigit : Char -> (| Err, Ok(Int) |)
 parseDigit c =
   case c of
     '0' -> Ok(0)
@@ -17,7 +16,7 @@ parseDigit c =
     '9' -> Ok(9)
     _ -> Err
 
-parseInt : String -> < Err | Ok(Int) >
+parseInt : String -> (| Err, Ok(Int) |)
 parseInt str =
   if str == ""
   then Err
@@ -34,25 +33,26 @@ parseInt str =
       Ok(0)
       str
 
-type Command =
-  < Quit
-  | Help
-  | List
-  | Add{ item : String }
-  | Delete{ index : Int }
-  | Invalid{ input : String }
-  >
+type Command = (|
+  Quit,
+  Help,
+  List,
+  Add{ item : String },
+  Delete{ index : Int },
+  Invalid{ input : String }
+|)
 
 parseCommand :
   String ->
   Command
 parseCommand line =
-  case string.rstrip line |> string.split " " of
+  let stripped = string.rstrip line in
+  case string.split " " stripped of
     ["quit"] -> Quit
     ["help"] -> Help
     ["list"] -> List
-    ["add", item] -> Add{ item } 
-    ["delete", value] -> 
+    ["add", item] -> Add{ item }
+    ["delete", value] ->
       case parseInt value of
         Err -> Invalid{ input = stripped }
         Ok(index) -> Delete{ index }
@@ -75,12 +75,12 @@ writeTodos todos =
 runCommand :
   Command ->
   Array String ->
-  IO < Continue{ todos : Array String } | Quit >
+  IO (| Continue{ todos : Array String }, Quit |)
 runCommand cmd todos =
   case cmd of
     Quit ->
       pure Quit
-    Help -> 
+    Help ->
       comp
         println "help - display this message"
         println "quit - exit the application"
@@ -102,7 +102,7 @@ runCommand cmd todos =
       pure Continue{ todos = array.delete index todos }
 
 loop : Array String -> IO ()
-loop todos = 
+loop todos =
   comp
     print "> "
     bind line <- readln
@@ -112,7 +112,7 @@ loop todos =
       Quit -> pure ()
 
 main : IO ()
-main = 
+main =
   comp
     println "Welcome to your TODO list"
     loop []

@@ -1,14 +1,16 @@
 mod test;
 
-use ipso_core::{Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{Binop, Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
 use ipso_rope::Rope;
-use ipso_syntax::{Binop, ModuleName};
+use ipso_syntax::ModuleName;
 use paste::paste;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fmt::Debug,
-    io::{BufRead, Write},
+    io::{self, BufRead},
     ops::Index,
+    process,
     rc::Rc,
 };
 use typed_arena::Arena;
@@ -194,6 +196,7 @@ pub enum Object<'heap> {
         env: &'heap [Value<'heap>],
         body: IOBody<'heap>,
     },
+    Cmd(Vec<Rc<str>>),
 }
 
 impl<'heap> Object<'heap> {
@@ -239,6 +242,13 @@ impl<'heap> Object<'heap> {
         match self {
             Object::Record(fields) => fields,
             val => panic!("expected record,got {:?}", val),
+        }
+    }
+
+    pub fn unpack_cmd(&'heap self) -> &'heap Vec<Rc<str>> {
+        match self {
+            Object::Cmd(values) => values,
+            val => panic!("expected command, got {:?}", val),
         }
     }
 
@@ -318,6 +328,7 @@ impl<'heap> Object<'heap> {
                 s.push(')');
                 s
             }
+            Object::Cmd(parts) => format!("Cmd({:?})", parts),
         }
     }
 }
@@ -367,6 +378,10 @@ impl<'heap> PartialEq for Object<'heap> {
                 Object::Variant(tag2, value2) => tag == tag2 && value == value2,
                 _ => false,
             },
+            Object::Cmd(parts) => match other {
+                Object::Cmd(parts2) => parts == parts2,
+                _ => false,
+            },
         }
     }
 }
@@ -378,9 +393,6 @@ pub enum Value<'heap> {
     Int(u32),
     Char(char),
     Unit,
-
-    Stdout,
-    Stdin,
 
     Object(&'heap Object<'heap>),
 }
@@ -417,6 +429,10 @@ impl<'heap> Value<'heap> {
         self.unpack_object().unpack_variant()
     }
 
+    pub fn unpack_cmd(&self) -> &'heap Vec<Rc<str>> {
+        self.unpack_object().unpack_cmd()
+    }
+
     pub fn unpack_object(&self) -> &'heap Object<'heap> {
         match self {
             Value::Object(obj) => obj,
@@ -446,20 +462,6 @@ impl<'heap> Value<'heap> {
         }
     }
 
-    pub fn unpack_stdout(&self) {
-        match self {
-            Value::Stdout => (),
-            val => panic!("expected stdout, got {:?}", val),
-        }
-    }
-
-    pub fn unpack_stdin(&self) {
-        match self {
-            Value::Stdin => (),
-            val => panic!("expected stdin, got {:?}", val),
-        }
-    }
-
     pub fn unpack_record(&self) -> &'heap [Value<'heap>] {
         self.unpack_object().unpack_record()
     }
@@ -471,8 +473,6 @@ impl<'heap> Value<'heap> {
             Value::Int(n) => format!("{:?}", n),
             Value::Char(c) => format!("{:?}", c),
             Value::Unit => String::from("()"),
-            Value::Stdout => String::from("Stdout"),
-            Value::Stdin => String::from("Stdin"),
             Value::Object(o) => o.render(),
         }
     }
@@ -492,8 +492,6 @@ impl<'heap> PartialEq for Value<'heap> {
                 _ => false,
             },
             Value::Unit => matches!(other, Value::Unit),
-            Value::Stdout => matches!(other, Value::Stdout),
-            Value::Stdin => matches!(other, Value::Stdin),
             Value::Object(o1) => match other {
                 Value::Object(o2) => o1.eq(o2),
                 _ => false,
@@ -509,7 +507,7 @@ pub struct Module {
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
     stdin: &'io mut dyn BufRead,
-    stdout: &'io mut dyn Write,
+    stdout: &'io mut dyn io::Write,
     bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
@@ -521,7 +519,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
     pub fn new(
         stdin: &'io mut dyn BufRead,
-        stdout: &'io mut dyn Write,
+        stdout: &'io mut dyn io::Write,
         context: &'ctx HashMap<String, Rc<Expr>>,
         module_context: HashMap<ModulePath, Module>,
         bytes: &'heap Arena<u8>,
@@ -560,11 +558,28 @@ where {
         self.values.alloc_extend(vals)
     }
 
+    pub fn alloc_ordering(&self, ordering: Ordering) -> Value<'heap> {
+        match ordering {
+            std::cmp::Ordering::Less => {
+                // Less () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(2, Value::Unit))
+            }
+            std::cmp::Ordering::Equal => {
+                // Equal () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(0, Value::Unit))
+            }
+            std::cmp::Ordering::Greater => {
+                // Greater () : (| Equal : (), Greater : (), Less : () |)
+                self.alloc(Object::Variant(1, Value::Unit))
+            }
+        }
+    }
+
     pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
         match name {
-            Builtin::PureIO => {
+            Builtin::Pure => {
                 function1!(
-                    pure_io,
+                    pure,
                     self,
                     |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
@@ -672,84 +687,22 @@ where {
                     }
                 )
             }
-            Builtin::Stdout => Value::Stdout,
-            Builtin::Stdin => Value::Stdin,
-            Builtin::WriteStdout => {
-                function2!(
-                    write_stdout,
+            Builtin::Println => {
+                function1!(
+                    println,
                     self,
                     |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        fn write_stdout_2<'io, 'ctx, 'heap>(
+                        fn println<'io, 'ctx, 'heap>(
                             interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
                             env: &'heap [Value<'heap>],
                         ) -> Value<'heap> {
-                            // env[0] : Stdout
-                            // env[1] : Bytes
-                            let () = env[0].unpack_stdout();
-                            let bs = env[1].unpack_bytes();
-                            let _ = interpreter.stdout.write_all(bs).unwrap();
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            writeln!(interpreter.stdout, "{}", value)
+                                .expect("writing to stdout failed");
                             Value::Unit
-                        }
-
-                        let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
-                            env.push(arg);
-                            env
-                        });
-                        interpreter.alloc(Object::IO {
-                            env,
-                            body: IOBody(write_stdout_2),
-                        })
-                    }
-                )
-            }
-            Builtin::FlushStdout => {
-                fn flush_stdout<'io, 'ctx, 'heap>(
-                    interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                    env: &'heap [Value<'heap>],
-                ) -> Value<'heap> {
-                    // env[0] : Stdout
-                    env[0].unpack_stdout();
-                    interpreter.stdout.flush().unwrap();
-                    Value::Unit
-                }
-                function1!(
-                    flush_stdout,
-                    self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let env = eval.alloc_values({
-                            let mut env = Vec::from(env);
-                            env.push(arg);
-                            env
-                        });
-                        eval.alloc(Object::IO {
-                            env,
-                            body: IOBody(flush_stdout),
-                        })
-                    }
-                )
-            }
-            Builtin::ReadLineStdin => {
-                function1!(
-                    readline_stdin,
-                    self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn read_line_stdin_1<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
-                            // env[0] : Stdin
-                            let () = env[0].unpack_stdin();
-                            let mut str = String::new();
-                            let _ = interpreter.stdin.read_line(&mut str).unwrap();
-                            let str = interpreter.alloc_str(&str);
-                            interpreter.alloc(Object::String(str))
                         }
                         let env = interpreter.alloc_values({
                             let mut env = Vec::from(env);
@@ -758,11 +711,61 @@ where {
                         });
                         let closure = interpreter.alloc(Object::IO {
                             env,
-                            body: IOBody(read_line_stdin_1),
+                            body: IOBody(println),
                         });
                         closure
                     }
                 )
+            }
+            Builtin::Print => {
+                function1!(
+                    print,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        fn print<'io, 'ctx, 'heap>(
+                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            {
+                                write!(interpreter.stdout, "{}", value)
+                                    .expect("writing to stdout failed");
+                                interpreter.stdout.flush().expect("flushing stdout failed");
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env);
+                            env.push(arg);
+                            env
+                        });
+                        let closure = interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(print),
+                        });
+                        closure
+                    }
+                )
+            }
+            Builtin::Readln => {
+                fn readln<'io, 'ctx, 'heap>(
+                    interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
+                    _: &'heap [Value<'heap>],
+                ) -> Value<'heap> {
+                    // env[0] : Stdin
+                    let mut str = String::new();
+                    let _ = interpreter.stdin.read_line(&mut str).unwrap();
+                    let str = interpreter.alloc_str(&str);
+                    interpreter.alloc(Object::String(str))
+                }
+                let closure = self.alloc(Object::IO {
+                    env: &[],
+                    body: IOBody(readln),
+                });
+                closure
             }
             Builtin::EqString => {
                 function2!(
@@ -778,6 +781,19 @@ where {
                         } else {
                             Value::False
                         }
+                    }
+                )
+            }
+            Builtin::CompareString => {
+                function2!(
+                    compare_string,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let a = env[0].unpack_string();
+                        let b = arg.unpack_string();
+                        interpreter.alloc_ordering(a.cmp(b))
                     }
                 )
             }
@@ -798,20 +814,16 @@ where {
                     }
                 )
             }
-            Builtin::LtInt => {
+            Builtin::CompareInt => {
                 function2!(
-                    lt_int,
+                    compare_int,
                     self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
-                        if a < b {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
+                        interpreter.alloc_ordering(a.cmp(&b))
                     }
                 )
             }
@@ -825,45 +837,6 @@ where {
                         let a = arg.unpack_int();
                         let str = eval.alloc_str(&format!("{}", a));
                         eval.alloc(Object::String(str))
-                    }
-                )
-            }
-            Builtin::Subtract => {
-                function2!(
-                    subtract,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a - b)
-                    }
-                )
-            }
-            Builtin::Add => {
-                function2!(
-                    add,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a + b)
-                    }
-                )
-            }
-            Builtin::Multiply => {
-                function2!(
-                    multiply,
-                    self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let a = env[0].unpack_int();
-                        let b = arg.unpack_int();
-                        Value::Int(a * b)
                     }
                 )
             }
@@ -894,43 +867,74 @@ where {
                     }
                 )
             }
-            Builtin::LtArray => {
+            Builtin::CompareArray => {
                 function3!(
-                    lt_array,
+                    compare_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
                      env: &'heap [Value<'heap>],
                      arg: Value<'heap>| {
-                        let lt = env[0];
+                        let f = env[0];
                         let a = env[1].unpack_array();
                         let b = arg.unpack_array();
 
-                        let mut ix = 0;
                         let a_len = a.len();
                         let b_len = b.len();
+                        let mut index = 0;
+                        let mut ordering = Ordering::Equal;
+
                         loop {
-                            // the prefix of a matches the prefix of b
-                            if ix < a_len {
-                                if ix < b_len {
-                                    let a_val = a[ix];
-                                    let b_val = b[ix];
-                                    if lt.apply(eval, a_val).apply(eval, b_val).unpack_bool() {
-                                        ix += 1;
-                                    } else {
-                                        return Value::False;
+                            fn unpack_ordering(value: &Value) -> Ordering {
+                                let (tag, _) = value.unpack_variant();
+                                match tag {
+                                    // Equal () : (| Equal : (), Greater : (), Less : () |)
+                                    0 => Ordering::Equal,
+                                    // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                    1 => Ordering::Greater,
+                                    // Less () : (| Equal : (), Greater : (), Less : () |)
+                                    2 => Ordering::Less,
+                                    tag => panic!("unexpected tag {}", tag),
+                                }
+                            }
+
+                            if index < a_len {
+                                if index < b_len {
+                                    // precondition: a[0..index] == b[0..index]
+                                    match unpack_ordering(
+                                        &f.apply(interpreter, a[index])
+                                            .apply(interpreter, b[index]),
+                                    ) {
+                                        Ordering::Less => {
+                                            ordering = Ordering::Less;
+                                            break;
+                                        }
+                                        Ordering::Equal => {
+                                            index += 1;
+                                            continue;
+                                        }
+                                        Ordering::Greater => {
+                                            ordering = Ordering::Greater;
+                                            break;
+                                        }
                                     }
                                 } else {
-                                    // a is longer than b
-                                    return Value::False;
+                                    // `a` contains more elements than `b` and we have reached the
+                                    // end of `b`
+                                    ordering = Ordering::Greater;
+                                    break;
                                 }
-                            } else if ix < b_len {
-                                // a is shorter than b
-                                return Value::True;
                             } else {
-                                // a is the same length as b
-                                return Value::False;
+                                // we have reached the end of `a`
+                                if index < b_len {
+                                    // and `b` still has more elements
+                                    ordering = Ordering::Less;
+                                } else {
+                                    // and we have reached the end of `b`
+                                }
+                                break;
                             }
                         }
+                        interpreter.alloc_ordering(ordering)
                     }
                 )
             }
@@ -1054,6 +1058,19 @@ where {
                     }
                 )
             }
+            Builtin::CompareChar => {
+                function2!(
+                    compare_char,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let c1 = env[0].unpack_char();
+                        let c2 = arg.unpack_char();
+                        interpreter.alloc_ordering(c1.cmp(&c2))
+                    }
+                )
+            }
             Builtin::SplitString => {
                 function2!(
                     split_string,
@@ -1104,6 +1121,78 @@ where {
                     }
                 )
             }
+            Builtin::Run => {
+                function1!(
+                    run,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        fn run_1<'io, 'ctx, 'heap>(
+                            _: &mut Interpreter<'io, 'ctx, 'heap>,
+                            env: &'heap [Value<'heap>],
+                        ) -> Value<'heap> {
+                            let cmd = env[0].unpack_cmd();
+                            if cmd.is_empty() {
+                                Value::Unit
+                            } else {
+                                let status = process::Command::new(cmd[0].as_ref())
+                                    .args(
+                                        cmd[1..].iter().map(|arg| arg.as_ref()).collect::<Vec<_>>(),
+                                    )
+                                    .status()
+                                    .unwrap_or_else(|err| {
+                                        println!("failed to start process {:?}: {}", cmd[0], err);
+                                        process::exit(1);
+                                    });
+
+                                match status.code() {
+                                    Some(code) => {
+                                        if code == 0 {
+                                            Value::Unit
+                                        } else {
+                                            println!(
+                                                "process {:?} exited with code {:?}",
+                                                cmd[0], code
+                                            );
+                                            process::exit(1);
+                                        }
+                                    }
+                                    None => {
+                                        println!("process {:?} terminated unexpectedly", cmd[0]);
+                                        process::exit(1);
+                                    }
+                                }
+                            }
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env);
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(run_1),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::EqBool => function2!(
+                eq_bool,
+                self,
+                |_: &mut Interpreter<'_, '_, 'heap>,
+                 env: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let a = env[0].unpack_bool();
+                    let b = arg.unpack_bool();
+                    if a == b {
+                        Value::True
+                    } else {
+                        Value::False
+                    }
+                }
+            ),
         }
     }
 
@@ -1198,29 +1287,53 @@ where {
 
             Expr::Int(n) => Value::Int(*n),
 
-            Expr::Binop(op, a, b) => {
-                let a = self.eval(env, a);
-                let b = self.eval(env, b);
-                match op {
-                    Binop::Add => {
-                        let a = a.unpack_int();
-                        let b = b.unpack_int();
-                        Value::Int(a + b)
-                    }
-                    Binop::Multiply => todo!("eval multiply {:?} {:?}", a, b),
-                    Binop::Subtract => todo!("eval subtract {:?} {:?}", a, b),
-                    Binop::Divide => todo!("eval divide {:?} {:?}", a, b),
-                    Binop::Append => todo!("eval append {:?} {:?}", a, b),
-                    Binop::Or => todo!("eval or {:?} {:?}", a, b),
-                    Binop::And => todo!("eval and {:?} {:?}", a, b),
-                    Binop::Eq => todo!("eval eq {:?} {:?}", a, b),
-                    Binop::Neq => todo!("eval neq {:?} {:?}", a, b),
-                    Binop::Gt => todo!("eval gt {:?} {:?}", a, b),
-                    Binop::Gte => todo!("eval gte {:?} {:?}", a, b),
-                    Binop::Lt => todo!("eval lt {:?} {:?}", a, b),
-                    Binop::Lte => todo!("eval lte {:?} {:?}", a, b),
+            Expr::Binop(op, a, b) => match op {
+                Binop::Add => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a + b)
                 }
-            }
+                Binop::Multiply => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a * b)
+                }
+                Binop::Subtract => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a - b)
+                }
+                Binop::Divide => {
+                    let a = self.eval(env, a).unpack_int();
+                    let b = self.eval(env, b).unpack_int();
+                    Value::Int(a / b)
+                }
+                Binop::Append => todo!("eval append"),
+                Binop::Or => {
+                    if self.eval(env, a).unpack_bool() {
+                        Value::True
+                    } else {
+                        self.eval(env, b)
+                    }
+                }
+                Binop::And => {
+                    if self.eval(env, a).unpack_bool() {
+                        self.eval(env, b)
+                    } else {
+                        Value::False
+                    }
+                }
+                Binop::RApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    right.apply(self, left)
+                }
+                Binop::LApply => {
+                    let left = self.eval(env, a);
+                    let right = self.eval(env, b);
+                    left.apply(self, right)
+                }
+            },
 
             Expr::Char(c) => Value::Char(*c),
 
@@ -1318,56 +1431,160 @@ where {
             }
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, expr);
+
                 let mut target: Option<&Expr> = None;
 
-                for branch in branches {
-                    match &branch.pattern {
-                        Pattern::Name => {
-                            env.push(expr);
-                            target = Some(&branch.body);
-                            break;
-                        }
-                        Pattern::Record { names, rest } => {
-                            let fields = expr.unpack_record();
-                            let mut extracted = Vec::with_capacity(names.len());
-                            for name in names {
-                                let ix = self.eval(env, name).unpack_int() as usize;
-                                env.push(fields[ix]);
-                                extracted.push(ix);
-                            }
-                            if *rest {
-                                let mut leftover_fields = Rope::from_vec(fields);
-                                extracted.sort_unstable();
-                                for ix in extracted.iter().rev() {
-                                    leftover_fields = leftover_fields.delete(*ix).unwrap();
+                match expr {
+                    Value::Object(&Object::Variant(tag, value)) => {
+                        /*
+                        Because of the way constructors are peeled from variants during
+                        pattern matching (see [note: peeling constructors when matching on variants]),
+                        the expected tag must change as each branch is checked.
+                        */
+                        let mut expected_tag = tag;
+
+                        for branch in branches {
+                            match &branch.pattern {
+                                Pattern::Variant { tag: branch_tag } => {
+                                    let branch_tag =
+                                        self.eval(env, branch_tag).unpack_int() as usize;
+
+                                    match expected_tag.cmp(&branch_tag) {
+                                        /*
+                                        When the expected tag is less than the branch's tag, it
+                                        means that the expected constructor comes *before* the
+                                        branch's constructor in the lexicographically ordered row
+                                        type.
+
+                                        The branch's contructor has no impact on the expected constructor's
+                                        position in the row type, so the expected tag doesn't need to be adjusted.
+
+                                        An illustration with an array:
+
+                                        ```
+                                        [a, b, c, d]
+                                        ```
+
+                                        `b` is at position 1 in the array. If `c` or `d` is removed, `b`'s position
+                                        doesn't change, because it preceds `c` and `d`.
+                                        */
+                                        std::cmp::Ordering::Less => {}
+
+                                        std::cmp::Ordering::Equal => {
+                                            env.push(value);
+                                            target = Some(&branch.body);
+                                            break;
+                                        }
+
+                                        /*
+                                        When the expected tag is less than the branch's tag, it
+                                        means that the expected constructor comes *after* the
+                                        branch's constructor in the lexicographically ordered row
+                                        type.
+
+                                        The branch's contructor influences the expected constructor's
+                                        position in the row type, so the expected tag *does* need to be adjusted.
+
+                                        Another array illustration:
+
+                                        ```
+                                        [a, b, c, d]
+                                        ```
+
+                                        `c` is at position 2 in the array. If `a` or `b` is removed then `c`'s position
+                                        changes.
+                                        */
+                                        std::cmp::Ordering::Greater => {
+                                            expected_tag -= 1;
+                                        }
+                                    }
                                 }
-                                let leftover_fields =
-                                    self.alloc_values(leftover_fields.iter().copied());
-                                let leftover_record = self.alloc(Object::Record(leftover_fields));
-                                env.push(leftover_record);
-                            }
-                            target = Some(&branch.body);
-                            break;
-                        }
-                        Pattern::Variant { tag: branch_tag } => {
-                            let (tag, value) = expr.unpack_variant();
-                            let branch_tag = self.eval(env, branch_tag).unpack_int() as usize;
-                            if *tag == branch_tag {
-                                env.push(*value);
-                                target = Some(&branch.body);
-                                break;
-                            }
-                        }
-                        Pattern::Char(actual_char) => {
-                            let expected_char = expr.unpack_char();
-                            if expected_char == *actual_char {
-                                target = Some(&branch.body);
-                                break;
+                                Pattern::Name => {
+                                    env.push(self.alloc(Object::Variant(expected_tag, value)));
+
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Wildcard => {
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::String(_)
+                                | Pattern::Int(_)
+                                | Pattern::Record { .. }
+                                | Pattern::Char(_) => {
+                                    panic!("expected variant pattern, got: {:?}", branch.pattern);
+                                }
                             }
                         }
-                        Pattern::Wildcard => {
-                            target = Some(&branch.body);
-                            break;
+                    }
+                    _ => {
+                        for branch in branches {
+                            match &branch.pattern {
+                                Pattern::Name => {
+                                    env.push(expr);
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Record { names, rest } => {
+                                    let fields = expr.unpack_record();
+                                    let mut extracted = Vec::with_capacity(names.len());
+                                    for name in names {
+                                        let ix = self.eval(env, name).unpack_int() as usize;
+                                        env.push(fields[ix]);
+                                        extracted.push(ix);
+                                    }
+                                    if *rest {
+                                        let mut leftover_fields = Rope::from_vec(fields);
+                                        extracted.sort_unstable();
+                                        for ix in extracted.iter().rev() {
+                                            leftover_fields = leftover_fields.delete(*ix).unwrap();
+                                        }
+                                        let leftover_fields =
+                                            self.alloc_values(leftover_fields.iter().copied());
+                                        let leftover_record =
+                                            self.alloc(Object::Record(leftover_fields));
+                                        env.push(leftover_record);
+                                    }
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                                Pattern::Variant { tag: branch_tag } => {
+                                    let (tag, value) = expr.unpack_variant();
+                                    let branch_tag =
+                                        self.eval(env, branch_tag).unpack_int() as usize;
+                                    if *tag == branch_tag {
+                                        env.push(*value);
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Char(actual_char) => {
+                                    let expected_char = expr.unpack_char();
+                                    if expected_char == *actual_char {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Int(actual_int) => {
+                                    let expected_int = expr.unpack_int();
+                                    if expected_int == *actual_int {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::String(actual_string) => {
+                                    let expected_string = expr.unpack_string();
+                                    if expected_string == actual_string.as_ref() {
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Wildcard => {
+                                    target = Some(&branch.body);
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -1378,6 +1595,7 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
+            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
         };
         out
     }

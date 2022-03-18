@@ -1,7 +1,7 @@
 apply :
-  < Err : e | Ok : (a -> b) > ->
-  < Err : e | Ok : a > ->
-  < Err : e | Ok : b >
+  (| Err : e, Ok : (a -> b) |) ->
+  (| Err : e, Ok : a |) ->
+  (| Err : e, Ok : b |)
 apply =
   (\a b ->
     case a of
@@ -13,4 +13,4 @@ apply =
   )
 
 main : IO ()
-main = pureIO ()
+main = pure ()

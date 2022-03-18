@@ -13,8 +13,8 @@ prettyArray arr =
       foldlArray 
         (\acc el -> "${acc}, ${show el}") 
         (indexArray 0 arr)
-        (sliceArray 1 (minusInt (lengthArray arr) 1) arr)
+        (sliceArray 1 (lengthArray arr - 1) arr)
   }]"
 
 main : IO ()
-main = writeStdout stdout (toUtf8 (prettyArray [0, 1, 2, 3, 4]))
+main = print (prettyArray [0, 1, 2, 3, 4])

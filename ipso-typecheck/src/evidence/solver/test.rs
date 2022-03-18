@@ -5,10 +5,11 @@ use crate::{
 };
 #[cfg(test)]
 use ipso_core::{
-    self as core, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember, TypeSig,
+    self as core, Binop, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember,
+    TypeSig,
 };
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, Binop};
+use ipso_syntax::kind::Kind;
 #[cfg(test)]
 use std::rc::Rc;
 
@@ -25,7 +26,7 @@ fn solve_constraint_1() {
                 None,
             ),
         };
-        let expected = solve_constraint(&None, &mut tc, &constraint);
+        let expected = solve_constraint(0, &None, &mut tc, &constraint);
         let actual = Ok(Expr::Int(0));
         assert_eq!(expected, actual)
     })
@@ -44,7 +45,7 @@ fn solve_constraint_2() {
                 None,
             ),
         };
-        let expected = solve_constraint(&None, &mut tc, &constraint);
+        let expected = solve_constraint(0, &None, &mut tc, &constraint);
         let actual = Ok(Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0)));
         assert_eq!(expected, actual)
     })
@@ -53,9 +54,9 @@ fn solve_constraint_2() {
 #[test]
 fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let var = tc.fresh_typevar(Kind::Row);
+        let var = tc.fresh_type_meta(&Kind::Row);
         tc.evidence.assume(
-            None,
+            0,
             Constraint::HasField {
                 field: Rc::from("z"),
                 rest: var.clone(),
@@ -74,7 +75,7 @@ fn solve_constraint_3() {
         };
 
         let expected_result = Ok(Expr::Int(2));
-        let actual_result = solve_constraint(&None, &mut tc, &constraint);
+        let actual_result = solve_constraint(0, &None, &mut tc, &constraint);
         assert_eq!(expected_result, actual_result);
 
         let expected_evidence = Evidence {
@@ -82,14 +83,14 @@ fn solve_constraint_3() {
                 field: Rc::from("z"),
                 rest: var.clone(),
             }],
-            environment: vec![(
-                Constraint::HasField {
+            environment: vec![crate::evidence::Item {
+                pos: 0,
+                constraint: Constraint::HasField {
                     field: Rc::from("z"),
                     rest: var,
                 },
-                None,
-                Some(Expr::EVar(EVar(0))),
-            )],
+                expr: Some(Expr::EVar(EVar(0))),
+            }],
         };
         let actual_evidence = tc.evidence;
         assert_eq!(expected_evidence, actual_evidence)
@@ -103,17 +104,17 @@ fn solve_constraint_4() {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
             tc.register_class(&ClassDeclaration {
                 supers: Vec::new(),
-                name: Rc::from("Eq"),
+                name: Rc::from("MyEq"),
                 args: vec![(Rc::from("a"), a.kind())],
                 members: vec![ClassMember {
-                    name: String::from("eq"),
+                    name: String::from("myeq"),
                     sig: {
                         TypeSig {
                             ty_vars: Vec::new(),
-                            body: core::Type::mk_arrow(
+                            body: core::Type::arrow(
                                 tc.common_kinds,
                                 a.clone(),
-                                core::Type::mk_arrow(tc.common_kinds, a, core::Type::Bool),
+                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                             ),
                         }
                     },
@@ -122,16 +123,16 @@ fn solve_constraint_4() {
         }
 
         let eq_ty = core::Type::unsafe_mk_name(
-            Rc::from("Eq"),
-            Kind::mk_arrow(Kind::Type, Kind::Constraint),
+            Rc::from("MyEq"),
+            Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         tc.register_instance(
             &Vec::new(),
             &Vec::new(),
             &Vec::new(),
-            &core::Type::mk_app(eq_ty.clone(), core::Type::Int),
+            &core::Type::app(eq_ty.clone(), core::Type::Int),
             &[InstanceMember {
-                name: String::from("Eq"),
+                name: String::from("MyEq"),
                 body: Expr::Builtin(Builtin::EqInt),
             }],
         );
@@ -140,13 +141,13 @@ fn solve_constraint_4() {
         tc.register_instance(
             &[(Rc::from("a"), a.kind())],
             &Vec::new(),
-            &[core::Type::mk_app(eq_ty.clone(), a.clone())],
-            &core::Type::mk_app(
+            &[core::Type::app(eq_ty.clone(), a.clone())],
+            &core::Type::app(
                 eq_ty.clone(),
-                core::Type::mk_app(core::Type::mk_array(tc.common_kinds), a),
+                core::Type::app(core::Type::mk_array(tc.common_kinds), a),
             ),
             &[InstanceMember {
-                name: String::from("Eq"),
+                name: String::from("MyEq"),
                 body: Expr::Builtin(Builtin::EqArray),
             }],
         );
@@ -161,11 +162,11 @@ fn solve_constraint_4() {
             )],
             None,
         ));
-        let constraint = &Constraint::from_type(&core::Type::mk_app(
+        let constraint = &Constraint::from_type(&core::Type::app(
             eq_ty,
-            core::Type::mk_app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
+            core::Type::app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
         ));
-        let actual = solve_constraint(&None, &mut tc, constraint);
+        let actual = solve_constraint(0, &None, &mut tc, constraint);
 
         assert_eq!(expected, actual)
     })

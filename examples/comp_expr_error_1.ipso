@@ -1,5 +1,5 @@
 main : IO ()
 main =
   comp
-    bind x <- readLineStdin stdin
-    writeStdout stdout x
+    bind x <- readln
+    print 1

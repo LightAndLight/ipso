@@ -2,8 +2,8 @@ recount : Int -> Int
 recount n =
   if eqInt n 0
   then 0
-  else add 1 (recount "hello")
+  else 1 + recount "hello"
 
 main : IO ()
 main =
-  writeStdout stdout (toUtf8 "${showInt (recount 10)}\n")
+  println (showInt (recount 10))

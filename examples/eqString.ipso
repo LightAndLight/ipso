@@ -1,10 +1,10 @@
 printBool : Bool -> IO ()
 printBool b =
-  writeStdout stdout (toUtf8 (
+  print (
     if b
     then "true\n"
     else "false\n"
-  ))
+  )
 
 main : IO ()
 main = 

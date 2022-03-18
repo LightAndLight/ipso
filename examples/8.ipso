@@ -1,2 +1,2 @@
 main : IO ()
-main = bindIO (readLineStdin stdin) (\x -> writeStdout stdout (toUtf8 "hello $x"))
+main = bindIO readln (\x -> print "hello $x")

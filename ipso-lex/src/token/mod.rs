@@ -18,6 +18,8 @@ impl Arbitrary for Relation {
     }
 }
 
+pub const INDENT_TAG: usize = 52;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
@@ -58,6 +60,12 @@ pub enum Name {
     Indent(Relation, usize),
     Dedent,
     Eof,
+    Backtick,
+    Cmd,
+    Bang,
+    Ampersand,
+    LParenPipe,
+    PipeRParen,
 }
 
 impl Arbitrary for Name {
@@ -100,6 +108,12 @@ impl Arbitrary for Name {
             Name::Slash,
             Name::Indent(Relation::arbitrary(g), usize::arbitrary(g)),
             Name::Dedent,
+            Name::Backtick,
+            Name::Cmd,
+            Name::Bang,
+            Name::Ampersand,
+            Name::LParenPipe,
+            Name::PipeRParen,
         ];
         g.choose(vals).unwrap().clone()
     }
@@ -107,7 +121,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        37 + Keyword::num_variants()
+        44 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -133,41 +147,46 @@ impl Name {
             18 => Some(Self::Keyword(Keyword::Let)),
             19 => Some(Self::Keyword(Keyword::In)),
             20 => Some(Self::Keyword(Keyword::Comp)),
-            21 => Some(Self::Keyword(Keyword::Return)),
-            22 => Some(Self::Keyword(Keyword::Bind)),
-            23 => Some(Self::Int),
-            24 => Some(Self::DoubleQuote),
-            25 => Some(Self::Dollar),
-            26 => Some(Self::DollarLBrace),
-            27 => Some(Self::String),
-            28 => Some(Self::SingleQuote),
-            29 => Some(Self::Char),
-            30 => Some(Self::LBrace),
-            31 => Some(Self::RBrace),
-            32 => Some(Self::LParen),
-            33 => Some(Self::RParen),
-            34 => Some(Self::LBracket),
-            35 => Some(Self::RBracket),
-            36 => Some(Self::LAngle),
-            37 => Some(Self::RAngle),
-            38 => Some(Self::Backslash),
-            39 => Some(Self::LeftArrow),
-            40 => Some(Self::Arrow),
-            41 => Some(Self::FatArrow),
-            42 => Some(Self::Dot),
-            43 => Some(Self::DotDot),
-            44 => Some(Self::Asterisk),
-            45 => Some(Self::Equals),
-            46 => Some(Self::Colon),
-            47 => Some(Self::Comma),
-            48 => Some(Self::Pipe),
-            49 => Some(Self::Underscore),
-            50 => Some(Self::Hyphen),
-            51 => Some(Self::Plus),
-            52 => Some(Self::Slash),
-            // 53 => Self::Indent(_),
-            54 => Some(Self::Dedent),
-            55 => Some(Self::Eof),
+            21 => Some(Self::Keyword(Keyword::Bind)),
+            22 => Some(Self::Int),
+            23 => Some(Self::DoubleQuote),
+            24 => Some(Self::Dollar),
+            25 => Some(Self::DollarLBrace),
+            26 => Some(Self::String),
+            27 => Some(Self::SingleQuote),
+            28 => Some(Self::Char),
+            29 => Some(Self::LBrace),
+            30 => Some(Self::RBrace),
+            31 => Some(Self::LParen),
+            32 => Some(Self::RParen),
+            33 => Some(Self::LBracket),
+            34 => Some(Self::RBracket),
+            35 => Some(Self::LAngle),
+            36 => Some(Self::RAngle),
+            37 => Some(Self::Backslash),
+            38 => Some(Self::LeftArrow),
+            39 => Some(Self::Arrow),
+            40 => Some(Self::FatArrow),
+            41 => Some(Self::Dot),
+            42 => Some(Self::DotDot),
+            43 => Some(Self::Asterisk),
+            44 => Some(Self::Equals),
+            45 => Some(Self::Colon),
+            46 => Some(Self::Comma),
+            47 => Some(Self::Pipe),
+            48 => Some(Self::Underscore),
+            49 => Some(Self::Hyphen),
+            50 => Some(Self::Plus),
+            51 => Some(Self::Slash),
+            // INDENT_TAG => Self::Indent(_),
+            53 => Some(Self::Dedent),
+            54 => Some(Self::Eof),
+            55 => Some(Self::Backtick),
+            56 => Some(Self::Cmd),
+            57 => Some(Self::Bang),
+            58 => Some(Self::Ampersand),
+            59 => Some(Self::LParenPipe),
+            60 => Some(Self::PipeRParen),
             _ => None,
         }
     }
@@ -195,41 +214,46 @@ impl Name {
             Self::Keyword(Keyword::Let) => 18,
             Self::Keyword(Keyword::In) => 19,
             Self::Keyword(Keyword::Comp) => 20,
-            Self::Keyword(Keyword::Return) => 21,
-            Self::Keyword(Keyword::Bind) => 22,
-            Self::Int => 23,
-            Self::DoubleQuote => 24,
-            Self::Dollar => 25,
-            Self::DollarLBrace => 26,
-            Self::String => 27,
-            Self::SingleQuote => 28,
-            Self::Char => 29,
-            Self::LBrace => 30,
-            Self::RBrace => 31,
-            Self::LParen => 32,
-            Self::RParen => 33,
-            Self::LBracket => 34,
-            Self::RBracket => 35,
-            Self::LAngle => 36,
-            Self::RAngle => 37,
-            Self::Backslash => 38,
-            Self::LeftArrow => 39,
-            Self::Arrow => 40,
-            Self::FatArrow => 41,
-            Self::Dot => 42,
-            Self::DotDot => 43,
-            Self::Asterisk => 44,
-            Self::Equals => 45,
-            Self::Colon => 46,
-            Self::Comma => 47,
-            Self::Pipe => 48,
-            Self::Underscore => 49,
-            Self::Hyphen => 50,
-            Self::Plus => 51,
-            Self::Slash => 52,
-            Self::Indent(_, _) => 53,
-            Self::Dedent => 54,
-            Self::Eof => 55,
+            Self::Keyword(Keyword::Bind) => 21,
+            Self::Int => 22,
+            Self::DoubleQuote => 23,
+            Self::Dollar => 24,
+            Self::DollarLBrace => 25,
+            Self::String => 26,
+            Self::SingleQuote => 27,
+            Self::Char => 28,
+            Self::LBrace => 29,
+            Self::RBrace => 30,
+            Self::LParen => 31,
+            Self::RParen => 32,
+            Self::LBracket => 33,
+            Self::RBracket => 34,
+            Self::LAngle => 35,
+            Self::RAngle => 36,
+            Self::Backslash => 37,
+            Self::LeftArrow => 38,
+            Self::Arrow => 39,
+            Self::FatArrow => 40,
+            Self::Dot => 41,
+            Self::DotDot => 42,
+            Self::Asterisk => 43,
+            Self::Equals => 44,
+            Self::Colon => 45,
+            Self::Comma => 46,
+            Self::Pipe => 47,
+            Self::Underscore => 48,
+            Self::Hyphen => 49,
+            Self::Plus => 50,
+            Self::Slash => 51,
+            Self::Indent(_, _) => INDENT_TAG,
+            Self::Dedent => 53,
+            Self::Eof => 54,
+            Self::Backtick => 55,
+            Self::Cmd => 56,
+            Self::Bang => 57,
+            Self::Ampersand => 58,
+            Self::LParenPipe => 59,
+            Self::PipeRParen => 60,
         }
     }
 
@@ -283,6 +307,12 @@ impl Name {
             Name::LAngle => String::from("'<'"),
             Name::RAngle => String::from("'>'"),
             Name::Eof => String::from("end of input"),
+            Name::Backtick => String::from("'`'"),
+            Name::Cmd => String::from("command fragment"),
+            Name::Bang => String::from('!'),
+            Name::Ampersand => String::from('&'),
+            Name::LParenPipe => String::from("(|"),
+            Name::PipeRParen => String::from("|)"),
         }
     }
 }
@@ -336,61 +366,19 @@ pub enum Data {
     Hyphen,
     Plus,
     Slash,
+
+    Backtick,
+    Cmd(Rc<str>),
+
+    Bang,
+    Ampersand,
+
+    LParenPipe,
+    PipeRParen,
 }
 
 impl Data {
-    pub fn render(&self) -> String {
-        match self {
-            Data::Unexpected(_) => String::from("unexpected"),
-            Data::Eof => String::from("end of input"),
-            Data::Ident(s) => {
-                if s.is_empty() {
-                    String::from("identifier")
-                } else {
-                    format!("\"{}\"", s)
-                }
-            }
-            Data::Int { value, length } => {
-                if *length == 0 {
-                    String::from("integer")
-                } else {
-                    format!("\"{}\"", value)
-                }
-            }
-            Data::Comment { .. } => String::from("comment"),
-            Data::DoubleQuote => String::from("'\"'"),
-            Data::Dollar => String::from("'$'"),
-            Data::DollarLBrace => String::from("'${'"),
-            Data::String { value, .. } => format!("{:?}", value),
-            Data::SingleQuote => String::from("'"),
-            Data::Char { value, .. } => format!("'{}'", value),
-            Data::LBrace => String::from("'{'"),
-            Data::RBrace => String::from("'}'"),
-            Data::LParen => String::from("'('"),
-            Data::RParen => String::from("')'"),
-            Data::LBracket => String::from("'['"),
-            Data::RBracket => String::from("']'"),
-            Data::Backslash => String::from("'\\'"),
-            Data::LeftArrow => String::from("'<-'"),
-            Data::Arrow => String::from("'->'"),
-            Data::FatArrow => String::from("'=>'"),
-            Data::Dot => String::from("'.'"),
-            Data::DotDot => String::from("'..'"),
-            Data::Asterisk => String::from("'*'"),
-            Data::Equals => String::from("'='"),
-            Data::Colon => String::from("':'"),
-            Data::Comma => String::from("','"),
-            Data::Underscore => String::from("'_'"),
-            Data::Hyphen => String::from("'-'"),
-            Data::Plus => String::from("'+'"),
-            Data::Slash => String::from("'/'"),
-            Data::Ctor => String::from("constructor"),
-            Data::Pipe => String::from("'|'"),
-            Data::LAngle => String::from("'<'"),
-            Data::RAngle => String::from("'>'"),
-        }
-    }
-
+    /// The number of bytes that were consumed to produce the token.
     pub fn length(&self) -> usize {
         match self {
             Data::Unexpected(_) => 1,
@@ -427,6 +415,12 @@ impl Data {
             Data::Pipe => 1,
             Data::LAngle => 1,
             Data::RAngle => 1,
+            Data::Backtick => 1,
+            Data::Cmd(value) => value.len(),
+            Data::Bang => 1,
+            Data::Ampersand => 1,
+            Data::LParenPipe => 2,
+            Data::PipeRParen => 2,
 
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
@@ -469,6 +463,12 @@ impl Data {
             Data::Hyphen => Name::Hyphen,
             Data::Plus => Name::Plus,
             Data::Slash => Name::Slash,
+            Data::Backtick => Name::Backtick,
+            Data::Cmd(_) => Name::Cmd,
+            Data::Bang => Name::Bang,
+            Data::Ampersand => Name::Ampersand,
+            Data::LParenPipe => Name::LParenPipe,
+            Data::PipeRParen => Name::PipeRParen,
         }
     }
 }

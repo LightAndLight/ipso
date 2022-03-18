@@ -1,11 +1,12 @@
-use ipso_core::{Builtin, CommonKinds, Declaration, Expr, Module, Type, TypeSig};
+use ipso_core::{
+    Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember,
+    Module, Pattern, Type, TypeSig,
+};
 use ipso_syntax::kind::Kind;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
-    let stdout_ty = Type::unsafe_mk_name(Rc::from("Stdout"), Kind::Type);
-    let stdin_ty = Type::unsafe_mk_name(Rc::from("Stdin"), Kind::Type);
     let string_ty = Type::String;
     let bytes_ty = Type::Bytes;
     let io_ty = Type::mk_io(common_kinds);
@@ -31,22 +32,22 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), b.kind()),
                         ],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(common_kinds, a.clone(), b.clone()),
-                            Type::mk_arrow(
+                            Type::arrow(common_kinds, a.clone(), b.clone()),
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_app(io_ty.clone(), a),
-                                Type::mk_app(io_ty.clone(), b),
+                                Type::app(io_ty.clone(), a),
+                                Type::app(io_ty.clone(), b),
                             ),
                         ),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::MapIO),
             },
-            // pureIO : a -> IO a
+            // pure : a -> IO a
             Declaration::Definition {
-                name: String::from("pureIO"),
+                name: String::from("pure"),
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
@@ -54,14 +55,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // a : Type
                             (Rc::from("a"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            a.clone(),
-                            Type::mk_app(io_ty.clone(), a),
-                        ),
+                        body: Type::arrow(common_kinds, a.clone(), Type::app(io_ty.clone(), a)),
                     }
                 },
-                body: Expr::alloc_builtin(Builtin::PureIO),
+                body: Expr::alloc_builtin(Builtin::Pure),
             },
             // bindIO : IO a -> (a -> IO b) -> IO b
             Declaration::Definition {
@@ -76,17 +73,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(io_ty.clone(), a.clone()),
-                            Type::mk_arrow(
+                            Type::app(io_ty.clone(), a.clone()),
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_arrow(
-                                    common_kinds,
-                                    a,
-                                    Type::mk_app(io_ty.clone(), b.clone()),
-                                ),
-                                Type::mk_app(io_ty.clone(), b),
+                                Type::arrow(common_kinds, a, Type::app(io_ty.clone(), b.clone())),
+                                Type::app(io_ty.clone(), b),
                             ),
                         ),
                     }
@@ -106,11 +99,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // b : Type
                             (Rc::from("b"), a.kind()),
                         ],
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            a,
-                            Type::mk_arrow(common_kinds, b.clone(), b),
-                        ),
+                        body: Type::arrow(common_kinds, a, Type::arrow(common_kinds, b.clone(), b)),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Trace),
@@ -120,165 +109,77 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("toUtf8"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(common_kinds, string_ty.clone(), bytes_ty.clone()),
+                    body: Type::arrow(common_kinds, string_ty.clone(), bytes_ty),
                 },
                 body: Expr::alloc_builtin(Builtin::ToUtf8),
             },
-            // Stdout : Type
-            Declaration::BuiltinType {
-                name: String::from("Stdout"),
-                kind: Kind::Type,
-            },
-            // stdout : Stdout
+            // println : String -> IO ()
             Declaration::Definition {
-                name: String::from("stdout"),
+                name: String::from("println"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: stdout_ty.clone(),
-                },
-                body: Expr::alloc_builtin(Builtin::Stdout),
-            },
-            // writeStdout : Stdout -> Bytes -> IO ()
-            Declaration::Definition {
-                name: String::from("writeStdout"),
-                sig: TypeSig {
-                    ty_vars: vec![],
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
-                        stdout_ty.clone(),
-                        Type::mk_arrow(
-                            common_kinds,
-                            bytes_ty,
-                            Type::mk_app(io_ty.clone(), unit_ty.clone()),
-                        ),
+                        string_ty.clone(),
+                        Type::app(io_ty.clone(), unit_ty.clone()),
                     ),
                 },
-                body: Expr::alloc_builtin(Builtin::WriteStdout),
+                body: Expr::alloc_builtin(Builtin::Println),
             },
-            // flushStdout : Stdout -> IO ()
+            // print : String -> IO ()
             Declaration::Definition {
-                name: String::from("flushStdout"),
+                name: String::from("print"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
-                        stdout_ty,
-                        Type::mk_app(io_ty.clone(), unit_ty),
+                        string_ty.clone(),
+                        Type::app(io_ty.clone(), unit_ty),
                     ),
                 },
-                body: Expr::alloc_builtin(Builtin::FlushStdout),
+                body: Expr::alloc_builtin(Builtin::Print),
             },
-            // Stdin : Type
-            Declaration::BuiltinType {
-                name: String::from("Stdin"),
-                kind: Kind::Type,
-            },
-            // stdin : Stdin
+            // readln : IO String
             Declaration::Definition {
-                name: String::from("stdin"),
+                name: String::from("readln"),
                 sig: TypeSig {
                     ty_vars: vec![],
-                    body: stdin_ty.clone(),
+                    body: Type::app(io_ty.clone(), string_ty.clone()),
                 },
-                body: Expr::alloc_builtin(Builtin::Stdin),
-            },
-            // readLineStdin : Stdin -> IO String
-            Declaration::Definition {
-                name: String::from("readLineStdin"),
-                sig: TypeSig {
-                    ty_vars: vec![],
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        stdin_ty,
-                        Type::mk_app(io_ty, string_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::ReadLineStdin),
+                body: Expr::alloc_builtin(Builtin::Readln),
             },
             // eqString : String -> String -> Bool
             Declaration::Definition {
                 name: String::from("eqString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         string_ty.clone(),
-                        Type::mk_arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqString),
-            },
-            // add : Int -> Int -> Int
-            Declaration::Definition {
-                name: String::from("add"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), int_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::Add),
-            },
-            // subtract : Int -> Int -> Int
-            Declaration::Definition {
-                name: String::from("subtract"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), int_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::Subtract),
-            },
-            // multiply : Int -> Int -> Int
-            Declaration::Definition {
-                name: String::from("multiply"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), int_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::Multiply),
             },
             // eqInt : Int -> Int -> Bool
             Declaration::Definition {
                 name: String::from("eqInt"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqInt),
-            },
-            // ltInt : Int -> Int -> Bool
-            Declaration::Definition {
-                name: String::from("ltInt"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::mk_arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::LtInt),
             },
             // showInt : Int -> String
             Declaration::Definition {
                 name: String::from("showInt"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(common_kinds, int_ty.clone(), string_ty.clone()),
+                    body: Type::arrow(common_kinds, int_ty.clone(), string_ty.clone()),
                 },
                 body: Expr::alloc_builtin(Builtin::ShowInt),
             },
@@ -289,19 +190,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), bool_ty.clone()),
+                                Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                Type::mk_arrow(
+                                Type::app(array_ty.clone(), a.clone()),
+                                Type::arrow(
                                     common_kinds,
-                                    Type::mk_app(array_ty.clone(), a),
+                                    Type::app(array_ty.clone(), a),
                                     bool_ty.clone(),
                                 ),
                             ),
@@ -309,34 +210,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::EqArray),
-            },
-            // ltArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
-            Declaration::Definition {
-                name: String::from("ltArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
-                            common_kinds,
-                            Type::mk_arrow(
-                                common_kinds,
-                                a.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), bool_ty.clone()),
-                            ),
-                            Type::mk_arrow(
-                                common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                Type::mk_arrow(
-                                    common_kinds,
-                                    Type::mk_app(array_ty.clone(), a),
-                                    bool_ty.clone(),
-                                ),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::LtArray),
             },
             // foldlArray : (b -> a -> b) -> b -> Array a -> b
             Declaration::Definition {
@@ -346,17 +219,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("b"), b.kind()), (Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 b.clone(),
-                                Type::mk_arrow(common_kinds, a.clone(), b.clone()),
+                                Type::arrow(common_kinds, a.clone(), b.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 b.clone(),
-                                Type::mk_arrow(common_kinds, Type::mk_app(array_ty.clone(), a), b),
+                                Type::arrow(common_kinds, Type::app(array_ty.clone(), a), b),
                             ),
                         ),
                     }
@@ -370,13 +243,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
-                                Type::mk_arrow(common_kinds, int_ty.clone(), a.clone()),
-                                Type::mk_app(array_ty.clone(), a),
+                                Type::arrow(common_kinds, int_ty.clone(), a.clone()),
+                                Type::app(array_ty.clone(), a),
                             ),
                         ),
                     }
@@ -390,9 +263,9 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(array_ty.clone(), a),
+                            Type::app(array_ty.clone(), a),
                             int_ty.clone(),
                         ),
                     }
@@ -406,14 +279,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
-                                common_kinds,
-                                Type::mk_app(array_ty.clone(), a.clone()),
-                                a,
-                            ),
+                            Type::arrow(common_kinds, Type::app(array_ty.clone(), a.clone()), a),
                         ),
                     }
                 },
@@ -426,16 +295,16 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
                             int_ty.clone(),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 int_ty,
-                                Type::mk_arrow(
+                                Type::arrow(
                                     common_kinds,
-                                    Type::mk_app(array_ty.clone(), a.clone()),
-                                    Type::mk_app(array_ty.clone(), a),
+                                    Type::app(array_ty.clone(), a.clone()),
+                                    Type::app(array_ty.clone(), a),
                                 ),
                             ),
                         ),
@@ -448,10 +317,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("filterString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
-                        Type::mk_arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
-                        Type::mk_arrow(common_kinds, string_ty.clone(), string_ty.clone()),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
+                        Type::arrow(common_kinds, string_ty.clone(), string_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::FilterString),
@@ -461,10 +330,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("eqChar"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::mk_arrow(common_kinds, char_ty.clone(), bool_ty),
+                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::EqChar),
@@ -474,13 +343,13 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("splitString"),
                 sig: TypeSig {
                     ty_vars: Vec::new(),
-                    body: Type::mk_arrow(
+                    body: Type::arrow(
                         common_kinds,
                         char_ty.clone(),
-                        Type::mk_arrow(
+                        Type::arrow(
                             common_kinds,
                             string_ty.clone(),
-                            Type::mk_app(array_ty.clone(), string_ty.clone()),
+                            Type::app(array_ty.clone(), string_ty.clone()),
                         ),
                     ),
                 },
@@ -493,17 +362,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, char_ty, a.clone()),
+                                Type::arrow(common_kinds, char_ty, a.clone()),
                             ),
-                            Type::mk_arrow(
+                            Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::mk_arrow(common_kinds, string_ty, a),
+                                Type::arrow(common_kinds, string_ty, a),
                             ),
                         ),
                     }
@@ -517,14 +386,679 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     let a = Type::unsafe_mk_var(0, Kind::Type);
                     TypeSig {
                         ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                        body: Type::mk_arrow(
+                        body: Type::arrow(
                             common_kinds,
-                            Type::mk_app(array_ty.clone(), a.clone()),
-                            Type::mk_arrow(common_kinds, a.clone(), Type::mk_app(array_ty, a)),
+                            Type::app(array_ty.clone(), a.clone()),
+                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty.clone(), a)),
                         ),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::SnocArray),
+            },
+            // run : Cmd -> IO ()
+            Declaration::Definition {
+                name: String::from("run"),
+                sig: {
+                    TypeSig {
+                        ty_vars: Vec::new(),
+                        body: Type::arrow(common_kinds, Type::Cmd, Type::app(io_ty, Type::Unit)),
+                    }
+                },
+                body: Expr::alloc_builtin(Builtin::Run),
+            },
+            /*
+            class Eq a where
+              eq : a -> a -> Bool
+             */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("Eq"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("eq"),
+                    sig: TypeSig {
+                        ty_vars: vec![],
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::arrow(common_kinds, Type::Var(Kind::Type, 0), bool_ty),
+                        ),
+                    },
+                }],
+            }),
+            /*
+            instance Eq Int where
+              eq = eqInt
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Int,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqInt),
+                }],
+            },
+            /*
+            instance Eq Char where
+              eq = eqChar
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Char,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqChar),
+                }],
+            },
+            /*
+            instance Eq String where
+              eq = eqString
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqString),
+                }],
+            },
+            /*
+            instance Eq Bool where
+              eq = eqBool
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Bool,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::Builtin(Builtin::EqBool),
+                }],
+            },
+            /*
+            instance Eq a where Eq (Array a) where
+              eq = eqArray eq
+             */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                superclass_constructors: vec![],
+                // Eq a
+                assumes: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Var(Kind::Type, 0),
+                )],
+                // Eq (Array a)
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("eq"),
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::EqArray),
+                            Expr::mk_app(Expr::Name(String::from("eq")), Expr::Var(0)),
+                        ),
+                    ),
+                }],
+            },
+            /*
+            class Eq a => Ord a where
+              compare : a -> a -> (| Less : (), Equal : (), Greater : () |)
+             */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Eq"),
+                    ),
+                    Type::Name(Kind::Type, Rc::from("a")),
+                )],
+                name: Rc::from("Ord"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("compare"),
+                    sig: TypeSig {
+                        ty_vars: vec![],
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::arrow(
+                                common_kinds,
+                                Type::Var(Kind::Type, 0),
+                                Type::mk_variant(
+                                    common_kinds,
+                                    vec![
+                                        (Rc::from("Less"), Type::Unit),
+                                        (Rc::from("Equal"), Type::Unit),
+                                        (Rc::from("Greater"), Type::Unit),
+                                    ],
+                                    None,
+                                ),
+                            ),
+                        ),
+                    },
+                }],
+            }),
+            /*
+            instance Ord Bool where
+              compare a b =
+                if a
+                then if b then EQ () else GT ()
+                else if b then LT () else EQ ()
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq Bool
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Bool,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_ifthenelse(
+                                Expr::Var(1),
+                                Expr::mk_ifthenelse(
+                                    Expr::Var(0),
+                                    // EQ () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
+                                    // GT () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(1)), Expr::Unit),
+                                ),
+                                Expr::mk_ifthenelse(
+                                    Expr::Var(0),
+                                    // LT () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(2)), Expr::Unit),
+                                    // EQ () : (| EQ : (), GT : (), LT : () |)
+                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
+                                ),
+                            ),
+                        ),
+                    ),
+                }],
+            },
+            /*
+            instance Ord Char where
+              compare = compareChar
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq Char
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Char,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::Builtin(Builtin::CompareChar),
+                }],
+            },
+            /*
+            instance Ord String where
+              compare = compareString
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq String
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqString))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::Builtin(Builtin::CompareString),
+                }],
+            },
+            /*
+            instance Ord Int where
+              compare = compareInt
+             */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![
+                    // dict : Eq Int
+                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
+                ],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Int,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    body: Expr::Builtin(Builtin::CompareInt),
+                }],
+            },
+            /*
+            instance Ord a => Ord (Array a) where
+              compare = compareArray compare
+             */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                superclass_constructors: vec![
+                    /*
+                    dict : Ord a -> Eq (Array a)
+                    dict = \ordDict -> { 0 = eqArray (eq ordDict.0) }
+                    */
+                    Expr::mk_lam(
+                        true,
+                        Expr::mk_record(
+                            vec![(
+                                Expr::Int(0),
+                                Expr::mk_app(
+                                    Expr::Builtin(Builtin::EqArray),
+                                    Expr::mk_app(
+                                        Expr::Name(String::from("eq")),
+                                        Expr::mk_project(Expr::Var(0), Expr::Int(0)),
+                                    ),
+                                ),
+                            )],
+                            None,
+                        ),
+                    ),
+                ],
+                assumes: vec![Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::Var(Kind::Type, 0),
+                )],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Ord"),
+                    ),
+                    Type::app(
+                        Type::Array(Kind::mk_arrow(&Kind::Type, &Kind::Type)),
+                        Type::Var(Kind::Type, 0),
+                    ),
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("compare"),
+                    // \ordDict -> compareArray (compare ordDict)
+                    body: Expr::mk_lam(
+                        true,
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::CompareArray),
+                            Expr::mk_app(Expr::Name(String::from("compare")), Expr::Var(0)),
+                        ),
+                    ),
+                }],
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("neq"),
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Eq"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    // \eqDict a b -> if eq eqDict a b then false else true
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_ifthenelse(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("eq")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    Expr::False,
+                                    Expr::True,
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("lt"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Less () -> True
+                        _ -> False
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Less () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(2)),
+                                            },
+                                            body: Expr::True,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::False,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("lte"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Greater () -> False
+                        _ -> True
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(1)),
+                                            },
+                                            body: Expr::False,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::True,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("gt"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Greater () -> True
+                        _ -> False
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Greater () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(1)),
+                                            },
+                                            body: Expr::True,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::False,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
+            },
+            {
+                let a = Type::Var(Kind::Type, 0);
+                Declaration::Definition {
+                    name: String::from("gte"),
+                    // Ord a => a -> a -> Bool
+                    sig: TypeSig::new(
+                        vec![(Rc::from("a"), Kind::Type)],
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Ord"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(
+                                common_kinds,
+                                a.clone(),
+                                Type::arrow(common_kinds, a, Type::Bool),
+                            ),
+                        ),
+                    ),
+                    /*
+                    \ordDict a b ->
+                      case compare ordDict a b of
+                        Less () -> False
+                        _ -> True
+                    */
+                    body: Rc::new(Expr::mk_lam(
+                        true,
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_case(
+                                    Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Name(String::from("compare")),
+                                                Expr::Var(2),
+                                            ),
+                                            Expr::Var(1),
+                                        ),
+                                        Expr::Var(0),
+                                    ),
+                                    vec![
+                                        Branch {
+                                            // Less () : (| Equal : (), Greater : (), Less : () |)
+                                            pattern: Pattern::Variant {
+                                                tag: Rc::new(Expr::Int(2)),
+                                            },
+                                            body: Expr::False,
+                                        },
+                                        Branch {
+                                            pattern: Pattern::Wildcard,
+                                            body: Expr::True,
+                                        },
+                                    ],
+                                ),
+                            ),
+                        ),
+                    )),
+                }
             },
         ],
     }

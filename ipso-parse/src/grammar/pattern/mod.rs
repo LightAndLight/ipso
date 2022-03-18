@@ -2,6 +2,8 @@
 
 mod test;
 
+use std::rc::Rc;
+
 use crate::{
     between, choices, indent, indent_scope, keep_right, map0, optional, spanned, ParseResult,
     Parser,
@@ -21,17 +23,13 @@ pub fn pattern_record_fields(
     names: &mut Vec<Spanned<String>>,
 ) -> ParseResult<Option<Spanned<String>>> {
     choices!(
-        parser,
         // ident [',' pattern_record_fields]
         spanned!(parser, indent!(parser, Relation::Gte, parser.ident_owned())).and_then(|name| {
             names.push(name);
-            optional!(
-                parser,
-                keep_right!(
-                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
-                    pattern_record_fields(parser, names)
-                )
-            )
+            optional!(keep_right!(
+                indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
+                pattern_record_fields(parser, names)
+            ))
             .map(|m_rest| match m_rest {
                 None => None,
                 Some(rest) => rest,
@@ -86,16 +84,30 @@ pattern ::=
   pattern_record
   pattern_variant
   char
+  int
+  '"' string '"'
   '_'
 ```
 */
 pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
     choices!(
-        parser,
         spanned!(parser, parser.ident_owned()).map(Pattern::Name),
         pattern_record(parser),
         pattern_variant(parser),
         spanned!(parser, parser.char()).map(Pattern::Char),
+        spanned!(parser, parser.int()).map(Pattern::Int),
+        spanned!(
+            parser,
+            between!(
+                parser.token(&token::Data::DoubleQuote),
+                parser.token(&token::Data::DoubleQuote),
+                parser.string()
+            )
+        )
+        .map(|s| Pattern::String(Spanned {
+            pos: s.pos,
+            item: Rc::from(s.item)
+        })),
         map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore))
     )
 }
