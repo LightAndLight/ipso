@@ -37,6 +37,8 @@
     * [Extension](#extension)
   * [IO](#io)
     * [Builtins](#builtins-3)
+  * [Commands](#commands)
+    * [Builtins](#builtins-4)
 * [Type Classes](#type-classes)
   * [Equality](#equality)
   * [Comparison](#comparison)
@@ -565,6 +567,26 @@ print : String -> IO ()
 
 ```ipso
 readln : IO String
+```
+
+### Commands
+
+```ipso-repl
+> :kind Cmd
+Type
+```
+
+```ipso-repl
+> :type `echo "hello, world!"
+Cmd
+```
+
+#### Builtins
+
+```ipso
+run : Cmd -> IO ()
+
+lines : Cmd -> IO (Array String)
 ```
 
 ## Type Classes

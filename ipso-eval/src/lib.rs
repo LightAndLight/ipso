@@ -10,10 +10,26 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
-    process,
+    process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
 use typed_arena::Arena;
+
+fn check_exit_status(cmd: &str, status: &ExitStatus) {
+    match status.code() {
+        Some(code) => {
+            if code == 0 {
+            } else {
+                println!("process {:?} exited with code {:?}", cmd, code);
+                process::exit(1);
+            }
+        }
+        None => {
+            println!("process {:?} terminated unexpectedly", cmd);
+            process::exit(1);
+        }
+    }
+}
 
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
@@ -245,7 +261,7 @@ impl<'heap> Object<'heap> {
         }
     }
 
-    pub fn unpack_cmd(&'heap self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&'heap self) -> &'heap [Rc<str>] {
         match self {
             Object::Cmd(values) => values,
             val => panic!("expected command, got {:?}", val),
@@ -429,7 +445,7 @@ impl<'heap> Value<'heap> {
         self.unpack_object().unpack_variant()
     }
 
-    pub fn unpack_cmd(&self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&self) -> &'heap [Rc<str>] {
         self.unpack_object().unpack_cmd()
     }
 
@@ -1146,23 +1162,9 @@ where {
                                         process::exit(1);
                                     });
 
-                                match status.code() {
-                                    Some(code) => {
-                                        if code == 0 {
-                                            Value::Unit
-                                        } else {
-                                            println!(
-                                                "process {:?} exited with code {:?}",
-                                                cmd[0], code
-                                            );
-                                            process::exit(1);
-                                        }
-                                    }
-                                    None => {
-                                        println!("process {:?} terminated unexpectedly", cmd[0]);
-                                        process::exit(1);
-                                    }
-                                }
+                                check_exit_status(&cmd[0], &status);
+
+                                Value::Unit
                             }
                         }
                         let env = interpreter.alloc_values({
@@ -1191,6 +1193,56 @@ where {
                     } else {
                         Value::False
                     }
+                }
+            ),
+            Builtin::Lines => function1!(
+                lines,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    fn lines_io_body<'heap>(
+                        interpreter: &mut Interpreter<'_, '_, 'heap>,
+                        env: &[Value],
+                    ) -> Value<'heap> {
+                        let cmd: &[Rc<str>] = env[0].unpack_cmd();
+                        if cmd.is_empty() {
+                            Value::Unit
+                        } else {
+                            let output = process::Command::new(cmd[0].as_ref())
+                                .args(cmd[1..].iter().map(|arg| arg.as_ref()))
+                                .stdin(Stdio::inherit())
+                                .stdout(Stdio::piped())
+                                .stderr(Stdio::inherit())
+                                .output()
+                                .unwrap_or_else(|err| {
+                                    panic!("failed to start process {:?}: {}", cmd[0], err)
+                                });
+
+                            check_exit_status(&cmd[0], &output.status);
+
+                            let lines: Vec<Value> = output
+                                .stdout
+                                .lines()
+                                .map(|line| {
+                                    let line = line.unwrap_or_else(|err| {
+                                        panic!("failed to decode line: {}", err)
+                                    });
+                                    let line = interpreter.alloc_str(&line);
+                                    interpreter.alloc(Object::String(line))
+                                })
+                                .collect();
+
+                            let lines = interpreter.alloc_values(lines);
+                            interpreter.alloc(Object::Array(lines))
+                        }
+                    }
+
+                    let env = interpreter.alloc_values([arg]);
+                    interpreter.alloc(Object::IO {
+                        env,
+                        body: IOBody(lines_io_body),
+                    })
                 }
             ),
         }

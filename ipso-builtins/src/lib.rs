@@ -372,7 +372,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             Type::arrow(
                                 common_kinds,
                                 a.clone(),
-                                Type::arrow(common_kinds, string_ty, a),
+                                Type::arrow(common_kinds, string_ty.clone(), a),
                             ),
                         ),
                     }
@@ -401,7 +401,11 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: {
                     TypeSig {
                         ty_vars: Vec::new(),
-                        body: Type::arrow(common_kinds, Type::Cmd, Type::app(io_ty, Type::Unit)),
+                        body: Type::arrow(
+                            common_kinds,
+                            Type::Cmd,
+                            Type::app(io_ty.clone(), Type::Unit),
+                        ),
                     }
                 },
                 body: Expr::alloc_builtin(Builtin::Run),
@@ -527,7 +531,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
                         Rc::from("Eq"),
                     ),
-                    Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                    Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
                 ),
                 members: vec![InstanceMember {
                     name: String::from("eq"),
@@ -1059,6 +1063,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         ),
                     )),
                 }
+            },
+            // lines : Cmd -> IO (Array String)
+            Declaration::Definition {
+                name: String::from("lines"),
+                sig: TypeSig::new(
+                    vec![],
+                    Type::arrow(
+                        common_kinds,
+                        Type::Cmd,
+                        Type::app(io_ty, Type::app(array_ty, string_ty)),
+                    ),
+                ),
+                body: Rc::new(Expr::Builtin(Builtin::Lines)),
             },
         ],
     }
