@@ -1,0 +1,9 @@
+mkEcho : String -> Cmd
+mkEcho a = `echo $a`
+
+main : IO ()
+main =
+  comp
+    println (showCmd (mkEcho "a"))
+    println (showCmd (mkEcho "bb"))
+    println (showCmd (mkEcho "cc dd"))

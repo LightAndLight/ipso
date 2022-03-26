@@ -1251,7 +1251,29 @@ where {
                 |interpreter: &mut Interpreter<'_, '_, 'heap>,
                  _: &'heap [Value<'heap>],
                  arg: Value<'heap>| {
-                    let cmd = arg.unpack_cmd().join(" ");
+                    let cmd = arg
+                        .unpack_cmd()
+                        .iter()
+                        .map(|value| {
+                            if value.contains(' ') {
+                                let mut string = String::with_capacity(value.len() + 2);
+
+                                string.push('"');
+                                value.chars().for_each(|c| {
+                                    if c == '"' {
+                                        string.push('\\');
+                                    }
+                                    string.push(c);
+                                });
+                                string.push('"');
+
+                                string
+                            } else {
+                                String::from(value.as_ref())
+                            }
+                        })
+                        .collect::<Vec<String>>()
+                        .join(" ");
                     interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
                 }
             ),
@@ -1657,7 +1679,19 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
-            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
+            Expr::Cmd(parts) => {
+                let parts = parts
+                    .iter()
+                    .map(|cmd_part| match cmd_part {
+                        ipso_core::CmdPart::Literal(value) => value.clone(),
+                        ipso_core::CmdPart::Expr(expr) => {
+                            let expr = self.eval(env, expr);
+                            Rc::from(expr.unpack_string())
+                        }
+                    })
+                    .collect();
+                self.alloc(Object::Cmd(parts))
+            }
         };
         out
     }

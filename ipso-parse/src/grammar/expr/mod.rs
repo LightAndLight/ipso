@@ -7,7 +7,7 @@ use crate::{
     map0, map2, operator::operator, optional, sep_by, spanned, ParseResult, Parser,
 };
 use ipso_lex::token;
-use ipso_syntax::{Binop, Branch, CompLine, Expr, Keyword, Spanned, StringPart};
+use ipso_syntax::{Binop, Branch, CmdPart, CompLine, Expr, Keyword, Spanned, StringPart};
 use std::rc::Rc;
 
 /**
@@ -246,30 +246,12 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
     })
 }
 
-pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
-    parser.expecting.insert(token::Name::Cmd);
-    match &parser.current {
-        None => ParseResult::unexpected(false),
-        Some(token) => match &token.data {
-            token::Data::Cmd(value) => {
-                let value = value.clone();
-                map0!(value, parser.consume())
-            }
-            _ => ParseResult::unexpected(false),
-        },
-    }
-}
-
 /**
-```text
-expr_cmd ::=
-  '`' cmd_part* '`'
-```
-
 ```text
 cmd_part ::=
   cmd_char*
   '"' string_char* '"'
+  '$' ident
 ```
 
 ```text
@@ -281,18 +263,49 @@ cmd_char ::=
   '\' '$'
 ```
 */
-pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
+pub fn cmd_part(parser: &mut Parser) -> ParseResult<CmdPart> {
+    choices!(
+        {
+            parser.expecting.insert(token::Name::Cmd);
+            match &parser.current {
+                None => ParseResult::unexpected(false),
+                Some(token) => match &token.data {
+                    token::Data::Cmd(value) => {
+                        let value = value.clone();
+                        map0!(CmdPart::Literal(value), parser.consume())
+                    }
+                    _ => ParseResult::unexpected(false),
+                },
+            }
+        },
+        between!(
+            parser.token(&token::Data::DoubleQuote),
+            parser.token(&token::Data::DoubleQuote),
+            parser.string().map(Rc::from)
+        )
+        .map(CmdPart::Literal),
+        keep_right!(
+            parser.token(&token::Data::Dollar),
+            spanned!(parser, parser.ident_owned())
+        )
+        .map(|value| CmdPart::Expr(Spanned {
+            pos: value.pos,
+            item: Expr::Var(value.item)
+        }))
+    )
+}
+
+/**
+```text
+expr_cmd ::=
+  '`' cmd_part* '`'
+```
+*/
+pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<CmdPart>> {
     between!(
         parser.token(&token::Data::Backtick),
         parser.token(&token::Data::Backtick),
-        many!(choices!(
-            cmd_part(parser),
-            between!(
-                parser.token(&token::Data::DoubleQuote),
-                parser.token(&token::Data::DoubleQuote),
-                parser.string().map(Rc::from)
-            )
-        ))
+        many!(cmd_part(parser))
     )
 }
 

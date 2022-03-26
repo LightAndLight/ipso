@@ -348,6 +348,12 @@ pub enum CompLine {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CmdPart {
+    Literal(Rc<str>),
+    Expr(Spanned<Expr>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
@@ -395,7 +401,7 @@ pub enum Expr {
 
     Comp(Vec<CompLine>),
 
-    Cmd(Vec<Rc<str>>),
+    Cmd(Vec<CmdPart>),
 }
 
 impl Expr {

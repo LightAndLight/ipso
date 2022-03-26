@@ -10,7 +10,9 @@ use crate::{
     BoundVars,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use ipso_core::{Binop, Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
+use ipso_core::{
+    Binop, Branch, CmdPart, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig,
+};
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, Spanned};
@@ -1451,7 +1453,18 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Int(n) => Ok((Expr::Int(*n), Type::Int)),
             syntax::Expr::Char(c) => Ok((Expr::Char(*c), Type::Char)),
             syntax::Expr::Unit => Ok((Expr::Unit, Type::Unit)),
-            syntax::Expr::Cmd(cmd_parts) => Ok((Expr::Cmd(cmd_parts.clone()), Type::Cmd)),
+            syntax::Expr::Cmd(cmd_parts) => {
+                let cmd_parts = cmd_parts
+                    .iter()
+                    .map(|cmd_part| match cmd_part {
+                        syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
+                        syntax::CmdPart::Expr(expr) => {
+                            self.check(expr, &Type::String).map(CmdPart::Expr)
+                        }
+                    })
+                    .collect::<Result<Vec<CmdPart>, _>>()?;
+                Ok((Expr::Cmd(cmd_parts), Type::Cmd))
+            }
             syntax::Expr::String(string_parts) => {
                 let string_parts: Vec<StringPart> = string_parts
                     .iter()
