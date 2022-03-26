@@ -1459,7 +1459,21 @@ impl<'a> InferenceContext<'a> {
                     .map(|cmd_part| match cmd_part {
                         syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
                         syntax::CmdPart::Expr(expr) => {
-                            self.check(expr, &Type::String).map(CmdPart::Expr)
+                            let expr = syntax::Expr::mk_app(
+                                Spanned {
+                                    pos: expr.pos,
+                                    item: syntax::Expr::Var(String::from("toArgs")),
+                                },
+                                expr.clone(),
+                            );
+                            self.check(
+                                &expr,
+                                &Type::app(
+                                    Type::Array(self.common_kinds.type_to_type.clone()),
+                                    Type::String,
+                                ),
+                            )
+                            .map(CmdPart::Expr)
                         }
                     })
                     .collect::<Result<Vec<CmdPart>, _>>()?;
