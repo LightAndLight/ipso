@@ -1072,7 +1072,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     Type::arrow(
                         common_kinds,
                         Type::Cmd,
-                        Type::app(io_ty, Type::app(array_ty, string_ty)),
+                        Type::app(io_ty, Type::app(array_ty.clone(), string_ty)),
                     ),
                 ),
                 body: Rc::new(Expr::Builtin(Builtin::Lines)),
@@ -1083,6 +1083,26 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
                 body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
             },
+            /*
+            class ToArgs a where
+              toArgs : a -> Array String
+            */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("ToArgs"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("toArgs"),
+                    sig: TypeSig::new(
+                        vec![],
+                        Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::app(array_ty, Type::String),
+                        ),
+                    ),
+                }],
+            }),
         ],
     }
 }

@@ -597,6 +597,9 @@ run : Cmd -> IO ()
 lines : Cmd -> IO (Array String)
 
 showCmd : Cmd -> String
+
+class ToArgs a where
+  toArgs : a -> Array String
 ```
 
 ## Type Classes
