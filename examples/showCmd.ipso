@@ -1,2 +1,6 @@
 main : IO ()
-main = println (showCmd `echo hello`)
+main = 
+  comp
+    println (showCmd `echo hello`)
+    println (showCmd `echo "hello world"`)
+    println (showCmd `echo "hello \"world\""`)
