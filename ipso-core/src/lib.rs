@@ -997,7 +997,15 @@ impl Expr {
                         .collect(),
                 ),
                 Expr::Unit => Expr::Unit,
-                Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+                Expr::Cmd(parts) => Expr::Cmd(
+                    parts
+                        .iter()
+                        .map(|part| match part {
+                            CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                            CmdPart::Expr(expr) => CmdPart::Expr(go(expr, f)),
+                        })
+                        .collect(),
+                ),
             }
         }
 
@@ -1105,7 +1113,15 @@ impl Expr {
             ),
 
             Expr::Unit => Expr::Unit,
-            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+            Expr::Cmd(parts) => Expr::Cmd(
+                parts
+                    .iter()
+                    .map(|part| match part {
+                        CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                        CmdPart::Expr(expr) => CmdPart::Expr(expr.__instantiate(depth, val)),
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -1208,7 +1224,10 @@ impl Expr {
 
             Expr::Unit => Ok(()),
 
-            Expr::Cmd(_) => Ok(()),
+            Expr::Cmd(parts) => parts.iter_mut().try_for_each(|part| match part {
+                CmdPart::Literal(_) => Ok(()),
+                CmdPart::Expr(expr) => expr.subst_placeholder(f),
+            }),
         }
     }
 
@@ -1286,7 +1305,15 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
-            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+            Expr::Cmd(parts) => Expr::Cmd(
+                parts
+                    .iter()
+                    .map(|part| match part {
+                        CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                        CmdPart::Expr(expr) => CmdPart::Expr(expr.__abstract_evar(depth, ev)),
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -1412,7 +1439,15 @@ impl<'a> Iterator for IterEVars<'a> {
                     xs
                 }),
                 Expr::Unit => Step::Skip,
-                Expr::Cmd(_) => Step::Skip,
+                Expr::Cmd(parts) => Step::Continue(
+                    parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            CmdPart::Literal(_) => None,
+                            CmdPart::Expr(expr) => Some(expr),
+                        })
+                        .collect(),
+                ),
             }
         }
 
