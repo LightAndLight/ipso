@@ -485,6 +485,8 @@ foldlArray : (b -> a -> b) -> b -> Array a -> b
 map : (a -> b) -> Array a -> Array b
 
 generateArray : Int -> (Int -> a) -> Array a
+
+flatMap : (a -> Array b) -> Array a -> Array b
 ```
 
 ### Byte Arrays

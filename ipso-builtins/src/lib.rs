@@ -1072,7 +1072,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     Type::arrow(
                         common_kinds,
                         Type::Cmd,
-                        Type::app(io_ty, Type::app(array_ty, string_ty)),
+                        Type::app(io_ty, Type::app(array_ty.clone(), string_ty)),
                     ),
                 ),
                 body: Rc::new(Expr::Builtin(Builtin::Lines)),
@@ -1082,6 +1082,27 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 name: String::from("showCmd"),
                 sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
                 body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
+            },
+            // flatMap : (a -> Array b) -> Array a -> Array b
+            Declaration::Definition {
+                name: String::from("flatMap"),
+                sig: TypeSig::new(
+                    vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
+                    Type::arrow(
+                        common_kinds,
+                        Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 1),
+                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
+                        ),
+                        Type::arrow(
+                            common_kinds,
+                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 1)),
+                            Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                        ),
+                    ),
+                ),
+                body: Rc::new(Expr::Builtin(Builtin::FlatMap)),
             },
         ],
     }

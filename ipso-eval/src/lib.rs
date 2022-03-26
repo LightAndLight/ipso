@@ -1277,6 +1277,23 @@ where {
                     interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
                 }
             ),
+            Builtin::FlatMap => function2!(
+                flat_map,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 env: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let f = env[0];
+                    let xs = arg.unpack_array();
+
+                    let mut result: Vec<Value> = Vec::new();
+                    for x in xs {
+                        result.extend(f.apply(interpreter, *x).unpack_array())
+                    }
+
+                    interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
+                }
+            ),
         }
     }
 

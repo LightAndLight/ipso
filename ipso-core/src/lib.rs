@@ -755,6 +755,7 @@ pub enum Builtin {
     EqBool,
     Lines,
     ShowCmd,
+    FlatMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

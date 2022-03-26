@@ -148,24 +148,19 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
             }
         }
         syntax::Expr::Project(value, field) => {
+            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(value).item);
+
             let (head, tail) = (*value).item.unwrap_projects();
-            match head {
-                syntax::Expr::Var(head) => match module_names.iter().find(|x| *x == head) {
-                    Some(_) => {
-                        let mut path: Vec<String> = Vec::with_capacity(tail.len() + 1);
-                        path.push(head.clone());
-                        path.extend(tail.into_iter().cloned());
-                        *expr = syntax::Expr::Module {
-                            name: syntax::ModuleName(path),
-                            item: field.clone(),
-                        }
+
+            if let syntax::Expr::Var(head) = head {
+                if module_names.iter().any(|x| x == head) {
+                    let mut path: Vec<String> = Vec::with_capacity(tail.len() + 1);
+                    path.push(head.clone());
+                    path.extend(tail.into_iter().cloned());
+                    *expr = syntax::Expr::Module {
+                        name: syntax::ModuleName(path),
+                        item: field.clone(),
                     }
-                    None => {
-                        todo!()
-                    }
-                },
-                _ => {
-                    todo!()
                 }
             }
         }
