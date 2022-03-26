@@ -276,7 +276,19 @@ hello!
 
 ```ipso-repl
 > :type \x -> `echo $x`
-String -> Cmd
+ToArgs a => a -> Cmd
+```
+
+```ipso-repl
+> let arg = "hi"
+> `echo $arg`
+`echo hi`
+```
+
+```ipso-repl
+> let args = ["hello", "world"]
+> `echo $arg`
+`echo hello world`
 ```
 
 ## Operators
@@ -599,6 +611,13 @@ run : Cmd -> IO ()
 lines : Cmd -> IO (Array String)
 
 showCmd : Cmd -> String
+
+class ToArgs a where
+  toArgs : a -> Array String
+
+instance ToArgs String
+
+instance ToArgs a => ToArgs (Array a) 
 ```
 
 ## Type Classes

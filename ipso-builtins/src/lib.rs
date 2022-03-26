@@ -1098,11 +1098,78 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         Type::arrow(
                             common_kinds,
                             Type::app(array_ty.clone(), Type::Var(Kind::Type, 1)),
-                            Type::app(array_ty, Type::Var(Kind::Type, 0)),
+                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
                         ),
                     ),
                 ),
                 body: Rc::new(Expr::Builtin(Builtin::FlatMap)),
+            },
+            /*
+            class ToArgs a where
+              toArgs : a -> Array String
+            */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("ToArgs"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("toArgs"),
+                    sig: TypeSig::new(
+                        vec![],
+                        Type::arrow(
+                            common_kinds,
+                            Type::Var(Kind::Type, 0),
+                            Type::app(array_ty.clone(), Type::String),
+                        ),
+                    ),
+                }],
+            }),
+            /*
+            instance ToArgs String where
+              toArgs x = [x]
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("ToArgs"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("toArgs"),
+                    body: Expr::mk_lam(true, Expr::Array(vec![Expr::Var(0)])),
+                }],
+            },
+            /*
+            instance ToArgs a => ToArgs (Array a) where
+              toArgs = flatMap toArgs
+            */
+            {
+                let to_args_ty = Type::Name(
+                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                    Rc::from("ToArgs"),
+                );
+                Declaration::Instance {
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                    superclass_constructors: vec![],
+                    assumes: vec![Type::app(to_args_ty.clone(), Type::Var(Kind::Type, 0))],
+                    head: Type::app(to_args_ty, Type::app(array_ty, Type::Var(Kind::Type, 0))),
+                    members: vec![InstanceMember {
+                        name: String::from("toArgs"),
+                        // \toArgsDict -> flatMap (toArgs toArgsDict)
+                        body: Expr::mk_lam(
+                            true,
+                            Expr::mk_app(
+                                Expr::Name(String::from("flatMap")),
+                                Expr::mk_app(Expr::Name(String::from("toArgs")), Expr::Var(0)),
+                            ),
+                        ),
+                    }],
+                }
             },
         ],
     }

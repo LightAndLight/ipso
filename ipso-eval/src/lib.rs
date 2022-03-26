@@ -1,6 +1,6 @@
 mod test;
 
-use ipso_core::{Binop, Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{Binop, Builtin, CmdPart, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::ModuleName;
 use paste::paste;
@@ -1697,17 +1697,18 @@ where {
             }
             Expr::Unit => Value::Unit,
             Expr::Cmd(parts) => {
-                let parts = parts
-                    .iter()
-                    .map(|cmd_part| match cmd_part {
-                        ipso_core::CmdPart::Literal(value) => value.clone(),
-                        ipso_core::CmdPart::Expr(expr) => {
-                            let expr = self.eval(env, expr);
-                            Rc::from(expr.unpack_string())
+                let mut new_parts: Vec<Rc<str>> = Vec::with_capacity(parts.len());
+                for part in parts {
+                    match part {
+                        CmdPart::Literal(value) => new_parts.push(value.clone()),
+                        CmdPart::Expr(expr) => {
+                            let args = self.eval(env, expr).unpack_array();
+                            new_parts
+                                .extend(args.iter().map(|value| Rc::from(value.unpack_string())));
                         }
-                    })
-                    .collect();
-                self.alloc(Object::Cmd(parts))
+                    }
+                }
+                self.alloc(Object::Cmd(new_parts))
             }
         };
         out
