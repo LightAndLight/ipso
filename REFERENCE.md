@@ -587,6 +587,8 @@ Cmd
 run : Cmd -> IO ()
 
 lines : Cmd -> IO (Array String)
+
+showCmd : Cmd -> String
 ```
 
 ## Type Classes

@@ -1,0 +1,2 @@
+main : IO ()
+main = println (showCmd `echo hello`)

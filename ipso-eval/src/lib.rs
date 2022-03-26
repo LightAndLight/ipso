@@ -1245,6 +1245,16 @@ where {
                     })
                 }
             ),
+            Builtin::ShowCmd => function1!(
+                show_cmd,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let cmd = arg.unpack_cmd().join(" ");
+                    interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
+                }
+            ),
         }
     }
 

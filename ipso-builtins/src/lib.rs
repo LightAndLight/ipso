@@ -1077,6 +1077,12 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 ),
                 body: Rc::new(Expr::Builtin(Builtin::Lines)),
             },
+            // showCmd : Cmd -> String
+            Declaration::Definition {
+                name: String::from("showCmd"),
+                sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
+                body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
+            },
         ],
     }
 }
