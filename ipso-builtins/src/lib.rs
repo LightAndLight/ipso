@@ -1103,6 +1103,26 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                 }],
             }),
+            /*
+            instance ToArgs String where
+              toArgs x = [x]
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                superclass_constructors: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("ToArgs"),
+                    ),
+                    Type::String,
+                ),
+                members: vec![InstanceMember {
+                    name: String::from("toArgs"),
+                    body: Expr::mk_lam(true, Expr::Array(vec![Expr::Var(0)])),
+                }],
+            },
         ],
     }
 }

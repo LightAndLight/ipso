@@ -600,6 +600,8 @@ showCmd : Cmd -> String
 
 class ToArgs a where
   toArgs : a -> Array String
+
+instance ToArgs String
 ```
 
 ## Type Classes
