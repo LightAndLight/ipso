@@ -19,6 +19,7 @@
 * [Let Bindings](#let-bindings)
 * [Computation Expressions](#computation-expressions)
 * [Command Literals](#command-literals)
+  * [Interpolation](#interpolation)
 * [Operators](#operators)
 * [Datatypes](#datatypes)
   * [Booleans](#booleans)
@@ -269,6 +270,13 @@ Cmd -> IO ()
 ```ipso-repl
 > run `echo "hello!"`
 hello!
+```
+
+### Interpolation
+
+```ipso-repl
+> :type \x -> `echo $x`
+String -> Cmd
 ```
 
 ## Operators
