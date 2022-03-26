@@ -1657,7 +1657,19 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
-            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
+            Expr::Cmd(parts) => {
+                let parts = parts
+                    .iter()
+                    .map(|cmd_part| match cmd_part {
+                        ipso_core::CmdPart::Literal(value) => value.clone(),
+                        ipso_core::CmdPart::Expr(expr) => {
+                            let expr = self.eval(env, expr);
+                            Rc::from(expr.unpack_string())
+                        }
+                    })
+                    .collect();
+                self.alloc(Object::Cmd(parts))
+            }
         };
         out
     }

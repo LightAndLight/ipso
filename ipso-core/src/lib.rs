@@ -780,6 +780,12 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CmdPart {
+    Literal(Rc<str>),
+    Expr(Expr),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
     EVar(EVar),
@@ -816,7 +822,7 @@ pub enum Expr {
     Case(Rc<Expr>, Vec<Branch>),
     Unit,
 
-    Cmd(Vec<Rc<str>>),
+    Cmd(Vec<CmdPart>),
 }
 
 impl Expr {

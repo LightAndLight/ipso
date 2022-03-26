@@ -659,19 +659,23 @@ impl<'input> Iterator for Lexer<'input> {
                                 column,
                             })
                         }
+                        '$' => {
+                            self.consume();
+                            self.mode.push(Mode::Ident);
+
+                            Some(Token {
+                                data: token::Data::Dollar,
+                                pos,
+                                column,
+                            })
+                        }
                         _ => {
                             let mut textual_length = 0;
                             let mut value = String::new();
 
                             while let Some(c) = self.current {
                                 match c {
-                                    '`' => {
-                                        break;
-                                    }
-                                    ' ' => {
-                                        break;
-                                    }
-                                    '"' => {
+                                    '`' | ' ' | '"' | '$' => {
                                         break;
                                     }
                                     '\\' => {
