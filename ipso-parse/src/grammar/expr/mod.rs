@@ -246,26 +246,7 @@ pub fn expr_array(parser: &mut Parser) -> ParseResult<Expr> {
     })
 }
 
-pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
-    parser.expecting.insert(token::Name::Cmd);
-    match &parser.current {
-        None => ParseResult::unexpected(false),
-        Some(token) => match &token.data {
-            token::Data::Cmd(value) => {
-                let value = value.clone();
-                map0!(value, parser.consume())
-            }
-            _ => ParseResult::unexpected(false),
-        },
-    }
-}
-
 /**
-```text
-expr_cmd ::=
-  '`' cmd_part* '`'
-```
-
 ```text
 cmd_part ::=
   cmd_char*
@@ -281,18 +262,40 @@ cmd_char ::=
   '\' '$'
 ```
 */
+pub fn cmd_part(parser: &mut Parser) -> ParseResult<Rc<str>> {
+    choices!(
+        {
+            parser.expecting.insert(token::Name::Cmd);
+            match &parser.current {
+                None => ParseResult::unexpected(false),
+                Some(token) => match &token.data {
+                    token::Data::Cmd(value) => {
+                        let value = value.clone();
+                        map0!(value, parser.consume())
+                    }
+                    _ => ParseResult::unexpected(false),
+                },
+            }
+        },
+        between!(
+            parser.token(&token::Data::DoubleQuote),
+            parser.token(&token::Data::DoubleQuote),
+            parser.string().map(Rc::from)
+        )
+    )
+}
+
+/**
+```text
+expr_cmd ::=
+  '`' cmd_part* '`'
+```
+*/
 pub fn expr_cmd(parser: &mut Parser) -> ParseResult<Vec<Rc<str>>> {
     between!(
         parser.token(&token::Data::Backtick),
         parser.token(&token::Data::Backtick),
-        many!(choices!(
-            cmd_part(parser),
-            between!(
-                parser.token(&token::Data::DoubleQuote),
-                parser.token(&token::Data::DoubleQuote),
-                parser.string().map(Rc::from)
-            )
-        ))
+        many!(cmd_part(parser))
     )
 }
 
