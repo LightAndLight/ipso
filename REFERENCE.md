@@ -276,7 +276,19 @@ hello!
 
 ```ipso-repl
 > :type \x -> `echo $x`
-String -> Cmd
+ToArgs a => a -> Cmd
+```
+
+```ipso-repl
+> let arg = "hi"
+> `echo $arg`
+`echo hi`
+```
+
+```ipso-repl
+> let args = ["hello", "world"]
+> `echo $arg`
+`echo hello world`
 ```
 
 ## Operators
