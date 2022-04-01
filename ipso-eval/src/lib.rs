@@ -520,7 +520,7 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module<'a> {
-    pub module_mapping: &'a HashMap<ModulePath, ModuleUsage>,
+    pub usages: &'a HashMap<ModulePath, ModuleUsage>,
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 
@@ -552,7 +552,7 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
                 (
                     module_path,
                     Module {
-                        module_mapping: &module.module_mapping,
+                        usages: &module.usages,
                         bindings: module.get_bindings(common_kinds),
                     },
                 )
@@ -1324,7 +1324,7 @@ where {
             None => panic!("no module found at {:?}", path),
             Some(module) => match module.bindings.get(binding) {
                 None => panic!("{:?} not found in {:?}", binding, path),
-                Some(expr) => (expr.clone(), module.module_mapping.clone()),
+                Some(expr) => (expr.clone(), module.usages.clone()),
             },
         };
         self.module_unmapping.push(

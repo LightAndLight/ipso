@@ -17,7 +17,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
     let array_ty = Type::mk_array(common_kinds);
 
     Module {
-        module_mapping: HashMap::new(),
+        usages: HashMap::new(),
         decls: vec![
             // mapIO : (a -> b) -> IO a -> IO b
             Declaration::Definition {

@@ -699,10 +699,10 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
-        let mut module_mapping = HashMap::new();
+        let mut module_usages = HashMap::new();
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(&mut module_mapping, decl)
+                self.check_declaration(&mut module_usages, decl)
                     .map(|m_decl| match m_decl {
                         Option::None => decls,
                         Option::Some(decl) => {
@@ -714,7 +714,7 @@ impl<'modules> Typechecker<'modules> {
             })
         })?;
         Ok(core::Module {
-            module_mapping,
+            usages: module_usages,
             decls,
         })
     }
@@ -1211,7 +1211,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
         module: &Spanned<String>,
         name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
@@ -1223,7 +1223,7 @@ impl<'modules> Typechecker<'modules> {
             Some(name) => name,
         };
 
-        match module_mapping.get(&path) {
+        match module_usages.get(&path) {
             None => {
                 let signatures = self
                     .modules
@@ -1232,7 +1232,7 @@ impl<'modules> Typechecker<'modules> {
                     .get_signatures(self.common_kinds);
                 let module_name = ModuleName(vec![actual_name.item.clone()]);
                 self.module_context.insert(module_name, signatures);
-                module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
+                module_usages.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
                 Ok(())
             }
             Some(_) => Err(TypeError::ShadowedModuleName {
@@ -1244,7 +1244,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_declaration(
         &mut self,
-        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
@@ -1260,7 +1260,7 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
             syntax::Declaration::Import { module, name } => self
-                .check_import(module_mapping, module, name)
+                .check_import(module_usages, module, name)
                 .map(|()| Option::None),
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))

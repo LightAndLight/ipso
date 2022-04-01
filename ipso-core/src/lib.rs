@@ -1733,7 +1733,7 @@ impl ModulePath {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     /// Describes how each imported file is referenced by this module.
-    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
+    pub usages: HashMap<ModulePath, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 
