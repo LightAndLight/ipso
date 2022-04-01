@@ -1069,7 +1069,7 @@ impl CheckedPattern {
 pub struct InferenceContext<'a> {
     common_kinds: &'a CommonKinds,
     source: &'a Source,
-    modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+    modules: HashMap<&'a ModuleName, &'a HashMap<String, TypeSig>>,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut kind_inference::Solutions,
@@ -1095,7 +1095,7 @@ impl<'a> InferenceContext<'a> {
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
-        modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+        modules: HashMap<&'a ModuleName, &'a HashMap<String, TypeSig>>,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut kind_inference::Solutions,

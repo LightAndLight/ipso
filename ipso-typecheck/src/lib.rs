@@ -148,7 +148,6 @@ pub struct Typechecker<'modules> {
     context: HashMap<String, core::TypeSig>,
     pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
     module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
-    module_context_names: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
     module_unmapping: HashMap<ModuleName, ModulePath>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
@@ -478,7 +477,6 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
-            module_context_names: HashMap::new(),
             module_unmapping: HashMap::new(),
             working_dir,
         }
@@ -1236,8 +1234,6 @@ impl<'modules> Typechecker<'modules> {
                     .get_signatures(self.common_kinds);
                 self.module_context.insert(path.clone(), signatures.clone());
                 let module_name = ModuleName(vec![actual_name.item.clone()]);
-                self.module_context_names
-                    .insert(module_name.clone(), signatures);
                 self.module_unmapping.insert(module_name, path.clone());
                 module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
                 Ok(())
@@ -1326,10 +1322,21 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn type_inference_context(&mut self) -> type_inference::InferenceContext {
+        let module_context = &self.module_context;
+        let module_context_named: HashMap<&ModuleName, &HashMap<String, core::TypeSig>> = self
+            .module_unmapping
+            .iter()
+            .filter_map(|(module_name, module_path)| {
+                module_context
+                    .get(module_path)
+                    .map(|type_sigs| (module_name, type_sigs))
+            })
+            .collect();
+
         type_inference::InferenceContext::new(
             self.common_kinds,
             &self.source,
-            &self.module_context_names,
+            module_context_named,
             &self.type_context,
             &self.bound_tyvars,
             &mut self.kind_solutions,
