@@ -7,6 +7,7 @@ edition = "2018"
 
 [dependencies]
 ipso-core = { path = "../ipso-core" }
+ipso-import = { path = "../ipso-import" }
 ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
 paste = "1.0.5"

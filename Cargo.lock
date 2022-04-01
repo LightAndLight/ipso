@@ -179,6 +179,7 @@ name = "ipso-eval"
 version = "0.1.0"
 dependencies = [
  "ipso-core",
+ "ipso-import",
  "ipso-rope",
  "ipso-syntax",
  "paste",

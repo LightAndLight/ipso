@@ -110,18 +110,6 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let mut stdin = config
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
-        let eval_modules = modules
-            .iter()
-            .map(|(module_path, module)| {
-                (
-                    module_path.clone(),
-                    eval::Module {
-                        module_mapping: module.module_mapping.clone(),
-                        bindings: module.get_bindings(&common_kinds),
-                    },
-                )
-            })
-            .collect();
         let context = builtins
             .decls
             .iter()
@@ -136,8 +124,9 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let mut interpreter = Interpreter::new(
             &mut stdin,
             &mut stdout,
+            &common_kinds,
+            &modules,
             &context,
-            eval_modules,
             &bytes,
             &values,
             &objects,

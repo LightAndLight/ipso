@@ -1,6 +1,9 @@
 mod test;
 
-use ipso_core::{Binop, Builtin, CmdPart, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{
+    Binop, Builtin, CmdPart, CommonKinds, Expr, ModulePath, ModuleUsage, Pattern, StringPart,
+};
+use ipso_import::Modules;
 use ipso_rope::Rope;
 use ipso_syntax::ModuleName;
 use paste::paste;
@@ -516,8 +519,8 @@ impl<'heap> PartialEq for Value<'heap> {
     }
 }
 
-pub struct Module {
-    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
+pub struct Module<'a> {
+    pub module_mapping: &'a HashMap<ModulePath, ModuleUsage>,
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 
@@ -528,7 +531,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
     context: &'ctx HashMap<String, Rc<Expr>>,
-    module_context: HashMap<ModulePath, Module>,
+    modules: HashMap<&'ctx ModulePath, Module<'ctx>>,
     module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
 }
 
@@ -536,17 +539,31 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
     pub fn new(
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
+        common_kinds: &'ctx CommonKinds,
+        modules: &'ctx Modules<'ctx>,
         context: &'ctx HashMap<String, Rc<Expr>>,
-        module_context: HashMap<ModulePath, Module>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
+        let modules = modules
+            .iter()
+            .map(|(module_path, module)| {
+                (
+                    module_path,
+                    Module {
+                        module_mapping: &module.module_mapping,
+                        bindings: module.get_bindings(common_kinds),
+                    },
+                )
+            })
+            .collect();
+
         Interpreter {
             stdin,
             stdout,
             context,
-            module_context,
+            modules,
             module_unmapping: Vec::with_capacity(1),
             bytes,
             values,
@@ -1303,7 +1320,7 @@ where {
         path: &ModulePath,
         binding: &str,
     ) -> Value<'heap> {
-        let (expr, next_module_mapping) = match self.module_context.get(path) {
+        let (expr, next_module_mapping) = match self.modules.get(path) {
             None => panic!("no module found at {:?}", path),
             Some(module) => match module.bindings.get(binding) {
                 None => panic!("{:?} not found in {:?}", binding, path),

@@ -3,7 +3,9 @@ use super::{Interpreter, Value};
 #[cfg(test)]
 use crate::{Env, Object};
 #[cfg(test)]
-use ipso_core::{Builtin, Expr, StringPart};
+use ipso_core::{Builtin, CommonKinds, Expr, StringPart};
+#[cfg(test)]
+use ipso_import::Modules;
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
@@ -20,12 +22,16 @@ fn eval_1() {
         Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
         Expr::Int(1),
     );
+    let common_kinds = CommonKinds::default();
     let context = HashMap::new();
+    let modules_data = Arena::new();
+    let modules = Modules::new(&modules_data);
     let mut interpreter = Interpreter::new(
         &mut stdin,
         &mut stdout,
+        &common_kinds,
+        &modules,
         &context,
-        HashMap::new(),
         &bytes,
         &values,
         &objects,
@@ -53,12 +59,16 @@ fn eval_2() {
         Expr::Builtin(Builtin::ToUtf8),
         Expr::String(vec![StringPart::String(str.clone())]),
     );
+    let common_kinds = CommonKinds::default();
     let context = HashMap::new();
+    let modules_data = Arena::new();
+    let modules = Modules::new(&modules_data);
     let mut interpreter = Interpreter::new(
         &mut stdin,
         &mut stdout,
+        &common_kinds,
+        &modules,
         &context,
-        HashMap::new(),
         &bytes,
         &values,
         &objects,
