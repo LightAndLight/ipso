@@ -147,8 +147,7 @@ pub struct Typechecker<'modules> {
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
     pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
-    module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
-    module_unmapping: HashMap<ModuleName, ModulePath>,
+    module_context: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
@@ -477,7 +476,6 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
-            module_unmapping: HashMap::new(),
             working_dir,
         }
     }
@@ -1232,9 +1230,8 @@ impl<'modules> Typechecker<'modules> {
                     .get(&path)
                     .unwrap()
                     .get_signatures(self.common_kinds);
-                self.module_context.insert(path.clone(), signatures);
                 let module_name = ModuleName(vec![actual_name.item.clone()]);
-                self.module_unmapping.insert(module_name, path.clone());
+                self.module_context.insert(module_name, signatures);
                 module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
                 Ok(())
             }
@@ -1322,21 +1319,10 @@ impl<'modules> Typechecker<'modules> {
     }
 
     fn type_inference_context(&mut self) -> type_inference::InferenceContext {
-        let module_context = &self.module_context;
-        let module_context_named: HashMap<&ModuleName, &HashMap<String, core::TypeSig>> = self
-            .module_unmapping
-            .iter()
-            .filter_map(|(module_name, module_path)| {
-                module_context
-                    .get(module_path)
-                    .map(|type_sigs| (module_name, type_sigs))
-            })
-            .collect();
-
         type_inference::InferenceContext::new(
             self.common_kinds,
             &self.source,
-            module_context_named,
+            &self.module_context,
             &self.type_context,
             &self.bound_tyvars,
             &mut self.kind_solutions,

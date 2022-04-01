@@ -25,7 +25,7 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
     let mut ctx = InferenceContext::new(
         &common_kinds,
         &source,
-        modules,
+        &modules,
         &types,
         &type_variables,
         &mut kind_solutions,
