@@ -631,7 +631,7 @@ fn ambiguous() {
         pos: 10,
         item: Expr::Int(3),
     };
-    let expected = ParseResult::ambiguous_use_of(&Spanned {
+    let expected = ParseResult::ambiguous_use_of(Spanned {
         pos: 7,
         item: Binop::Eq,
     });
