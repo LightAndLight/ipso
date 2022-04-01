@@ -1232,7 +1232,7 @@ impl<'modules> Typechecker<'modules> {
                     .get(&path)
                     .unwrap()
                     .get_signatures(self.common_kinds);
-                self.module_context.insert(path.clone(), signatures.clone());
+                self.module_context.insert(path.clone(), signatures);
                 let module_name = ModuleName(vec![actual_name.item.clone()]);
                 self.module_unmapping.insert(module_name, path.clone());
                 module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
