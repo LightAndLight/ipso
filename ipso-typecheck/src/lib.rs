@@ -1213,12 +1213,12 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
         module: &Spanned<String>,
-        name: &Option<Spanned<String>>,
+        as_name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
         let path =
             ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
 
-        let actual_name = match name {
+        let actual_name = match as_name {
             None => module,
             Some(name) => name,
         };
@@ -1259,8 +1259,8 @@ impl<'modules> Typechecker<'modules> {
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
-            syntax::Declaration::Import { module, name } => self
-                .check_import(module_usages, module, name)
+            syntax::Declaration::Import { module, as_name } => self
+                .check_import(module_usages, module, as_name)
                 .map(|()| Option::None),
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))

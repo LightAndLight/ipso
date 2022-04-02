@@ -503,7 +503,7 @@ pub enum Declaration {
     },
     Import {
         module: Spanned<String>,
-        name: Option<Spanned<String>>,
+        as_name: Option<Spanned<String>>,
     },
     FromImport {
         module: Spanned<String>,
