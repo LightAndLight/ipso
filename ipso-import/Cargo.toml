@@ -12,4 +12,3 @@ ipso-parse = { path = "../ipso-parse" }
 ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
-typed-arena = "2.0.1"

@@ -146,7 +146,7 @@ pub fn operator(
                             }
                             _ => {
                                 loop_result =
-                                    loop_result.and_then(|()| ParseResult::ambiguous_use_of(binop))
+                                    loop_result.and_then(|()| ParseResult::ambiguous_use_of(*binop))
                             }
                         },
                         Ordering::Greater => {

@@ -147,9 +147,7 @@ pub struct Typechecker<'modules> {
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
     pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
-    module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
-    module_context_names: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
-    module_unmapping: HashMap<ModuleName, ModulePath>,
+    module_context: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
@@ -478,8 +476,6 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
-            module_context_names: HashMap::new(),
-            module_unmapping: HashMap::new(),
             working_dir,
         }
     }
@@ -703,10 +699,10 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
-        let mut module_mapping = HashMap::new();
+        let mut module_usages = HashMap::new();
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(&mut module_mapping, decl)
+                self.check_declaration(&mut module_usages, decl)
                     .map(|m_decl| match m_decl {
                         Option::None => decls,
                         Option::Some(decl) => {
@@ -718,7 +714,7 @@ impl<'modules> Typechecker<'modules> {
             })
         })?;
         Ok(core::Module {
-            module_mapping,
+            usages: module_usages,
             decls,
         })
     }
@@ -1215,31 +1211,28 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
         module: &Spanned<String>,
-        name: &Option<Spanned<String>>,
+        as_name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
         let path =
             ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
 
-        let actual_name = match name {
+        let actual_name = match as_name {
             None => module,
             Some(name) => name,
         };
 
-        match module_mapping.get(&path) {
+        match module_usages.get(&path) {
             None => {
                 let signatures = self
                     .modules
                     .get(&path)
                     .unwrap()
                     .get_signatures(self.common_kinds);
-                self.module_context.insert(path.clone(), signatures.clone());
                 let module_name = ModuleName(vec![actual_name.item.clone()]);
-                self.module_context_names
-                    .insert(module_name.clone(), signatures);
-                self.module_unmapping.insert(module_name, path.clone());
-                module_mapping.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
+                self.module_context.insert(module_name, signatures);
+                module_usages.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
                 Ok(())
             }
             Some(_) => Err(TypeError::ShadowedModuleName {
@@ -1251,7 +1244,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_declaration(
         &mut self,
-        module_mapping: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
@@ -1266,8 +1259,8 @@ impl<'modules> Typechecker<'modules> {
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
-            syntax::Declaration::Import { module, name } => self
-                .check_import(module_mapping, module, name)
+            syntax::Declaration::Import { module, as_name } => self
+                .check_import(module_usages, module, as_name)
                 .map(|()| Option::None),
             syntax::Declaration::FromImport { module, names } => {
                 todo!("check from-import {:?}", (module, names))
@@ -1329,7 +1322,7 @@ impl<'modules> Typechecker<'modules> {
         type_inference::InferenceContext::new(
             self.common_kinds,
             &self.source,
-            &self.module_context_names,
+            &self.module_context,
             &self.type_context,
             &self.bound_tyvars,
             &mut self.kind_solutions,

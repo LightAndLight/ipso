@@ -137,10 +137,10 @@ impl<A> ParseResult<A> {
         }
     }
 
-    fn ambiguous_use_of(operator: &Spanned<Binop>) -> Self {
+    fn ambiguous_use_of(operator: Spanned<Binop>) -> Self {
         ParseResult {
             consumed: false,
-            result: Err(ParseErrorName::AmbiguousUseOf(operator.clone())),
+            result: Err(ParseErrorName::AmbiguousUseOf(operator)),
         }
     }
 

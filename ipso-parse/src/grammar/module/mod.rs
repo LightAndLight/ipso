@@ -100,7 +100,7 @@ pub fn import(parser: &mut Parser) -> ParseResult<Declaration> {
                         indent!(parser, Relation::Gt, parser.keyword(&Keyword::As)),
                         spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
                     ))
-                    .map(|name| Declaration::Import { module, name })
+                    .map(|as_name| Declaration::Import { module, as_name })
                 }
             )
         )
