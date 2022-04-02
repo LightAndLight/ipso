@@ -68,7 +68,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let main = String::from("main");
 
     let modules_data = Arena::new();
-    let mut modules = import::Modules::new(&modules_data);
+    let mut modules = core::Modules::new(&modules_data);
     let source = Source::Interactive {
         label: main.clone(),
     };
@@ -79,7 +79,14 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_module_path: ModulePath = ModulePath::from_file(&target_path);
     let common_kinds = CommonKinds::default();
     let builtins = builtins::builtins(&common_kinds);
-    let module = modules.import(&source, 0, &target_module_path, &common_kinds, &builtins)?;
+    let module = import::import(
+        &mut modules,
+        &source,
+        0,
+        &target_module_path,
+        &common_kinds,
+        &builtins,
+    )?;
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,

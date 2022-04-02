@@ -6,12 +6,10 @@ use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, ModuleName};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
-    collections::HashMap,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
 };
-use typed_arena::Arena;
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -65,11 +63,6 @@ impl From<typecheck::TypeError> for ModuleError {
     fn from(err: typecheck::TypeError) -> Self {
         ModuleError::Check(err)
     }
-}
-
-pub struct Modules<'a> {
-    data: &'a Arena<core::Module>,
-    pub index: HashMap<ModulePath, &'a core::Module>,
 }
 
 fn desugar_module_accessors_comp_line(module_names: &Rope<String>, line: &mut syntax::CompLine) {
@@ -290,84 +283,67 @@ fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo
     paths
 }
 
-impl<'a> Modules<'a> {
-    pub fn new(data: &'a Arena<core::Module>) -> Self {
-        Modules {
-            data,
-            index: HashMap::new(),
-        }
-    }
+/// Import a module.
+///
+/// Module imports are cached, so importing the same module repeatedly is cheap.
+///
+/// * `location` - source file location for error reporting
+/// * `pos` - source file offset for error reporting
+pub fn import<'a>(
+    modules: &mut core::Modules<'a>,
+    source: &Source,
+    pos: usize,
+    module_path: &ModulePath,
+    common_kinds: &CommonKinds,
+    builtins: &Module,
+) -> Result<&'a core::Module, ModuleError> {
+    match modules.index.get(module_path) {
+        None => {
+            let path = module_path.as_path();
+            if path.exists() {
+                let input_location = Source::File {
+                    path: PathBuf::from(path),
+                };
+                let mut module = parse::parse_file(path)?;
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<ModulePath, &core::Module> {
-        self.index.iter()
-    }
-
-    pub fn lookup(&self, path: &ModulePath) -> Option<&core::Module> {
-        self.index.get(path).copied()
-    }
-
-    /// Import a module.
-    ///
-    /// Module imports are cached, so importing the same module repeatedly is cheap.
-    ///
-    /// * `location` - source file location for error reporting
-    /// * `pos` - source file offset for error reporting
-    pub fn import(
-        &mut self,
-        source: &Source,
-        pos: usize,
-        module_path: &ModulePath,
-        common_kinds: &CommonKinds,
-        builtins: &Module,
-    ) -> Result<&'a core::Module, ModuleError> {
-        match self.index.get(module_path) {
-            None => {
-                let path = module_path.as_path();
-                if path.exists() {
-                    let input_location = Source::File {
-                        path: PathBuf::from(path),
-                    };
-                    let mut module = parse::parse_file(path)?;
-
-                    for import_info in calculate_imports(path, &mut module).into_iter() {
-                        if let Err(err) = self.import(
-                            &Source::File {
-                                path: PathBuf::from(path),
-                            },
-                            import_info.pos,
-                            &import_info.module_path,
-                            common_kinds,
-                            builtins,
-                        ) {
-                            return Err(err);
-                        }
+                for import_info in calculate_imports(path, &mut module).into_iter() {
+                    if let Err(err) = import(
+                        modules,
+                        &Source::File {
+                            path: PathBuf::from(path),
+                        },
+                        import_info.pos,
+                        &import_info.module_path,
+                        common_kinds,
+                        builtins,
+                    ) {
+                        return Err(err);
                     }
-                    let module = {
-                        let working_dir = path.parent().unwrap();
-                        let mut tc = {
-                            let mut tc = Typechecker::new(
-                                working_dir,
-                                input_location,
-                                common_kinds,
-                                &self.index,
-                            );
-                            tc.register_from_import(builtins, &syntax::Names::All);
-                            tc
-                        };
-                        tc.check_module(&module)
-                    }?;
-                    let module_ref: &core::Module = self.data.alloc(module);
-                    self.index.insert(module_path.clone(), module_ref);
-                    Ok(module_ref)
-                } else {
-                    Err(ModuleError::NotFound {
-                        source: source.clone(),
-                        pos,
-                        module_path: module_path.clone(),
-                    })
                 }
+                let module = {
+                    let working_dir = path.parent().unwrap();
+                    let mut tc = {
+                        let mut tc = Typechecker::new(
+                            working_dir,
+                            input_location,
+                            common_kinds,
+                            &modules.index,
+                        );
+                        tc.register_from_import(builtins, &syntax::Names::All);
+                        tc
+                    };
+                    tc.check_module(&module)
+                }?;
+                let module_ref: &core::Module = modules.insert(module_path, module);
+                Ok(module_ref)
+            } else {
+                Err(ModuleError::NotFound {
+                    source: source.clone(),
+                    pos,
+                    module_path: module_path.clone(),
+                })
             }
-            Some(module_ref) => Ok(*module_ref),
         }
+        Some(module_ref) => Ok(*module_ref),
     }
 }

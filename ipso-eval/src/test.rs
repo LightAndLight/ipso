@@ -3,9 +3,7 @@ use super::{Interpreter, Value};
 #[cfg(test)]
 use crate::{Env, Object};
 #[cfg(test)]
-use ipso_core::{Builtin, CommonKinds, Expr, StringPart};
-#[cfg(test)]
-use ipso_import::Modules;
+use ipso_core::{Builtin, CommonKinds, Expr, Modules, StringPart};
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]

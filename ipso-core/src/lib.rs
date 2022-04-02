@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
+use typed_arena::Arena;
 
 /**
 Well-kinded types.
@@ -1752,5 +1753,33 @@ impl Module {
             acc.extend(decl.get_signatures(common_kinds).into_iter());
             acc
         })
+    }
+}
+
+pub struct Modules<'a> {
+    data: &'a Arena<Module>,
+    pub index: HashMap<ModulePath, &'a Module>,
+}
+
+impl<'a> Modules<'a> {
+    pub fn new(data: &'a Arena<Module>) -> Self {
+        Modules {
+            data,
+            index: HashMap::new(),
+        }
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<ModulePath, &Module> {
+        self.index.iter()
+    }
+
+    pub fn lookup(&self, path: &ModulePath) -> Option<&Module> {
+        self.index.get(path).copied()
+    }
+
+    pub fn insert(&mut self, path: &ModulePath, module: Module) -> &'a Module {
+        let module_ref: &Module = self.data.alloc(module);
+        self.index.insert(path.clone(), module_ref);
+        module_ref
     }
 }

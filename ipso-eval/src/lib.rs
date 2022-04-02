@@ -1,9 +1,9 @@
 mod test;
 
 use ipso_core::{
-    Binop, Builtin, CmdPart, CommonKinds, Expr, ModulePath, ModuleUsage, Pattern, StringPart,
+    Binop, Builtin, CmdPart, CommonKinds, Expr, ModulePath, ModuleUsage, Modules, Pattern,
+    StringPart,
 };
-use ipso_import::Modules;
 use ipso_rope::Rope;
 use ipso_syntax::ModuleName;
 use paste::paste;
