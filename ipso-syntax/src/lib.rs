@@ -7,6 +7,7 @@ use quickcheck::Arbitrary;
 pub use r#type::Type;
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     hash::Hash,
     path::{Path, PathBuf},
     rc::Rc,
@@ -359,46 +360,24 @@ pub enum CmdPart {
     Expr(Spanned<Expr>),
 }
 
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub struct ModulePath {
-    pub file: PathBuf,
-    pub submodules: Vec<String>,
-}
-
-impl ModulePath {
-    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
-        let mut path = module_name
-            .iter()
-            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
-        path.set_extension("ipso");
-        ModulePath {
-            file: path,
-            submodules: vec![],
-        }
-    }
-
-    pub fn from_file(file: &Path) -> Self {
-        ModulePath {
-            file: PathBuf::from(file),
-            submodules: vec![],
-        }
-    }
-
-    pub fn path(&self) -> &Path {
-        self.file.as_path()
-    }
-
-    pub fn with_submodules(mut self, submodules: Vec<String>) -> Self {
-        self.submodules = submodules;
-        self
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
-        path: ModulePath,
+        id: ModuleId,
+
+        /**
+        A chain of submodule accessors.
+
+        e.g. `module.submodule1.submodule2`
+        */
+        path: Vec<String>,
+
+        /**
+        The referenced item.
+
+        e.g. `module.submodule.item`
+        */
         item: String,
     },
 
@@ -550,9 +529,71 @@ pub enum Declaration {
         module: Spanned<String>,
         names: Names,
     },
+    ResolvedImport {
+        id: ModuleId,
+        module: Spanned<String>,
+        as_name: Option<Spanned<String>>,
+    },
+    ResolvedFromImport {
+        id: ModuleId,
+        module: Spanned<String>,
+        names: Names,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Spanned<Declaration>>,
+}
+
+pub struct Modules<M> {
+    data: Vec<M>,
+    path_to_index: HashMap<PathBuf, usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModuleId(usize);
+
+impl<M> Default for Modules<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> Modules<M> {
+    pub fn new() -> Self {
+        Modules {
+            data: vec![],
+            path_to_index: HashMap::new(),
+        }
+    }
+
+    pub fn iter_paths(&self) -> impl Iterator<Item = (&Path, &M)> {
+        let data = &self.data;
+        self.path_to_index
+            .iter()
+            .map(move |(path, index)| (path.as_path(), &data[*index]))
+    }
+
+    pub fn iter_ids(&self) -> impl Iterator<Item = (ModuleId, &M)> {
+        let data = &self.data;
+        self.path_to_index
+            .iter()
+            .map(move |(_, index)| (ModuleId(*index), &data[*index]))
+    }
+
+    pub fn lookup(&self, id: ModuleId) -> &M {
+        &self.data[id.0]
+    }
+
+    pub fn lookup_id(&self, path: &Path) -> Option<ModuleId> {
+        self.path_to_index.get(path).map(|index| ModuleId(*index))
+    }
+
+    pub fn insert(&mut self, path: PathBuf, module: M) -> ModuleId {
+        let index = self.data.len();
+        self.data.push(module);
+        self.path_to_index.insert(path, index);
+        ModuleId(index)
+    }
 }

@@ -2,7 +2,7 @@ use diagnostic::{Location, Message};
 use ipso_core::{self as core, CommonKinds, Module};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, ModuleName, ModulePath};
+use ipso_syntax::{self as syntax};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     collections::{HashMap, HashSet},
@@ -10,13 +10,14 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
+use syntax::{ModuleId, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
     NotFound {
         source: Source,
         pos: usize,
-        module_path: ModulePath,
+        module_path: PathBuf,
     },
     DoesNotDefine {
         source: Source,
@@ -41,10 +42,7 @@ impl ModuleError {
                 }),
                 Message {
                     content: String::from("module not found"),
-                    addendum: Some(format!(
-                        "file {} does not exist",
-                        module_path.path().display()
-                    )),
+                    addendum: Some(format!("file {} does not exist", module_path.display())),
                 },
             ),
             ModuleError::DoesNotDefine { source, pos } => diagnostic.item(
@@ -90,15 +88,14 @@ enum ImportedItemInfo {
     e.g. `from x import y`
     */
     DefinitionImportedFrom {
-        /// The module's file path.
-        path: PathBuf,
+        id: ModuleId,
 
         /**
         Any submodule references.
 
         e.g. in `from x.y import z`, `.y` is a submodule reference.
         */
-        submodules: Vec<String>,
+        path: Vec<String>,
     },
 
     /**
@@ -106,10 +103,7 @@ enum ImportedItemInfo {
 
     e.g. `import x`, `import x as y`
     */
-    ModuleImportedAs {
-        /// The module's file path.
-        path: PathBuf,
-    },
+    ModuleImportedAs { id: ModuleId },
 }
 
 fn desugar_module_accessors_comp_line(
@@ -137,9 +131,7 @@ fn desugar_module_accessors_expr(
         syntax::Expr::Var(name) => {
             if let Some(imported_item_info) = imported_items.get(name) {
                 match imported_item_info {
-                    ImportedItemInfo::DefinitionImportedFrom {
-                        path, submodules, ..
-                    } => {
+                    ImportedItemInfo::DefinitionImportedFrom { id, path, .. } => {
                         /*
                         ```
                         from x import y
@@ -160,10 +152,8 @@ fn desugar_module_accessors_expr(
                         ```
                         */
                         *expr = syntax::Expr::Module {
-                            path: ModulePath {
-                                file: path.clone(),
-                                submodules: submodules.clone(),
-                            },
+                            id: *id,
+                            path: path.clone(),
                             item: name.clone(),
                         };
                     }
@@ -276,25 +266,24 @@ fn desugar_module_accessors_expr(
             desugar_module_accessors_expr(imported_items, &mut value.item);
 
             match &value.item {
-                syntax::Expr::Module { path, item } => {
+                syntax::Expr::Module { id, path, item } => {
                     let mut path = path.clone();
-                    path.submodules.push(item.clone());
+                    path.push(item.clone());
 
                     *expr = syntax::Expr::Module {
+                        id: *id,
                         path,
                         item: field.clone(),
                     };
                 }
 
                 syntax::Expr::Var(name) => {
-                    if let Some(ImportedItemInfo::ModuleImportedAs { path }) =
+                    if let Some(ImportedItemInfo::ModuleImportedAs { id }) =
                         imported_items.get(name)
                     {
                         *expr = syntax::Expr::Module {
-                            path: ModulePath {
-                                file: path.clone(),
-                                submodules: vec![],
-                            },
+                            id: *id,
+                            path: vec![],
                             item: field.clone(),
                         }
                     }
@@ -375,16 +364,19 @@ fn desugar_module_accessors_decl(
             }
         }
         syntax::Declaration::TypeAlias { .. } => {}
-        syntax::Declaration::Import { .. } => {}
-        syntax::Declaration::FromImport { .. } => {}
+
+        syntax::Declaration::Import { .. } => panic!("unresolved Import"),
+        syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
+
+        syntax::Declaration::ResolvedImport { .. }
+        | syntax::Declaration::ResolvedFromImport { .. } => {}
     }
 }
 
 fn desugar_module_accessors(
     common_kinds: &CommonKinds,
-    modules: &core::Modules,
+    modules: &Modules<core::Module>,
     module: &mut syntax::Module,
-    working_dir: &Path,
 ) {
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
     for decl in &mut module.decls {
@@ -393,28 +385,17 @@ fn desugar_module_accessors(
             | syntax::Declaration::Class { .. }
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
-            syntax::Declaration::Import { module, .. } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+            syntax::Declaration::Import { .. } => panic!("unresolved Import"),
+            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
+            syntax::Declaration::ResolvedImport { id, module, .. } => {
                 imported_items.insert(
                     module.item.clone(),
-                    ImportedItemInfo::ModuleImportedAs {
-                        path: PathBuf::from(module_path.path()),
-                    },
+                    ImportedItemInfo::ModuleImportedAs { id: *id },
                 );
             }
-            syntax::Declaration::FromImport { module, names } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-                let path = PathBuf::from(module_path.path());
+            syntax::Declaration::ResolvedFromImport { id, names, .. } => {
+                let module = modules.lookup(*id);
 
-                let module = modules.lookup(&module_path).unwrap_or_else(|| {
-                    panic!(
-                        "impossible: module {} ({}) is missing",
-                        module.item,
-                        path.display()
-                    )
-                });
                 match names {
                     syntax::Names::All => {
                         module
@@ -424,8 +405,8 @@ fn desugar_module_accessors(
                                 imported_items.insert(
                                     name,
                                     ImportedItemInfo::DefinitionImportedFrom {
-                                        path: path.clone(),
-                                        submodules: vec![],
+                                        id: *id,
+                                        path: vec![],
                                     },
                                 );
                             })
@@ -435,8 +416,8 @@ fn desugar_module_accessors(
                             imported_items.insert(
                                 name.item.clone(),
                                 ImportedItemInfo::DefinitionImportedFrom {
-                                    path: path.clone(),
-                                    submodules: vec![],
+                                    id: *id,
+                                    path: vec![],
                                 },
                             );
                         }
@@ -451,23 +432,115 @@ fn desugar_module_accessors(
     }
 }
 
+fn resolve_imports(
+    common_kinds: &CommonKinds,
+    builtins: &Module,
+    modules: &mut Modules<core::Module>,
+    working_dir: &Path,
+    path: &Path,
+    module: &mut syntax::Module,
+) -> Result<(), ModuleError> {
+    let decls: Vec<syntax::Spanned<syntax::Declaration>> = module
+        .decls
+        .iter()
+        .map(|decl| -> Result<_, ModuleError> {
+            match &decl.item {
+                syntax::Declaration::Import { module, as_name } => {
+                    let source = &Source::File {
+                        path: PathBuf::from(path),
+                    };
+                    let module_path = working_dir.join(&module.item).with_extension("ipso");
+                    let id = import(
+                        modules,
+                        source,
+                        module.pos,
+                        &module_path,
+                        common_kinds,
+                        builtins,
+                    )?;
+
+                    Ok(syntax::Spanned {
+                        pos: decl.pos,
+                        item: syntax::Declaration::ResolvedImport {
+                            id,
+                            module: module.clone(),
+                            as_name: as_name.clone(),
+                        },
+                    })
+                }
+                syntax::Declaration::FromImport { module, names } => {
+                    let source = &Source::File {
+                        path: PathBuf::from(path),
+                    };
+                    let imported_module_path =
+                        working_dir.join(&module.item).with_extension("ipso");
+
+                    let imported_module_id = import(
+                        modules,
+                        source,
+                        module.pos,
+                        &imported_module_path,
+                        common_kinds,
+                        builtins,
+                    )?;
+                    let imported_module = modules.lookup(imported_module_id);
+
+                    match names {
+                        syntax::Names::All => Ok::<(), ModuleError>(()),
+                        syntax::Names::Names(names) => {
+                            let available_names: HashSet<String> = imported_module
+                                .get_bindings(common_kinds)
+                                .into_keys()
+                                .collect();
+
+                            names.iter().try_for_each(|name| {
+                                if available_names.contains(&name.item) {
+                                    Ok(())
+                                } else {
+                                    Err(ModuleError::DoesNotDefine {
+                                        source: source.clone(),
+                                        pos: name.pos,
+                                    })
+                                }
+                            })
+                        }
+                    }?;
+
+                    Ok(syntax::Spanned {
+                        pos: decl.pos,
+                        item: syntax::Declaration::ResolvedFromImport {
+                            id: imported_module_id,
+                            module: module.clone(),
+                            names: names.clone(),
+                        },
+                    })
+                }
+                _ => Ok(decl.clone()),
+            }
+        })
+        .collect::<Result<_, _>>()?;
+
+    module.decls = decls;
+    Ok(())
+}
+
 /// Import a module.
 ///
 /// Module imports are cached, so importing the same module repeatedly is cheap.
 ///
-/// * `location` - source file location for error reporting
+/// * `source` - source file location for error reporting
 /// * `pos` - source file offset for error reporting
-pub fn import<'a>(
-    modules: &mut core::Modules<'a>,
+/// * `path` - file path to import
+pub fn import(
+    modules: &mut Modules<core::Module>,
     source: &Source,
     pos: usize,
-    module_path: &ModulePath,
+    path: &Path,
     common_kinds: &CommonKinds,
     builtins: &Module,
-) -> Result<&'a core::Module, ModuleError> {
-    match modules.index.get(module_path) {
+) -> Result<ModuleId, ModuleError> {
+    match modules.lookup_id(path) {
         None => {
-            let path = module_path.path();
             if path.exists() {
                 let input_location = Source::File {
                     path: PathBuf::from(path),
@@ -476,119 +549,36 @@ pub fn import<'a>(
 
                 let working_dir = path.parent().unwrap();
 
-                enum CheckImport<'a> {
-                    Import {
-                        module: &'a syntax::Spanned<String>,
-                    },
-                    FromImport {
-                        module: &'a syntax::Spanned<String>,
-                        names: &'a syntax::Names,
-                    },
-                }
-                module
-                    .decls
-                    .iter()
-                    .filter_map(|decl| match &decl.item {
-                        syntax::Declaration::Definition { .. }
-                        | syntax::Declaration::Class { .. }
-                        | syntax::Declaration::Instance { .. }
-                        | syntax::Declaration::TypeAlias { .. } => None,
-                        syntax::Declaration::Import { module, .. } => {
-                            Some(CheckImport::Import { module })
-                        }
-                        syntax::Declaration::FromImport { module, names } => {
-                            Some(CheckImport::FromImport { module, names })
-                        }
-                    })
-                    .try_for_each(|filtered_item| match filtered_item {
-                        CheckImport::Import { module } => {
-                            let module_path = ModulePath::from_module(
-                                working_dir,
-                                &ModuleName(vec![module.item.clone()]),
-                            );
-                            let _ = import(
-                                modules,
-                                &Source::File {
-                                    path: PathBuf::from(path),
-                                },
-                                module.pos,
-                                &module_path,
-                                common_kinds,
-                                builtins,
-                            )?;
-
-                            Ok::<(), ModuleError>(())
-                        }
-                        CheckImport::FromImport { module, names } => {
-                            let importing_module_path = ModulePath::from_module(
-                                working_dir,
-                                &ModuleName(vec![module.item.clone()]),
-                            );
-
-                            let imported_module = import(
-                                modules,
-                                &Source::File {
-                                    path: PathBuf::from(path),
-                                },
-                                module.pos,
-                                &importing_module_path,
-                                common_kinds,
-                                builtins,
-                            )?;
-
-                            match names {
-                                syntax::Names::All => Ok::<(), ModuleError>(()),
-                                syntax::Names::Names(names) => {
-                                    let available_names: HashSet<String> = imported_module
-                                        .get_bindings(common_kinds)
-                                        .into_keys()
-                                        .collect();
-
-                                    names.iter().try_for_each(|name| {
-                                        if available_names.contains(&name.item) {
-                                            Ok(())
-                                        } else {
-                                            Err(ModuleError::DoesNotDefine {
-                                                source: Source::File {
-                                                    path: PathBuf::from(module_path.path()),
-                                                },
-                                                pos: name.pos,
-                                            })
-                                        }
-                                    })
-                                }
-                            }?;
-
-                            Ok(())
-                        }
-                    })?;
-
-                desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
+                resolve_imports(
+                    common_kinds,
+                    builtins,
+                    modules,
+                    working_dir,
+                    path,
+                    &mut module,
+                )?;
+                desugar_module_accessors(common_kinds, modules, &mut module);
 
                 let module = {
                     let working_dir = path.parent().unwrap();
                     let mut tc = {
-                        let mut tc = Typechecker::new(
-                            working_dir,
-                            input_location,
-                            common_kinds,
-                            &modules.index,
-                        );
+                        let mut tc =
+                            Typechecker::new(working_dir, input_location, common_kinds, modules);
                         tc.register_from_import(builtins, &syntax::Names::All);
                         tc
                     };
                     tc.check_module(&module)
                 }?;
-                let module_ref: &core::Module = modules.insert(module_path, module);
-                Ok(module_ref)
+                let module_id: ModuleId = modules.insert(path.to_path_buf(), module);
+                Ok(module_id)
             } else {
                 Err(ModuleError::NotFound {
                     source: source.clone(),
                     pos,
-                    module_path: module_path.clone(),
+                    module_path: path.to_path_buf(),
                 })
             }
         }
-        Some(module_ref) => Ok(*module_ref),
+        Some(module_id) => Ok(module_id),
     }
 }

@@ -1,10 +1,10 @@
 mod test;
 
 use ipso_core::{
-    Binop, Builtin, CmdPart, CommonKinds, Expr, ModuleUsage, Modules, Pattern, StringPart,
+    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, ModuleUsage, Pattern, StringPart,
 };
 use ipso_rope::Rope;
-use ipso_syntax::ModulePath;
+use ipso_syntax::{ModuleId, Modules};
 use paste::paste;
 use std::{
     cmp::Ordering,
@@ -12,6 +12,7 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
+    path::PathBuf,
     process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
@@ -519,7 +520,7 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module<'a> {
-    pub usages: &'a HashMap<ModulePath, ModuleUsage>,
+    pub usages: &'a HashMap<PathBuf, ModuleUsage>,
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 
@@ -530,7 +531,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
     context: &'ctx HashMap<String, Rc<Expr>>,
-    modules: HashMap<&'ctx ModulePath, Module<'ctx>>,
+    modules: HashMap<ModuleId, Module<'ctx>>,
 }
 
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
@@ -538,17 +539,17 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
         common_kinds: &'ctx CommonKinds,
-        modules: &'ctx Modules<'ctx>,
+        modules: &'ctx Modules<core::Module>,
         context: &'ctx HashMap<String, Rc<Expr>>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
         let modules = modules
-            .iter()
-            .map(|(module_path, module)| {
+            .iter_ids()
+            .map(|(module_id, module)| {
                 (
-                    module_path,
+                    module_id,
                     Module {
                         usages: &module.usages,
                         bindings: module.get_bindings(common_kinds),
@@ -1314,13 +1315,14 @@ where {
     pub fn eval_from_module(
         &mut self,
         env: &mut Env<'heap>,
-        path: &ModulePath,
+        id: &ModuleId,
+        _path: &[String],
         binding: &str,
     ) -> Value<'heap> {
-        let (expr, _) = match self.modules.get(path) {
-            None => panic!("no module found at {:?}", path),
+        let (expr, _) = match self.modules.get(id) {
+            None => panic!("{:?} not found", id),
             Some(module) => match module.bindings.get(binding) {
-                None => panic!("{:?} not found in {:?}", binding, path),
+                None => panic!("{:?} not found in {:?}", binding, id),
                 Some(expr) => (expr.clone(), module.usages.clone()),
             },
         };
@@ -1340,7 +1342,7 @@ where {
                 };
                 self.eval(env, body)
             }
-            Expr::Module(path, item) => self.eval_from_module(env, path, item),
+            Expr::Module { id, path, item } => self.eval_from_module(env, id, path, item),
             Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {

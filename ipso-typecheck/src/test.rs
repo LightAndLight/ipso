@@ -10,7 +10,7 @@ use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, Spanned};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::rc::Rc;
 
