@@ -529,6 +529,16 @@ pub enum Declaration {
         module: Spanned<String>,
         names: Names,
     },
+    ResolvedImport {
+        id: ModuleId,
+        module: Spanned<String>,
+        as_name: Option<Spanned<String>>,
+    },
+    ResolvedFromImport {
+        id: ModuleId,
+        module: Spanned<String>,
+        names: Names,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]

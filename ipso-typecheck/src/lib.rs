@@ -1220,6 +1220,7 @@ impl<'modules> Typechecker<'modules> {
     fn check_import(
         &mut self,
         module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
+        module_id: ModuleId,
         module: &Spanned<String>,
         as_name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
@@ -1232,7 +1233,6 @@ impl<'modules> Typechecker<'modules> {
 
         match module_usages.get(&module_path) {
             None => {
-                let module_id = self.modules.lookup_id(&module_path).unwrap();
                 let signatures = self
                     .modules
                     .lookup(module_id)
@@ -1254,12 +1254,12 @@ impl<'modules> Typechecker<'modules> {
     fn check_from_import(
         &mut self,
         module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
+        module_id: ModuleId,
         module: &Spanned<String>,
         names: &syntax::Names,
     ) -> Result<(), TypeError> {
         let module_path = self.working_dir.join(&module.item).with_extension("ipso");
 
-        let module_id = self.modules.lookup_id(&module_path).unwrap();
         let signatures = self
             .modules
             .lookup(module_id)
@@ -1296,12 +1296,21 @@ impl<'modules> Typechecker<'modules> {
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
-            syntax::Declaration::Import { module, as_name } => self
-                .check_import(module_usages, module, as_name)
+
+            syntax::Declaration::Import { .. } => panic!("unresolved Import in typecheck"),
+            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport in typecheck"),
+
+            syntax::Declaration::ResolvedImport {
+                id,
+                module,
+                as_name,
+            } => self
+                .check_import(module_usages, *id, module, as_name)
                 .map(|()| Option::None),
-            syntax::Declaration::FromImport { module, names } => self
-                .check_from_import(module_usages, module, names)
+            syntax::Declaration::ResolvedFromImport { id, module, names } => self
+                .check_from_import(module_usages, *id, module, names)
                 .map(|()| Option::None),
+
             syntax::Declaration::Class {
                 supers,
                 name,

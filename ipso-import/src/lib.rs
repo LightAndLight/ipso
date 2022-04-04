@@ -364,8 +364,12 @@ fn desugar_module_accessors_decl(
             }
         }
         syntax::Declaration::TypeAlias { .. } => {}
-        syntax::Declaration::Import { .. } => {}
-        syntax::Declaration::FromImport { .. } => {}
+
+        syntax::Declaration::Import { .. } => panic!("unresolved Import"),
+        syntax::Declaration::FromImport { .. } => panic!("unresolved Import"),
+
+        syntax::Declaration::ResolvedImport { .. }
+        | syntax::Declaration::ResolvedFromImport { .. } => {}
     }
 }
 
@@ -373,7 +377,6 @@ fn desugar_module_accessors(
     common_kinds: &CommonKinds,
     modules: &Modules<core::Module>,
     module: &mut syntax::Module,
-    working_dir: &Path,
 ) {
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
     for decl in &mut module.decls {
@@ -382,26 +385,17 @@ fn desugar_module_accessors(
             | syntax::Declaration::Class { .. }
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
-            syntax::Declaration::Import { module, .. } => {
-                let file = working_dir.join(&module.item).with_extension("ipso");
-                let id = modules.lookup_id(&file).unwrap();
-
+            syntax::Declaration::Import { .. } => panic!("unresolved Import"),
+            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
+            syntax::Declaration::ResolvedImport { id, module, .. } => {
                 imported_items.insert(
                     module.item.clone(),
-                    ImportedItemInfo::ModuleImportedAs { id },
+                    ImportedItemInfo::ModuleImportedAs { id: *id },
                 );
             }
-            syntax::Declaration::FromImport { module, names } => {
-                let file = working_dir.join(&module.item).with_extension("ipso");
-                let id = modules.lookup_id(&file).unwrap_or_else(|| {
-                    panic!(
-                        "impossible: module {} ({}) is missing",
-                        module.item,
-                        file.display()
-                    )
-                });
+            syntax::Declaration::ResolvedFromImport { id, names, .. } => {
+                let module = modules.lookup(*id);
 
-                let module = modules.lookup(id);
                 match names {
                     syntax::Names::All => {
                         module
@@ -410,7 +404,10 @@ fn desugar_module_accessors(
                             .for_each(|name| {
                                 imported_items.insert(
                                     name,
-                                    ImportedItemInfo::DefinitionImportedFrom { id, path: vec![] },
+                                    ImportedItemInfo::DefinitionImportedFrom {
+                                        id: *id,
+                                        path: vec![],
+                                    },
                                 );
                             })
                     }
@@ -418,7 +415,10 @@ fn desugar_module_accessors(
                         for name in names {
                             imported_items.insert(
                                 name.item.clone(),
-                                ImportedItemInfo::DefinitionImportedFrom { id, path: vec![] },
+                                ImportedItemInfo::DefinitionImportedFrom {
+                                    id: *id,
+                                    path: vec![],
+                                },
                             );
                         }
                     }
@@ -430,6 +430,98 @@ fn desugar_module_accessors(
     for decl in &mut module.decls {
         desugar_module_accessors_decl(&imported_items, &mut decl.item);
     }
+}
+
+fn resolve_imports(
+    common_kinds: &CommonKinds,
+    builtins: &Module,
+    modules: &mut Modules<core::Module>,
+    working_dir: &Path,
+    path: &Path,
+    module: &mut syntax::Module,
+) -> Result<(), ModuleError> {
+    let decls: Vec<syntax::Spanned<syntax::Declaration>> = module
+        .decls
+        .iter_mut()
+        .map(|decl| -> Result<_, ModuleError> {
+            match &decl.item {
+                syntax::Declaration::Import { module, as_name } => {
+                    let source = &Source::File {
+                        path: PathBuf::from(path),
+                    };
+                    let module_path = working_dir.join(&module.item).with_extension("ipso");
+                    let id = import(
+                        modules,
+                        source,
+                        module.pos,
+                        &module_path,
+                        common_kinds,
+                        builtins,
+                    )?;
+
+                    Ok(syntax::Spanned {
+                        pos: decl.pos,
+                        item: syntax::Declaration::ResolvedImport {
+                            id,
+                            module: module.clone(),
+                            as_name: as_name.clone(),
+                        },
+                    })
+                }
+                syntax::Declaration::FromImport { module, names } => {
+                    let source = &Source::File {
+                        path: PathBuf::from(path),
+                    };
+                    let importing_module_path =
+                        working_dir.join(&module.item).with_extension("ipso");
+
+                    let imported_module_id = import(
+                        modules,
+                        source,
+                        module.pos,
+                        &importing_module_path,
+                        common_kinds,
+                        builtins,
+                    )?;
+                    let imported_module = modules.lookup(imported_module_id);
+
+                    match names {
+                        syntax::Names::All => Ok::<(), ModuleError>(()),
+                        syntax::Names::Names(names) => {
+                            let available_names: HashSet<String> = imported_module
+                                .get_bindings(common_kinds)
+                                .into_keys()
+                                .collect();
+
+                            names.iter().try_for_each(|name| {
+                                if available_names.contains(&name.item) {
+                                    Ok(())
+                                } else {
+                                    Err(ModuleError::DoesNotDefine {
+                                        source: source.clone(),
+                                        pos: name.pos,
+                                    })
+                                }
+                            })
+                        }
+                    }?;
+
+                    Ok(syntax::Spanned {
+                        pos: decl.pos,
+                        item: syntax::Declaration::ResolvedFromImport {
+                            id: imported_module_id,
+                            module: module.clone(),
+                            names: names.clone(),
+                        },
+                    })
+                }
+                _ => Ok(decl.clone()),
+            }
+        })
+        .collect::<Result<_, _>>()?;
+
+    module.decls = decls;
+    Ok(())
 }
 
 /// Import a module.
@@ -457,90 +549,15 @@ pub fn import(
 
                 let working_dir = path.parent().unwrap();
 
-                enum CheckImport<'a> {
-                    Import {
-                        module: &'a syntax::Spanned<String>,
-                    },
-                    FromImport {
-                        module: &'a syntax::Spanned<String>,
-                        names: &'a syntax::Names,
-                    },
-                }
-                module
-                    .decls
-                    .iter()
-                    .filter_map(|decl| match &decl.item {
-                        syntax::Declaration::Definition { .. }
-                        | syntax::Declaration::Class { .. }
-                        | syntax::Declaration::Instance { .. }
-                        | syntax::Declaration::TypeAlias { .. } => None,
-                        syntax::Declaration::Import { module, .. } => {
-                            Some(CheckImport::Import { module })
-                        }
-                        syntax::Declaration::FromImport { module, names } => {
-                            Some(CheckImport::FromImport { module, names })
-                        }
-                    })
-                    .try_for_each(|filtered_item| match filtered_item {
-                        CheckImport::Import { module } => {
-                            let module_path = working_dir.join(&module.item).with_extension("ipso");
-                            let _ = import(
-                                modules,
-                                &Source::File {
-                                    path: PathBuf::from(path),
-                                },
-                                module.pos,
-                                &module_path,
-                                common_kinds,
-                                builtins,
-                            )?;
-
-                            Ok::<(), ModuleError>(())
-                        }
-                        CheckImport::FromImport { module, names } => {
-                            let importing_module_path =
-                                working_dir.join(&module.item).with_extension("ipso");
-
-                            let imported_module_id = import(
-                                modules,
-                                &Source::File {
-                                    path: PathBuf::from(path),
-                                },
-                                module.pos,
-                                &importing_module_path,
-                                common_kinds,
-                                builtins,
-                            )?;
-                            let imported_module = modules.lookup(imported_module_id);
-
-                            match names {
-                                syntax::Names::All => Ok::<(), ModuleError>(()),
-                                syntax::Names::Names(names) => {
-                                    let available_names: HashSet<String> = imported_module
-                                        .get_bindings(common_kinds)
-                                        .into_keys()
-                                        .collect();
-
-                                    names.iter().try_for_each(|name| {
-                                        if available_names.contains(&name.item) {
-                                            Ok(())
-                                        } else {
-                                            Err(ModuleError::DoesNotDefine {
-                                                source: Source::File {
-                                                    path: PathBuf::from(path),
-                                                },
-                                                pos: name.pos,
-                                            })
-                                        }
-                                    })
-                                }
-                            }?;
-
-                            Ok(())
-                        }
-                    })?;
-
-                desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
+                resolve_imports(
+                    common_kinds,
+                    builtins,
+                    modules,
+                    working_dir,
+                    path,
+                    &mut module,
+                )?;
+                desugar_module_accessors(common_kinds, modules, &mut module);
 
                 let module = {
                     let working_dir = path.parent().unwrap();
