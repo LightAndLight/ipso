@@ -437,11 +437,6 @@ fn desugar_module_accessors(
     }
 }
 
-struct ImportInfo {
-    pos: usize,
-    module_path: ModulePath,
-}
-
 fn check_import(
     common_kinds: &CommonKinds,
     builtins: &Module,
@@ -452,18 +447,13 @@ fn check_import(
 ) -> Result<(), ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
     if module_path.path().exists() {
-        let import_info = ImportInfo {
-            pos: module.pos,
-            module_path,
-        };
-
         let _ = import(
             modules,
             &Source::File {
                 path: PathBuf::from(file),
             },
-            import_info.pos,
-            &import_info.module_path,
+            module.pos,
+            &module_path,
             common_kinds,
             builtins,
         )?;
@@ -492,18 +482,13 @@ fn check_from_import(
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
     if module_path.path().exists() {
-        let import_info = ImportInfo {
-            pos: module.pos,
-            module_path,
-        };
-
         let _ = import(
             modules,
             &Source::File {
                 path: PathBuf::from(file),
             },
-            import_info.pos,
-            &import_info.module_path,
+            module.pos,
+            &module_path,
             common_kinds,
             builtins,
         )?;
