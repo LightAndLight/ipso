@@ -446,32 +446,54 @@ fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>
     let working_dir = file.parent().unwrap();
     let mut imports: Vec<ImportInfo> = Vec::new();
 
-    for decl in &module.decls {
-        match &decl.item {
-            syntax::Declaration::Definition { .. }
-            | syntax::Declaration::Class { .. }
-            | syntax::Declaration::Instance { .. }
-            | syntax::Declaration::TypeAlias { .. } => {}
-            syntax::Declaration::Import { module, .. } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+    module.decls.iter().try_for_each(|decl| match &decl.item {
+        syntax::Declaration::Definition { .. }
+        | syntax::Declaration::Class { .. }
+        | syntax::Declaration::Instance { .. }
+        | syntax::Declaration::TypeAlias { .. } => Ok(()),
+        syntax::Declaration::Import { module, .. } => {
+            let module_path =
+                ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
+            if module_path.path().exists() {
                 imports.push(ImportInfo {
                     pos: module.pos,
                     module_path,
-                })
-            }
-            syntax::Declaration::FromImport { module, .. } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+                });
 
-                imports.push(ImportInfo {
+                Ok(())
+            } else {
+                Err(ModuleError::NotFound {
+                    source: Source::File {
+                        path: PathBuf::from(file),
+                    },
                     pos: module.pos,
                     module_path,
                 })
             }
         }
-    }
+        syntax::Declaration::FromImport { module, .. } => {
+            let module_path =
+                ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+
+            if module_path.path().exists() {
+                imports.push(ImportInfo {
+                    pos: module.pos,
+                    module_path,
+                });
+
+                Ok(())
+            } else {
+                Err(ModuleError::NotFound {
+                    source: Source::File {
+                        path: PathBuf::from(file),
+                    },
+                    pos: module.pos,
+                    module_path,
+                })
+            }
+        }
+    })?;
 
     Ok(imports)
 }
