@@ -442,6 +442,56 @@ struct ImportInfo {
     module_path: ModulePath,
 }
 
+fn check_import(
+    working_dir: &Path,
+    module: &syntax::Spanned<String>,
+    imports: &mut Vec<ImportInfo>,
+    file: &Path,
+) -> Result<(), ModuleError> {
+    let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+    if module_path.path().exists() {
+        imports.push(ImportInfo {
+            pos: module.pos,
+            module_path,
+        });
+
+        Ok(())
+    } else {
+        Err(ModuleError::NotFound {
+            source: Source::File {
+                path: PathBuf::from(file),
+            },
+            pos: module.pos,
+            module_path,
+        })
+    }
+}
+
+fn check_from_import(
+    working_dir: &Path,
+    module: &syntax::Spanned<String>,
+    imports: &mut Vec<ImportInfo>,
+    file: &Path,
+) -> Result<(), ModuleError> {
+    let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+    if module_path.path().exists() {
+        imports.push(ImportInfo {
+            pos: module.pos,
+            module_path,
+        });
+
+        Ok(())
+    } else {
+        Err(ModuleError::NotFound {
+            source: Source::File {
+                path: PathBuf::from(file),
+            },
+            pos: module.pos,
+            module_path,
+        })
+    }
+}
+
 fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>, ModuleError> {
     let working_dir = file.parent().unwrap();
     let mut imports: Vec<ImportInfo> = Vec::new();
@@ -452,46 +502,10 @@ fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>
         | syntax::Declaration::Instance { .. }
         | syntax::Declaration::TypeAlias { .. } => Ok(()),
         syntax::Declaration::Import { module, .. } => {
-            let module_path =
-                ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-
-            if module_path.path().exists() {
-                imports.push(ImportInfo {
-                    pos: module.pos,
-                    module_path,
-                });
-
-                Ok(())
-            } else {
-                Err(ModuleError::NotFound {
-                    source: Source::File {
-                        path: PathBuf::from(file),
-                    },
-                    pos: module.pos,
-                    module_path,
-                })
-            }
+            check_import(working_dir, module, &mut imports, file)
         }
         syntax::Declaration::FromImport { module, .. } => {
-            let module_path =
-                ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-
-            if module_path.path().exists() {
-                imports.push(ImportInfo {
-                    pos: module.pos,
-                    module_path,
-                });
-
-                Ok(())
-            } else {
-                Err(ModuleError::NotFound {
-                    source: Source::File {
-                        path: PathBuf::from(file),
-                    },
-                    pos: module.pos,
-                    module_path,
-                })
-            }
+            check_from_import(working_dir, module, &mut imports, file)
         }
     })?;
 
