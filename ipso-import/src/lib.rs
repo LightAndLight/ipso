@@ -366,7 +366,7 @@ fn desugar_module_accessors_decl(
         syntax::Declaration::TypeAlias { .. } => {}
 
         syntax::Declaration::Import { .. } => panic!("unresolved Import"),
-        syntax::Declaration::FromImport { .. } => panic!("unresolved Import"),
+        syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
 
         syntax::Declaration::ResolvedImport { .. }
         | syntax::Declaration::ResolvedFromImport { .. } => {}
