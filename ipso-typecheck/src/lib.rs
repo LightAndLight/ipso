@@ -1297,8 +1297,8 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
-            syntax::Declaration::Import { .. } => panic!("unresolved Import in typecheck"),
-            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport in typecheck"),
+            syntax::Declaration::Import { .. } => panic!("unresolved Import"),
+            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
 
             syntax::Declaration::ResolvedImport {
                 id,
