@@ -442,7 +442,7 @@ fn resolve_imports(
 ) -> Result<(), ModuleError> {
     let decls: Vec<syntax::Spanned<syntax::Declaration>> = module
         .decls
-        .iter_mut()
+        .iter()
         .map(|decl| -> Result<_, ModuleError> {
             match &decl.item {
                 syntax::Declaration::Import { module, as_name } => {
