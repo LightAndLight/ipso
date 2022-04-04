@@ -472,14 +472,14 @@ fn resolve_imports(
                     let source = &Source::File {
                         path: PathBuf::from(path),
                     };
-                    let importing_module_path =
+                    let imported_module_path =
                         working_dir.join(&module.item).with_extension("ipso");
 
                     let imported_module_id = import(
                         modules,
                         source,
                         module.pos,
-                        &importing_module_path,
+                        &imported_module_path,
                         common_kinds,
                         builtins,
                     )?;
