@@ -366,16 +366,8 @@ fn desugar_module_accessors_decl(
     }
 }
 
-struct ImportInfo {
-    pos: usize,
-    module_path: ModulePath,
-}
-
-fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
-    let working_dir = file.parent().unwrap();
+fn desugar_module_accessors(module: &mut syntax::Module, working_dir: &Path) {
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
-    let mut imports: Vec<ImportInfo> = Vec::new();
-
     for decl in &mut module.decls {
         match &decl.item {
             syntax::Declaration::Definition { .. }
@@ -391,44 +383,75 @@ fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo
                         path: PathBuf::from(module_path.path()),
                     },
                 );
+            }
+            syntax::Declaration::FromImport { module, names } => {
+                let module_path =
+                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+                let path = PathBuf::from(module_path.path());
+
+                match names {
+                    syntax::Names::All => {
+                        // look up all importable definitions in module and add them
+                        todo!("FromImport All")
+                    }
+                    syntax::Names::Names(names) => {
+                        for name in names {
+                            imported_items.insert(
+                                name.clone(),
+                                ImportedItemInfo::DefinitionImportedFrom {
+                                    path: path.clone(),
+                                    submodules: vec![],
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for decl in &mut module.decls {
+        desugar_module_accessors_decl(&imported_items, &mut decl.item);
+    }
+}
+
+struct ImportInfo {
+    pos: usize,
+    module_path: ModulePath,
+}
+
+fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
+    let working_dir = file.parent().unwrap();
+    let mut imports: Vec<ImportInfo> = Vec::new();
+
+    for decl in &mut module.decls {
+        match &decl.item {
+            syntax::Declaration::Definition { .. }
+            | syntax::Declaration::Class { .. }
+            | syntax::Declaration::Instance { .. }
+            | syntax::Declaration::TypeAlias { .. } => {}
+            syntax::Declaration::Import { module, .. } => {
+                let module_path =
+                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
                 imports.push(ImportInfo {
                     pos: module.pos,
                     module_path,
                 })
             }
-            syntax::Declaration::FromImport { module, names } => match names {
-                syntax::Names::All => {
-                    // look up all importable definitions in module and add them
-                    todo!("FromImport All")
-                }
-                syntax::Names::Names(names) => {
-                    let module_path = ModulePath::from_module(
-                        working_dir,
-                        &ModuleName(vec![module.item.clone()]),
-                    );
-                    let path = PathBuf::from(module_path.path());
+            syntax::Declaration::FromImport { module, .. } => {
+                let module_path =
+                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
-                    for name in names {
-                        imported_items.insert(
-                            name.clone(),
-                            ImportedItemInfo::DefinitionImportedFrom {
-                                path: path.clone(),
-                                submodules: vec![],
-                            },
-                        );
-                    }
-
-                    imports.push(ImportInfo {
-                        pos: module.pos,
-                        module_path,
-                    })
-                }
-            },
+                imports.push(ImportInfo {
+                    pos: module.pos,
+                    module_path,
+                })
+            }
         }
-
-        desugar_module_accessors_decl(&imported_items, &mut decl.item)
     }
+
+    desugar_module_accessors(module, working_dir);
 
     imports
 }
