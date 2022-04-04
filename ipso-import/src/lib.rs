@@ -385,8 +385,10 @@ fn desugar_module_accessors(
             | syntax::Declaration::Class { .. }
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
+
             syntax::Declaration::Import { .. } => panic!("unresolved Import"),
             syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
+
             syntax::Declaration::ResolvedImport { id, module, .. } => {
                 imported_items.insert(
                     module.item.clone(),
@@ -424,10 +426,8 @@ fn desugar_module_accessors(
                     }
                 }
             }
-        }
-    }
+        };
 
-    for decl in &mut module.decls {
         desugar_module_accessors_decl(&imported_items, &mut decl.item);
     }
 }
