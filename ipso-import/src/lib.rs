@@ -495,29 +495,6 @@ fn check_from_import(
     }
 }
 
-fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>, ModuleError> {
-    let working_dir = file.parent().unwrap();
-
-    let imports: Vec<ImportInfo> = module
-        .decls
-        .iter()
-        .filter_map(|decl| match &decl.item {
-            syntax::Declaration::Definition { .. }
-            | syntax::Declaration::Class { .. }
-            | syntax::Declaration::Instance { .. }
-            | syntax::Declaration::TypeAlias { .. } => None,
-            syntax::Declaration::Import { module, .. } => {
-                Some(check_import(working_dir, module, file))
-            }
-            syntax::Declaration::FromImport { module, names } => {
-                Some(check_from_import(working_dir, module, file, names))
-            }
-        })
-        .collect::<Result<_, _>>()?;
-
-    Ok(imports)
-}
-
 /// Import a module.
 ///
 /// Module imports are cached, so importing the same module repeatedly is cheap.
@@ -541,9 +518,42 @@ pub fn import<'a>(
                 };
                 let mut module = parse::parse_file(path)?;
 
-                let import_infos = check_imports(path, &module)?;
-                import_infos.into_iter().try_for_each(
-                    |import_info| -> Result<(), ModuleError> {
+                let working_dir = path.parent().unwrap();
+
+                enum CheckImport<'a> {
+                    Import {
+                        module: &'a syntax::Spanned<String>,
+                    },
+                    FromImport {
+                        module: &'a syntax::Spanned<String>,
+                        names: &'a syntax::Names,
+                    },
+                }
+                module
+                    .decls
+                    .iter()
+                    .filter_map(|decl| match &decl.item {
+                        syntax::Declaration::Definition { .. }
+                        | syntax::Declaration::Class { .. }
+                        | syntax::Declaration::Instance { .. }
+                        | syntax::Declaration::TypeAlias { .. } => None,
+                        syntax::Declaration::Import { module, .. } => {
+                            Some(CheckImport::Import { module })
+                        }
+                        syntax::Declaration::FromImport { module, names } => {
+                            Some(CheckImport::FromImport { module, names })
+                        }
+                    })
+                    .try_for_each(|filtered_item| {
+                        let import_info = match filtered_item {
+                            CheckImport::Import { module } => {
+                                check_import(working_dir, module, path)
+                            }
+                            CheckImport::FromImport { module, names } => {
+                                check_from_import(working_dir, module, path, names)
+                            }
+                        }?;
+
                         let _ = import(
                             modules,
                             &Source::File {
@@ -555,11 +565,9 @@ pub fn import<'a>(
                             builtins,
                         )?;
 
-                        Ok(())
-                    },
-                )?;
+                        Ok::<(), ModuleError>(())
+                    })?;
 
-                let working_dir = path.parent().unwrap();
                 desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
 
                 let module = {
