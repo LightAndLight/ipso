@@ -5,7 +5,13 @@ pub mod r#type;
 
 use quickcheck::Arbitrary;
 pub use r#type::Type;
-use std::{cmp::Ordering, hash::Hash, path::PathBuf, rc::Rc};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    hash::Hash,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
@@ -358,8 +364,7 @@ pub enum CmdPart {
 pub enum Expr {
     Var(String),
     Module {
-        /// The module's file path.
-        file: PathBuf,
+        id: ModuleId,
 
         /**
         A chain of submodule accessors.
@@ -529,4 +534,56 @@ pub enum Declaration {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Spanned<Declaration>>,
+}
+
+pub struct Modules<M> {
+    data: Vec<M>,
+    path_to_index: HashMap<PathBuf, usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModuleId(usize);
+
+impl<M> Default for Modules<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> Modules<M> {
+    pub fn new() -> Self {
+        Modules {
+            data: vec![],
+            path_to_index: HashMap::new(),
+        }
+    }
+
+    pub fn iter_paths(&self) -> impl Iterator<Item = (&Path, &M)> {
+        let data = &self.data;
+        self.path_to_index
+            .iter()
+            .map(move |(path, index)| (path.as_path(), &data[*index]))
+    }
+
+    pub fn iter_ids(&self) -> impl Iterator<Item = (ModuleId, &M)> {
+        let data = &self.data;
+        self.path_to_index
+            .iter()
+            .map(move |(_, index)| (ModuleId(*index), &data[*index]))
+    }
+
+    pub fn lookup(&self, id: ModuleId) -> &M {
+        &self.data[id.0]
+    }
+
+    pub fn lookup_id(&self, path: &Path) -> Option<ModuleId> {
+        self.path_to_index.get(path).map(|index| ModuleId(*index))
+    }
+
+    pub fn insert(&mut self, path: PathBuf, module: M) -> ModuleId {
+        let index = self.data.len();
+        self.data.push(module);
+        self.path_to_index.insert(path, index);
+        ModuleId(index)
+    }
 }

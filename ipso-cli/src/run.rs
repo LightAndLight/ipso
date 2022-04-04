@@ -11,6 +11,7 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
+use syntax::Modules;
 use typed_arena::Arena;
 
 pub struct Config {
@@ -67,8 +68,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
 
     let main = String::from("main");
 
-    let modules_data = Arena::new();
-    let mut modules = core::Modules::new(&modules_data);
+    let mut modules = Modules::new();
     let source = Source::Interactive {
         label: main.clone(),
     };
@@ -78,7 +78,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     }
     let common_kinds = CommonKinds::default();
     let builtins = builtins::builtins(&common_kinds);
-    let module = import::import(
+    let module_id = import::import(
         &mut modules,
         &source,
         0,
@@ -86,6 +86,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         &common_kinds,
         &builtins,
     )?;
+    let module = modules.lookup(module_id);
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,
@@ -94,8 +95,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = {
-            let mut tc =
-                Typechecker::new(working_dir.as_path(), source, &common_kinds, &modules.index);
+            let mut tc = Typechecker::new(working_dir.as_path(), source, &common_kinds, &modules);
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };
@@ -137,7 +137,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action = interpreter.eval_from_module(&mut env, &target_path, &[], entrypoint);
+        let action = interpreter.eval_from_module(&mut env, &module_id, &[], entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

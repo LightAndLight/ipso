@@ -168,7 +168,6 @@ version = "0.1.0"
 dependencies = [
  "ipso-syntax",
  "ipso-util",
- "typed-arena",
 ]
 
 [[package]]

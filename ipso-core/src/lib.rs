@@ -6,10 +6,10 @@ use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::Rc,
 };
-use typed_arena::Arena;
+use syntax::ModuleId;
 
 /**
 Well-kinded types.
@@ -795,7 +795,7 @@ pub enum Expr {
     Name(String),
     Module {
         /// The module's file path.
-        file: PathBuf,
+        id: ModuleId,
 
         /**
         A chain of submodule accessors.
@@ -967,8 +967,8 @@ impl Expr {
         fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
             match expr {
                 Expr::Var(v) => Expr::Var(f.apply(*v)),
-                Expr::Module { file, path, item } => Expr::Module {
-                    file: file.clone(),
+                Expr::Module { id, path, item } => Expr::Module {
+                    id: *id,
                     path: path.clone(),
                     item: item.clone(),
                 },
@@ -1077,8 +1077,8 @@ impl Expr {
                 cmp::Ordering::Equal => val.map_vars(|n| n + depth),
                 cmp::Ordering::Greater => Expr::Var(*n - 1),
             },
-            Expr::Module { file, path, item } => Expr::Module {
-                file: file.clone(),
+            Expr::Module { id, path, item } => Expr::Module {
+                id: *id,
                 path: path.clone(),
                 item: item.clone(),
             },
@@ -1274,8 +1274,8 @@ impl Expr {
                 }
             }
             Expr::Name(n) => Expr::Name(n.clone()),
-            Expr::Module { file, path, item } => Expr::Module {
-                file: file.clone(),
+            Expr::Module { id, path, item } => Expr::Module {
+                id: *id,
                 path: path.clone(),
                 item: item.clone(),
             },
@@ -1739,33 +1739,5 @@ impl Module {
             acc.extend(decl.get_signatures(common_kinds).into_iter());
             acc
         })
-    }
-}
-
-pub struct Modules<'a> {
-    data: &'a Arena<Module>,
-    pub index: HashMap<PathBuf, &'a Module>,
-}
-
-impl<'a> Modules<'a> {
-    pub fn new(data: &'a Arena<Module>) -> Self {
-        Modules {
-            data,
-            index: HashMap::new(),
-        }
-    }
-
-    pub fn iter(&self) -> std::collections::hash_map::Iter<PathBuf, &Module> {
-        self.index.iter()
-    }
-
-    pub fn lookup(&self, path: &Path) -> Option<&Module> {
-        self.index.get(path).copied()
-    }
-
-    pub fn insert(&mut self, path: PathBuf, module: Module) -> &'a Module {
-        let module_ref: &Module = self.data.alloc(module);
-        self.index.insert(path, module_ref);
-        module_ref
     }
 }

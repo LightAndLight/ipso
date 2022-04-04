@@ -18,6 +18,7 @@ use std::{
     rc::Rc,
     todo,
 };
+use syntax::{ModuleId, Modules};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -151,14 +152,14 @@ pub struct Typechecker<'modules> {
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
-    modules: &'modules HashMap<PathBuf, &'modules core::Module>,
+    modules: &'modules Modules<core::Module>,
     /**
     Cached context for modules that have been imported.
 
     Ideally we would use a module path and item name to look up type signatures
     in `modules`, but that's currently too resource intensive.
     */
-    module_context: HashMap<PathBuf, HashMap<String, core::TypeSig>>,
+    module_context: HashMap<ModuleId, HashMap<String, core::TypeSig>>,
     working_dir: &'modules Path,
 }
 
@@ -417,9 +418,10 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 macro_rules! with_tc {
     ($path:expr, $location:expr, $f:expr) => {{
         use ipso_core::CommonKinds;
-        use std::collections::HashMap;
+        use ipso_syntax::Modules;
+
         let common_kinds = CommonKinds::default();
-        let modules = HashMap::new();
+        let modules = Modules::new();
         let tc = Typechecker::new_with_builtins($path, $location, &common_kinds, &modules);
         $f(tc)
     }};
@@ -464,7 +466,7 @@ impl<'modules> Typechecker<'modules> {
         working_dir: &'modules Path,
         source: Source,
         common_kinds: &'modules CommonKinds,
-        modules: &'modules HashMap<PathBuf, &'modules core::Module>,
+        modules: &'modules Modules<core::Module>,
     ) -> Self {
         Typechecker {
             common_kinds,
@@ -490,7 +492,7 @@ impl<'modules> Typechecker<'modules> {
         working_dir: &'modules Path,
         location: Source,
         common_kinds: &'modules CommonKinds,
-        modules: &'modules HashMap<PathBuf, &'modules core::Module>,
+        modules: &'modules Modules<core::Module>,
     ) -> Self {
         let mut tc = Self::new(working_dir, location, common_kinds, modules);
         tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
@@ -1230,12 +1232,12 @@ impl<'modules> Typechecker<'modules> {
 
         match module_usages.get(&module_path) {
             None => {
+                let module_id = self.modules.lookup_id(&module_path).unwrap();
                 let signatures = self
                     .modules
-                    .get(&module_path)
-                    .unwrap()
+                    .lookup(module_id)
                     .get_signatures(self.common_kinds);
-                self.module_context.insert(module_path.clone(), signatures);
+                self.module_context.insert(module_id, signatures);
                 module_usages.insert(
                     module_path,
                     core::ModuleUsage::Named(actual_name.item.clone()),
@@ -1257,13 +1259,13 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(), TypeError> {
         let module_path = self.working_dir.join(&module.item).with_extension("ipso");
 
+        let module_id = self.modules.lookup_id(&module_path).unwrap();
         let signatures = self
             .modules
-            .get(&module_path)
-            .unwrap()
+            .lookup(module_id)
             .get_signatures(self.common_kinds);
 
-        self.module_context.insert(module_path.clone(), signatures);
+        self.module_context.insert(module_id, signatures);
         module_usages.insert(
             module_path,
             match names {
