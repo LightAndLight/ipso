@@ -443,16 +443,32 @@ struct ImportInfo {
 }
 
 fn check_import(
+    common_kinds: &CommonKinds,
+    builtins: &Module,
+    modules: &mut core::Modules,
     working_dir: &Path,
     module: &syntax::Spanned<String>,
     file: &Path,
-) -> Result<ImportInfo, ModuleError> {
+) -> Result<(), ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
     if module_path.path().exists() {
-        Ok(ImportInfo {
+        let import_info = ImportInfo {
             pos: module.pos,
             module_path,
-        })
+        };
+
+        let _ = import(
+            modules,
+            &Source::File {
+                path: PathBuf::from(file),
+            },
+            import_info.pos,
+            &import_info.module_path,
+            common_kinds,
+            builtins,
+        )?;
+
+        Ok(())
     } else {
         Err(ModuleError::NotFound {
             source: Source::File {
@@ -465,14 +481,33 @@ fn check_import(
 }
 
 fn check_from_import(
+    modules: &mut core::Modules,
+    common_kinds: &CommonKinds,
+    builtins: &Module,
     working_dir: &Path,
     module: &syntax::Spanned<String>,
     file: &Path,
     names: &syntax::Names,
-) -> Result<ImportInfo, ModuleError> {
+) -> Result<(), ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
     if module_path.path().exists() {
+        let import_info = ImportInfo {
+            pos: module.pos,
+            module_path,
+        };
+
+        let _ = import(
+            modules,
+            &Source::File {
+                path: PathBuf::from(file),
+            },
+            import_info.pos,
+            &import_info.module_path,
+            common_kinds,
+            builtins,
+        )?;
+
         match names {
             syntax::Names::All => Ok::<(), ModuleError>(()),
             syntax::Names::Names(names) => names.iter().try_for_each(|name| {
@@ -480,10 +515,7 @@ fn check_from_import(
             }),
         }?;
 
-        Ok(ImportInfo {
-            pos: module.pos,
-            module_path,
-        })
+        Ok(())
     } else {
         Err(ModuleError::NotFound {
             source: Source::File {
@@ -544,28 +576,19 @@ pub fn import<'a>(
                             Some(CheckImport::FromImport { module, names })
                         }
                     })
-                    .try_for_each(|filtered_item| {
-                        let import_info = match filtered_item {
-                            CheckImport::Import { module } => {
-                                check_import(working_dir, module, path)
-                            }
-                            CheckImport::FromImport { module, names } => {
-                                check_from_import(working_dir, module, path, names)
-                            }
-                        }?;
-
-                        let _ = import(
+                    .try_for_each(|filtered_item| match filtered_item {
+                        CheckImport::Import { module } => {
+                            check_import(common_kinds, builtins, modules, working_dir, module, path)
+                        }
+                        CheckImport::FromImport { module, names } => check_from_import(
                             modules,
-                            &Source::File {
-                                path: PathBuf::from(path),
-                            },
-                            import_info.pos,
-                            &import_info.module_path,
                             common_kinds,
                             builtins,
-                        )?;
-
-                        Ok::<(), ModuleError>(())
+                            working_dir,
+                            module,
+                            path,
+                            names,
+                        ),
                     })?;
 
                 desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
