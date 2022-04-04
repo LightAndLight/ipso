@@ -445,17 +445,14 @@ struct ImportInfo {
 fn check_import(
     working_dir: &Path,
     module: &syntax::Spanned<String>,
-    imports: &mut Vec<ImportInfo>,
     file: &Path,
-) -> Result<(), ModuleError> {
+) -> Result<ImportInfo, ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
     if module_path.path().exists() {
-        imports.push(ImportInfo {
+        Ok(ImportInfo {
             pos: module.pos,
             module_path,
-        });
-
-        Ok(())
+        })
     } else {
         Err(ModuleError::NotFound {
             source: Source::File {
@@ -470,17 +467,14 @@ fn check_import(
 fn check_from_import(
     working_dir: &Path,
     module: &syntax::Spanned<String>,
-    imports: &mut Vec<ImportInfo>,
     file: &Path,
-) -> Result<(), ModuleError> {
+) -> Result<ImportInfo, ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
     if module_path.path().exists() {
-        imports.push(ImportInfo {
+        Ok(ImportInfo {
             pos: module.pos,
             module_path,
-        });
-
-        Ok(())
+        })
     } else {
         Err(ModuleError::NotFound {
             source: Source::File {
@@ -496,18 +490,27 @@ fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>
     let working_dir = file.parent().unwrap();
     let mut imports: Vec<ImportInfo> = Vec::new();
 
-    module.decls.iter().try_for_each(|decl| match &decl.item {
-        syntax::Declaration::Definition { .. }
-        | syntax::Declaration::Class { .. }
-        | syntax::Declaration::Instance { .. }
-        | syntax::Declaration::TypeAlias { .. } => Ok(()),
-        syntax::Declaration::Import { module, .. } => {
-            check_import(working_dir, module, &mut imports, file)
-        }
-        syntax::Declaration::FromImport { module, .. } => {
-            check_from_import(working_dir, module, &mut imports, file)
-        }
-    })?;
+    module
+        .decls
+        .iter()
+        .try_for_each(|decl| -> Result<(), ModuleError> {
+            match &decl.item {
+                syntax::Declaration::Definition { .. }
+                | syntax::Declaration::Class { .. }
+                | syntax::Declaration::Instance { .. }
+                | syntax::Declaration::TypeAlias { .. } => Ok(()),
+                syntax::Declaration::Import { module, .. } => {
+                    let import_info = check_import(working_dir, module, file)?;
+                    imports.push(import_info);
+                    Ok(())
+                }
+                syntax::Declaration::FromImport { module, .. } => {
+                    let import_info = check_from_import(working_dir, module, file)?;
+                    imports.push(import_info);
+                    Ok(())
+                }
+            }
+        })?;
 
     Ok(imports)
 }
