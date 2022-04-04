@@ -373,65 +373,6 @@ fn desugar_module_accessors_decl(
     }
 }
 
-fn desugar_module_accessors(
-    common_kinds: &CommonKinds,
-    modules: &Modules<core::Module>,
-    module: &mut syntax::Module,
-) {
-    let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
-    for decl in &mut module.decls {
-        match &decl.item {
-            syntax::Declaration::Definition { .. }
-            | syntax::Declaration::Class { .. }
-            | syntax::Declaration::Instance { .. }
-            | syntax::Declaration::TypeAlias { .. } => {}
-
-            syntax::Declaration::Import { .. } => panic!("unresolved Import"),
-            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
-
-            syntax::Declaration::ResolvedImport { id, module, .. } => {
-                imported_items.insert(
-                    module.item.clone(),
-                    ImportedItemInfo::ModuleImportedAs { id: *id },
-                );
-            }
-            syntax::Declaration::ResolvedFromImport { id, names, .. } => {
-                let module = modules.lookup(*id);
-
-                match names {
-                    syntax::Names::All => {
-                        module
-                            .get_bindings(common_kinds)
-                            .into_keys()
-                            .for_each(|name| {
-                                imported_items.insert(
-                                    name,
-                                    ImportedItemInfo::DefinitionImportedFrom {
-                                        id: *id,
-                                        path: vec![],
-                                    },
-                                );
-                            })
-                    }
-                    syntax::Names::Names(names) => {
-                        for name in names {
-                            imported_items.insert(
-                                name.item.clone(),
-                                ImportedItemInfo::DefinitionImportedFrom {
-                                    id: *id,
-                                    path: vec![],
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        };
-
-        desugar_module_accessors_decl(&imported_items, &mut decl.item);
-    }
-}
-
 fn resolve_imports(
     common_kinds: &CommonKinds,
     builtins: &Module,
@@ -440,15 +381,18 @@ fn resolve_imports(
     path: &Path,
     module: &mut syntax::Module,
 ) -> Result<(), ModuleError> {
+    let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
+
     let decls: Vec<syntax::Spanned<syntax::Declaration>> = module
         .decls
         .iter()
         .map(|decl| -> Result<_, ModuleError> {
-            match &decl.item {
+            let mut decl = match &decl.item {
                 syntax::Declaration::Import { module, as_name } => {
                     let source = &Source::File {
                         path: PathBuf::from(path),
                     };
+
                     let module_path = working_dir.join(&module.item).with_extension("ipso");
                     let id = import(
                         modules,
@@ -459,7 +403,12 @@ fn resolve_imports(
                         builtins,
                     )?;
 
-                    Ok(syntax::Spanned {
+                    imported_items.insert(
+                        module.item.clone(),
+                        ImportedItemInfo::ModuleImportedAs { id },
+                    );
+
+                    Ok::<_, ModuleError>(syntax::Spanned {
                         pos: decl.pos,
                         item: syntax::Declaration::ResolvedImport {
                             id,
@@ -472,9 +421,9 @@ fn resolve_imports(
                     let source = &Source::File {
                         path: PathBuf::from(path),
                     };
+
                     let imported_module_path =
                         working_dir.join(&module.item).with_extension("ipso");
-
                     let imported_module_id = import(
                         modules,
                         source,
@@ -486,8 +435,33 @@ fn resolve_imports(
                     let imported_module = modules.lookup(imported_module_id);
 
                     match names {
-                        syntax::Names::All => Ok::<(), ModuleError>(()),
+                        syntax::Names::All => {
+                            imported_items.extend(
+                                imported_module.get_bindings(common_kinds).into_keys().map(
+                                    |name| {
+                                        (
+                                            name,
+                                            ImportedItemInfo::DefinitionImportedFrom {
+                                                id: imported_module_id,
+                                                path: vec![],
+                                            },
+                                        )
+                                    },
+                                ),
+                            );
+                            Ok::<(), ModuleError>(())
+                        }
                         syntax::Names::Names(names) => {
+                            imported_items.extend(names.iter().map(|name| {
+                                (
+                                    name.item.clone(),
+                                    ImportedItemInfo::DefinitionImportedFrom {
+                                        id: imported_module_id,
+                                        path: vec![],
+                                    },
+                                )
+                            }));
+
                             let available_names: HashSet<String> = imported_module
                                 .get_bindings(common_kinds)
                                 .into_keys()
@@ -516,7 +490,11 @@ fn resolve_imports(
                     })
                 }
                 _ => Ok(decl.clone()),
-            }
+            }?;
+
+            desugar_module_accessors_decl(&imported_items, &mut decl.item);
+
+            Ok(decl)
         })
         .collect::<Result<_, _>>()?;
 
@@ -557,7 +535,6 @@ pub fn import(
                     path,
                     &mut module,
                 )?;
-                desugar_module_accessors(common_kinds, modules, &mut module);
 
                 let module = {
                     let working_dir = path.parent().unwrap();
