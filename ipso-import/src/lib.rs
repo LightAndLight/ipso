@@ -5,7 +5,7 @@ use ipso_parse as parse;
 use ipso_syntax::{self as syntax, ModuleName, ModulePath};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
@@ -17,6 +17,10 @@ pub enum ModuleError {
         source: Source,
         pos: usize,
         module_path: ModulePath,
+    },
+    DoesNotDefine {
+        source: Source,
+        pos: usize,
     },
     IO(io::Error),
     Parse(parse::ParseError),
@@ -41,6 +45,16 @@ impl ModuleError {
                         "file {} does not exist",
                         module_path.path().display()
                     )),
+                },
+            ),
+            ModuleError::DoesNotDefine { source, pos } => diagnostic.item(
+                Some(Location {
+                    source: source.clone(),
+                    offset: Some(*pos),
+                }),
+                Message {
+                    content: String::from("not defined in module"),
+                    addendum: None,
                 },
             ),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
@@ -419,7 +433,7 @@ fn desugar_module_accessors(
                     syntax::Names::Names(names) => {
                         for name in names {
                             imported_items.insert(
-                                name.clone(),
+                                name.item.clone(),
                                 ImportedItemInfo::DefinitionImportedFrom {
                                     path: path.clone(),
                                     submodules: vec![],
@@ -506,27 +520,43 @@ pub fn import<'a>(
                             Ok::<(), ModuleError>(())
                         }
                         CheckImport::FromImport { module, names } => {
-                            let module_path = ModulePath::from_module(
+                            let importing_module_path = ModulePath::from_module(
                                 working_dir,
                                 &ModuleName(vec![module.item.clone()]),
                             );
 
-                            let _ = import(
+                            let imported_module = import(
                                 modules,
                                 &Source::File {
                                     path: PathBuf::from(path),
                                 },
                                 module.pos,
-                                &module_path,
+                                &importing_module_path,
                                 common_kinds,
                                 builtins,
                             )?;
 
                             match names {
                                 syntax::Names::All => Ok::<(), ModuleError>(()),
-                                syntax::Names::Names(names) => names.iter().try_for_each(|name| {
-                                    todo!("check that each name exists");
-                                }),
+                                syntax::Names::Names(names) => {
+                                    let available_names: HashSet<String> = imported_module
+                                        .get_bindings(common_kinds)
+                                        .into_keys()
+                                        .collect();
+
+                                    names.iter().try_for_each(|name| {
+                                        if available_names.contains(&name.item) {
+                                            Ok(())
+                                        } else {
+                                            Err(ModuleError::DoesNotDefine {
+                                                source: Source::File {
+                                                    path: PathBuf::from(module_path.path()),
+                                                },
+                                                pos: name.pos,
+                                            })
+                                        }
+                                    })
+                                }
                             }?;
 
                             Ok(())

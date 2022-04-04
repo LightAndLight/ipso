@@ -730,7 +730,7 @@ impl<'modules> Typechecker<'modules> {
         let should_import = |expected_name: &str| -> bool {
             match names {
                 syntax::Names::All => true,
-                syntax::Names::Names(names) => names.iter().any(|name| name == expected_name),
+                syntax::Names::Names(names) => names.iter().any(|name| name.item == expected_name),
             }
         };
         for decl in &module.decls {

@@ -130,7 +130,7 @@ pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Asterisk))
                         ),
                         sep_by!(
-                            indent!(parser, Relation::Gt, parser.ident_owned()),
+                            indent!(parser, Relation::Gt, spanned!(parser, parser.ident_owned())),
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Comma))
                         )
                         .map(Names::Names)

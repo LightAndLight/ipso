@@ -514,7 +514,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Names {
     All,
-    Names(Vec<String>),
+    Names(Vec<Spanned<String>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

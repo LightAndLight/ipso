@@ -1,0 +1,4 @@
+from other import a, b, c
+
+main : IO ()
+main = pureIO ()
