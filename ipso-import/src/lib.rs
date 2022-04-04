@@ -437,61 +437,6 @@ fn desugar_module_accessors(
     }
 }
 
-fn check_import(
-    common_kinds: &CommonKinds,
-    builtins: &Module,
-    modules: &mut core::Modules,
-    working_dir: &Path,
-    module: &syntax::Spanned<String>,
-    file: &Path,
-) -> Result<(), ModuleError> {
-    let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-    let _ = import(
-        modules,
-        &Source::File {
-            path: PathBuf::from(file),
-        },
-        module.pos,
-        &module_path,
-        common_kinds,
-        builtins,
-    )?;
-
-    Ok(())
-}
-
-fn check_from_import(
-    modules: &mut core::Modules,
-    common_kinds: &CommonKinds,
-    builtins: &Module,
-    working_dir: &Path,
-    module: &syntax::Spanned<String>,
-    file: &Path,
-    names: &syntax::Names,
-) -> Result<(), ModuleError> {
-    let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-
-    let _ = import(
-        modules,
-        &Source::File {
-            path: PathBuf::from(file),
-        },
-        module.pos,
-        &module_path,
-        common_kinds,
-        builtins,
-    )?;
-
-    match names {
-        syntax::Names::All => Ok::<(), ModuleError>(()),
-        syntax::Names::Names(names) => names.iter().try_for_each(|name| {
-            todo!("check that each name exists");
-        }),
-    }?;
-
-    Ok(())
-}
-
 /// Import a module.
 ///
 /// Module imports are cached, so importing the same module repeatedly is cheap.
@@ -543,17 +488,49 @@ pub fn import<'a>(
                     })
                     .try_for_each(|filtered_item| match filtered_item {
                         CheckImport::Import { module } => {
-                            check_import(common_kinds, builtins, modules, working_dir, module, path)
+                            let module_path = ModulePath::from_module(
+                                working_dir,
+                                &ModuleName(vec![module.item.clone()]),
+                            );
+                            let _ = import(
+                                modules,
+                                &Source::File {
+                                    path: PathBuf::from(path),
+                                },
+                                module.pos,
+                                &module_path,
+                                common_kinds,
+                                builtins,
+                            )?;
+
+                            Ok::<(), ModuleError>(())
                         }
-                        CheckImport::FromImport { module, names } => check_from_import(
-                            modules,
-                            common_kinds,
-                            builtins,
-                            working_dir,
-                            module,
-                            path,
-                            names,
-                        ),
+                        CheckImport::FromImport { module, names } => {
+                            let module_path = ModulePath::from_module(
+                                working_dir,
+                                &ModuleName(vec![module.item.clone()]),
+                            );
+
+                            let _ = import(
+                                modules,
+                                &Source::File {
+                                    path: PathBuf::from(path),
+                                },
+                                module.pos,
+                                &module_path,
+                                common_kinds,
+                                builtins,
+                            )?;
+
+                            match names {
+                                syntax::Names::All => Ok::<(), ModuleError>(()),
+                                syntax::Names::Names(names) => names.iter().try_for_each(|name| {
+                                    todo!("check that each name exists");
+                                }),
+                            }?;
+
+                            Ok(())
+                        }
                     })?;
 
                 desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
