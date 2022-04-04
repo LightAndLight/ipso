@@ -468,9 +468,18 @@ fn check_from_import(
     working_dir: &Path,
     module: &syntax::Spanned<String>,
     file: &Path,
+    names: &syntax::Names,
 ) -> Result<ImportInfo, ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+
     if module_path.path().exists() {
+        match names {
+            syntax::Names::All => Ok::<(), ModuleError>(()),
+            syntax::Names::Names(names) => names.iter().try_for_each(|name| {
+                todo!("check that each name exists");
+            }),
+        }?;
+
         Ok(ImportInfo {
             pos: module.pos,
             module_path,
@@ -500,8 +509,8 @@ fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>
             syntax::Declaration::Import { module, .. } => {
                 Some(check_import(working_dir, module, file))
             }
-            syntax::Declaration::FromImport { module, .. } => {
-                Some(check_from_import(working_dir, module, file))
+            syntax::Declaration::FromImport { module, names } => {
+                Some(check_from_import(working_dir, module, file, names))
             }
         })
         .collect::<Result<_, _>>()?;
