@@ -8,7 +8,7 @@ pub mod type_inference;
 use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use ipso_builtins as builtins;
-use ipso_core::{self as core, CommonKinds, ModulePath};
+use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind, ModuleName, Spanned};
 use std::{
@@ -18,6 +18,7 @@ use std::{
     rc::Rc,
     todo,
 };
+use syntax::ModulePath;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -147,12 +148,18 @@ pub struct Typechecker<'modules> {
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
     pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
-    module_context: HashMap<ModuleName, HashMap<String, core::TypeSig>>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
     modules: &'modules HashMap<ModulePath, &'modules core::Module>,
+    /**
+    Cached context for modules that have been imported.
+
+    Ideally we would use a module path and item name to look up type signatures
+    in `modules`, but that's currently too resource intensive.
+    */
+    module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
     working_dir: &'modules Path,
 }
 
@@ -1215,7 +1222,7 @@ impl<'modules> Typechecker<'modules> {
         module: &Spanned<String>,
         as_name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
-        let path =
+        let module_path =
             ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
 
         let actual_name = match as_name {
@@ -1223,16 +1230,18 @@ impl<'modules> Typechecker<'modules> {
             Some(name) => name,
         };
 
-        match module_usages.get(&path) {
+        match module_usages.get(&module_path) {
             None => {
                 let signatures = self
                     .modules
-                    .get(&path)
+                    .get(&module_path)
                     .unwrap()
                     .get_signatures(self.common_kinds);
-                let module_name = ModuleName(vec![actual_name.item.clone()]);
-                self.module_context.insert(module_name, signatures);
-                module_usages.insert(path, core::ModuleUsage::Named(actual_name.item.clone()));
+                self.module_context.insert(module_path.clone(), signatures);
+                module_usages.insert(
+                    module_path,
+                    core::ModuleUsage::Named(actual_name.item.clone()),
+                );
                 Ok(())
             }
             Some(_) => Err(TypeError::ShadowedModuleName {

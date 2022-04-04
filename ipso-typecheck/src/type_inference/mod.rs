@@ -20,7 +20,7 @@ use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
 };
-use syntax::{kind::Kind, ModuleName};
+use syntax::{kind::Kind, ModulePath};
 
 /// A mapping from type metavariables to their solutions.
 #[derive(Default)]
@@ -1069,7 +1069,7 @@ impl CheckedPattern {
 pub struct InferenceContext<'a> {
     common_kinds: &'a CommonKinds,
     source: &'a Source,
-    modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+    modules: &'a HashMap<ModulePath, HashMap<String, TypeSig>>,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut kind_inference::Solutions,
@@ -1095,7 +1095,7 @@ impl<'a> InferenceContext<'a> {
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
-        modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+        modules: &'a HashMap<ModulePath, HashMap<String, TypeSig>>,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut kind_inference::Solutions,
@@ -1418,13 +1418,13 @@ impl<'a> InferenceContext<'a> {
                     }
                 },
             },
-            syntax::Expr::Module { name, item } => match self.modules.get(name) {
+            syntax::Expr::Module { path, item } => match self.modules.get(path) {
                 None => {
                     /*
                     A module accessor will only be desugared if the module was in scope, so this case
                     is impossible as long as `ctx.modules` is valid w.r.t this expression.
                     */
-                    panic!("module not in scope: {:?}", name)
+                    panic!("module not in scope: {:?}", path)
                 }
                 Some(definitions) => match definitions.get(item) {
                     None => {
@@ -1432,7 +1432,7 @@ impl<'a> InferenceContext<'a> {
                     }
                     Some(type_signature) => Ok(self.instantiate(
                         expr.pos,
-                        Expr::Module(name.clone(), item.clone()),
+                        Expr::Module(path.clone(), item.clone()),
                         type_signature,
                     )),
                 },

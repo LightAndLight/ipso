@@ -1,11 +1,11 @@
 use diagnostic::{Location, Message};
-use ipso_core::{self as core, CommonKinds, Module, ModulePath};
+use ipso_core::{self as core, CommonKinds, Module};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
-use ipso_rope::Rope;
-use ipso_syntax::{self as syntax, ModuleName};
+use ipso_syntax::{self as syntax, ModuleName, ModulePath};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
+    collections::HashMap,
     io::{self},
     path::{Path, PathBuf},
     rc::Rc,
@@ -37,7 +37,10 @@ impl ModuleError {
                 }),
                 Message {
                     content: String::from("module not found"),
-                    addendum: Some(format!("file {} does not exist", module_path.to_str())),
+                    addendum: Some(format!(
+                        "file {} does not exist",
+                        module_path.path().display()
+                    )),
                 },
             ),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
@@ -65,55 +68,169 @@ impl From<typecheck::TypeError> for ModuleError {
     }
 }
 
-fn desugar_module_accessors_comp_line(module_names: &Rope<String>, line: &mut syntax::CompLine) {
+#[derive(Debug, Clone)]
+enum ImportedItemInfo {
+    /**
+    A definition was imported from a specific module.
+
+    e.g. `from x import y`
+    */
+    DefinitionImportedFrom {
+        /// The module's file path.
+        path: PathBuf,
+
+        /**
+        Any submodule references.
+
+        e.g. in `from x.y import z`, `.y` is a submodule reference.
+        */
+        submodules: Vec<String>,
+    },
+
+    /**
+    A module was imported.
+
+    e.g. `import x`, `import x as y`
+    */
+    ModuleImportedAs {
+        /// The module's file path.
+        path: PathBuf,
+    },
+}
+
+fn desugar_module_accessors_comp_line(
+    imported_items: &HashMap<String, ImportedItemInfo>,
+    line: &mut syntax::CompLine,
+) {
     match line {
         syntax::CompLine::Expr(value) => {
-            desugar_module_accessors_expr(module_names, &mut value.item);
+            desugar_module_accessors_expr(imported_items, &mut value.item);
         }
         syntax::CompLine::Bind(_, value) => {
-            desugar_module_accessors_expr(module_names, &mut value.item);
+            desugar_module_accessors_expr(imported_items, &mut value.item);
         }
         syntax::CompLine::Let(_, value) => {
-            desugar_module_accessors_expr(module_names, &mut value.item);
+            desugar_module_accessors_expr(imported_items, &mut value.item);
         }
     }
 }
 
-fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax::Expr) {
+fn desugar_module_accessors_expr(
+    imported_items: &HashMap<String, ImportedItemInfo>,
+    expr: &mut syntax::Expr,
+) {
     match expr {
-        syntax::Expr::Var(_) => {}
+        syntax::Expr::Var(name) => {
+            if let Some(imported_item_info) = imported_items.get(name) {
+                match imported_item_info {
+                    ImportedItemInfo::DefinitionImportedFrom {
+                        path, submodules, ..
+                    } => {
+                        /*
+                        ```
+                        from x import y
+
+                        ...
+
+                        y
+                        ```
+
+                        is desugared to
+
+                        ```
+                        import x
+
+                        ...
+
+                        <x's path>.y
+                        ```
+                        */
+                        *expr = syntax::Expr::Module {
+                            path: ModulePath {
+                                file: path.clone(),
+                                submodules: submodules.clone(),
+                            },
+                            item: name.clone(),
+                        };
+                    }
+                    ImportedItemInfo::ModuleImportedAs { .. } => {
+                        /*
+                        A module can only be used as an expression when an item is projected from it.
+
+                        i.e.
+
+                        ```
+                        import x
+
+                        ...
+
+                        x
+                        ```
+
+                        is not allowed, and
+
+                        ```
+                        import x
+
+                        ...
+
+
+                        x.y
+                        ```
+
+                        is allowed.
+
+                        Module item access is desugared in the `Expr::Project` branch, rather than here.
+                        */
+                    }
+                }
+            }
+        }
         syntax::Expr::Module { .. } => {}
         syntax::Expr::App(a, b) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Lam { args, body } => {
-            let module_names = {
-                let mut module_names = module_names.clone();
+            let imported_items = {
+                let mut imported_items: HashMap<String, ImportedItemInfo> = imported_items.clone();
                 for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    module_names = module_names
-                        .delete_first(|x| x == &name.item)
-                        .unwrap_or_else(|x| x);
+                    imported_items.remove(&name.item);
                 }
-                module_names
+                imported_items
             };
-            desugar_module_accessors_expr(&module_names, &mut Rc::make_mut(body).item)
+            desugar_module_accessors_expr(&imported_items, &mut Rc::make_mut(body).item)
         }
         syntax::Expr::Let { value, rest, .. } => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(value).item);
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(rest).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(value).item);
+
+            /*
+            TODO: fix variable shadowing
+
+            ```
+            import x
+
+            ...
+
+
+            let x = {} in x.a
+            ```
+
+            In the above example, `x.a` should be a record projection rather than a module access.
+            */
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(rest).item);
         }
         syntax::Expr::True => {}
         syntax::Expr::False => {}
         syntax::Expr::IfThenElse(a, b, c) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(c).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(c).item);
         }
         syntax::Expr::Int(_) => {}
         syntax::Expr::Binop(_, a, b) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(b).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Char(_) => {}
         syntax::Expr::String(parts) => {
@@ -121,56 +238,69 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
                 match part {
                     syntax::StringPart::String(_) => {}
                     syntax::StringPart::Expr(e) => {
-                        desugar_module_accessors_expr(module_names, &mut e.item);
+                        desugar_module_accessors_expr(imported_items, &mut e.item);
                     }
                 }
             }
         }
         syntax::Expr::Array(xs) => {
             for x in xs {
-                desugar_module_accessors_expr(module_names, &mut x.item);
+                desugar_module_accessors_expr(imported_items, &mut x.item);
             }
         }
         syntax::Expr::Record { fields, rest } => {
             for (_, e) in fields {
-                desugar_module_accessors_expr(module_names, &mut e.item);
+                desugar_module_accessors_expr(imported_items, &mut e.item);
             }
 
             for e in rest {
-                desugar_module_accessors_expr(module_names, &mut Rc::make_mut(e).item);
+                desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(e).item);
             }
         }
         syntax::Expr::Project(value, field) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(value).item);
+            let value = Rc::make_mut(value);
+            desugar_module_accessors_expr(imported_items, &mut value.item);
 
-            let (head, tail) = (*value).item.unwrap_projects();
+            match &value.item {
+                syntax::Expr::Module { path, item } => {
+                    let mut path = path.clone();
+                    path.submodules.push(item.clone());
 
-            if let syntax::Expr::Var(head) = head {
-                if module_names.iter().any(|x| x == head) {
-                    let mut path: Vec<String> = Vec::with_capacity(tail.len() + 1);
-                    path.push(head.clone());
-                    path.extend(tail.into_iter().cloned());
                     *expr = syntax::Expr::Module {
-                        name: syntax::ModuleName(path),
+                        path,
                         item: field.clone(),
+                    };
+                }
+
+                syntax::Expr::Var(name) => {
+                    if let Some(ImportedItemInfo::ModuleImportedAs { path }) =
+                        imported_items.get(name)
+                    {
+                        *expr = syntax::Expr::Module {
+                            path: ModulePath {
+                                file: path.clone(),
+                                submodules: vec![],
+                            },
+                            item: field.clone(),
+                        }
                     }
                 }
+                _ => {}
             }
         }
         syntax::Expr::Variant(_) => {}
         syntax::Expr::Embed(_, a) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
         }
         syntax::Expr::Case(a, branches) => {
-            desugar_module_accessors_expr(module_names, &mut Rc::make_mut(a).item);
+            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
 
             for branch in branches {
                 let module_names = {
-                    let mut module_names = module_names.clone();
+                    // TODO: replace this loop with filter_map/collect
+                    let mut module_names = imported_items.clone();
                     for name in branch.pattern.item.iter_names() {
-                        module_names = module_names
-                            .delete_first(|x| x == &name.item)
-                            .unwrap_or_else(|x| x);
+                        module_names.remove(&name.item);
                     }
                     module_names
                 };
@@ -180,17 +310,20 @@ fn desugar_module_accessors_expr(module_names: &Rope<String>, expr: &mut syntax:
         syntax::Expr::Unit => {}
         syntax::Expr::Comp(lines) => lines
             .iter_mut()
-            .for_each(|line| desugar_module_accessors_comp_line(module_names, line)),
+            .for_each(|line| desugar_module_accessors_comp_line(imported_items, line)),
         syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {
-                desugar_module_accessors_expr(module_names, &mut expr.item)
+                desugar_module_accessors_expr(imported_items, &mut expr.item)
             }
         }),
     }
 }
 
-fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::Declaration) {
+fn desugar_module_accessors_decl(
+    imported_items: &HashMap<String, ImportedItemInfo>,
+    decl: &mut syntax::Declaration,
+) {
     match decl {
         syntax::Declaration::Definition {
             name,
@@ -198,18 +331,15 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
             args,
             body,
         } => {
-            let module_names = {
-                let mut module_names = module_names
-                    .delete_first(|x| x == name)
-                    .unwrap_or_else(|x| x);
+            let imported_items = {
+                let mut imported_items = imported_items.clone();
+                imported_items.remove(name);
                 for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    module_names = module_names
-                        .delete_first(|x| x == &name.item)
-                        .unwrap_or_else(|x| x);
+                    imported_items.remove(&name.item);
                 }
-                module_names
+                imported_items
             };
-            desugar_module_accessors_expr(&module_names, &mut body.item);
+            desugar_module_accessors_expr(&imported_items, &mut body.item);
         }
         syntax::Declaration::Class { .. } => {}
         syntax::Declaration::Instance {
@@ -219,19 +349,15 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
             members,
         } => {
             for (name, args, body) in members {
-                let module_names = {
-                    let mut module_names = module_names
-                        .clone()
-                        .delete_first(|x| x == &name.item)
-                        .unwrap_or_else(|x| x);
+                let imported_items = {
+                    let mut imported_items = imported_items.clone();
+                    imported_items.remove(&name.item);
                     for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                        module_names = module_names
-                            .delete_first(|x| x == &name.item)
-                            .unwrap_or_else(|x| x);
+                        imported_items.remove(&name.item);
                     }
-                    module_names
+                    imported_items
                 };
-                desugar_module_accessors_expr(&module_names, &mut body.item)
+                desugar_module_accessors_expr(&imported_items, &mut body.item)
             }
         }
         syntax::Declaration::TypeAlias { .. } => {}
@@ -243,12 +369,13 @@ fn desugar_module_accessors_decl(module_names: Rope<String>, decl: &mut syntax::
 struct ImportInfo {
     pos: usize,
     module_path: ModulePath,
-    module: Option<String>,
 }
 
 fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
     let working_dir = file.parent().unwrap();
-    let mut paths: Vec<ImportInfo> = Vec::new();
+    let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
+    let mut imports: Vec<ImportInfo> = Vec::new();
+
     for decl in &mut module.decls {
         match &decl.item {
             syntax::Declaration::Definition { .. }
@@ -256,31 +383,54 @@ fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
             syntax::Declaration::Import { module, .. } => {
-                paths.push(ImportInfo {
+                let module_path =
+                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+                imported_items.insert(
+                    module.item.clone(),
+                    ImportedItemInfo::ModuleImportedAs {
+                        path: PathBuf::from(module_path.path()),
+                    },
+                );
+
+                imports.push(ImportInfo {
                     pos: module.pos,
-                    module_path: ModulePath::from_module(
+                    module_path,
+                })
+            }
+            syntax::Declaration::FromImport { module, names } => match names {
+                syntax::Names::All => {
+                    // look up all importable definitions in module and add them
+                    todo!("FromImport All")
+                }
+                syntax::Names::Names(names) => {
+                    let module_path = ModulePath::from_module(
                         working_dir,
                         &ModuleName(vec![module.item.clone()]),
-                    ),
-                    module: Some(module.item.clone()),
-                });
-            }
-            syntax::Declaration::FromImport { module, .. } => {
-                paths.push(ImportInfo {
-                    pos: module.pos,
-                    module_path: ModulePath::from_module(
-                        working_dir,
-                        &ModuleName(vec![module.item.clone()]),
-                    ),
-                    module: None,
-                });
-            }
+                    );
+                    let path = PathBuf::from(module_path.path());
+
+                    for name in names {
+                        imported_items.insert(
+                            name.clone(),
+                            ImportedItemInfo::DefinitionImportedFrom {
+                                path: path.clone(),
+                                submodules: vec![],
+                            },
+                        );
+                    }
+
+                    imports.push(ImportInfo {
+                        pos: module.pos,
+                        module_path,
+                    })
+                }
+            },
         }
 
-        let module_names: Vec<String> = paths.iter().filter_map(|x| x.module.clone()).collect();
-        desugar_module_accessors_decl(Rope::from_vec(&module_names), &mut decl.item)
+        desugar_module_accessors_decl(&imported_items, &mut decl.item)
     }
-    paths
+
+    imports
 }
 
 /// Import a module.
@@ -299,7 +449,7 @@ pub fn import<'a>(
 ) -> Result<&'a core::Module, ModuleError> {
     match modules.index.get(module_path) {
         None => {
-            let path = module_path.as_path();
+            let path = module_path.path();
             if path.exists() {
                 let input_location = Source::File {
                     path: PathBuf::from(path),

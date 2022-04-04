@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleName};
+use ipso_syntax::{self as syntax, kind::Kind, r#type};
 use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
     rc::Rc,
 };
+use syntax::ModulePath;
 use typed_arena::Arena;
 
 /**
@@ -793,7 +793,7 @@ pub enum Expr {
     EVar(EVar),
     Placeholder(Placeholder),
     Name(String),
-    Module(ModuleName, String),
+    Module(ModulePath, String),
     Builtin(Builtin),
 
     App(Rc<Expr>, Rc<Expr>),
@@ -1680,55 +1680,6 @@ pub enum ModuleUsage {
     Items(Vec<String>),
     /// The entire contents of a module were imported
     All,
-}
-
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub enum ModulePath {
-    Module {
-        module_name: ModuleName,
-        path: PathBuf,
-    },
-    File {
-        path: PathBuf,
-    },
-}
-
-impl ModulePath {
-    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
-        let mut path = module_name
-            .iter()
-            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
-        path.set_extension("ipso");
-        ModulePath::Module {
-            module_name: module_name.clone(),
-            path,
-        }
-    }
-
-    pub fn from_file(file: &Path) -> Self {
-        ModulePath::File {
-            path: PathBuf::from(file),
-        }
-    }
-
-    pub fn as_path(&self) -> &Path {
-        let path = match self {
-            ModulePath::Module { path, .. } => path,
-            ModulePath::File { path, .. } => path,
-        };
-        path.as_path()
-    }
-
-    pub fn to_str(&self) -> &str {
-        self.as_path().to_str().unwrap()
-    }
-
-    pub fn get_module_name(&self) -> Option<&ModuleName> {
-        match self {
-            ModulePath::Module { module_name, .. } => Option::Some(module_name),
-            ModulePath::File { .. } => None,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
