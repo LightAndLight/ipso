@@ -446,28 +446,18 @@ fn check_import(
     file: &Path,
 ) -> Result<(), ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-    if module_path.path().exists() {
-        let _ = import(
-            modules,
-            &Source::File {
-                path: PathBuf::from(file),
-            },
-            module.pos,
-            &module_path,
-            common_kinds,
-            builtins,
-        )?;
+    let _ = import(
+        modules,
+        &Source::File {
+            path: PathBuf::from(file),
+        },
+        module.pos,
+        &module_path,
+        common_kinds,
+        builtins,
+    )?;
 
-        Ok(())
-    } else {
-        Err(ModuleError::NotFound {
-            source: Source::File {
-                path: PathBuf::from(file),
-            },
-            pos: module.pos,
-            module_path,
-        })
-    }
+    Ok(())
 }
 
 fn check_from_import(
@@ -481,35 +471,25 @@ fn check_from_import(
 ) -> Result<(), ModuleError> {
     let module_path = ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
 
-    if module_path.path().exists() {
-        let _ = import(
-            modules,
-            &Source::File {
-                path: PathBuf::from(file),
-            },
-            module.pos,
-            &module_path,
-            common_kinds,
-            builtins,
-        )?;
+    let _ = import(
+        modules,
+        &Source::File {
+            path: PathBuf::from(file),
+        },
+        module.pos,
+        &module_path,
+        common_kinds,
+        builtins,
+    )?;
 
-        match names {
-            syntax::Names::All => Ok::<(), ModuleError>(()),
-            syntax::Names::Names(names) => names.iter().try_for_each(|name| {
-                todo!("check that each name exists");
-            }),
-        }?;
+    match names {
+        syntax::Names::All => Ok::<(), ModuleError>(()),
+        syntax::Names::Names(names) => names.iter().try_for_each(|name| {
+            todo!("check that each name exists");
+        }),
+    }?;
 
-        Ok(())
-    } else {
-        Err(ModuleError::NotFound {
-            source: Source::File {
-                path: PathBuf::from(file),
-            },
-            pos: module.pos,
-            module_path,
-        })
-    }
+    Ok(())
 }
 
 /// Import a module.
