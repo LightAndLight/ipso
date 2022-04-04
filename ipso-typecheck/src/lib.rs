@@ -1251,6 +1251,35 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
+    fn check_from_import(
+        &mut self,
+        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module: &Spanned<String>,
+        names: &syntax::Names,
+    ) -> Result<(), TypeError> {
+        let module_path =
+            ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
+
+        let signatures = self
+            .modules
+            .get(&module_path)
+            .unwrap()
+            .get_signatures(self.common_kinds);
+
+        self.module_context.insert(module_path.clone(), signatures);
+        module_usages.insert(
+            module_path,
+            match names {
+                syntax::Names::All => core::ModuleUsage::All,
+                syntax::Names::Names(names) => {
+                    core::ModuleUsage::Items(names.iter().map(|name| name.item.clone()).collect())
+                }
+            },
+        );
+
+        Ok(())
+    }
+
     fn check_declaration(
         &mut self,
         module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
@@ -1271,9 +1300,9 @@ impl<'modules> Typechecker<'modules> {
             syntax::Declaration::Import { module, as_name } => self
                 .check_import(module_usages, module, as_name)
                 .map(|()| Option::None),
-            syntax::Declaration::FromImport { module, names } => {
-                todo!("check from-import {:?}", (module, names))
-            }
+            syntax::Declaration::FromImport { module, names } => self
+                .check_from_import(module_usages, module, names)
+                .map(|()| Option::None),
             syntax::Declaration::Class {
                 supers,
                 name,
