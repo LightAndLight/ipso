@@ -420,11 +420,11 @@ struct ImportInfo {
     module_path: ModulePath,
 }
 
-fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo> {
+fn calculate_imports(file: &Path, module: &syntax::Module) -> Vec<ImportInfo> {
     let working_dir = file.parent().unwrap();
     let mut imports: Vec<ImportInfo> = Vec::new();
 
-    for decl in &mut module.decls {
+    for decl in &module.decls {
         match &decl.item {
             syntax::Declaration::Definition { .. }
             | syntax::Declaration::Class { .. }
@@ -450,8 +450,6 @@ fn calculate_imports(file: &Path, module: &mut syntax::Module) -> Vec<ImportInfo
             }
         }
     }
-
-    desugar_module_accessors(module, working_dir);
 
     imports
 }
@@ -479,7 +477,7 @@ pub fn import<'a>(
                 };
                 let mut module = parse::parse_file(path)?;
 
-                for import_info in calculate_imports(path, &mut module).into_iter() {
+                for import_info in calculate_imports(path, &module).into_iter() {
                     if let Err(err) = import(
                         modules,
                         &Source::File {
@@ -493,6 +491,10 @@ pub fn import<'a>(
                         return Err(err);
                     }
                 }
+
+                let working_dir = path.parent().unwrap();
+                desugar_module_accessors(&mut module, working_dir);
+
                 let module = {
                     let working_dir = path.parent().unwrap();
                     let mut tc = {
