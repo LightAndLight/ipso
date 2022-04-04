@@ -1,11 +1,10 @@
 mod test;
 
 use ipso_core::{
-    Binop, Builtin, CmdPart, CommonKinds, Expr, ModulePath, ModuleUsage, Modules, Pattern,
-    StringPart,
+    Binop, Builtin, CmdPart, CommonKinds, Expr, ModuleUsage, Modules, Pattern, StringPart,
 };
 use ipso_rope::Rope;
-use ipso_syntax::ModuleName;
+use ipso_syntax::ModulePath;
 use paste::paste;
 use std::{
     cmp::Ordering,
@@ -532,7 +531,6 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     objects: &'heap Arena<Object<'heap>>,
     context: &'ctx HashMap<String, Rc<Expr>>,
     modules: HashMap<&'ctx ModulePath, Module<'ctx>>,
-    module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
 }
 
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
@@ -564,7 +562,6 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
             stdout,
             context,
             modules,
-            module_unmapping: Vec::with_capacity(1),
             bytes,
             values,
             objects,
@@ -1320,29 +1317,15 @@ where {
         path: &ModulePath,
         binding: &str,
     ) -> Value<'heap> {
-        let (expr, next_module_mapping) = match self.modules.get(path) {
+        let (expr, _) = match self.modules.get(path) {
             None => panic!("no module found at {:?}", path),
             Some(module) => match module.bindings.get(binding) {
                 None => panic!("{:?} not found in {:?}", binding, path),
                 Some(expr) => (expr.clone(), module.usages.clone()),
             },
         };
-        self.module_unmapping.push(
-            next_module_mapping
-                .into_iter()
-                .filter_map(|(module_path, module_usage)| {
-                    let m_module_name = match module_usage {
-                        ModuleUsage::All => module_path.get_module_name().cloned(),
-                        ModuleUsage::Items(_) => module_path.get_module_name().cloned(),
-                        ModuleUsage::Named(name) => Some(ModuleName(vec![name])),
-                    };
-                    m_module_name.map(|module_name| (module_name, module_path))
-                })
-                .collect(),
-        );
-        let res = self.eval(env, &expr);
-        self.module_unmapping.pop();
-        res
+
+        self.eval(env, &expr)
     }
 
     pub fn eval(&mut self, env: &mut Env<'heap>, expr: &Expr) -> Value<'heap> {
@@ -1357,16 +1340,7 @@ where {
                 };
                 self.eval(env, body)
             }
-            Expr::Module(name, item) => {
-                let path: ModulePath = self
-                    .module_unmapping
-                    .last()
-                    .unwrap()
-                    .get(name)
-                    .unwrap()
-                    .clone();
-                self.eval_from_module(env, &path, item)
-            }
+            Expr::Module(path, item) => self.eval_from_module(env, path, item),
             Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {

@@ -1,11 +1,11 @@
 use eval::Env;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, CommonKinds, ModulePath};
+use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, kind::Kind};
+use ipso_syntax::{self as syntax, kind::Kind, ModulePath};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     io::{self, BufRead, BufReader, Write},

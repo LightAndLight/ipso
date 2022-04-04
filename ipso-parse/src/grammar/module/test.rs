@@ -271,9 +271,18 @@ fn parse_from_import_2() {
                 item: String::from("asdf")
             },
             names: Names::Names(vec![
-                String::from("b"),
-                String::from("c"),
-                String::from("d")
+                Spanned {
+                    pos: 17,
+                    item: String::from("b")
+                },
+                Spanned {
+                    pos: 20,
+                    item: String::from("c")
+                },
+                Spanned {
+                    pos: 23,
+                    item: String::from("d")
+                }
             ])
         })
     )

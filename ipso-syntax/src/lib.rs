@@ -5,7 +5,12 @@ pub mod r#type;
 
 use quickcheck::Arbitrary;
 pub use r#type::Type;
-use std::{cmp::Ordering, hash::Hash, rc::Rc};
+use std::{
+    cmp::Ordering,
+    hash::Hash,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
@@ -331,6 +336,7 @@ pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleName(pub Vec<String>);
 
@@ -353,11 +359,46 @@ pub enum CmdPart {
     Expr(Spanned<Expr>),
 }
 
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+pub struct ModulePath {
+    pub file: PathBuf,
+    pub submodules: Vec<String>,
+}
+
+impl ModulePath {
+    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
+        let mut path = module_name
+            .iter()
+            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
+        path.set_extension("ipso");
+        ModulePath {
+            file: path,
+            submodules: vec![],
+        }
+    }
+
+    pub fn from_file(file: &Path) -> Self {
+        ModulePath {
+            file: PathBuf::from(file),
+            submodules: vec![],
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        self.file.as_path()
+    }
+
+    pub fn with_submodules(mut self, submodules: Vec<String>) -> Self {
+        self.submodules = submodules;
+        self
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
-        name: ModuleName,
+        path: ModulePath,
         item: String,
     },
 
@@ -473,7 +514,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Names {
     All,
-    Names(Vec<String>),
+    Names(Vec<Spanned<String>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
