@@ -366,7 +366,12 @@ fn desugar_module_accessors_decl(
     }
 }
 
-fn desugar_module_accessors(module: &mut syntax::Module, working_dir: &Path) {
+fn desugar_module_accessors(
+    common_kinds: &CommonKinds,
+    modules: &core::Modules,
+    module: &mut syntax::Module,
+    working_dir: &Path,
+) {
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
     for decl in &mut module.decls {
         match &decl.item {
@@ -389,10 +394,27 @@ fn desugar_module_accessors(module: &mut syntax::Module, working_dir: &Path) {
                     ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
                 let path = PathBuf::from(module_path.path());
 
+                let module = modules.lookup(&module_path).unwrap_or_else(|| {
+                    panic!(
+                        "impossible: module {} ({}) is missing",
+                        module.item,
+                        path.display()
+                    )
+                });
                 match names {
                     syntax::Names::All => {
-                        // look up all importable definitions in module and add them
-                        todo!("FromImport All")
+                        module
+                            .get_bindings(common_kinds)
+                            .into_keys()
+                            .for_each(|name| {
+                                imported_items.insert(
+                                    name,
+                                    ImportedItemInfo::DefinitionImportedFrom {
+                                        path: path.clone(),
+                                        submodules: vec![],
+                                    },
+                                );
+                            })
                     }
                     syntax::Names::Names(names) => {
                         for name in names {
@@ -420,7 +442,7 @@ struct ImportInfo {
     module_path: ModulePath,
 }
 
-fn calculate_imports(file: &Path, module: &syntax::Module) -> Vec<ImportInfo> {
+fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>, ModuleError> {
     let working_dir = file.parent().unwrap();
     let mut imports: Vec<ImportInfo> = Vec::new();
 
@@ -451,7 +473,7 @@ fn calculate_imports(file: &Path, module: &syntax::Module) -> Vec<ImportInfo> {
         }
     }
 
-    imports
+    Ok(imports)
 }
 
 /// Import a module.
@@ -477,23 +499,26 @@ pub fn import<'a>(
                 };
                 let mut module = parse::parse_file(path)?;
 
-                for import_info in calculate_imports(path, &module).into_iter() {
-                    if let Err(err) = import(
-                        modules,
-                        &Source::File {
-                            path: PathBuf::from(path),
-                        },
-                        import_info.pos,
-                        &import_info.module_path,
-                        common_kinds,
-                        builtins,
-                    ) {
-                        return Err(err);
-                    }
-                }
+                let import_infos = check_imports(path, &module)?;
+                import_infos.into_iter().try_for_each(
+                    |import_info| -> Result<(), ModuleError> {
+                        let _ = import(
+                            modules,
+                            &Source::File {
+                                path: PathBuf::from(path),
+                            },
+                            import_info.pos,
+                            &import_info.module_path,
+                            common_kinds,
+                            builtins,
+                        )?;
+
+                        Ok(())
+                    },
+                )?;
 
                 let working_dir = path.parent().unwrap();
-                desugar_module_accessors(&mut module, working_dir);
+                desugar_module_accessors(common_kinds, modules, &mut module, working_dir);
 
                 let module = {
                     let working_dir = path.parent().unwrap();
