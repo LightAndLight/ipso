@@ -488,29 +488,23 @@ fn check_from_import(
 
 fn check_imports(file: &Path, module: &syntax::Module) -> Result<Vec<ImportInfo>, ModuleError> {
     let working_dir = file.parent().unwrap();
-    let mut imports: Vec<ImportInfo> = Vec::new();
 
-    module
+    let imports: Vec<ImportInfo> = module
         .decls
         .iter()
-        .try_for_each(|decl| -> Result<(), ModuleError> {
-            match &decl.item {
-                syntax::Declaration::Definition { .. }
-                | syntax::Declaration::Class { .. }
-                | syntax::Declaration::Instance { .. }
-                | syntax::Declaration::TypeAlias { .. } => Ok(()),
-                syntax::Declaration::Import { module, .. } => {
-                    let import_info = check_import(working_dir, module, file)?;
-                    imports.push(import_info);
-                    Ok(())
-                }
-                syntax::Declaration::FromImport { module, .. } => {
-                    let import_info = check_from_import(working_dir, module, file)?;
-                    imports.push(import_info);
-                    Ok(())
-                }
+        .filter_map(|decl| match &decl.item {
+            syntax::Declaration::Definition { .. }
+            | syntax::Declaration::Class { .. }
+            | syntax::Declaration::Instance { .. }
+            | syntax::Declaration::TypeAlias { .. } => None,
+            syntax::Declaration::Import { module, .. } => {
+                Some(check_import(working_dir, module, file))
             }
-        })?;
+            syntax::Declaration::FromImport { module, .. } => {
+                Some(check_from_import(working_dir, module, file))
+            }
+        })
+        .collect::<Result<_, _>>()?;
 
     Ok(imports)
 }
