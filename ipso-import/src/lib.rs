@@ -2,7 +2,7 @@ use diagnostic::{Location, Message};
 use ipso_core::{self as core, CommonKinds, Module};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, ModuleName, ModulePath};
+use ipso_syntax::{self as syntax};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     collections::{HashMap, HashSet},
@@ -16,7 +16,7 @@ pub enum ModuleError {
     NotFound {
         source: Source,
         pos: usize,
-        module_path: ModulePath,
+        module_path: PathBuf,
     },
     DoesNotDefine {
         source: Source,
@@ -41,10 +41,7 @@ impl ModuleError {
                 }),
                 Message {
                     content: String::from("module not found"),
-                    addendum: Some(format!(
-                        "file {} does not exist",
-                        module_path.path().display()
-                    )),
+                    addendum: Some(format!("file {} does not exist", module_path.display())),
                 },
             ),
             ModuleError::DoesNotDefine { source, pos } => diagnostic.item(
@@ -91,14 +88,14 @@ enum ImportedItemInfo {
     */
     DefinitionImportedFrom {
         /// The module's file path.
-        path: PathBuf,
+        file: PathBuf,
 
         /**
         Any submodule references.
 
         e.g. in `from x.y import z`, `.y` is a submodule reference.
         */
-        submodules: Vec<String>,
+        path: Vec<String>,
     },
 
     /**
@@ -108,7 +105,7 @@ enum ImportedItemInfo {
     */
     ModuleImportedAs {
         /// The module's file path.
-        path: PathBuf,
+        file: PathBuf,
     },
 }
 
@@ -137,9 +134,7 @@ fn desugar_module_accessors_expr(
         syntax::Expr::Var(name) => {
             if let Some(imported_item_info) = imported_items.get(name) {
                 match imported_item_info {
-                    ImportedItemInfo::DefinitionImportedFrom {
-                        path, submodules, ..
-                    } => {
+                    ImportedItemInfo::DefinitionImportedFrom { file, path, .. } => {
                         /*
                         ```
                         from x import y
@@ -160,10 +155,8 @@ fn desugar_module_accessors_expr(
                         ```
                         */
                         *expr = syntax::Expr::Module {
-                            path: ModulePath {
-                                file: path.clone(),
-                                submodules: submodules.clone(),
-                            },
+                            file: file.clone(),
+                            path: path.clone(),
                             item: name.clone(),
                         };
                     }
@@ -276,25 +269,24 @@ fn desugar_module_accessors_expr(
             desugar_module_accessors_expr(imported_items, &mut value.item);
 
             match &value.item {
-                syntax::Expr::Module { path, item } => {
+                syntax::Expr::Module { file, path, item } => {
                     let mut path = path.clone();
-                    path.submodules.push(item.clone());
+                    path.push(item.clone());
 
                     *expr = syntax::Expr::Module {
+                        file: file.clone(),
                         path,
                         item: field.clone(),
                     };
                 }
 
                 syntax::Expr::Var(name) => {
-                    if let Some(ImportedItemInfo::ModuleImportedAs { path }) =
+                    if let Some(ImportedItemInfo::ModuleImportedAs { file }) =
                         imported_items.get(name)
                     {
                         *expr = syntax::Expr::Module {
-                            path: ModulePath {
-                                file: path.clone(),
-                                submodules: vec![],
-                            },
+                            file: file.clone(),
+                            path: vec![],
                             item: field.clone(),
                         }
                     }
@@ -394,25 +386,20 @@ fn desugar_module_accessors(
             | syntax::Declaration::Instance { .. }
             | syntax::Declaration::TypeAlias { .. } => {}
             syntax::Declaration::Import { module, .. } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
+                let file = working_dir.join(&module.item).with_extension("ipso");
                 imported_items.insert(
                     module.item.clone(),
-                    ImportedItemInfo::ModuleImportedAs {
-                        path: PathBuf::from(module_path.path()),
-                    },
+                    ImportedItemInfo::ModuleImportedAs { file },
                 );
             }
             syntax::Declaration::FromImport { module, names } => {
-                let module_path =
-                    ModulePath::from_module(working_dir, &ModuleName(vec![module.item.clone()]));
-                let path = PathBuf::from(module_path.path());
+                let file = working_dir.join(&module.item).with_extension("ipso");
 
-                let module = modules.lookup(&module_path).unwrap_or_else(|| {
+                let module = modules.lookup(&file).unwrap_or_else(|| {
                     panic!(
                         "impossible: module {} ({}) is missing",
                         module.item,
-                        path.display()
+                        file.display()
                     )
                 });
                 match names {
@@ -424,8 +411,8 @@ fn desugar_module_accessors(
                                 imported_items.insert(
                                     name,
                                     ImportedItemInfo::DefinitionImportedFrom {
-                                        path: path.clone(),
-                                        submodules: vec![],
+                                        file: file.clone(),
+                                        path: vec![],
                                     },
                                 );
                             })
@@ -435,8 +422,8 @@ fn desugar_module_accessors(
                             imported_items.insert(
                                 name.item.clone(),
                                 ImportedItemInfo::DefinitionImportedFrom {
-                                    path: path.clone(),
-                                    submodules: vec![],
+                                    file: file.clone(),
+                                    path: vec![],
                                 },
                             );
                         }
@@ -455,19 +442,19 @@ fn desugar_module_accessors(
 ///
 /// Module imports are cached, so importing the same module repeatedly is cheap.
 ///
-/// * `location` - source file location for error reporting
+/// * `source` - source file location for error reporting
 /// * `pos` - source file offset for error reporting
+/// * `path` - file path to import
 pub fn import<'a>(
     modules: &mut core::Modules<'a>,
     source: &Source,
     pos: usize,
-    module_path: &ModulePath,
+    path: &Path,
     common_kinds: &CommonKinds,
     builtins: &Module,
 ) -> Result<&'a core::Module, ModuleError> {
-    match modules.index.get(module_path) {
+    match modules.index.get(path) {
         None => {
-            let path = module_path.path();
             if path.exists() {
                 let input_location = Source::File {
                     path: PathBuf::from(path),
@@ -502,10 +489,7 @@ pub fn import<'a>(
                     })
                     .try_for_each(|filtered_item| match filtered_item {
                         CheckImport::Import { module } => {
-                            let module_path = ModulePath::from_module(
-                                working_dir,
-                                &ModuleName(vec![module.item.clone()]),
-                            );
+                            let module_path = working_dir.join(&module.item).with_extension("ipso");
                             let _ = import(
                                 modules,
                                 &Source::File {
@@ -520,10 +504,8 @@ pub fn import<'a>(
                             Ok::<(), ModuleError>(())
                         }
                         CheckImport::FromImport { module, names } => {
-                            let importing_module_path = ModulePath::from_module(
-                                working_dir,
-                                &ModuleName(vec![module.item.clone()]),
-                            );
+                            let importing_module_path =
+                                working_dir.join(&module.item).with_extension("ipso");
 
                             let imported_module = import(
                                 modules,
@@ -550,7 +532,7 @@ pub fn import<'a>(
                                         } else {
                                             Err(ModuleError::DoesNotDefine {
                                                 source: Source::File {
-                                                    path: PathBuf::from(module_path.path()),
+                                                    path: PathBuf::from(path),
                                                 },
                                                 pos: name.pos,
                                             })
@@ -579,13 +561,13 @@ pub fn import<'a>(
                     };
                     tc.check_module(&module)
                 }?;
-                let module_ref: &core::Module = modules.insert(module_path, module);
+                let module_ref: &core::Module = modules.insert(path.to_path_buf(), module);
                 Ok(module_ref)
             } else {
                 Err(ModuleError::NotFound {
                     source: source.clone(),
                     pos,
-                    module_path: module_path.clone(),
+                    module_path: path.to_path_buf(),
                 })
             }
         }

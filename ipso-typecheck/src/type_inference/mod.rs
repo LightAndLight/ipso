@@ -18,9 +18,10 @@ use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, Spanned};
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     rc::Rc,
 };
-use syntax::{kind::Kind, ModulePath};
+use syntax::kind::Kind;
 
 /// A mapping from type metavariables to their solutions.
 #[derive(Default)]
@@ -1069,7 +1070,7 @@ impl CheckedPattern {
 pub struct InferenceContext<'a> {
     common_kinds: &'a CommonKinds,
     source: &'a Source,
-    modules: &'a HashMap<ModulePath, HashMap<String, TypeSig>>,
+    modules: &'a HashMap<PathBuf, HashMap<String, TypeSig>>,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut kind_inference::Solutions,
@@ -1095,7 +1096,7 @@ impl<'a> InferenceContext<'a> {
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
-        modules: &'a HashMap<ModulePath, HashMap<String, TypeSig>>,
+        modules: &'a HashMap<PathBuf, HashMap<String, TypeSig>>,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut kind_inference::Solutions,
@@ -1418,7 +1419,7 @@ impl<'a> InferenceContext<'a> {
                     }
                 },
             },
-            syntax::Expr::Module { path, item } => match self.modules.get(path) {
+            syntax::Expr::Module { file, path, item } => match self.modules.get(file) {
                 None => {
                     /*
                     A module accessor will only be desugared if the module was in scope, so this case
@@ -1432,7 +1433,11 @@ impl<'a> InferenceContext<'a> {
                     }
                     Some(type_signature) => Ok(self.instantiate(
                         expr.pos,
-                        Expr::Module(path.clone(), item.clone()),
+                        Expr::Module {
+                            file: file.clone(),
+                            path: path.clone(),
+                            item: item.clone(),
+                        },
                         type_signature,
                     )),
                 },

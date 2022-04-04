@@ -5,7 +5,7 @@ use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, kind::Kind, ModulePath};
+use ipso_syntax::{self as syntax, kind::Kind};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     io::{self, BufRead, BufReader, Write},
@@ -76,14 +76,13 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     if !target_path.exists() {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
-    let target_module_path: ModulePath = ModulePath::from_file(&target_path);
     let common_kinds = CommonKinds::default();
     let builtins = builtins::builtins(&common_kinds);
     let module = import::import(
         &mut modules,
         &source,
         0,
-        &target_module_path,
+        &target_path,
         &common_kinds,
         &builtins,
     )?;
@@ -138,7 +137,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action = interpreter.eval_from_module(&mut env, &target_module_path, entrypoint);
+        let action = interpreter.eval_from_module(&mut env, &target_path, &[], entrypoint);
         action.perform_io(&mut interpreter)
     };
     Ok(())

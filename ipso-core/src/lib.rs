@@ -6,9 +6,9 @@ use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::ModulePath;
 use typed_arena::Arena;
 
 /**
@@ -793,13 +793,36 @@ pub enum Expr {
     EVar(EVar),
     Placeholder(Placeholder),
     Name(String),
-    Module(ModulePath, String),
+    Module {
+        /// The module's file path.
+        file: PathBuf,
+
+        /**
+        A chain of submodule accessors.
+
+        e.g. `module.submodule1.submodule2`
+        */
+        path: Vec<String>,
+
+        /**
+        The referenced item.
+
+        e.g. `module.submodule.item`
+        */
+        item: String,
+    },
     Builtin(Builtin),
 
     App(Rc<Expr>, Rc<Expr>),
-    Lam { arg: bool, body: Rc<Expr> },
+    Lam {
+        arg: bool,
+        body: Rc<Expr>,
+    },
 
-    Let { value: Rc<Expr>, rest: Rc<Expr> },
+    Let {
+        value: Rc<Expr>,
+        rest: Rc<Expr>,
+    },
 
     True,
     False,
@@ -944,7 +967,11 @@ impl Expr {
         fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
             match expr {
                 Expr::Var(v) => Expr::Var(f.apply(*v)),
-                Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+                Expr::Module { file, path, item } => Expr::Module {
+                    file: file.clone(),
+                    path: path.clone(),
+                    item: item.clone(),
+                },
                 Expr::EVar(v) => Expr::EVar(*v),
                 Expr::Placeholder(p) => Expr::Placeholder(*p),
                 Expr::Name(n) => Expr::Name(n.clone()),
@@ -1050,7 +1077,11 @@ impl Expr {
                 cmp::Ordering::Equal => val.map_vars(|n| n + depth),
                 cmp::Ordering::Greater => Expr::Var(*n - 1),
             },
-            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+            Expr::Module { file, path, item } => Expr::Module {
+                file: file.clone(),
+                path: path.clone(),
+                item: item.clone(),
+            },
             Expr::EVar(v) => Expr::EVar(*v),
             Expr::Placeholder(v) => Expr::Placeholder(*v),
             Expr::Name(n) => Expr::Name(n.clone()),
@@ -1133,7 +1164,7 @@ impl Expr {
         match self {
             Expr::Var(_) => Ok(()),
             Expr::EVar(_) => Ok(()),
-            Expr::Module(_, _) => Ok(()),
+            Expr::Module { .. } => Ok(()),
             Expr::Placeholder(v) => {
                 let new_value = f(v)?;
                 *self = new_value;
@@ -1243,7 +1274,11 @@ impl Expr {
                 }
             }
             Expr::Name(n) => Expr::Name(n.clone()),
-            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+            Expr::Module { file, path, item } => Expr::Module {
+                file: file.clone(),
+                path: path.clone(),
+                item: item.clone(),
+            },
             Expr::Placeholder(n) => Expr::Placeholder(*n),
             Expr::Builtin(b) => Expr::Builtin(*b),
             Expr::App(a, b) => {
@@ -1393,7 +1428,7 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::EVar(a) => Step::Yield(a),
                 Expr::Placeholder(_) => Step::Skip,
                 Expr::Name(_) => Step::Skip,
-                Expr::Module(_, _) => Step::Skip,
+                Expr::Module { .. } => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
                 Expr::App(a, b) => Step::Continue2(a, b),
                 Expr::Lam { arg: _, body } => Step::Continue1(body),
@@ -1685,7 +1720,7 @@ pub enum ModuleUsage {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     /// Describes how each imported file is referenced by this module.
-    pub usages: HashMap<ModulePath, ModuleUsage>,
+    pub usages: HashMap<PathBuf, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 
@@ -1709,7 +1744,7 @@ impl Module {
 
 pub struct Modules<'a> {
     data: &'a Arena<Module>,
-    pub index: HashMap<ModulePath, &'a Module>,
+    pub index: HashMap<PathBuf, &'a Module>,
 }
 
 impl<'a> Modules<'a> {
@@ -1720,17 +1755,17 @@ impl<'a> Modules<'a> {
         }
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<ModulePath, &Module> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<PathBuf, &Module> {
         self.index.iter()
     }
 
-    pub fn lookup(&self, path: &ModulePath) -> Option<&Module> {
+    pub fn lookup(&self, path: &Path) -> Option<&Module> {
         self.index.get(path).copied()
     }
 
-    pub fn insert(&mut self, path: &ModulePath, module: Module) -> &'a Module {
+    pub fn insert(&mut self, path: PathBuf, module: Module) -> &'a Module {
         let module_ref: &Module = self.data.alloc(module);
-        self.index.insert(path.clone(), module_ref);
+        self.index.insert(path, module_ref);
         module_ref
     }
 }

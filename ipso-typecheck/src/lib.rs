@@ -10,15 +10,14 @@ use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use ipso_builtins as builtins;
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
-use ipso_syntax::{self as syntax, kind::Kind, ModuleName, Spanned};
+use ipso_syntax::{self as syntax, kind::Kind, Spanned};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
     todo,
 };
-use syntax::ModulePath;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -152,14 +151,14 @@ pub struct Typechecker<'modules> {
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
     position: Option<usize>,
-    modules: &'modules HashMap<ModulePath, &'modules core::Module>,
+    modules: &'modules HashMap<PathBuf, &'modules core::Module>,
     /**
     Cached context for modules that have been imported.
 
     Ideally we would use a module path and item name to look up type signatures
     in `modules`, but that's currently too resource intensive.
     */
-    module_context: HashMap<ModulePath, HashMap<String, core::TypeSig>>,
+    module_context: HashMap<PathBuf, HashMap<String, core::TypeSig>>,
     working_dir: &'modules Path,
 }
 
@@ -465,7 +464,7 @@ impl<'modules> Typechecker<'modules> {
         working_dir: &'modules Path,
         source: Source,
         common_kinds: &'modules CommonKinds,
-        modules: &'modules HashMap<ModulePath, &'modules core::Module>,
+        modules: &'modules HashMap<PathBuf, &'modules core::Module>,
     ) -> Self {
         Typechecker {
             common_kinds,
@@ -491,7 +490,7 @@ impl<'modules> Typechecker<'modules> {
         working_dir: &'modules Path,
         location: Source,
         common_kinds: &'modules CommonKinds,
-        modules: &'modules HashMap<ModulePath, &'modules core::Module>,
+        modules: &'modules HashMap<PathBuf, &'modules core::Module>,
     ) -> Self {
         let mut tc = Self::new(working_dir, location, common_kinds, modules);
         tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
@@ -1218,12 +1217,11 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_import(
         &mut self,
-        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
         module: &Spanned<String>,
         as_name: &Option<Spanned<String>>,
     ) -> Result<(), TypeError> {
-        let module_path =
-            ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
+        let module_path = self.working_dir.join(&module.item).with_extension("ipso");
 
         let actual_name = match as_name {
             None => module,
@@ -1253,12 +1251,11 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_from_import(
         &mut self,
-        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
         module: &Spanned<String>,
         names: &syntax::Names,
     ) -> Result<(), TypeError> {
-        let module_path =
-            ModulePath::from_module(self.working_dir, &ModuleName(vec![module.item.clone()]));
+        let module_path = self.working_dir.join(&module.item).with_extension("ipso");
 
         let signatures = self
             .modules
@@ -1282,7 +1279,7 @@ impl<'modules> Typechecker<'modules> {
 
     fn check_declaration(
         &mut self,
-        module_usages: &mut HashMap<ModulePath, core::ModuleUsage>,
+        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {

@@ -5,12 +5,7 @@ pub mod r#type;
 
 use quickcheck::Arbitrary;
 pub use r#type::Type;
-use std::{
-    cmp::Ordering,
-    hash::Hash,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{cmp::Ordering, hash::Hash, path::PathBuf, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
@@ -359,46 +354,25 @@ pub enum CmdPart {
     Expr(Spanned<Expr>),
 }
 
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub struct ModulePath {
-    pub file: PathBuf,
-    pub submodules: Vec<String>,
-}
-
-impl ModulePath {
-    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
-        let mut path = module_name
-            .iter()
-            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
-        path.set_extension("ipso");
-        ModulePath {
-            file: path,
-            submodules: vec![],
-        }
-    }
-
-    pub fn from_file(file: &Path) -> Self {
-        ModulePath {
-            file: PathBuf::from(file),
-            submodules: vec![],
-        }
-    }
-
-    pub fn path(&self) -> &Path {
-        self.file.as_path()
-    }
-
-    pub fn with_submodules(mut self, submodules: Vec<String>) -> Self {
-        self.submodules = submodules;
-        self
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
-        path: ModulePath,
+        /// The module's file path.
+        file: PathBuf,
+
+        /**
+        A chain of submodule accessors.
+
+        e.g. `module.submodule1.submodule2`
+        */
+        path: Vec<String>,
+
+        /**
+        The referenced item.
+
+        e.g. `module.submodule.item`
+        */
         item: String,
     },
 
