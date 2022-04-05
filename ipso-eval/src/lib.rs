@@ -12,7 +12,6 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
-    path::PathBuf,
     process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
@@ -520,7 +519,7 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module<'a> {
-    pub usages: &'a HashMap<PathBuf, ModuleUsage>,
+    pub usages: &'a HashMap<ModuleId, ModuleUsage>,
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 

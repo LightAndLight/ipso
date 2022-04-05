@@ -6,7 +6,6 @@ use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
-    path::PathBuf,
     rc::Rc,
 };
 use syntax::ModuleId;
@@ -1720,7 +1719,7 @@ pub enum ModuleUsage {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     /// Describes how each imported file is referenced by this module.
-    pub usages: HashMap<PathBuf, ModuleUsage>,
+    pub usages: HashMap<ModuleId, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 

@@ -524,10 +524,8 @@ pub fn import(
                 )?;
 
                 let module = {
-                    let working_dir = path.parent().unwrap();
                     let mut tc = {
-                        let mut tc =
-                            Typechecker::new(working_dir, input_location, common_kinds, modules);
+                        let mut tc = Typechecker::new(input_location, common_kinds, modules);
                         tc.register_from_import(builtins, &syntax::Names::All);
                         tc
                     };
