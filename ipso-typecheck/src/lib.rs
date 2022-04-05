@@ -1214,16 +1214,9 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
-            syntax::Declaration::Import { resolved, .. } => {
+            syntax::Declaration::Import { resolved, .. }
+            | syntax::Declaration::FromImport { resolved, .. } => {
                 let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
-
-                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
-                self.module_context.insert(id, signatures);
-
-                Ok(None)
-            }
-            syntax::Declaration::FromImport { resolved, .. } => {
-                let id = resolved.unwrap_or_else(|| panic!("unresolved FromImport"));
 
                 let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
                 self.module_context.insert(id, signatures);
