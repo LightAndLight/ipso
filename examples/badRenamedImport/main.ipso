@@ -1,0 +1,4 @@
+import a as b
+
+main : IO ()
+main = println a.value
