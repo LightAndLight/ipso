@@ -14,7 +14,6 @@ use ipso_syntax::{self as syntax, kind::Kind, Spanned};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    path::{Path, PathBuf},
     rc::Rc,
     todo,
 };
@@ -160,7 +159,6 @@ pub struct Typechecker<'modules> {
     in `modules`, but that's currently too resource intensive.
     */
     module_context: HashMap<ModuleId, HashMap<String, core::TypeSig>>,
-    working_dir: &'modules Path,
 }
 
 macro_rules! with_position {
@@ -242,10 +240,6 @@ pub enum TypeError {
         pos: usize,
         context: Option<SolveConstraintContext>,
     },
-    ShadowedModuleName {
-        source: Source,
-        pos: usize,
-    },
 }
 
 impl TypeError {
@@ -259,7 +253,6 @@ impl TypeError {
             TypeError::NoSuchClass { source, .. } => source.clone(),
             TypeError::NotAMember { source, .. } => source.clone(),
             TypeError::CannotDeduce { source, .. } => source.clone(),
-            TypeError::ShadowedModuleName { source, .. } => source.clone(),
         }
     }
 
@@ -273,7 +266,6 @@ impl TypeError {
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
             TypeError::CannotDeduce { pos, .. } => *pos,
-            TypeError::ShadowedModuleName { pos, .. } => *pos,
         }
     }
 
@@ -332,7 +324,6 @@ impl TypeError {
                 None => String::from("cannot deduce"),
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
-            TypeError::ShadowedModuleName { .. } => String::from("shadowed module name"),
         }
     }
 
@@ -368,7 +359,6 @@ impl TypeError {
             TypeError::NoSuchClass { .. } => None,
             TypeError::NotAMember { .. } => None,
             TypeError::CannotDeduce { .. } => None,
-            TypeError::ShadowedModuleName { .. } => None,
         }
     }
 
@@ -416,13 +406,13 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 
 #[macro_export]
 macro_rules! with_tc {
-    ($path:expr, $location:expr, $f:expr) => {{
+    ($location:expr, $f:expr) => {{
         use ipso_core::CommonKinds;
         use ipso_syntax::Modules;
 
         let common_kinds = CommonKinds::default();
         let modules = Modules::new();
-        let tc = Typechecker::new_with_builtins($path, $location, &common_kinds, &modules);
+        let tc = Typechecker::new_with_builtins($location, &common_kinds, &modules);
         $f(tc)
     }};
 }
@@ -430,9 +420,7 @@ macro_rules! with_tc {
 #[macro_export]
 macro_rules! current_dir_with_tc {
     ($f:expr) => {{
-        let path = std::env::current_dir().unwrap();
         crate::with_tc!(
-            path.as_path(),
             ipso_diagnostic::Source::Interactive {
                 label: String::from("(typechecker)")
             },
@@ -463,7 +451,6 @@ pub struct InferredPattern {
 
 impl<'modules> Typechecker<'modules> {
     pub fn new(
-        working_dir: &'modules Path,
         source: Source,
         common_kinds: &'modules CommonKinds,
         modules: &'modules Modules<core::Module>,
@@ -484,17 +471,15 @@ impl<'modules> Typechecker<'modules> {
             position: None,
             modules,
             module_context: HashMap::new(),
-            working_dir,
         }
     }
 
     pub fn new_with_builtins(
-        working_dir: &'modules Path,
         location: Source,
         common_kinds: &'modules CommonKinds,
         modules: &'modules Modules<core::Module>,
     ) -> Self {
-        let mut tc = Self::new(working_dir, location, common_kinds, modules);
+        let mut tc = Self::new(location, common_kinds, modules);
         tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
         tc
     }
@@ -707,24 +692,19 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
-        let mut module_usages = HashMap::new();
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(&mut module_usages, decl)
-                    .map(|m_decl| match m_decl {
-                        Option::None => decls,
-                        Option::Some(decl) => {
-                            self.register_declaration(&decl);
-                            decls.push(decl);
-                            decls
-                        }
-                    })
+                self.check_declaration(decl).map(|m_decl| match m_decl {
+                    Option::None => decls,
+                    Option::Some(decl) => {
+                        self.register_declaration(&decl);
+                        decls.push(decl);
+                        decls
+                    }
+                })
             })
         })?;
-        Ok(core::Module {
-            usages: module_usages,
-            decls,
-        })
+        Ok(core::Module { decls })
     }
 
     pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
@@ -1217,71 +1197,8 @@ impl<'modules> Typechecker<'modules> {
         })
     }
 
-    fn check_import(
-        &mut self,
-        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
-        module_id: ModuleId,
-        module: &Spanned<String>,
-        as_name: &Option<Spanned<String>>,
-    ) -> Result<(), TypeError> {
-        let module_path = self.working_dir.join(&module.item).with_extension("ipso");
-
-        let actual_name = match as_name {
-            None => module,
-            Some(name) => name,
-        };
-
-        match module_usages.get(&module_path) {
-            None => {
-                let signatures = self
-                    .modules
-                    .lookup(module_id)
-                    .get_signatures(self.common_kinds);
-                self.module_context.insert(module_id, signatures);
-                module_usages.insert(
-                    module_path,
-                    core::ModuleUsage::Named(actual_name.item.clone()),
-                );
-                Ok(())
-            }
-            Some(_) => Err(TypeError::ShadowedModuleName {
-                source: self.source(),
-                pos: actual_name.pos,
-            }),
-        }
-    }
-
-    fn check_from_import(
-        &mut self,
-        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
-        module_id: ModuleId,
-        module: &Spanned<String>,
-        names: &syntax::Names,
-    ) -> Result<(), TypeError> {
-        let module_path = self.working_dir.join(&module.item).with_extension("ipso");
-
-        let signatures = self
-            .modules
-            .lookup(module_id)
-            .get_signatures(self.common_kinds);
-
-        self.module_context.insert(module_id, signatures);
-        module_usages.insert(
-            module_path,
-            match names {
-                syntax::Names::All => core::ModuleUsage::All,
-                syntax::Names::Names(names) => {
-                    core::ModuleUsage::Items(names.iter().map(|name| name.item.clone()).collect())
-                }
-            },
-        );
-
-        Ok(())
-    }
-
     fn check_declaration(
         &mut self,
-        module_usages: &mut HashMap<PathBuf, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
@@ -1297,23 +1214,14 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
-            syntax::Declaration::Import {
-                resolved,
-                module,
-                as_name,
-            } => {
+            syntax::Declaration::Import { resolved, .. }
+            | syntax::Declaration::FromImport { resolved, .. } => {
                 let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
-                self.check_import(module_usages, id, module, as_name)
-                    .map(|()| Option::None)
-            }
-            syntax::Declaration::FromImport {
-                resolved,
-                module,
-                names,
-            } => {
-                let id = resolved.unwrap_or_else(|| panic!("unresolved FromImport"));
-                self.check_from_import(module_usages, id, module, names)
-                    .map(|()| Option::None)
+
+                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
+                self.module_context.insert(id, signatures);
+
+                Ok(None)
             }
 
             syntax::Declaration::Class {

@@ -1,8 +1,6 @@
 mod test;
 
-use ipso_core::{
-    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, ModuleUsage, Pattern, StringPart,
-};
+use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, Modules};
 use paste::paste;
@@ -12,7 +10,6 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
-    path::PathBuf,
     process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
@@ -519,8 +516,7 @@ impl<'heap> PartialEq for Value<'heap> {
     }
 }
 
-pub struct Module<'a> {
-    pub usages: &'a HashMap<PathBuf, ModuleUsage>,
+pub struct Module {
     pub bindings: HashMap<String, Rc<Expr>>,
 }
 
@@ -531,7 +527,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
     context: &'ctx HashMap<String, Rc<Expr>>,
-    modules: HashMap<ModuleId, Module<'ctx>>,
+    modules: HashMap<ModuleId, Module>,
 }
 
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
@@ -551,7 +547,6 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
                 (
                     module_id,
                     Module {
-                        usages: &module.usages,
                         bindings: module.get_bindings(common_kinds),
                     },
                 )
@@ -1319,11 +1314,11 @@ where {
         _path: &[String],
         binding: &str,
     ) -> Value<'heap> {
-        let (expr, _) = match self.modules.get(id) {
+        let expr = match self.modules.get(id) {
             None => panic!("{:?} not found", id),
             Some(module) => match module.bindings.get(binding) {
                 None => panic!("{:?} not found in {:?}", binding, id),
-                Some(expr) => (expr.clone(), module.usages.clone()),
+                Some(expr) => expr.clone(),
             },
         };
 

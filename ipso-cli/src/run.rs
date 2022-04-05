@@ -64,8 +64,6 @@ fn find_entrypoint_signature(
 }
 
 pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
-    let working_dir = std::env::current_dir().unwrap();
-
     let main = String::from("main");
 
     let mut modules = Modules::new();
@@ -95,7 +93,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
         let mut tc = {
-            let mut tc = Typechecker::new(working_dir.as_path(), source, &common_kinds, &modules);
+            let mut tc = Typechecker::new(source, &common_kinds, &modules);
             tc.register_from_import(&builtins, &syntax::Names::All);
             tc
         };

@@ -10,7 +10,7 @@ use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, Spanned};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 #[cfg(test)]
 use std::rc::Rc;
 
@@ -301,7 +301,7 @@ fn check_definition_1() {
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         assert_eq!(
-            tc.check_declaration(&mut HashMap::new(), &decl),
+            tc.check_declaration(&decl),
             Ok(Some(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
@@ -389,7 +389,7 @@ fn check_definition_2() {
                 ),
             )),
         }));
-        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
+        let actual = tc.check_declaration(&decl);
         assert_eq!(expected, actual)
     })
 }
@@ -468,7 +468,7 @@ fn check_definition_3() {
                 None,
             )),
         }));
-        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
+        let actual = tc.check_declaration(&decl);
         assert_eq!(expected, actual)
     })
 }
@@ -548,7 +548,7 @@ fn check_definition_4() {
                 ),
             )),
         }));
-        let actual = tc.check_declaration(&mut HashMap::new(), &decl);
+        let actual = tc.check_declaration(&decl);
         assert_eq!(expected, actual)
     })
 }
@@ -579,27 +579,24 @@ fn check_class_1() {
         class MyEq a where
           myeq : a -> a -> Bool
         */
-        let actual = tc.check_declaration(
-            &mut HashMap::new(),
-            &Spanned {
-                pos: 0,
-                item: syntax::Declaration::Class {
-                    supers: Vec::new(),
-                    name: Rc::from("MyEq"),
-                    args: vec![Spanned {
-                        pos: 9,
-                        item: Rc::from("a"),
-                    }],
-                    members: vec![(
-                        String::from("myeq"),
-                        Type::mk_arrow(
-                            Type::Var(Rc::from("a")),
-                            Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
-                        ),
-                    )],
-                },
+        let actual = tc.check_declaration(&Spanned {
+            pos: 0,
+            item: syntax::Declaration::Class {
+                supers: Vec::new(),
+                name: Rc::from("MyEq"),
+                args: vec![Spanned {
+                    pos: 9,
+                    item: Rc::from("a"),
+                }],
+                members: vec![(
+                    String::from("myeq"),
+                    Type::mk_arrow(
+                        Type::Var(Rc::from("a")),
+                        Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
+                    ),
+                )],
             },
-        );
+        });
         assert_eq!(expected, actual);
 
         let decl = actual.unwrap().unwrap();
@@ -686,27 +683,24 @@ fn check_class_2() {
         class Wut a where
           wut : a -> b -> Bool
         */
-        let actual = tc.check_declaration(
-            &mut HashMap::new(),
-            &Spanned {
-                pos: 0,
-                item: syntax::Declaration::Class {
-                    supers: Vec::new(),
-                    name: Rc::from("Wut"),
-                    args: vec![Spanned {
-                        pos: 9,
-                        item: Rc::from("a"),
-                    }],
-                    members: vec![(
-                        String::from("wut"),
-                        Type::mk_arrow(
-                            Type::Var(Rc::from("a")),
-                            Type::mk_arrow(Type::Var(Rc::from("b")), Type::Bool),
-                        ),
-                    )],
-                },
+        let actual = tc.check_declaration(&Spanned {
+            pos: 0,
+            item: syntax::Declaration::Class {
+                supers: Vec::new(),
+                name: Rc::from("Wut"),
+                args: vec![Spanned {
+                    pos: 9,
+                    item: Rc::from("a"),
+                }],
+                members: vec![(
+                    String::from("wut"),
+                    Type::mk_arrow(
+                        Type::Var(Rc::from("a")),
+                        Type::mk_arrow(Type::Var(Rc::from("b")), Type::Bool),
+                    ),
+                )],
             },
-        );
+        });
         assert_eq!(expected, actual);
 
         let decl = actual.unwrap().unwrap();
@@ -811,49 +805,46 @@ fn check_instance_1() {
         instance Eq () where
           eq x y = True
         */
-        let actual = tc.check_declaration(
-            &mut HashMap::new(),
-            &Spanned {
-                pos: 0,
-                item: syntax::Declaration::Instance {
-                    assumes: Vec::new(),
-                    name: Spanned {
-                        pos: 9,
-                        item: Rc::from("Eq"),
-                    },
-                    args: vec![Spanned {
-                        pos: 11,
-                        item: Type::Unit,
-                    }],
-                    members: vec![(
-                        Spanned {
-                            pos: 22,
-                            item: String::from("eq"),
-                        },
-                        vec![
-                            syntax::Spanned {
-                                pos: 25,
-                                item: syntax::Pattern::Name(Spanned {
-                                    pos: 25,
-                                    item: String::from("x"),
-                                }),
-                            },
-                            syntax::Spanned {
-                                pos: 27,
-                                item: syntax::Pattern::Name(Spanned {
-                                    pos: 27,
-                                    item: String::from("y"),
-                                }),
-                            },
-                        ],
-                        Spanned {
-                            pos: 31,
-                            item: syntax::Expr::True,
-                        },
-                    )],
+        let actual = tc.check_declaration(&Spanned {
+            pos: 0,
+            item: syntax::Declaration::Instance {
+                assumes: Vec::new(),
+                name: Spanned {
+                    pos: 9,
+                    item: Rc::from("Eq"),
                 },
+                args: vec![Spanned {
+                    pos: 11,
+                    item: Type::Unit,
+                }],
+                members: vec![(
+                    Spanned {
+                        pos: 22,
+                        item: String::from("eq"),
+                    },
+                    vec![
+                        syntax::Spanned {
+                            pos: 25,
+                            item: syntax::Pattern::Name(Spanned {
+                                pos: 25,
+                                item: String::from("x"),
+                            }),
+                        },
+                        syntax::Spanned {
+                            pos: 27,
+                            item: syntax::Pattern::Name(Spanned {
+                                pos: 27,
+                                item: String::from("y"),
+                            }),
+                        },
+                    ],
+                    Spanned {
+                        pos: 31,
+                        item: syntax::Expr::True,
+                    },
+                )],
             },
-        );
+        });
         assert_eq!(expected, actual)
     })
 }

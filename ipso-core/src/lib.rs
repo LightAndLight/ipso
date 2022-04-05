@@ -6,7 +6,6 @@ use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
-    path::PathBuf,
     rc::Rc,
 };
 use syntax::ModuleId;
@@ -1707,20 +1706,8 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ModuleUsage {
-    /// A module was given a particular name during importing
-    Named(String),
-    /// Specific names were imported from a module
-    Items(Vec<String>),
-    /// The entire contents of a module were imported
-    All,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
-    /// Describes how each imported file is referenced by this module.
-    pub usages: HashMap<PathBuf, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 
