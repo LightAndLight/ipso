@@ -343,24 +343,19 @@ fn resolve_imports(
                     module,
                     as_name,
                 } => {
-                    let source = &Source::File {
-                        path: PathBuf::from(path),
-                    };
-
-                    let module_path = working_dir.join(&module.item).with_extension("ipso");
                     let id = import(
                         modules,
-                        source,
+                        &Source::File {
+                            path: PathBuf::from(path),
+                        },
                         module.pos,
-                        &module_path,
+                        &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
                         builtins,
                     )?;
 
-                    let actual_name = as_name.as_ref().unwrap_or(module);
-
                     imported_items.insert(
-                        actual_name.item.clone(),
+                        as_name.as_ref().unwrap_or(module).item.clone(),
                         ImportedItemInfo::ModuleImportedAs { id },
                     );
 
@@ -373,17 +368,15 @@ fn resolve_imports(
                     module,
                     names,
                 } => {
-                    let source = &Source::File {
+                    let source = Source::File {
                         path: PathBuf::from(path),
                     };
 
-                    let imported_module_path =
-                        working_dir.join(&module.item).with_extension("ipso");
                     let imported_module_id = import(
                         modules,
-                        source,
+                        &source,
                         module.pos,
-                        &imported_module_path,
+                        &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
                         builtins,
                     )?;
@@ -404,7 +397,7 @@ fn resolve_imports(
                                     },
                                 ),
                             );
-                            Ok::<(), ModuleError>(())
+                            Ok(())
                         }
                         syntax::Names::Names(names) => {
                             imported_items.extend(names.iter().map(|name| {
@@ -422,16 +415,19 @@ fn resolve_imports(
                                 .into_keys()
                                 .collect();
 
-                            names.iter().try_for_each(|name| {
-                                if available_names.contains(&name.item) {
-                                    Ok(())
-                                } else {
-                                    Err(ModuleError::DoesNotDefine {
-                                        source: source.clone(),
-                                        pos: name.pos,
-                                    })
-                                }
-                            })
+                            names
+                                .iter()
+                                .try_for_each(|name| {
+                                    if available_names.contains(&name.item) {
+                                        Ok(())
+                                    } else {
+                                        Err(name)
+                                    }
+                                })
+                                .map_err(|name| ModuleError::DoesNotDefine {
+                                    source,
+                                    pos: name.pos,
+                                })
                         }
                     }?;
 
