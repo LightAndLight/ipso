@@ -3,7 +3,6 @@ use ipso_core::{
     Module, Pattern, Type, TypeSig,
 };
 use ipso_syntax::kind::Kind;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
@@ -17,7 +16,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
     let array_ty = Type::mk_array(common_kinds);
 
     Module {
-        usages: HashMap::new(),
         decls: vec![
             // mapIO : (a -> b) -> IO a -> IO b
             Declaration::Definition {

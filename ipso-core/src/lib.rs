@@ -1718,8 +1718,6 @@ pub enum ModuleUsage {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
-    /// Describes how each imported file is referenced by this module.
-    pub usages: HashMap<ModuleId, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 

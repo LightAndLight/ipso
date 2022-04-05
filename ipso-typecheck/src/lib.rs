@@ -714,10 +714,7 @@ impl<'modules> Typechecker<'modules> {
                     })
             })
         })?;
-        Ok(core::Module {
-            usages: module_usages,
-            decls,
-        })
+        Ok(core::Module { decls })
     }
 
     pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
