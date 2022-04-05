@@ -240,10 +240,6 @@ pub enum TypeError {
         pos: usize,
         context: Option<SolveConstraintContext>,
     },
-    ShadowedModuleName {
-        source: Source,
-        pos: usize,
-    },
 }
 
 impl TypeError {
@@ -257,7 +253,6 @@ impl TypeError {
             TypeError::NoSuchClass { source, .. } => source.clone(),
             TypeError::NotAMember { source, .. } => source.clone(),
             TypeError::CannotDeduce { source, .. } => source.clone(),
-            TypeError::ShadowedModuleName { source, .. } => source.clone(),
         }
     }
 
@@ -271,7 +266,6 @@ impl TypeError {
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
             TypeError::CannotDeduce { pos, .. } => *pos,
-            TypeError::ShadowedModuleName { pos, .. } => *pos,
         }
     }
 
@@ -330,7 +324,6 @@ impl TypeError {
                 None => String::from("cannot deduce"),
                 Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
             },
-            TypeError::ShadowedModuleName { .. } => String::from("shadowed module name"),
         }
     }
 
@@ -366,7 +359,6 @@ impl TypeError {
             TypeError::NoSuchClass { .. } => None,
             TypeError::NotAMember { .. } => None,
             TypeError::CannotDeduce { .. } => None,
-            TypeError::ShadowedModuleName { .. } => None,
         }
     }
 
@@ -700,18 +692,16 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
-        let mut module_usages = HashMap::new();
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(&mut module_usages, decl)
-                    .map(|m_decl| match m_decl {
-                        Option::None => decls,
-                        Option::Some(decl) => {
-                            self.register_declaration(&decl);
-                            decls.push(decl);
-                            decls
-                        }
-                    })
+                self.check_declaration(decl).map(|m_decl| match m_decl {
+                    Option::None => decls,
+                    Option::Some(decl) => {
+                        self.register_declaration(&decl);
+                        decls.push(decl);
+                        decls
+                    }
+                })
             })
         })?;
         Ok(core::Module { decls })
@@ -1207,66 +1197,8 @@ impl<'modules> Typechecker<'modules> {
         })
     }
 
-    fn check_import(
-        &mut self,
-        module_usages: &mut HashMap<ModuleId, core::ModuleUsage>,
-        module_id: ModuleId,
-        module: &Spanned<String>,
-        as_name: &Option<Spanned<String>>,
-    ) -> Result<(), TypeError> {
-        let actual_name = match as_name {
-            None => module,
-            Some(name) => name,
-        };
-
-        match module_usages.get(&module_id) {
-            None => {
-                let signatures = self
-                    .modules
-                    .lookup(module_id)
-                    .get_signatures(self.common_kinds);
-                self.module_context.insert(module_id, signatures);
-                module_usages.insert(
-                    module_id,
-                    core::ModuleUsage::Named(actual_name.item.clone()),
-                );
-                Ok(())
-            }
-            Some(_) => Err(TypeError::ShadowedModuleName {
-                source: self.source(),
-                pos: actual_name.pos,
-            }),
-        }
-    }
-
-    fn check_from_import(
-        &mut self,
-        module_usages: &mut HashMap<ModuleId, core::ModuleUsage>,
-        module_id: ModuleId,
-        names: &syntax::Names,
-    ) -> Result<(), TypeError> {
-        let signatures = self
-            .modules
-            .lookup(module_id)
-            .get_signatures(self.common_kinds);
-
-        self.module_context.insert(module_id, signatures);
-        module_usages.insert(
-            module_id,
-            match names {
-                syntax::Names::All => core::ModuleUsage::All,
-                syntax::Names::Names(names) => {
-                    core::ModuleUsage::Items(names.iter().map(|name| name.item.clone()).collect())
-                }
-            },
-        );
-
-        Ok(())
-    }
-
     fn check_declaration(
         &mut self,
-        module_usages: &mut HashMap<ModuleId, core::ModuleUsage>,
         decl: &syntax::Spanned<syntax::Declaration>,
     ) -> Result<Option<core::Declaration>, TypeError> {
         match &decl.item {
@@ -1282,21 +1214,21 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
-            syntax::Declaration::Import {
-                resolved,
-                module,
-                as_name,
-            } => {
+            syntax::Declaration::Import { resolved, .. } => {
                 let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
-                self.check_import(module_usages, id, module, as_name)
-                    .map(|()| Option::None)
+
+                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
+                self.module_context.insert(id, signatures);
+
+                Ok(None)
             }
-            syntax::Declaration::FromImport {
-                resolved, names, ..
-            } => {
+            syntax::Declaration::FromImport { resolved, .. } => {
                 let id = resolved.unwrap_or_else(|| panic!("unresolved FromImport"));
-                self.check_from_import(module_usages, id, names)
-                    .map(|()| Option::None)
+
+                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
+                self.module_context.insert(id, signatures);
+
+                Ok(None)
             }
 
             syntax::Declaration::Class {
