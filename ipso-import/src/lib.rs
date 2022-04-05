@@ -442,27 +442,43 @@ fn resolve_imports(
                     args,
                     body,
                 } => {
-                    let imported_items = {
-                        let mut imported_items = imported_items.clone();
-                        imported_items.remove(name);
-                        for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                            imported_items.remove(&name.item);
-                        }
-                        imported_items
-                    };
+                    let bound_names: HashSet<&str> = std::iter::once(name.as_str())
+                        .chain(args.iter().flat_map(|pattern| {
+                            pattern.item.iter_names().map(|name| name.item.as_str())
+                        }))
+                        .collect();
+                    let imported_items: HashMap<String, ImportedItemInfo> = imported_items
+                        .iter()
+                        .filter_map(|(name, item)| {
+                            if bound_names.contains(name.as_str()) {
+                                None
+                            } else {
+                                Some((name.clone(), item.clone()))
+                            }
+                        })
+                        .collect();
+
                     desugar_module_accessors_expr(&imported_items, &mut body.item);
                     Ok(())
                 }
                 syntax::Declaration::Instance { members, .. } => {
                     for (name, args, body) in members {
-                        let imported_items = {
-                            let mut imported_items = imported_items.clone();
-                            imported_items.remove(&name.item);
-                            for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                                imported_items.remove(&name.item);
-                            }
-                            imported_items
-                        };
+                        let bound_names: HashSet<&str> = std::iter::once(name.item.as_str())
+                            .chain(args.iter().flat_map(|pattern| {
+                                pattern.item.iter_names().map(|name| name.item.as_str())
+                            }))
+                            .collect();
+                        let imported_items: HashMap<String, ImportedItemInfo> = imported_items
+                            .iter()
+                            .filter_map(|(name, item)| {
+                                if bound_names.contains(name.as_str()) {
+                                    None
+                                } else {
+                                    Some((name.clone(), item.clone()))
+                                }
+                            })
+                            .collect();
+
                         desugar_module_accessors_expr(&imported_items, &mut body.item)
                     }
                     Ok(())
