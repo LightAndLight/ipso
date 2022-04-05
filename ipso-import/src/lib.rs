@@ -323,56 +323,6 @@ fn desugar_module_accessors_expr(
     }
 }
 
-fn desugar_module_accessors_decl(
-    imported_items: &HashMap<String, ImportedItemInfo>,
-    decl: &mut syntax::Declaration,
-) {
-    match decl {
-        syntax::Declaration::Definition {
-            name,
-            ty: _,
-            args,
-            body,
-        } => {
-            let imported_items = {
-                let mut imported_items = imported_items.clone();
-                imported_items.remove(name);
-                for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    imported_items.remove(&name.item);
-                }
-                imported_items
-            };
-            desugar_module_accessors_expr(&imported_items, &mut body.item);
-        }
-        syntax::Declaration::Class { .. } => {}
-        syntax::Declaration::Instance {
-            assumes: _,
-            name: _,
-            args: _,
-            members,
-        } => {
-            for (name, args, body) in members {
-                let imported_items = {
-                    let mut imported_items = imported_items.clone();
-                    imported_items.remove(&name.item);
-                    for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                        imported_items.remove(&name.item);
-                    }
-                    imported_items
-                };
-                desugar_module_accessors_expr(&imported_items, &mut body.item)
-            }
-        }
-        syntax::Declaration::TypeAlias { .. } => {}
-
-        syntax::Declaration::Import { .. } => panic!("unresolved Import"),
-        syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
-
-        syntax::Declaration::ResolvedImport { .. }
-        | syntax::Declaration::ResolvedFromImport { .. } => {}
-    }
-}
-
 fn resolve_imports(
     common_kinds: &CommonKinds,
     builtins: &Module,
@@ -383,11 +333,11 @@ fn resolve_imports(
 ) -> Result<(), ModuleError> {
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
 
-    let decls: Vec<syntax::Spanned<syntax::Declaration>> = module
+    module
         .decls
-        .iter()
-        .map(|decl| -> Result<_, ModuleError> {
-            let mut decl = match &decl.item {
+        .iter_mut()
+        .try_for_each(|decl| -> Result<_, ModuleError> {
+            match &mut decl.item {
                 syntax::Declaration::Import { module, as_name } => {
                     let source = &Source::File {
                         path: PathBuf::from(path),
@@ -408,14 +358,16 @@ fn resolve_imports(
                         ImportedItemInfo::ModuleImportedAs { id },
                     );
 
-                    Ok::<_, ModuleError>(syntax::Spanned {
+                    *decl = syntax::Spanned {
                         pos: decl.pos,
                         item: syntax::Declaration::ResolvedImport {
                             id,
                             module: module.clone(),
                             as_name: as_name.clone(),
                         },
-                    })
+                    };
+
+                    Ok(())
                 }
                 syntax::Declaration::FromImport { module, names } => {
                     let source = &Source::File {
@@ -480,26 +432,56 @@ fn resolve_imports(
                         }
                     }?;
 
-                    Ok(syntax::Spanned {
+                    *decl = syntax::Spanned {
                         pos: decl.pos,
                         item: syntax::Declaration::ResolvedFromImport {
                             id: imported_module_id,
                             module: module.clone(),
                             names: names.clone(),
                         },
-                    })
+                    };
+
+                    Ok(())
                 }
-                _ => Ok(decl.clone()),
-            }?;
 
-            desugar_module_accessors_decl(&imported_items, &mut decl.item);
+                syntax::Declaration::Definition {
+                    name,
+                    ty: _,
+                    args,
+                    body,
+                } => {
+                    let imported_items = {
+                        let mut imported_items = imported_items.clone();
+                        imported_items.remove(name);
+                        for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
+                            imported_items.remove(&name.item);
+                        }
+                        imported_items
+                    };
+                    desugar_module_accessors_expr(&imported_items, &mut body.item);
+                    Ok(())
+                }
+                syntax::Declaration::Instance { members, .. } => {
+                    for (name, args, body) in members {
+                        let imported_items = {
+                            let mut imported_items = imported_items.clone();
+                            imported_items.remove(&name.item);
+                            for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
+                                imported_items.remove(&name.item);
+                            }
+                            imported_items
+                        };
+                        desugar_module_accessors_expr(&imported_items, &mut body.item)
+                    }
+                    Ok(())
+                }
 
-            Ok(decl)
+                syntax::Declaration::Class { .. }
+                | syntax::Declaration::TypeAlias { .. }
+                | syntax::Declaration::ResolvedImport { .. }
+                | syntax::Declaration::ResolvedFromImport { .. } => Ok(()),
+            }
         })
-        .collect::<Result<_, _>>()?;
-
-    module.decls = decls;
-    Ok(())
 }
 
 /// Import a module.
