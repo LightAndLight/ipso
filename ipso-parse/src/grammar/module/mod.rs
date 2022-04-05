@@ -100,7 +100,11 @@ pub fn import(parser: &mut Parser) -> ParseResult<Declaration> {
                         indent!(parser, Relation::Gt, parser.keyword(&Keyword::As)),
                         spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
                     ))
-                    .map(|as_name| Declaration::Import { module, as_name })
+                    .map(|as_name| Declaration::Import {
+                        resolved: None,
+                        module,
+                        as_name,
+                    })
                 }
             )
         )
@@ -135,7 +139,11 @@ pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
                         )
                         .map(Names::Names)
                     )
-                    .map(|names| Declaration::FromImport { module, names })
+                    .map(|names| Declaration::FromImport {
+                        resolved: None,
+                        module,
+                        names
+                    })
                 )
             )
         )

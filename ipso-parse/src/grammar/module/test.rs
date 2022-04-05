@@ -37,6 +37,7 @@ fn parse_import_1() {
         "import yes",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
@@ -52,6 +53,7 @@ fn parse_import_as_1() {
         "import yes as no",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
@@ -70,6 +72,7 @@ fn parse_import_as_2() {
         "import yes\n as no",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
@@ -251,6 +254,7 @@ fn parse_from_import_1() {
         "from asdf import *",
         from_import,
         Ok(Declaration::FromImport {
+            resolved: None,
             module: Spanned {
                 pos: 5,
                 item: String::from("asdf")
@@ -266,6 +270,7 @@ fn parse_from_import_2() {
         "from asdf import b, c, d",
         from_import,
         Ok(Declaration::FromImport {
+            resolved: None,
             module: Spanned {
                 pos: 5,
                 item: String::from("asdf")

@@ -338,7 +338,11 @@ fn resolve_imports(
         .iter_mut()
         .try_for_each(|decl| -> Result<_, ModuleError> {
             match &mut decl.item {
-                syntax::Declaration::Import { module, as_name } => {
+                syntax::Declaration::Import {
+                    resolved,
+                    module,
+                    as_name,
+                } => {
                     let source = &Source::File {
                         path: PathBuf::from(path),
                     };
@@ -353,23 +357,22 @@ fn resolve_imports(
                         builtins,
                     )?;
 
+                    let actual_name = as_name.as_ref().unwrap_or(module);
+
                     imported_items.insert(
-                        module.item.clone(),
+                        actual_name.item.clone(),
                         ImportedItemInfo::ModuleImportedAs { id },
                     );
 
-                    *decl = syntax::Spanned {
-                        pos: decl.pos,
-                        item: syntax::Declaration::ResolvedImport {
-                            id,
-                            module: module.clone(),
-                            as_name: as_name.clone(),
-                        },
-                    };
+                    *resolved = Some(id);
 
                     Ok(())
                 }
-                syntax::Declaration::FromImport { module, names } => {
+                syntax::Declaration::FromImport {
+                    resolved,
+                    module,
+                    names,
+                } => {
                     let source = &Source::File {
                         path: PathBuf::from(path),
                     };
@@ -432,14 +435,7 @@ fn resolve_imports(
                         }
                     }?;
 
-                    *decl = syntax::Spanned {
-                        pos: decl.pos,
-                        item: syntax::Declaration::ResolvedFromImport {
-                            id: imported_module_id,
-                            module: module.clone(),
-                            names: names.clone(),
-                        },
-                    };
+                    *resolved = Some(imported_module_id);
 
                     Ok(())
                 }
@@ -476,10 +472,7 @@ fn resolve_imports(
                     Ok(())
                 }
 
-                syntax::Declaration::Class { .. }
-                | syntax::Declaration::TypeAlias { .. }
-                | syntax::Declaration::ResolvedImport { .. }
-                | syntax::Declaration::ResolvedFromImport { .. } => Ok(()),
+                syntax::Declaration::Class { .. } | syntax::Declaration::TypeAlias { .. } => Ok(()),
             }
         })
 }

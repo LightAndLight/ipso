@@ -522,20 +522,12 @@ pub enum Declaration {
         body: Type<Rc<str>>,
     },
     Import {
+        resolved: Option<ModuleId>,
         module: Spanned<String>,
         as_name: Option<Spanned<String>>,
     },
     FromImport {
-        module: Spanned<String>,
-        names: Names,
-    },
-    ResolvedImport {
-        id: ModuleId,
-        module: Spanned<String>,
-        as_name: Option<Spanned<String>>,
-    },
-    ResolvedFromImport {
-        id: ModuleId,
+        resolved: Option<ModuleId>,
         module: Spanned<String>,
         names: Names,
     },

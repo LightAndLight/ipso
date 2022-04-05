@@ -1297,19 +1297,24 @@ impl<'modules> Typechecker<'modules> {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
-            syntax::Declaration::Import { .. } => panic!("unresolved Import"),
-            syntax::Declaration::FromImport { .. } => panic!("unresolved FromImport"),
-
-            syntax::Declaration::ResolvedImport {
-                id,
+            syntax::Declaration::Import {
+                resolved,
                 module,
                 as_name,
-            } => self
-                .check_import(module_usages, *id, module, as_name)
-                .map(|()| Option::None),
-            syntax::Declaration::ResolvedFromImport { id, module, names } => self
-                .check_from_import(module_usages, *id, module, names)
-                .map(|()| Option::None),
+            } => {
+                let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
+                self.check_import(module_usages, id, module, as_name)
+                    .map(|()| Option::None)
+            }
+            syntax::Declaration::FromImport {
+                resolved,
+                module,
+                names,
+            } => {
+                let id = resolved.unwrap_or_else(|| panic!("unresolved FromImport"));
+                self.check_from_import(module_usages, id, module, names)
+                    .map(|()| Option::None)
+            }
 
             syntax::Declaration::Class {
                 supers,
