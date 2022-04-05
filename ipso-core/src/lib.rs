@@ -1706,16 +1706,6 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ModuleUsage {
-    /// A module was given a particular name during importing
-    Named(String),
-    /// Specific names were imported from a module
-    Items(Vec<String>),
-    /// The entire contents of a module were imported
-    All,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Declaration>,
