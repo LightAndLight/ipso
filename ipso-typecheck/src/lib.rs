@@ -141,12 +141,11 @@ pub struct Typechecker<'modules> {
     common_kinds: &'modules CommonKinds,
     source: Source,
     kind_solutions: kind_inference::Solutions,
-    pub type_solutions: type_inference::Solutions,
-    pub implications: Vec<Implication>,
-    pub evidence: Evidence,
+    type_solutions: type_inference::Solutions,
+    implications: Vec<Implication>,
+    evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
-    pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
@@ -464,7 +463,6 @@ impl<'modules> Typechecker<'modules> {
             evidence: Evidence::new(),
             type_context: HashMap::new(),
             context: HashMap::new(),
-            registered_bindings: HashMap::new(),
             class_context: HashMap::new(),
             bound_vars: BoundVars::new(),
             bound_tyvars: BoundVars::new(),
@@ -623,7 +621,6 @@ impl<'modules> Typechecker<'modules> {
                 .iter()
                 .map(|(name, (sig, _))| (name.clone(), sig.clone())),
         );
-        self.registered_bindings.extend(decl_bindings);
 
         // update class context
         self.class_context.insert(decl_name, decl.clone());
@@ -672,10 +669,8 @@ impl<'modules> Typechecker<'modules> {
                 self.type_context
                     .insert(Rc::from(name.as_str()), kind.clone());
             }
-            core::Declaration::Definition { name, sig, body } => {
+            core::Declaration::Definition { name, sig, .. } => {
                 self.context.insert(name.clone(), sig.clone());
-                self.registered_bindings
-                    .insert(name.clone(), (sig.clone(), body.clone()));
             }
             core::Declaration::TypeAlias { name, args, body } => {
                 todo!("register TypeAlias {:?}", (name, args, body))
