@@ -630,28 +630,22 @@ fn check_class_1() {
                 Rc::from("MyEq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
-            (
-                core::TypeSig {
-                    ty_vars: vec![(Rc::from("a"), a.kind())],
-                    body: core::Type::mk_fatarrow(
+            core::TypeSig {
+                ty_vars: vec![(Rc::from("a"), a.kind())],
+                body: core::Type::mk_fatarrow(
+                    tc.common_kinds,
+                    core::Type::app(eq_ty, a.clone()),
+                    core::Type::arrow(
                         tc.common_kinds,
-                        core::Type::app(eq_ty, a.clone()),
-                        core::Type::arrow(
-                            tc.common_kinds,
-                            a.clone(),
-                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
-                        ),
+                        a.clone(),
+                        core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
                     ),
-                },
-                Rc::new(core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
-                )),
-            )
+                ),
+            }
         };
         assert_eq!(
             Some(&expected_member),
-            tc.registered_bindings.get(&String::from("myeq"))
+            tc.context.get(&String::from("myeq"))
         );
     })
 }
@@ -736,28 +730,22 @@ fn check_class_2() {
             );
             let a = core::Type::unsafe_mk_var(1, Kind::Type);
             let b = core::Type::unsafe_mk_var(0, Kind::Type);
-            (
-                core::TypeSig {
-                    ty_vars: vec![(Rc::from("a"), a.kind()), (Rc::from("b"), b.kind())],
-                    body: core::Type::mk_fatarrow(
+            core::TypeSig {
+                ty_vars: vec![(Rc::from("a"), a.kind()), (Rc::from("b"), b.kind())],
+                body: core::Type::mk_fatarrow(
+                    tc.common_kinds,
+                    core::Type::app(wut_ty, a.clone()),
+                    core::Type::arrow(
                         tc.common_kinds,
-                        core::Type::app(wut_ty, a.clone()),
-                        core::Type::arrow(
-                            tc.common_kinds,
-                            a,
-                            core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
-                        ),
+                        a,
+                        core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
                     ),
-                },
-                Rc::new(core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(0)),
-                )),
-            )
+                ),
+            }
         };
         assert_eq!(
             Some(&expected_member),
-            tc.registered_bindings.get(&String::from("wut")),
+            tc.context.get(&String::from("wut")),
             "expected member"
         );
     })
