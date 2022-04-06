@@ -146,7 +146,7 @@ pub struct Typechecker<'modules> {
     pub evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::TypeSig>,
-    pub registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
+    registered_bindings: HashMap<String, (core::TypeSig, Rc<core::Expr>)>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
