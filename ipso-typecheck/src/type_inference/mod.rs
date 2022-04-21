@@ -1878,7 +1878,7 @@ impl<'a> InferenceContext<'a> {
                             //
                             // Register the variables bound by this line so the variables
                             // can be references by subsequent lines.
-                            self.variables.insert(&[(name.clone(), name_ty)]);
+                            self.variables.insert(&[(name.item.clone(), name_ty)]);
 
                             ret_ty = Err(CompExprEnd::Bind);
                             Ok(CheckedCompLine::Bind {
@@ -1889,7 +1889,7 @@ impl<'a> InferenceContext<'a> {
                         syntax::CompLine::Let(name, value) => {
                             let (value, value_ty) = self.infer(value)?;
 
-                            self.variables.insert(&[(name.clone(), value_ty)]);
+                            self.variables.insert(&[(name.item.clone(), value_ty)]);
 
                             ret_ty = Err(CompExprEnd::Let);
                             Ok(CheckedCompLine::Let {

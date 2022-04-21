@@ -350,8 +350,8 @@ impl ModuleName {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompLine {
     Expr(Spanned<Expr>),
-    Bind(Rc<str>, Spanned<Expr>),
-    Let(Rc<str>, Spanned<Expr>),
+    Bind(Spanned<Rc<str>>, Spanned<Expr>),
+    Let(Spanned<Rc<str>>, Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
