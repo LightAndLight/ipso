@@ -287,17 +287,6 @@ impl TypeError {
                         render_kind_inference_error(error)
                     }
                 },
-                type_inference::InferenceErrorInfo::CompExprEndsWith { end } => {
-                    String::from(match end {
-                        type_inference::CompExprEnd::None => "empty computation expression",
-                        type_inference::CompExprEnd::Bind => {
-                            "computation expression ends with a bind"
-                        }
-                        type_inference::CompExprEnd::Let => {
-                            "computation expression ends with a let"
-                        }
-                    })
-                }
 
                 type_inference::InferenceErrorInfo::NotInScope { .. } => {
                     String::from("variable not in scope")
@@ -330,7 +319,6 @@ impl TypeError {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
                 type_inference::InferenceErrorInfo::UnificationError { .. } => None,
-                type_inference::InferenceErrorInfo::CompExprEndsWith { .. } => None,
                 type_inference::InferenceErrorInfo::NotInScope { .. } => None,
                 type_inference::InferenceErrorInfo::DuplicateArgument { .. } => None,
                 type_inference::InferenceErrorInfo::RedundantPattern { .. } => None,

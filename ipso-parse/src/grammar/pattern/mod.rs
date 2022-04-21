@@ -20,11 +20,11 @@ pattern_record_fields ::=
 */
 pub fn pattern_record_fields(
     parser: &mut Parser,
-    names: &mut Vec<Spanned<String>>,
-) -> ParseResult<Option<Spanned<String>>> {
+    names: &mut Vec<Spanned<Rc<str>>>,
+) -> ParseResult<Option<Spanned<Rc<str>>>> {
     choices!(
         // ident [',' pattern_record_fields]
-        spanned!(parser, indent!(parser, Relation::Gte, parser.ident_owned())).and_then(|name| {
+        spanned!(parser, indent!(parser, Relation::Gte, parser.ident())).and_then(|name| {
             names.push(name);
             optional!(keep_right!(
                 indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
@@ -38,7 +38,7 @@ pub fn pattern_record_fields(
         // '..' ident
         keep_right!(
             indent!(parser, Relation::Gte, parser.token(&token::Data::DotDot)),
-            spanned!(parser, indent!(parser, Relation::Gte, parser.ident_owned())).map(Some)
+            spanned!(parser, indent!(parser, Relation::Gte, parser.ident())).map(Some)
         )
     )
 }
@@ -71,8 +71,8 @@ pattern_variant ::=
 ```
 */
 pub fn pattern_variant(parser: &mut Parser) -> ParseResult<Pattern> {
-    parser.ctor_owned().and_then(|name| {
-        spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
+    parser.ctor().and_then(|name| {
+        spanned!(parser, indent!(parser, Relation::Gt, parser.ident()))
             .map(|arg| Pattern::Variant { name, arg })
     })
 }
@@ -91,7 +91,7 @@ pattern ::=
 */
 pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
     choices!(
-        spanned!(parser, parser.ident_owned()).map(Pattern::Name),
+        spanned!(parser, parser.ident()).map(Pattern::Name),
         pattern_record(parser),
         pattern_variant(parser),
         spanned!(parser, parser.char()).map(Pattern::Char),

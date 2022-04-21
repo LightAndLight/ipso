@@ -1,3 +1,4 @@
+pub mod desugar;
 pub mod kind;
 #[cfg(test)]
 mod test;
@@ -241,14 +242,14 @@ pub enum StringPart {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
-    Name(Spanned<String>),
+    Name(Spanned<Rc<str>>),
     Record {
-        names: Vec<Spanned<String>>,
-        rest: Option<Spanned<String>>,
+        names: Vec<Spanned<Rc<str>>>,
+        rest: Option<Spanned<Rc<str>>>,
     },
     Variant {
-        name: String,
-        arg: Spanned<String>,
+        name: Rc<str>,
+        arg: Spanned<Rc<str>>,
     },
     Char(Spanned<char>),
     Int(Spanned<u32>),
@@ -257,12 +258,12 @@ pub enum Pattern {
 }
 
 pub struct IterNames<'a> {
-    items: Vec<&'a Spanned<String>>,
+    items: Vec<&'a Spanned<Rc<str>>>,
     pattern: Option<&'a Pattern>,
 }
 
 impl<'a> Iterator for IterNames<'a> {
-    type Item = &'a Spanned<String>;
+    type Item = &'a Spanned<Rc<str>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.pattern {
@@ -303,7 +304,7 @@ impl Pattern {
         }
     }
 
-    pub fn get_arg_names(&self) -> Vec<&Spanned<String>> {
+    pub fn get_arg_names(&self) -> Vec<&Spanned<Rc<str>>> {
         let mut arg_names = Vec::new();
         match self {
             Pattern::Name(n) => {
@@ -350,8 +351,8 @@ impl ModuleName {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompLine {
     Expr(Spanned<Expr>),
-    Bind(Rc<str>, Spanned<Expr>),
-    Let(Rc<str>, Spanned<Expr>),
+    Bind(Spanned<Rc<str>>, Spanned<Expr>),
+    Let(Spanned<Rc<str>>, Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -419,7 +420,7 @@ pub enum Expr {
 
     Unit,
 
-    Comp(Vec<CompLine>),
+    Comp(Vec<Spanned<CompLine>>),
 
     Cmd(Vec<CmdPart>),
 }

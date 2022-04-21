@@ -25,7 +25,7 @@ pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
         {
             keep_right!(
                 parser.keyword(&Keyword::Bind),
-                indent!(parser, Relation::Gt, parser.ident())
+                indent!(parser, Relation::Gt, spanned!(parser, parser.ident()))
             )
             .and_then(|name| {
                 keep_right!(
@@ -39,7 +39,7 @@ pub fn comp_line(parser: &mut Parser) -> ParseResult<CompLine> {
         {
             keep_right!(
                 parser.keyword(&Keyword::Let),
-                indent!(parser, Relation::Gt, parser.ident())
+                indent!(parser, Relation::Gt, spanned!(parser, parser.ident()))
             )
             .and_then(|name| {
                 keep_right!(
@@ -71,7 +71,12 @@ pub fn expr_comp(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                     Relation::Gt,
                     indent_scope!(
                         parser,
-                        many!(indent!(parser, Relation::Eq, comp_line(parser))).map(Expr::Comp)
+                        many!(indent!(
+                            parser,
+                            Relation::Eq,
+                            spanned!(parser, comp_line(parser))
+                        ))
+                        .map(Expr::Comp)
                     )
                 )
             )

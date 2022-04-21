@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{ModuleId, Modules};
+use syntax::{desugar, ModuleId, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -25,6 +25,7 @@ pub enum ModuleError {
     },
     IO(io::Error),
     Parse(parse::ParseError),
+    Desugar(desugar::Error),
     Check(typecheck::TypeError),
 }
 
@@ -57,6 +58,7 @@ impl ModuleError {
             ),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
+            ModuleError::Desugar(err) => err.report(diagnostic),
             ModuleError::Check(err) => err.report(diagnostic),
         }
     }
@@ -71,6 +73,12 @@ impl From<io::Error> for ModuleError {
 impl From<parse::ParseError> for ModuleError {
     fn from(err: parse::ParseError) -> Self {
         ModuleError::Parse(err)
+    }
+}
+
+impl From<desugar::Error> for ModuleError {
+    fn from(err: desugar::Error) -> Self {
+        ModuleError::Desugar(err)
     }
 }
 
@@ -106,24 +114,24 @@ enum ImportedItemInfo {
     ModuleImportedAs { id: ModuleId },
 }
 
-fn desugar_module_accessors_comp_line(
+fn rewrite_module_accessors_comp_line(
     imported_items: &HashMap<String, ImportedItemInfo>,
     line: &mut syntax::CompLine,
 ) {
     match line {
         syntax::CompLine::Expr(value) => {
-            desugar_module_accessors_expr(imported_items, &mut value.item);
+            rewrite_module_accessors_expr(imported_items, &mut value.item);
         }
         syntax::CompLine::Bind(_, value) => {
-            desugar_module_accessors_expr(imported_items, &mut value.item);
+            rewrite_module_accessors_expr(imported_items, &mut value.item);
         }
         syntax::CompLine::Let(_, value) => {
-            desugar_module_accessors_expr(imported_items, &mut value.item);
+            rewrite_module_accessors_expr(imported_items, &mut value.item);
         }
     }
 }
 
-fn desugar_module_accessors_expr(
+fn rewrite_module_accessors_expr(
     imported_items: &HashMap<String, ImportedItemInfo>,
     expr: &mut syntax::Expr,
 ) {
@@ -141,7 +149,7 @@ fn desugar_module_accessors_expr(
                         y
                         ```
 
-                        is desugared to
+                        is rewritten to
 
                         ```
                         import x
@@ -184,7 +192,7 @@ fn desugar_module_accessors_expr(
 
                         is allowed.
 
-                        Module item access is desugared in the `Expr::Project` branch, rather than here.
+                        Module item access is rewritten in the `Expr::Project` branch, rather than here.
                         */
                     }
                 }
@@ -192,21 +200,21 @@ fn desugar_module_accessors_expr(
         }
         syntax::Expr::Module { .. } => {}
         syntax::Expr::App(a, b) => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Lam { args, body } => {
             let imported_items = {
                 let mut imported_items: HashMap<String, ImportedItemInfo> = imported_items.clone();
                 for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    imported_items.remove(&name.item);
+                    imported_items.remove(name.item.as_ref());
                 }
                 imported_items
             };
-            desugar_module_accessors_expr(&imported_items, &mut Rc::make_mut(body).item)
+            rewrite_module_accessors_expr(&imported_items, &mut Rc::make_mut(body).item)
         }
         syntax::Expr::Let { value, rest, .. } => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(value).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(value).item);
 
             /*
             TODO: fix variable shadowing
@@ -222,19 +230,19 @@ fn desugar_module_accessors_expr(
 
             In the above example, `x.a` should be a record projection rather than a module access.
             */
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(rest).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(rest).item);
         }
         syntax::Expr::True => {}
         syntax::Expr::False => {}
         syntax::Expr::IfThenElse(a, b, c) => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(c).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(c).item);
         }
         syntax::Expr::Int(_) => {}
         syntax::Expr::Binop(_, a, b) => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Char(_) => {}
         syntax::Expr::String(parts) => {
@@ -242,28 +250,28 @@ fn desugar_module_accessors_expr(
                 match part {
                     syntax::StringPart::String(_) => {}
                     syntax::StringPart::Expr(e) => {
-                        desugar_module_accessors_expr(imported_items, &mut e.item);
+                        rewrite_module_accessors_expr(imported_items, &mut e.item);
                     }
                 }
             }
         }
         syntax::Expr::Array(xs) => {
             for x in xs {
-                desugar_module_accessors_expr(imported_items, &mut x.item);
+                rewrite_module_accessors_expr(imported_items, &mut x.item);
             }
         }
         syntax::Expr::Record { fields, rest } => {
             for (_, e) in fields {
-                desugar_module_accessors_expr(imported_items, &mut e.item);
+                rewrite_module_accessors_expr(imported_items, &mut e.item);
             }
 
             for e in rest {
-                desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(e).item);
+                rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(e).item);
             }
         }
         syntax::Expr::Project(value, field) => {
             let value = Rc::make_mut(value);
-            desugar_module_accessors_expr(imported_items, &mut value.item);
+            rewrite_module_accessors_expr(imported_items, &mut value.item);
 
             match &value.item {
                 syntax::Expr::Module { id, path, item } => {
@@ -293,31 +301,31 @@ fn desugar_module_accessors_expr(
         }
         syntax::Expr::Variant(_) => {}
         syntax::Expr::Embed(_, a) => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
         }
         syntax::Expr::Case(a, branches) => {
-            desugar_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
 
             for branch in branches {
                 let module_names = {
                     // TODO: replace this loop with filter_map/collect
                     let mut module_names = imported_items.clone();
                     for name in branch.pattern.item.iter_names() {
-                        module_names.remove(&name.item);
+                        module_names.remove(name.item.as_ref());
                     }
                     module_names
                 };
-                desugar_module_accessors_expr(&module_names, &mut branch.body.item);
+                rewrite_module_accessors_expr(&module_names, &mut branch.body.item);
             }
         }
         syntax::Expr::Unit => {}
         syntax::Expr::Comp(lines) => lines
             .iter_mut()
-            .for_each(|line| desugar_module_accessors_comp_line(imported_items, line)),
+            .for_each(|line| rewrite_module_accessors_comp_line(imported_items, &mut line.item)),
         syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {
-                desugar_module_accessors_expr(imported_items, &mut expr.item)
+                rewrite_module_accessors_expr(imported_items, &mut expr.item)
             }
         }),
     }
@@ -444,7 +452,7 @@ fn resolve_imports(
                 } => {
                     let bound_names: HashSet<&str> = std::iter::once(name.as_str())
                         .chain(args.iter().flat_map(|pattern| {
-                            pattern.item.iter_names().map(|name| name.item.as_str())
+                            pattern.item.iter_names().map(|name| name.item.as_ref())
                         }))
                         .collect();
                     let imported_items: HashMap<String, ImportedItemInfo> = imported_items
@@ -458,14 +466,14 @@ fn resolve_imports(
                         })
                         .collect();
 
-                    desugar_module_accessors_expr(&imported_items, &mut body.item);
+                    rewrite_module_accessors_expr(&imported_items, &mut body.item);
                     Ok(())
                 }
                 syntax::Declaration::Instance { members, .. } => {
                     for (name, args, body) in members {
                         let bound_names: HashSet<&str> = std::iter::once(name.item.as_str())
                             .chain(args.iter().flat_map(|pattern| {
-                                pattern.item.iter_names().map(|name| name.item.as_str())
+                                pattern.item.iter_names().map(|name| name.item.as_ref())
                             }))
                             .collect();
                         let imported_items: HashMap<String, ImportedItemInfo> = imported_items
@@ -479,7 +487,7 @@ fn resolve_imports(
                             })
                             .collect();
 
-                        desugar_module_accessors_expr(&imported_items, &mut body.item)
+                        rewrite_module_accessors_expr(&imported_items, &mut body.item)
                     }
                     Ok(())
                 }
@@ -510,7 +518,9 @@ pub fn import(
                 let input_location = Source::File {
                     path: PathBuf::from(path),
                 };
-                let mut module = parse::parse_file(path)?;
+
+                let module = parse::parse_file(path)?;
+                let mut module = desugar::desugar_module(&input_location, module)?;
 
                 let working_dir = path.parent().unwrap();
 
