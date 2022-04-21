@@ -8,6 +8,8 @@ use ipso_diagnostic::Source;
 use ipso_lex::Lexer;
 #[cfg(test)]
 use ipso_syntax::{Pattern, Spanned};
+#[cfg(test)]
+use std::rc::Rc;
 
 #[cfg(test)]
 macro_rules! parse_test {
@@ -33,7 +35,7 @@ fn parse_pattern_1() {
         pattern,
         Ok(Pattern::Name(Spanned {
             pos: 0,
-            item: String::from("a")
+            item: Rc::from("a")
         }))
     )
 }

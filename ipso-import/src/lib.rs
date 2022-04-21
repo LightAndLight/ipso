@@ -199,7 +199,7 @@ fn desugar_module_accessors_expr(
             let imported_items = {
                 let mut imported_items: HashMap<String, ImportedItemInfo> = imported_items.clone();
                 for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    imported_items.remove(&name.item);
+                    imported_items.remove(name.item.as_ref());
                 }
                 imported_items
             };
@@ -303,7 +303,7 @@ fn desugar_module_accessors_expr(
                     // TODO: replace this loop with filter_map/collect
                     let mut module_names = imported_items.clone();
                     for name in branch.pattern.item.iter_names() {
-                        module_names.remove(&name.item);
+                        module_names.remove(name.item.as_ref());
                     }
                     module_names
                 };
@@ -444,7 +444,7 @@ fn resolve_imports(
                 } => {
                     let bound_names: HashSet<&str> = std::iter::once(name.as_str())
                         .chain(args.iter().flat_map(|pattern| {
-                            pattern.item.iter_names().map(|name| name.item.as_str())
+                            pattern.item.iter_names().map(|name| name.item.as_ref())
                         }))
                         .collect();
                     let imported_items: HashMap<String, ImportedItemInfo> = imported_items
@@ -465,7 +465,7 @@ fn resolve_imports(
                     for (name, args, body) in members {
                         let bound_names: HashSet<&str> = std::iter::once(name.item.as_str())
                             .chain(args.iter().flat_map(|pattern| {
-                                pattern.item.iter_names().map(|name| name.item.as_str())
+                                pattern.item.iter_names().map(|name| name.item.as_ref())
                             }))
                             .collect();
                         let imported_items: HashMap<String, ImportedItemInfo> = imported_items

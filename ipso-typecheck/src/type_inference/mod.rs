@@ -890,7 +890,7 @@ pub enum InferenceErrorInfo {
     UnificationError { error: UnificationError },
     CompExprEndsWith { end: CompExprEnd },
     NotInScope { name: String },
-    DuplicateArgument { name: String },
+    DuplicateArgument { name: Rc<str> },
     RedundantPattern,
 }
 
@@ -930,7 +930,7 @@ impl InferenceError {
     }
 
     /// Construct an [`InferenceErrorInfo::DuplicateArgument`].
-    pub fn duplicate_argument(source: &Source, name: String) -> Self {
+    pub fn duplicate_argument(source: &Source, name: Rc<str>) -> Self {
         InferenceError {
             source: source.clone(),
             position: None,
@@ -1086,7 +1086,7 @@ fn pattern_is_redundant(
 ) -> bool {
     saw_catchall
         || match pattern {
-            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_str()),
+            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_ref()),
             _ => false,
         }
 }
@@ -1230,7 +1230,7 @@ impl<'a> InferenceContext<'a> {
         args.iter()
             .flat_map(|arg| arg.item.get_arg_names().into_iter())
             .try_for_each(|arg| {
-                if seen.contains(&arg.item.as_str()) {
+                if seen.contains(&arg.item.as_ref()) {
                     Err(
                         InferenceError::duplicate_argument(self.source, arg.item.clone())
                             .with_position(arg.pos),
@@ -1242,11 +1242,11 @@ impl<'a> InferenceContext<'a> {
             })
     }
 
-    fn infer_name_pattern(&mut self, name: &Spanned<String>) -> InferredPattern {
+    fn infer_name_pattern(&mut self, name: &Spanned<Rc<str>>) -> InferredPattern {
         let name_ty = self.fresh_type_meta(&Kind::Type);
         InferredPattern::Any {
             pattern: Pattern::Name,
-            names: vec![(Rc::from(name.item.as_str()), name_ty.clone())],
+            names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
             ty: name_ty,
         }
     }
@@ -1277,8 +1277,8 @@ impl<'a> InferenceContext<'a> {
 
     fn infer_record_pattern(
         &mut self,
-        names: &[Spanned<String>],
-        rest: Option<&Spanned<String>>,
+        names: &[Spanned<Rc<str>>],
+        rest: Option<&Spanned<Rc<str>>>,
     ) -> InferredPattern {
         let mut names_to_positions: FnvHashMap<&str, usize> =
             FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
@@ -1313,7 +1313,7 @@ impl<'a> InferenceContext<'a> {
             }
             if let Some(rest) = rest {
                 names_tys.push((
-                    Rc::from(rest.item.as_str()),
+                    Rc::from(rest.item.as_ref()),
                     Type::app(Type::mk_record_ctor(self.common_kinds), row.clone()),
                 ));
             }
@@ -1335,7 +1335,7 @@ impl<'a> InferenceContext<'a> {
         &mut self,
         pos: usize,
         ctor: &str,
-        arg: &Spanned<String>,
+        arg: &Spanned<Rc<str>>,
     ) -> InferredPattern {
         let ctor: Rc<str> = Rc::from(ctor);
         let arg_ty = self.fresh_type_meta(&Kind::Type);
@@ -1350,7 +1350,7 @@ impl<'a> InferenceContext<'a> {
         InferredPattern::Variant {
             tag: Rc::new(tag),
             ctor,
-            arg_name: Rc::from(arg.item.as_str()),
+            arg_name: Rc::from(arg.item.as_ref()),
             arg_ty,
             rest: rest_row,
         }

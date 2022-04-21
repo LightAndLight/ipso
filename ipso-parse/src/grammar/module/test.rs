@@ -183,7 +183,7 @@ fn parse_definition_4() {
                     pos: 10,
                     item: Pattern::Name(Spanned {
                         pos: 10,
-                        item: String::from("y")
+                        item: Rc::from("y")
                     })
                 },
                 Spanned {

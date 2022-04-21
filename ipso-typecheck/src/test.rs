@@ -289,7 +289,7 @@ fn check_definition_1() {
                     pos: 14,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 14,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 body: syntax::Spanned {
@@ -336,7 +336,7 @@ fn check_definition_2() {
                     pos: 37,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 37,
-                        item: String::from("r"),
+                        item: Rc::from("r"),
                     }),
                 }],
                 body: syntax::Spanned {
@@ -496,11 +496,11 @@ fn check_definition_4() {
                     item: syntax::Pattern::Record {
                         names: vec![syntax::Spanned {
                             pos: 1,
-                            item: String::from("x"),
+                            item: Rc::from("x"),
                         }],
                         rest: Some(syntax::Spanned {
                             pos: 2,
-                            item: String::from("r"),
+                            item: Rc::from("r"),
                         }),
                     },
                 }],
@@ -815,14 +815,14 @@ fn check_instance_1() {
                             pos: 25,
                             item: syntax::Pattern::Name(Spanned {
                                 pos: 25,
-                                item: String::from("x"),
+                                item: Rc::from("x"),
                             }),
                         },
                         syntax::Spanned {
                             pos: 27,
                             item: syntax::Pattern::Name(Spanned {
                                 pos: 27,
-                                item: String::from("y"),
+                                item: Rc::from("y"),
                             }),
                         },
                     ],
