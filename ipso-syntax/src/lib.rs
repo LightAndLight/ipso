@@ -419,7 +419,7 @@ pub enum Expr {
 
     Unit,
 
-    Comp(Vec<CompLine>),
+    Comp(Vec<Spanned<CompLine>>),
 
     Cmd(Vec<CmdPart>),
 }

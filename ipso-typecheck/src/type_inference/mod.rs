@@ -1856,7 +1856,7 @@ impl<'a> InferenceContext<'a> {
                 let mut ret_ty = Err(CompExprEnd::None);
                 let mut checked_lines: Vec<CheckedCompLine> = comp_lines
                     .iter()
-                    .map(|line| match line {
+                    .map(|line| match &line.item {
                         syntax::CompLine::Expr(value) => {
                             let ret_ty_var = self.fresh_type_meta(&Kind::Type);
                             let value = self.check(

@@ -313,7 +313,7 @@ fn desugar_module_accessors_expr(
         syntax::Expr::Unit => {}
         syntax::Expr::Comp(lines) => lines
             .iter_mut()
-            .for_each(|line| desugar_module_accessors_comp_line(imported_items, line)),
+            .for_each(|line| desugar_module_accessors_comp_line(imported_items, &mut line.item)),
         syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {

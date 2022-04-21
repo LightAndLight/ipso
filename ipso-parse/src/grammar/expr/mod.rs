@@ -71,7 +71,12 @@ pub fn expr_comp(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
                     Relation::Gt,
                     indent_scope!(
                         parser,
-                        many!(indent!(parser, Relation::Eq, comp_line(parser))).map(Expr::Comp)
+                        many!(indent!(
+                            parser,
+                            Relation::Eq,
+                            spanned!(parser, comp_line(parser))
+                        ))
+                        .map(Expr::Comp)
                     )
                 )
             )
