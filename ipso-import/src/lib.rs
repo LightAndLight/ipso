@@ -518,7 +518,9 @@ pub fn import(
                 let input_location = Source::File {
                     path: PathBuf::from(path),
                 };
-                let mut module = parse::parse_file(path)?;
+
+                let module = parse::parse_file(path)?;
+                let mut module = desugar::desugar_module(&input_location, module)?;
 
                 let working_dir = path.parent().unwrap();
 
@@ -530,8 +532,6 @@ pub fn import(
                     path,
                     &mut module,
                 )?;
-
-                let module = desugar::desugar_module(&input_location, module)?;
 
                 let module = {
                     let mut tc = {
