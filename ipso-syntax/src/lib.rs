@@ -1,3 +1,4 @@
+pub mod desugar;
 pub mod kind;
 #[cfg(test)]
 mod test;

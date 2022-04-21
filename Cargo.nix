@@ -7,9 +7,9 @@ args@{
     "ipso-builtins/default"
     "ipso-core/default"
     "ipso-syntax/default"
+    "ipso-diagnostic/default"
     "ipso-util/default"
     "ipso-cli/default"
-    "ipso-diagnostic/default"
     "ipso-eval/default"
     "ipso-import/default"
     "ipso-parse/default"
@@ -49,9 +49,9 @@ in
     ipso-builtins = rustPackages.unknown.ipso-builtins."0.1.0";
     ipso-core = rustPackages.unknown.ipso-core."0.1.0";
     ipso-syntax = rustPackages.unknown.ipso-syntax."0.1.0";
+    ipso-diagnostic = rustPackages.unknown.ipso-diagnostic."0.1.0";
     ipso-util = rustPackages.unknown.ipso-util."0.1.0";
     ipso-cli = rustPackages.unknown.ipso-cli."0.1.0";
-    ipso-diagnostic = rustPackages.unknown.ipso-diagnostic."0.1.0";
     ipso-eval = rustPackages.unknown.ipso-eval."0.1.0";
     ipso-import = rustPackages.unknown.ipso-import."0.1.0";
     ipso-parse = rustPackages.unknown.ipso-parse."0.1.0";
@@ -281,7 +281,6 @@ in
     dependencies = {
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
-      typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
     };
   });
   
@@ -363,6 +362,7 @@ in
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/ipso-syntax");
     dependencies = {
+      ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
       ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
       quickcheck = rustPackages."registry+https://github.com/rust-lang/crates.io-index".quickcheck."1.0.3" { inherit profileName; };
     };

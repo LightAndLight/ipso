@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{ModuleId, Modules};
+use syntax::{desugar, ModuleId, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -25,6 +25,7 @@ pub enum ModuleError {
     },
     IO(io::Error),
     Parse(parse::ParseError),
+    Desugar(desugar::Error),
     Check(typecheck::TypeError),
 }
 
@@ -57,6 +58,7 @@ impl ModuleError {
             ),
             ModuleError::IO(err) => panic!("ioerror: {}", err),
             ModuleError::Parse(err) => err.report(diagnostic),
+            ModuleError::Desugar(err) => err.report(diagnostic),
             ModuleError::Check(err) => err.report(diagnostic),
         }
     }
@@ -71,6 +73,12 @@ impl From<io::Error> for ModuleError {
 impl From<parse::ParseError> for ModuleError {
     fn from(err: parse::ParseError) -> Self {
         ModuleError::Parse(err)
+    }
+}
+
+impl From<desugar::Error> for ModuleError {
+    fn from(err: desugar::Error) -> Self {
+        ModuleError::Desugar(err)
     }
 }
 
@@ -522,6 +530,8 @@ pub fn import(
                     path,
                     &mut module,
                 )?;
+
+                let module = desugar::desugar_module(&input_location, module)?;
 
                 let module = {
                     let mut tc = {

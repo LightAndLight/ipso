@@ -876,19 +876,10 @@ pub fn unify(
     }
 }
 
-/// An invalid ending for a computation expression.
-#[derive(PartialEq, Eq, Debug)]
-pub enum CompExprEnd {
-    None,
-    Let,
-    Bind,
-}
-
 /// Type inference error information.
 #[derive(PartialEq, Eq, Debug)]
 pub enum InferenceErrorInfo {
     UnificationError { error: UnificationError },
-    CompExprEndsWith { end: CompExprEnd },
     NotInScope { name: String },
     DuplicateArgument { name: Rc<str> },
     RedundantPattern,
@@ -917,15 +908,6 @@ impl InferenceError {
             info: InferenceErrorInfo::NotInScope {
                 name: String::from(name),
             },
-        }
-    }
-
-    /// Construct an [`InferenceErrorInfo::CompExprEndsWith`].
-    pub fn comp_expr_ends_with(source: &Source, end: CompExprEnd) -> Self {
-        InferenceError {
-            source: source.clone(),
-            position: None,
-            info: InferenceErrorInfo::CompExprEndsWith { end },
         }
     }
 
@@ -1846,114 +1828,8 @@ impl<'a> InferenceContext<'a> {
             }
             syntax::Expr::Case(expr, branches) => self.check_case(expr, branches),
 
-            syntax::Expr::Comp(comp_lines) => {
-                enum CheckedCompLine {
-                    Bind { vars_bound: usize, value: Expr },
-                    Let { vars_bound: usize, value: Expr },
-                    Expr(Expr),
-                }
-
-                let mut ret_ty = Err(CompExprEnd::None);
-                let mut checked_lines: Vec<CheckedCompLine> = comp_lines
-                    .iter()
-                    .map(|line| match &line.item {
-                        syntax::CompLine::Expr(value) => {
-                            let ret_ty_var = self.fresh_type_meta(&Kind::Type);
-                            let value = self.check(
-                                value,
-                                &Type::app(Type::mk_io(self.common_kinds), ret_ty_var.clone()),
-                            )?;
-
-                            ret_ty = Ok(ret_ty_var);
-                            Ok(CheckedCompLine::Expr(value))
-                        }
-                        syntax::CompLine::Bind(name, value) => {
-                            let name_ty = self.fresh_type_meta(&Kind::Type);
-                            let value = self.check(
-                                value,
-                                &Type::app(Type::mk_io(self.common_kinds), name_ty.clone()),
-                            )?;
-
-                            // [note: checking `bind`s]
-                            //
-                            // Register the variables bound by this line so the variables
-                            // can be references by subsequent lines.
-                            self.variables.insert(&[(name.item.clone(), name_ty)]);
-
-                            ret_ty = Err(CompExprEnd::Bind);
-                            Ok(CheckedCompLine::Bind {
-                                vars_bound: 1,
-                                value,
-                            })
-                        }
-                        syntax::CompLine::Let(name, value) => {
-                            let (value, value_ty) = self.infer(value)?;
-
-                            self.variables.insert(&[(name.item.clone(), value_ty)]);
-
-                            ret_ty = Err(CompExprEnd::Let);
-                            Ok(CheckedCompLine::Let {
-                                vars_bound: 1,
-                                value,
-                            })
-                        }
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                match ret_ty {
-                    Err(end) => {
-                        debug_assert!(match checked_lines.last() {
-                            Some(_) => matches!(end, CompExprEnd::Bind | CompExprEnd::Let),
-                            None => matches!(end, CompExprEnd::None),
-                        });
-
-                        Err(InferenceError::comp_expr_ends_with(self.source, end)
-                            .with_position(expr.pos))
-                    }
-                    Ok(ret_ty) => {
-                        debug_assert!(matches!(
-                            checked_lines.last(),
-                            Some(CheckedCompLine::Expr { .. })
-                        ));
-
-                        let desugared: Expr = match checked_lines.pop().unwrap() {
-                            CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. } => {
-                                unreachable!()
-                            }
-                            CheckedCompLine::Expr(value) => value,
-                        };
-                        let desugared = checked_lines.into_iter().rev().fold(
-                            desugared,
-                            |desugared, checked_line| match checked_line {
-                                CheckedCompLine::Expr(value) => {
-                                    // Desugar[comp { value; rest }] -> bindIO value (\_ -> Desugar[rest])
-                                    Expr::mk_app(
-                                        Expr::mk_app(Expr::Name(String::from("bindIO")), value),
-                                        Expr::mk_lam(false, desugared),
-                                    )
-                                }
-                                CheckedCompLine::Bind { vars_bound, value } => {
-                                    // Delete the variables that were bound in [note: checking `bind`s]
-                                    self.variables.delete(vars_bound);
-
-                                    // Desugar[comp { bind name <- value; rest }] -> bindIO value (\name -> Desugar[rest])
-                                    Expr::mk_app(
-                                        Expr::mk_app(Expr::Name(String::from("bindIO")), value),
-                                        Expr::mk_lam(true, desugared),
-                                    )
-                                }
-                                CheckedCompLine::Let { vars_bound, value } => {
-                                    self.variables.delete(vars_bound);
-
-                                    // Desugar[comp { let name = value; rest }] -> let x = value in Desugar[rest]
-                                    Expr::mk_let(value, desugared)
-                                }
-                            },
-                        );
-
-                        Ok((desugared, Type::app(Type::mk_io(self.common_kinds), ret_ty)))
-                    }
-                }
+            syntax::Expr::Comp(_) => {
+                panic!("computation expression was not desugared")
             }
         }
     }

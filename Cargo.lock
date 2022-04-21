@@ -226,6 +226,7 @@ version = "0.1.0"
 name = "ipso-syntax"
 version = "0.1.0"
 dependencies = [
+ "ipso-diagnostic",
  "ipso-util",
  "quickcheck",
  "quickcheck_macros",
