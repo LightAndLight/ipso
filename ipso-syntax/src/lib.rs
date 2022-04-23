@@ -539,9 +539,21 @@ pub struct Module {
     pub decls: Vec<Spanned<Declaration>>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ModuleKey {
+    Path(PathBuf),
+    Name(String),
+}
+
+impl From<&Path> for ModuleKey {
+    fn from(path: &Path) -> Self {
+        Self::Path(PathBuf::from(path))
+    }
+}
+
 pub struct Modules<M> {
     data: Vec<M>,
-    path_to_index: HashMap<PathBuf, usize>,
+    key_to_index: HashMap<ModuleKey, usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -557,20 +569,20 @@ impl<M> Modules<M> {
     pub fn new() -> Self {
         Modules {
             data: vec![],
-            path_to_index: HashMap::new(),
+            key_to_index: HashMap::new(),
         }
     }
 
-    pub fn iter_paths(&self) -> impl Iterator<Item = (&Path, &M)> {
+    pub fn iter_keys(&self) -> impl Iterator<Item = (&ModuleKey, &M)> {
         let data = &self.data;
-        self.path_to_index
+        self.key_to_index
             .iter()
-            .map(move |(path, index)| (path.as_path(), &data[*index]))
+            .map(move |(key, index)| (key, &data[*index]))
     }
 
     pub fn iter_ids(&self) -> impl Iterator<Item = (ModuleId, &M)> {
         let data = &self.data;
-        self.path_to_index
+        self.key_to_index
             .iter()
             .map(move |(_, index)| (ModuleId(*index), &data[*index]))
     }
@@ -579,14 +591,14 @@ impl<M> Modules<M> {
         &self.data[id.0]
     }
 
-    pub fn lookup_id(&self, path: &Path) -> Option<ModuleId> {
-        self.path_to_index.get(path).map(|index| ModuleId(*index))
+    pub fn lookup_id(&self, key: &ModuleKey) -> Option<ModuleId> {
+        self.key_to_index.get(key).map(|index| ModuleId(*index))
     }
 
-    pub fn insert(&mut self, path: PathBuf, module: M) -> ModuleId {
+    pub fn insert(&mut self, key: ModuleKey, module: M) -> ModuleId {
         let index = self.data.len();
         self.data.push(module);
-        self.path_to_index.insert(path, index);
+        self.key_to_index.insert(key, index);
         ModuleId(index)
     }
 }

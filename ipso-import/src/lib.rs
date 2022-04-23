@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{desugar, ModuleId, Modules};
+use syntax::{desugar, ModuleId, ModuleKey, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -512,7 +512,7 @@ pub fn import(
     common_kinds: &CommonKinds,
     builtins: &Module,
 ) -> Result<ModuleId, ModuleError> {
-    match modules.lookup_id(path) {
+    match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
             if path.exists() {
                 let input_location = Source::File {
@@ -541,7 +541,7 @@ pub fn import(
                     };
                     tc.check_module(&module)
                 }?;
-                let module_id: ModuleId = modules.insert(path.to_path_buf(), module);
+                let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
                 Ok(module_id)
             } else {
                 Err(ModuleError::NotFound {
