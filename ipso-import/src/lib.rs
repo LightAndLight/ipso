@@ -1,5 +1,5 @@
 use diagnostic::{Location, Message};
-use ipso_core::{self as core, CommonKinds, Module};
+use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax};
@@ -333,13 +333,94 @@ fn rewrite_module_accessors_expr(
 
 fn resolve_imports(
     common_kinds: &CommonKinds,
-    builtins: &Module,
     modules: &mut Modules<core::Module>,
+    builtins_module_id: ModuleId,
     working_dir: &Path,
     path: &Path,
     module: &mut syntax::Module,
 ) -> Result<(), ModuleError> {
+    fn resolve_from_import_all(
+        common_kinds: &CommonKinds,
+        modules: &mut Modules<core::Module>,
+        imported_items: &mut HashMap<String, ImportedItemInfo>,
+        imported_module_id: ModuleId,
+    ) {
+        let imported_module = modules.lookup(imported_module_id);
+
+        imported_items.extend(
+            imported_module
+                .get_bindings(common_kinds)
+                .into_keys()
+                .map(|name| {
+                    (
+                        name,
+                        ImportedItemInfo::DefinitionImportedFrom {
+                            id: imported_module_id,
+                            path: vec![],
+                        },
+                    )
+                }),
+        );
+    }
+
+    fn resolve_from_import(
+        common_kinds: &CommonKinds,
+        modules: &mut Modules<core::Module>,
+        source: Source,
+        imported_items: &mut HashMap<String, ImportedItemInfo>,
+        imported_module_id: ModuleId,
+        names: &syntax::Names,
+    ) -> Result<(), ModuleError> {
+        let imported_module = modules.lookup(imported_module_id);
+
+        match names {
+            syntax::Names::All => {
+                resolve_from_import_all(common_kinds, modules, imported_items, imported_module_id);
+
+                Ok(())
+            }
+            syntax::Names::Names(names) => {
+                imported_items.extend(names.iter().map(|name| {
+                    (
+                        name.item.clone(),
+                        ImportedItemInfo::DefinitionImportedFrom {
+                            id: imported_module_id,
+                            path: vec![],
+                        },
+                    )
+                }));
+
+                let available_names: HashSet<String> = imported_module
+                    .get_bindings(common_kinds)
+                    .into_keys()
+                    .collect();
+
+                names
+                    .iter()
+                    .try_for_each(|name| {
+                        if available_names.contains(&name.item) {
+                            Ok(())
+                        } else {
+                            Err(name)
+                        }
+                    })
+                    .map_err(|name| ModuleError::DoesNotDefine {
+                        source,
+                        pos: name.pos,
+                    })
+            }
+        }
+    }
+
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
+
+    // Resolve the builtins imports, as if the first declaration was `from builtins import *`.
+    resolve_from_import_all(
+        common_kinds,
+        modules,
+        &mut imported_items,
+        builtins_module_id,
+    );
 
     module
         .decls
@@ -353,13 +434,13 @@ fn resolve_imports(
                 } => {
                     let id = import(
                         modules,
+                        builtins_module_id,
                         &Source::File {
                             path: PathBuf::from(path),
                         },
                         module.pos,
                         &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
-                        builtins,
                     )?;
 
                     imported_items.insert(
@@ -382,62 +463,21 @@ fn resolve_imports(
 
                     let imported_module_id = import(
                         modules,
+                        builtins_module_id,
                         &source,
                         module.pos,
                         &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
-                        builtins,
                     )?;
-                    let imported_module = modules.lookup(imported_module_id);
 
-                    match names {
-                        syntax::Names::All => {
-                            imported_items.extend(
-                                imported_module.get_bindings(common_kinds).into_keys().map(
-                                    |name| {
-                                        (
-                                            name,
-                                            ImportedItemInfo::DefinitionImportedFrom {
-                                                id: imported_module_id,
-                                                path: vec![],
-                                            },
-                                        )
-                                    },
-                                ),
-                            );
-                            Ok(())
-                        }
-                        syntax::Names::Names(names) => {
-                            imported_items.extend(names.iter().map(|name| {
-                                (
-                                    name.item.clone(),
-                                    ImportedItemInfo::DefinitionImportedFrom {
-                                        id: imported_module_id,
-                                        path: vec![],
-                                    },
-                                )
-                            }));
-
-                            let available_names: HashSet<String> = imported_module
-                                .get_bindings(common_kinds)
-                                .into_keys()
-                                .collect();
-
-                            names
-                                .iter()
-                                .try_for_each(|name| {
-                                    if available_names.contains(&name.item) {
-                                        Ok(())
-                                    } else {
-                                        Err(name)
-                                    }
-                                })
-                                .map_err(|name| ModuleError::DoesNotDefine {
-                                    source,
-                                    pos: name.pos,
-                                })
-                        }
-                    }?;
+                    resolve_from_import(
+                        common_kinds,
+                        modules,
+                        source,
+                        &mut imported_items,
+                        imported_module_id,
+                        names,
+                    )?;
 
                     *resolved = Some(imported_module_id);
 
@@ -494,7 +534,28 @@ fn resolve_imports(
 
                 syntax::Declaration::Class { .. } | syntax::Declaration::TypeAlias { .. } => Ok(()),
             }
-        })
+        })?;
+
+    /*
+    We insert the resolved `from builtins import *` because the type checker uses the imports in `decls`
+    to decide which names will be in scope with which types.
+    */
+    module.decls.insert(
+        0,
+        syntax::Spanned {
+            pos: 0,
+            item: syntax::Declaration::FromImport {
+                resolved: Some(builtins_module_id),
+                module: syntax::Spanned {
+                    pos: 0,
+                    item: String::from("builtins"),
+                },
+                names: syntax::Names::All,
+            },
+        },
+    );
+
+    Ok(())
 }
 
 /// Import a module.
@@ -506,11 +567,11 @@ fn resolve_imports(
 /// * `path` - file path to import
 pub fn import(
     modules: &mut Modules<core::Module>,
+    builtins_module_id: ModuleId,
     source: &Source,
     pos: usize,
     path: &Path,
     common_kinds: &CommonKinds,
-    builtins: &Module,
 ) -> Result<ModuleId, ModuleError> {
     match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
@@ -526,22 +587,17 @@ pub fn import(
 
                 resolve_imports(
                     common_kinds,
-                    builtins,
                     modules,
+                    builtins_module_id,
                     working_dir,
                     path,
                     &mut module,
                 )?;
 
-                let module = {
-                    let mut tc = {
-                        let mut tc = Typechecker::new(input_location, common_kinds, modules);
-                        tc.register_from_import(builtins, &syntax::Names::All);
-                        tc
-                    };
-                    tc.check_module(&module)
-                }?;
+                let module = Typechecker::new(input_location, common_kinds, modules)
+                    .check_module(&module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
+
                 Ok(module_id)
             } else {
                 Err(ModuleError::NotFound {

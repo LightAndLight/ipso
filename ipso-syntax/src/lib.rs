@@ -551,6 +551,12 @@ impl From<&Path> for ModuleKey {
     }
 }
 
+impl From<&str> for ModuleKey {
+    fn from(name: &str) -> Self {
+        Self::Name(String::from(name))
+    }
+}
+
 pub struct Modules<M> {
     data: Vec<M>,
     key_to_index: HashMap<ModuleKey, usize>,

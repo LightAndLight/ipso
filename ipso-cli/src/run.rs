@@ -11,7 +11,7 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
-use syntax::Modules;
+use syntax::{ModuleKey, Modules};
 use typed_arena::Arena;
 
 pub struct Config {
@@ -75,14 +75,17 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
     let common_kinds = CommonKinds::default();
-    let builtins = builtins::builtins(&common_kinds);
+    let builtins_module_id = {
+        let builtins = builtins::builtins(&common_kinds);
+        modules.insert(ModuleKey::from("builtins"), builtins)
+    };
     let module_id = import::import(
         &mut modules,
+        builtins_module_id,
         &source,
         0,
         &target_path,
         &common_kinds,
-        &builtins,
     )?;
     let module = modules.lookup(module_id);
 
@@ -92,11 +95,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc = {
-            let mut tc = Typechecker::new(source, &common_kinds, &modules);
-            tc.register_from_import(&builtins, &syntax::Names::All);
-            tc
-        };
+        let mut tc = Typechecker::new(source, &common_kinds, &modules);
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
             tc.fresh_type_meta(&Kind::Type),
@@ -114,16 +113,10 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let mut stdin = config
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
-        let context = builtins
+        let context = module
             .decls
             .iter()
             .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
-            .chain(
-                module
-                    .decls
-                    .iter()
-                    .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter()),
-            )
             .collect();
         let mut interpreter = Interpreter::new(
             &mut stdin,

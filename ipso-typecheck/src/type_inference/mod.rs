@@ -1406,7 +1406,10 @@ impl<'a> InferenceContext<'a> {
                     A module accessor will only be desugared if the module was in scope, so this case
                     is impossible as long as `ctx.modules` is valid w.r.t this expression.
                     */
-                    panic!("module not in scope: {:?}", path)
+                    panic!(
+                        "module not in scope. id: {:?}, path: {:?}, item: {:?}",
+                        id, path, item
+                    )
                 }
                 Some(definitions) => match definitions.get(item) {
                     None => {
