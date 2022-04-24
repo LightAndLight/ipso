@@ -318,6 +318,7 @@ in
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       ipso_typecheck = rustPackages."unknown".ipso-typecheck."0.1.0" { inherit profileName; };
+      ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
     };
   });
   
