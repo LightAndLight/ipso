@@ -1207,10 +1207,31 @@ impl<'modules> Typechecker<'modules> {
 
             syntax::Declaration::Import { resolved, .. }
             | syntax::Declaration::FromImport { resolved, .. } => {
-                let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
+                let id = resolved.unwrap_or_else(|| panic!("unresolved import"));
 
-                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
-                self.module_context.insert(id, signatures);
+                let module = self.modules.lookup(id);
+                {
+                    let signatures = module.get_signatures(self.common_kinds);
+                    self.module_context.insert(id, signatures);
+                }
+                module.decls.iter().for_each(|decl| {
+                    if let core::Declaration::Instance {
+                        ty_vars,
+                        superclass_constructors,
+                        assumes,
+                        head,
+                        members,
+                    } = decl
+                    {
+                        self.register_instance(
+                            ty_vars,
+                            superclass_constructors,
+                            assumes,
+                            head,
+                            members,
+                        )
+                    }
+                });
 
                 Ok(None)
             }
