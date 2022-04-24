@@ -7,7 +7,6 @@ pub mod type_inference;
 
 use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
-use ipso_builtins as builtins;
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
@@ -394,12 +393,17 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 #[macro_export]
 macro_rules! with_tc {
     ($location:expr, $f:expr) => {{
+        use ipso_builtins as builtins;
         use ipso_core::CommonKinds;
-        use ipso_syntax::Modules;
+        use ipso_syntax::{self as syntax, Modules};
 
         let common_kinds = CommonKinds::default();
         let modules = Modules::new();
-        let tc = Typechecker::new_with_builtins($location, &common_kinds, &modules);
+        let tc = {
+            let mut tc = Typechecker::new($location, &common_kinds, &modules);
+            tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
+            tc
+        };
         $f(tc)
     }};
 }
@@ -458,16 +462,6 @@ impl<'modules> Typechecker<'modules> {
             modules,
             module_context: HashMap::new(),
         }
-    }
-
-    pub fn new_with_builtins(
-        location: Source,
-        common_kinds: &'modules CommonKinds,
-        modules: &'modules Modules<core::Module>,
-    ) -> Self {
-        let mut tc = Self::new(location, common_kinds, modules);
-        tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
-        tc
     }
 
     fn eq_zonked_type(&self, t1: &core::Type, t2: &core::Type) -> bool {
