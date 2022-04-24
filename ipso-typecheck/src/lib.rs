@@ -1006,6 +1006,11 @@ impl<'modules> Typechecker<'modules> {
             Spanned<syntax::Expr>,
         )],
     ) -> Result<core::Declaration, TypeError> {
+        struct InstanceMember {
+            name: String,
+            body: core::Expr,
+        }
+
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass {
@@ -1130,7 +1135,7 @@ impl<'modules> Typechecker<'modules> {
                         Err(err) => return Err(err),
                         Ok((member_body, _)) => {
                             self.bound_tyvars.delete(member_type.sig.ty_vars.len());
-                            new_members.push(core::InstanceMember {
+                            new_members.push(InstanceMember {
                                 name: member_name.item.clone(),
                                 body: member_body,
                             });

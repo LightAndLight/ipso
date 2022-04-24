@@ -1586,12 +1586,6 @@ pub struct ClassMember {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstanceMember {
-    pub name: String,
-    pub body: Expr,
-}
-
-#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     BuiltinType {
         name: String,
