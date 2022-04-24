@@ -700,38 +700,43 @@ impl<'modules> Typechecker<'modules> {
                 syntax::Names::Names(names) => names.iter().any(|name| name.item == expected_name),
             }
         };
+
         for decl in &module.decls {
             match decl {
-                core::Declaration::BuiltinType { name, kind: _ } => {
+                core::Declaration::BuiltinType { name, kind } => {
                     if should_import(name) {
-                        self.register_declaration(decl);
+                        self.register_builtin_type(name, kind);
                     }
                 }
-                core::Declaration::Definition {
-                    name,
-                    sig: _,
-                    body: _,
+                core::Declaration::Definition { name, sig, .. } => {
+                    if should_import(name) {
+                        self.register_definition(name, sig);
+                    }
+                }
+                core::Declaration::TypeAlias { name, args, body } => {
+                    if should_import(name) {
+                        self.register_type_alias(name, args, body);
+                    }
+                }
+                core::Declaration::Class(class_decl) => {
+                    if should_import(class_decl.name.as_ref()) {
+                        self.register_class(class_decl);
+                    }
+                }
+                core::Declaration::Instance {
+                    ty_vars,
+                    superclass_constructors,
+                    assumes,
+                    head,
+                    members,
                 } => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::TypeAlias {
-                    name,
-                    args: _,
-                    body: _,
-                } => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::Class(core::ClassDeclaration { name, .. }) => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::Instance { .. } => {
-                    self.register_declaration(decl);
+                    self.register_instance(
+                        ty_vars,
+                        superclass_constructors,
+                        assumes,
+                        head,
+                        members,
+                    );
                 }
             }
         }
