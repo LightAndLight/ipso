@@ -1,6 +1,8 @@
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 
-use crate::{Branch, CmdPart, CompLine, Declaration, Expr, Module, Pattern, Spanned, StringPart};
+use crate::{
+    Binop, Branch, CmdPart, CompLine, Declaration, Expr, Module, Pattern, Spanned, StringPart,
+};
 use std::rc::Rc;
 
 /// An invalid ending for a computation expression.
@@ -133,9 +135,62 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
             desugar_expr_mut(source, &mut Rc::make_mut(a))?;
             desugar_expr_mut(source, &mut Rc::make_mut(b))
         }
-        Expr::Binop(_, left, right) => {
+        Expr::Binop(op, left, right) => {
+            fn mk_desugared_binop(
+                pos: usize,
+                op: &str,
+                left: Rc<Spanned<Expr>>,
+                right: Rc<Spanned<Expr>>,
+            ) -> Expr {
+                Expr::App(
+                    Rc::new(Spanned {
+                        pos,
+                        item: Expr::App(
+                            Rc::new(Spanned {
+                                pos,
+                                item: Expr::mk_var(op),
+                            }),
+                            left,
+                        ),
+                    }),
+                    right,
+                )
+            }
+
             desugar_expr_mut(source, &mut Rc::make_mut(left))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(right))
+            desugar_expr_mut(source, &mut Rc::make_mut(right))?;
+
+            match &op.item {
+                Binop::Add
+                | Binop::Multiply
+                | Binop::Subtract
+                | Binop::Divide
+                | Binop::Append
+                | Binop::Or
+                | Binop::And
+                | Binop::LApply
+                | Binop::RApply => {}
+                Binop::Eq => {
+                    expr.item = mk_desugared_binop(expr.pos, "eq", left.clone(), right.clone());
+                }
+                Binop::Neq => {
+                    expr.item = mk_desugared_binop(expr.pos, "neq", left.clone(), right.clone());
+                }
+                Binop::Gt => {
+                    expr.item = mk_desugared_binop(expr.pos, "gt", left.clone(), right.clone());
+                }
+                Binop::Gte => {
+                    expr.item = mk_desugared_binop(expr.pos, "gte", left.clone(), right.clone());
+                }
+                Binop::Lt => {
+                    expr.item = mk_desugared_binop(expr.pos, "lt", left.clone(), right.clone());
+                }
+                Binop::Lte => {
+                    expr.item = mk_desugared_binop(expr.pos, "lte", left.clone(), right.clone());
+                }
+            }
+
+            Ok(())
         }
         Expr::String(parts) => parts
             .iter_mut()
