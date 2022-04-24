@@ -616,32 +616,41 @@ impl<'modules> Typechecker<'modules> {
         head: &core::Type,
         members: &[core::InstanceMember],
     ) {
-        let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
-        dictionary.extend(members.iter().map(|member| member.body.clone()));
+        fn build_evidence(
+            superclass_constructors: &[core::Expr],
+            assumes: &[core::Type],
+            members: &[core::InstanceMember],
+        ) -> core::Expr {
+            let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
+            dictionary.extend(members.iter().map(|member| member.body.clone()));
 
-        for (ix, _assume) in assumes.iter().enumerate().rev() {
-            for item in &mut dictionary {
-                *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
+            for (ix, _assume) in assumes.iter().enumerate().rev() {
+                for item in &mut dictionary {
+                    *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
+                }
             }
-        }
 
-        let mut evidence = core::Expr::mk_record(
-            dictionary
-                .into_iter()
-                .enumerate()
-                .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
-                .collect(),
-            None,
-        );
-        for _assume in assumes.iter() {
-            evidence = core::Expr::mk_lam(true, evidence);
+            let mut evidence = core::Expr::mk_record(
+                dictionary
+                    .into_iter()
+                    .enumerate()
+                    .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
+                    .collect(),
+                None,
+            );
+
+            for _assume in assumes.iter() {
+                evidence = core::Expr::mk_lam(true, evidence);
+            }
+
+            evidence
         }
 
         self.implications.push(Implication {
             ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
             antecedents: Vec::from(assumes),
             consequent: head.clone(),
-            evidence,
+            evidence: build_evidence(superclass_constructors, assumes, members),
         });
     }
 
