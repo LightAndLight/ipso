@@ -1015,11 +1015,11 @@ impl<'modules> Typechecker<'modules> {
             Some(class_decl) => Ok(class_decl.clone()),
         }?;
 
-        let name_item: Rc<str> = Rc::from(name.item.as_ref());
-
-        let head = args.iter().fold(syntax::Type::Name(name_item), |acc, el| {
-            syntax::Type::mk_app(acc, el.item.clone())
-        });
+        let head = args
+            .iter()
+            .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
+                syntax::Type::mk_app(acc, el.item.clone())
+            });
 
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
             let mut seen_names: HashSet<&str> = HashSet::new();
