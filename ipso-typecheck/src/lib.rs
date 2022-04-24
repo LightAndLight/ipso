@@ -1006,11 +1006,6 @@ impl<'modules> Typechecker<'modules> {
             Spanned<syntax::Expr>,
         )],
     ) -> Result<core::Declaration, TypeError> {
-        struct InstanceMember {
-            name: String,
-            body: core::Expr,
-        }
-
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass {
@@ -1102,7 +1097,7 @@ impl<'modules> Typechecker<'modules> {
         let head = with_position!(self, name.pos, self.check_kind(&head, &Kind::Constraint))?;
 
         // type check members
-        let mut new_members = Vec::with_capacity(members.len());
+        let mut checked_members = Vec::with_capacity(members.len());
         for (member_name, member_args, member_body) in members {
             match instantiated_class_members
                 .iter()
@@ -1135,10 +1130,7 @@ impl<'modules> Typechecker<'modules> {
                         Err(err) => return Err(err),
                         Ok((member_body, _)) => {
                             self.bound_tyvars.delete(member_type.sig.ty_vars.len());
-                            new_members.push(InstanceMember {
-                                name: member_name.item.clone(),
-                                body: member_body,
-                            });
+                            checked_members.push(member_body);
                         }
                     };
                 }
@@ -1155,7 +1147,7 @@ impl<'modules> Typechecker<'modules> {
 
         let evidence = {
             let mut dictionary: Vec<core::Expr> = superclass_constructors;
-            dictionary.extend(new_members.iter().map(|member| member.body.clone()));
+            dictionary.extend(checked_members.into_iter());
 
             for (ix, _assume) in assumes.iter().enumerate().rev() {
                 for item in &mut dictionary {
