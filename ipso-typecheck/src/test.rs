@@ -4,7 +4,7 @@ use crate::{
     BoundVars, Typechecker,
 };
 #[cfg(test)]
-use ipso_core::{self as core, ClassMember, InstanceMember, Placeholder, TypeSig};
+use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
 #[cfg(test)]
 use ipso_syntax::{kind::Kind, r#type::Type, Spanned};
 #[cfg(test)]
@@ -231,7 +231,7 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::Int(2),
+                Rc::new(core::Expr::Int(2)),
                 Constraint::HasField {
                     field: Rc::from("z"),
                     rest: core::Type::mk_rows(
@@ -249,7 +249,7 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::Int(1),
+                Rc::new(core::Expr::Int(1)),
                 Constraint::HasField {
                     field: Rc::from("y"),
                     rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
@@ -261,7 +261,7 @@ fn infer_record_1() {
 
         assert_eq!(
             Ok((
-                core::Expr::Int(0),
+                Rc::new(core::Expr::Int(0)),
                 Constraint::HasField {
                     field: Rc::from("x"),
                     rest: core::Type::RowNil
@@ -764,10 +764,15 @@ fn check_instance_1() {
                 superclass_constructors: Vec::new(),
                 assumes: Vec::new(),
                 head: core::Type::app(eq_ty, core::Type::Unit),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
-                }],
+                evidence: Rc::new(core::Expr::mk_record(
+                    vec![(
+                        // eq
+                        core::Expr::Int(0),
+                        // \a b -> True
+                        core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
+                    )],
+                    None,
+                )),
             }))
         };
         {

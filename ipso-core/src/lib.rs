@@ -869,6 +869,21 @@ impl Expr {
         }
     }
 
+    pub fn app(a: Rc<Expr>, b: Rc<Expr>) -> Expr {
+        match a.as_ref() {
+            Expr::Lam { arg, body } => {
+                if *arg {
+                    // this potentially increases the number of redexes in the term.
+                    // todo: bind the arg with a let?
+                    body.instantiate(&b)
+                } else {
+                    body.as_ref().clone()
+                }
+            }
+            _ => Expr::App(a, b),
+        }
+    }
+
     pub fn mk_lam(arg: bool, body: Expr) -> Expr {
         Expr::Lam {
             arg,
@@ -932,6 +947,15 @@ impl Expr {
             }
         }
         Expr::Binop(op, Rc::new(a), Rc::new(b))
+    }
+
+    pub fn mk_binop_l(op: Binop, a: Expr, b: Rc<Expr>) -> Expr {
+        if op == Binop::Add {
+            if let (Expr::Int(a), Expr::Int(b)) = (&a, b.as_ref()) {
+                return Expr::Int(*a + *b);
+            }
+        }
+        Expr::Binop(op, Rc::new(a), b)
     }
 
     pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
@@ -1589,7 +1613,7 @@ pub enum Declaration {
         superclass_constructors: Vec<Expr>,
         assumes: Vec<Type>,
         head: Type,
-        members: Vec<InstanceMember>,
+        evidence: Rc<Expr>,
     },
 }
 
