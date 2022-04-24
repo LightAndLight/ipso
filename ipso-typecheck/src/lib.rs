@@ -1149,7 +1149,7 @@ impl<'modules> Typechecker<'modules> {
             .collect();
 
         let evidence = {
-            let mut dictionary: Vec<core::Expr> = superclass_constructors.clone();
+            let mut dictionary: Vec<core::Expr> = superclass_constructors;
             dictionary.extend(new_members.iter().map(|member| member.body.clone()));
 
             for (ix, _assume) in assumes.iter().enumerate().rev() {
