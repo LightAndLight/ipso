@@ -645,17 +645,26 @@ impl<'modules> Typechecker<'modules> {
         });
     }
 
+    pub fn register_builtin_type(&mut self, name: &str, kind: &Kind) {
+        self.type_context.insert(Rc::from(name), kind.clone());
+    }
+
+    pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
+        self.context.insert(String::from(name), sig.clone());
+    }
+
+    pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
+        todo!("register TypeAlias {:?}", (name, args, body))
+    }
+
     pub fn register_declaration(&mut self, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                self.type_context
-                    .insert(Rc::from(name.as_str()), kind.clone());
+                self.register_builtin_type(name, kind);
             }
-            core::Declaration::Definition { name, sig, .. } => {
-                self.context.insert(name.clone(), sig.clone());
-            }
+            core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
             core::Declaration::TypeAlias { name, args, body } => {
-                todo!("register TypeAlias {:?}", (name, args, body))
+                self.register_type_alias(name, args, body)
             }
             core::Declaration::Class(decl) => self.register_class(decl),
             core::Declaration::Instance {
