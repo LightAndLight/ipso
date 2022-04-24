@@ -761,7 +761,6 @@ fn check_instance_1() {
             );
             Ok(Some(core::Declaration::Instance {
                 ty_vars: Vec::new(),
-                superclass_constructors: Vec::new(),
                 assumes: Vec::new(),
                 head: core::Type::app(eq_ty, core::Type::Unit),
                 evidence: Rc::new(core::Expr::mk_record(

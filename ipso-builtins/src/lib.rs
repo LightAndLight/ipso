@@ -434,7 +434,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -454,7 +453,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -474,7 +472,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -494,7 +491,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -514,7 +510,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                superclass_constructors: vec![],
                 // Eq a
                 assumes: vec![Type::app(
                     Type::Name(
@@ -593,10 +588,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Bool
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -663,10 +654,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Char
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -696,10 +683,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq String
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqString))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -729,10 +712,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Int
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -762,28 +741,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                superclass_constructors: vec![
-                    /*
-                    dict : Ord a -> Eq (Array a)
-                    dict = \ordDict -> { 0 = eqArray (eq ordDict.0) }
-                    */
-                    Expr::mk_lam(
-                        true,
-                        Expr::mk_record(
-                            vec![(
-                                Expr::Int(0),
-                                Expr::mk_app(
-                                    Expr::Builtin(Builtin::EqArray),
-                                    Expr::mk_app(
-                                        Expr::Name(String::from("eq")),
-                                        Expr::mk_project(Expr::Var(0), Expr::Int(0)),
-                                    ),
-                                ),
-                            )],
-                            None,
-                        ),
-                    ),
-                ],
                 assumes: vec![Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
@@ -1212,7 +1169,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -1242,7 +1198,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 );
                 Declaration::Instance {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                    superclass_constructors: vec![],
                     assumes: vec![Type::app(to_args_ty.clone(), Type::Var(Kind::Type, 0))],
                     head: Type::app(to_args_ty, Type::app(array_ty, Type::Var(Kind::Type, 0))),
                     // \toArgsDict -> ...

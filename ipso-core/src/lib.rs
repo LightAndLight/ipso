@@ -1610,7 +1610,6 @@ pub enum Declaration {
     Class(ClassDeclaration),
     Instance {
         ty_vars: Vec<(Rc<str>, Kind)>,
-        superclass_constructors: Vec<Expr>,
         assumes: Vec<Type>,
         head: Type,
         evidence: Rc<Expr>,

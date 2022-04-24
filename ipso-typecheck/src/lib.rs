@@ -1176,7 +1176,6 @@ impl<'modules> Typechecker<'modules> {
 
         Ok(core::Declaration::Instance {
             ty_vars,
-            superclass_constructors,
             assumes: assumes
                 .into_iter()
                 .map(|assume| self.zonk_type(assume))
