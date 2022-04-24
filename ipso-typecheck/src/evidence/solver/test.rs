@@ -130,7 +130,6 @@ fn solve_constraint_4() {
         tc.register_instance(
             &Vec::new(),
             &Vec::new(),
-            &Vec::new(),
             &core::Type::app(eq_ty.clone(), core::Type::Int),
             Rc::new(Expr::mk_record(
                 vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))],
@@ -141,7 +140,6 @@ fn solve_constraint_4() {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
             &[(Rc::from("a"), a.kind())],
-            &Vec::new(),
             &[core::Type::app(eq_ty.clone(), a.clone())],
             &core::Type::app(
                 eq_ty.clone(),

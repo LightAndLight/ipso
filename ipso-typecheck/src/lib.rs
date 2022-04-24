@@ -611,7 +611,6 @@ impl<'modules> Typechecker<'modules> {
     pub fn register_instance(
         &mut self,
         ty_vars: &[(Rc<str>, Kind)],
-        superclass_constructors: &[core::Expr],
         assumes: &[core::Type],
         head: &core::Type,
         evidence: Rc<core::Expr>,
@@ -648,17 +647,11 @@ impl<'modules> Typechecker<'modules> {
             core::Declaration::Class(decl) => self.register_class(decl),
             core::Declaration::Instance {
                 ty_vars,
-                superclass_constructors,
                 assumes,
                 head,
                 evidence,
-            } => self.register_instance(
-                ty_vars,
-                superclass_constructors,
-                assumes,
-                head,
-                evidence.clone(),
-            ),
+                ..
+            } => self.register_instance(ty_vars, assumes, head, evidence.clone()),
         }
     }
 
@@ -710,18 +703,12 @@ impl<'modules> Typechecker<'modules> {
                 }
                 core::Declaration::Instance {
                     ty_vars,
-                    superclass_constructors,
                     assumes,
                     head,
                     evidence,
+                    ..
                 } => {
-                    self.register_instance(
-                        ty_vars,
-                        superclass_constructors,
-                        assumes,
-                        head,
-                        evidence.clone(),
-                    );
+                    self.register_instance(ty_vars, assumes, head, evidence.clone());
                 }
             }
         }
@@ -1161,13 +1148,9 @@ impl<'modules> Typechecker<'modules> {
             .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
             .collect();
 
-        fn build_evidence(
-            superclass_constructors: &[core::Expr],
-            assumes: &[core::Type],
-            members: &[core::InstanceMember],
-        ) -> core::Expr {
-            let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
-            dictionary.extend(members.iter().map(|member| member.body.clone()));
+        let evidence = {
+            let mut dictionary: Vec<core::Expr> = superclass_constructors.clone();
+            dictionary.extend(new_members.iter().map(|member| member.body.clone()));
 
             for (ix, _assume) in assumes.iter().enumerate().rev() {
                 for item in &mut dictionary {
@@ -1188,14 +1171,8 @@ impl<'modules> Typechecker<'modules> {
                 evidence = core::Expr::mk_lam(true, evidence);
             }
 
-            evidence
-        }
-
-        let evidence = Rc::new(build_evidence(
-            &superclass_constructors,
-            &assumes,
-            &new_members,
-        ));
+            Rc::new(evidence)
+        };
 
         Ok(core::Declaration::Instance {
             ty_vars,
@@ -1238,19 +1215,13 @@ impl<'modules> Typechecker<'modules> {
                 module.decls.iter().for_each(|decl| {
                     if let core::Declaration::Instance {
                         ty_vars,
-                        superclass_constructors,
                         assumes,
                         head,
                         evidence,
+                        ..
                     } = decl
                     {
-                        self.register_instance(
-                            ty_vars,
-                            superclass_constructors,
-                            assumes,
-                            head,
-                            evidence.clone(),
-                        )
+                        self.register_instance(ty_vars, assumes, head, evidence.clone())
                     }
                 });
 
