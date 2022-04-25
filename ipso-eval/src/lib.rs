@@ -556,6 +556,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
 }
 
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,

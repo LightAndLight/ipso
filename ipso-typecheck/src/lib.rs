@@ -1035,11 +1035,7 @@ impl<'modules> Typechecker<'modules> {
         assumes: &[Spanned<syntax::Type<Rc<str>>>],
         name: &Spanned<Rc<str>>,
         args: &[Spanned<syntax::Type<Rc<str>>>],
-        members: &[(
-            Spanned<String>,
-            Vec<Spanned<syntax::Pattern>>,
-            Spanned<syntax::Expr>,
-        )],
+        members: &[syntax::InstanceMember],
     ) -> Result<(core::Declaration, core::Declaration), TypeError> {
         let evidence_name: Rc<str> = {
             let mut buffer = String::new();
@@ -1161,15 +1157,15 @@ impl<'modules> Typechecker<'modules> {
 
         // type check members
         let mut checked_members = Vec::with_capacity(members.len());
-        for (member_name, member_args, member_body) in members {
+        for member in members {
             match instantiated_class_members
                 .iter()
-                .find(|class_member| class_member.name == member_name.item)
+                .find(|class_member| class_member.name == member.name.item)
             {
                 None => {
                     return Err(TypeError::NotAMember {
                         source: self.source(),
-                        pos: member_name.pos,
+                        pos: member.name.pos,
                         cls: name.item.clone(),
                     })
                 }
@@ -1179,10 +1175,10 @@ impl<'modules> Typechecker<'modules> {
                     match self
                         .check_type(
                             &Spanned {
-                                pos: member_name.pos,
+                                pos: member.name.pos,
                                 item: syntax::Expr::mk_lam(
-                                    member_args.clone(),
-                                    member_body.clone(),
+                                    member.args.clone(),
+                                    member.body.clone(),
                                 ),
                             },
                             &member_type.sig.body,

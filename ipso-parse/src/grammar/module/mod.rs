@@ -13,7 +13,7 @@ use crate::{
     indent, indent_scope, keep_left, keep_right, many, many_, map0, optional, sep_by, spanned,
     ParseResult, Parser,
 };
-use ipso_syntax::{Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, Type};
+use ipso_syntax::{Declaration, InstanceMember, Keyword, Module, Names, Spanned, Type};
 use std::rc::Rc;
 
 /**
@@ -242,9 +242,7 @@ instance_member ::=
   ident pattern* '=' expr
 ```
 */
-pub fn instance_member(
-    parser: &mut Parser,
-) -> ParseResult<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)> {
+pub fn instance_member(parser: &mut Parser) -> ParseResult<InstanceMember> {
     spanned!(parser, parser.ident_owned()).and_then(|name| {
         many!(indent!(
             parser,
@@ -254,7 +252,7 @@ pub fn instance_member(
         .and_then(|args| {
             keep_right!(
                 indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
-                expr(parser).map(|body| (name, args, body))
+                expr(parser).map(|body| InstanceMember { name, args, body })
             )
         })
     })

@@ -1074,6 +1074,7 @@ fn pattern_is_redundant(
 }
 
 impl<'a> InferenceContext<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,

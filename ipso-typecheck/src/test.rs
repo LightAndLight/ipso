@@ -3,7 +3,7 @@ use crate::{
     BoundVars, Declarations, Typechecker,
 };
 use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
-use ipso_syntax::{kind::Kind, r#type::Type, ModuleId, Spanned};
+use ipso_syntax::{kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
 use ipso_util::void::Void;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -828,12 +828,12 @@ fn check_instance_1() {
                     pos: 11,
                     item: Type::Unit,
                 }],
-                members: vec![(
-                    Spanned {
+                members: vec![InstanceMember {
+                    name: Spanned {
                         pos: 22,
                         item: String::from("eq"),
                     },
-                    vec![
+                    args: vec![
                         syntax::Spanned {
                             pos: 25,
                             item: syntax::Pattern::Name(Spanned {
@@ -849,11 +849,11 @@ fn check_instance_1() {
                             }),
                         },
                     ],
-                    Spanned {
+                    body: Spanned {
                         pos: 31,
                         item: syntax::Expr::True,
                     },
-                )],
+                }],
             },
         });
         assert_eq!(expected, actual)

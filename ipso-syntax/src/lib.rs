@@ -499,6 +499,13 @@ pub enum Names {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct InstanceMember {
+    pub name: Spanned<String>,
+    pub args: Vec<Spanned<Pattern>>,
+    pub body: Spanned<Expr>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     Definition {
         name: String,
@@ -516,7 +523,7 @@ pub enum Declaration {
         assumes: Vec<Spanned<Type<Rc<str>>>>,
         name: Spanned<Rc<str>>,
         args: Vec<Spanned<Type<Rc<str>>>>,
-        members: Vec<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)>,
+        members: Vec<InstanceMember>,
     },
     TypeAlias {
         name: String,

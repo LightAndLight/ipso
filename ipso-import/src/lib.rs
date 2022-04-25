@@ -500,10 +500,10 @@ fn resolve_imports(
                     Ok(())
                 }
                 syntax::Declaration::Instance { members, .. } => {
-                    for (name, args, body) in members {
+                    for member in members {
                         let to_exclude: Vec<Rc<str>> =
-                            std::iter::once(Rc::from(name.item.as_str()))
-                                .chain(args.iter().flat_map(|pattern| {
+                            std::iter::once(Rc::from(member.name.item.as_str()))
+                                .chain(member.args.iter().flat_map(|pattern| {
                                     pattern.item.iter_names().map(|name| name.item.clone())
                                 }))
                                 .collect();
@@ -512,7 +512,7 @@ fn resolve_imports(
                         rewrite_module_accessors_expr(
                             &mut exclude,
                             &imported_items,
-                            &mut body.item,
+                            &mut member.body.item,
                         );
                         exclude.remove_all(to_exclude.into_iter());
                     }

@@ -77,7 +77,7 @@ fn desugar_decl_mut(source: &Source, decl: &mut Declaration) -> Result<(), Error
         Declaration::Definition { body, .. } => desugar_expr_mut(source, body),
         Declaration::Instance { members, .. } => members
             .iter_mut()
-            .try_for_each(|(_, _, expr)| desugar_expr_mut(source, expr)),
+            .try_for_each(|member| desugar_expr_mut(source, &mut member.body)),
         Declaration::Class { .. }
         | Declaration::TypeAlias { .. }
         | Declaration::Import { .. }
