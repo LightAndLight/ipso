@@ -99,7 +99,17 @@ fn desugar_branch_mut(source: &Source, branch: &mut Branch) -> Result<(), Error>
 fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), Error> {
     match cmd_part {
         CmdPart::Literal(_) => Ok(()),
-        CmdPart::Expr(expr) => desugar_expr_mut(source, expr),
+        CmdPart::Expr(expr) => {
+            desugar_expr_mut(source, expr)?;
+            *expr = Expr::mk_app(
+                Spanned {
+                    pos: expr.pos,
+                    item: Expr::Var(String::from("toArgs")),
+                },
+                expr.clone(),
+            );
+            Ok(())
+        }
     }
 }
 
