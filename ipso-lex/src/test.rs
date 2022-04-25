@@ -1,11 +1,6 @@
-#[cfg(test)]
-use std::rc::Rc;
-
-#[cfg(test)]
 use super::Lexer;
-
-#[cfg(test)]
 use crate::token::{self, Token};
+use std::rc::Rc;
 
 #[test]
 fn lex_char_1() {

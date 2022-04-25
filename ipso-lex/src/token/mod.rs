@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod test;
 
 use ipso_syntax::Keyword;

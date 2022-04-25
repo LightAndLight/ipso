@@ -1,11 +1,7 @@
+use crate::{is_keyword, Keyword, Type, KEYWORDS};
+use quickcheck_macros::quickcheck;
 use std::rc::Rc;
 
-#[cfg(test)]
-use crate::{is_keyword, Keyword, Type, KEYWORDS};
-#[cfg(test)]
-use quickcheck_macros::quickcheck;
-
-#[cfg(test)]
 #[quickcheck]
 fn prop_all_keywords_in_list(keyword: Keyword) {
     let keyword_string = keyword.to_string();

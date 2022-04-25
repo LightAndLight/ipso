@@ -1,9 +1,6 @@
-#[cfg(test)]
 use crate::token::Name;
-#[cfg(test)]
 use quickcheck_macros::quickcheck;
 
-#[cfg(test)]
 #[quickcheck]
 fn prop_from_int_to_int(n: Name) -> bool {
     match n {
@@ -12,7 +9,6 @@ fn prop_from_int_to_int(n: Name) -> bool {
     }
 }
 
-#[cfg(test)]
 #[quickcheck]
 fn prop_to_int_from_int(n: usize) -> bool {
     match Name::from_int(n) {

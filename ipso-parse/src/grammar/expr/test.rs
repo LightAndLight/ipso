@@ -1,22 +1,14 @@
-#[cfg(test)]
 use super::{expr_app, expr_case, string};
-#[cfg(test)]
 use crate::ParseError;
-#[cfg(test)]
 use crate::{keep_left, map2, Parser};
-#[cfg(test)]
 use ipso_diagnostic::Source;
-#[cfg(test)]
 use ipso_lex::{
     token::{self, Relation},
     Lexer,
 };
-#[cfg(test)]
 use ipso_syntax::{Branch, Expr, Keyword, Pattern, Spanned, StringPart};
-#[cfg(test)]
 use std::rc::Rc;
 
-#[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {{
         assert_eq!($output, {

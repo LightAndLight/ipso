@@ -1,8 +1,5 @@
-#[cfg(test)]
 use crate::{operator::operator, ParseResult};
-use ipso_syntax::Spanned;
-#[cfg(test)]
-use ipso_syntax::{Binop, Expr};
+use ipso_syntax::{Binop, Expr, Spanned};
 
 #[test]
 fn all_left_associative() {

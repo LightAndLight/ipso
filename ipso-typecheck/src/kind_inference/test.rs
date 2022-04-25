@@ -1,12 +1,7 @@
-#[cfg(test)]
 use super::{infer, InferenceContext, InferenceError, InferenceErrorHint, Solutions};
-#[cfg(test)]
 use crate::BoundVars;
-#[cfg(test)]
 use ipso_core::{self as core, CommonKinds};
-#[cfg(test)]
 use ipso_syntax::{self as syntax, kind::Kind};
-#[cfg(test)]
 use std::collections::HashMap;
 use std::rc::Rc;
 

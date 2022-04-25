@@ -1,7 +1,8 @@
-pub mod desugar;
-pub mod kind;
 #[cfg(test)]
 mod test;
+
+pub mod desugar;
+pub mod kind;
 pub mod r#type;
 
 use quickcheck::Arbitrary;

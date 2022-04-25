@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use std::{
     collections::HashMap,
     fmt::Write as FmtWrite,
@@ -6,8 +9,6 @@ use std::{
     path::PathBuf,
     str::from_utf8,
 };
-
-mod test;
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub enum Source {

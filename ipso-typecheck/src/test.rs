@@ -1,17 +1,11 @@
-#[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
     BoundVars, Declarations, Typechecker,
 };
-#[cfg(test)]
 use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
-#[cfg(test)]
 use ipso_syntax::{kind::Kind, r#type::Type, ModuleId, Spanned};
-#[cfg(test)]
 use ipso_util::void::Void;
-#[cfg(test)]
 use std::collections::HashSet;
-#[cfg(test)]
 use std::rc::Rc;
 
 #[test]

@@ -1,14 +1,8 @@
-#[cfg(test)]
 use super::{Interpreter, Value};
-#[cfg(test)]
 use crate::{Env, Object};
-#[cfg(test)]
 use ipso_core::{Builtin, CommonKinds, Expr, StringPart};
-#[cfg(test)]
 use ipso_syntax::Modules;
-#[cfg(test)]
 use std::collections::HashMap;
-#[cfg(test)]
 use typed_arena::Arena;
 
 #[test]
