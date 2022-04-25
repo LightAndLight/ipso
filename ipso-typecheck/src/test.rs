@@ -1,8 +1,7 @@
-use crate::Declarations;
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    BoundVars, Typechecker,
+    BoundVars, Declarations, Typechecker,
 };
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
