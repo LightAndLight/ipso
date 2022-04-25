@@ -324,18 +324,15 @@ fn resolve_imports(
 ) -> Result<(), ModuleError> {
     fn resolve_from_import_all(
         common_kinds: &CommonKinds,
-        modules: &mut Modules<core::Module>,
         imported_items: &mut HashMap<String, ImportedItemInfo>,
         imported_module_id: ModuleId,
+        imported_module: &core::Module,
     ) {
-        let imported_module = modules.lookup(imported_module_id);
-
         imported_items.extend(
             imported_module
                 .get_bindings(common_kinds)
                 .into_keys()
                 .filter_map(|name| match name {
-                    core::Name::Evidence(_) => None,
                     core::Name::Definition(name) => Some((
                         name,
                         ImportedItemInfo::DefinitionImportedFrom {
@@ -343,6 +340,11 @@ fn resolve_imports(
                             path: vec![],
                         },
                     )),
+                    /*
+                    Only definitions are brought into scope. Evidence values
+                    are internal to their respective modules.
+                    */
+                    core::Name::Evidence(_) => None,
                 }),
         );
     }
@@ -359,7 +361,12 @@ fn resolve_imports(
 
         match names {
             syntax::Names::All => {
-                resolve_from_import_all(common_kinds, modules, imported_items, imported_module_id);
+                resolve_from_import_all(
+                    common_kinds,
+                    imported_items,
+                    imported_module_id,
+                    imported_module,
+                );
 
                 Ok(())
             }
@@ -406,9 +413,9 @@ fn resolve_imports(
     // Resolve the builtins imports, as if the first declaration was `from builtins import *`.
     resolve_from_import_all(
         common_kinds,
-        modules,
         &mut imported_items,
         builtins_module_id,
+        modules.lookup(builtins_module_id),
     );
 
     module
