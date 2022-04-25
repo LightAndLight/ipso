@@ -257,16 +257,14 @@ fn rewrite_module_accessors_expr(
                     };
                 }
 
-                syntax::Expr::Var(name) => {
-                    if !exclude.contains(name.as_str()) {
-                        if let Some(ImportedItemInfo::ModuleImportedAs { id }) =
-                            imported_items.get(name)
-                        {
-                            *expr = syntax::Expr::Module {
-                                id: *id,
-                                path: vec![],
-                                item: field.clone(),
-                            }
+                syntax::Expr::Var(name) if !exclude.contains(name.as_str()) => {
+                    if let Some(ImportedItemInfo::ModuleImportedAs { id }) =
+                        imported_items.get(name)
+                    {
+                        *expr = syntax::Expr::Module {
+                            id: *id,
+                            path: vec![],
+                            item: field.clone(),
                         }
                     }
                 }
