@@ -1,8 +1,7 @@
 //! Parsing patterns
 
+#[cfg(test)]
 mod test;
-
-use std::rc::Rc;
 
 use crate::{
     between, choices, indent, indent_scope, keep_right, map0, optional, spanned, ParseResult,
@@ -10,6 +9,7 @@ use crate::{
 };
 use ipso_lex::token;
 use ipso_syntax::{Pattern, Spanned};
+use std::rc::Rc;
 
 /**
 ```text

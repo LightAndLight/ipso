@@ -1,5 +1,6 @@
 //! Parsing modules
 
+#[cfg(test)]
 mod test;
 
 use crate::{

@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod test;
 
 #[derive(PartialEq, Eq, Debug, Clone)]

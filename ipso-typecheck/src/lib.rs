@@ -1,8 +1,9 @@
+#[cfg(test)]
+mod test;
+
 pub mod evidence;
 pub mod kind_inference;
 pub mod metavariables;
-#[cfg(test)]
-mod test;
 pub mod type_inference;
 
 use diagnostic::{Location, Message};

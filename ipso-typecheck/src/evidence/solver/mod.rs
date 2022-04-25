@@ -1,12 +1,11 @@
-use std::rc::Rc;
+#[cfg(test)]
+mod test;
 
+use super::Constraint;
 use crate::{metavariables, Implication, SolveConstraintContext, TypeError, Typechecker};
 use ipso_core::{self as core, Binop, Expr, Placeholder};
 use ipso_syntax::kind::Kind;
-
-use super::Constraint;
-
-mod test;
+use std::rc::Rc;
 
 pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<core::Expr>> {
     tc.evidence.environment.iter().find_map(

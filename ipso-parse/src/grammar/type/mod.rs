@@ -1,5 +1,6 @@
 //! Parsing types
 
+#[cfg(test)]
 mod test;
 
 use crate::{

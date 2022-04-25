@@ -1,13 +1,9 @@
-#[cfg(test)]
 use crate::{
     evidence::{solver::solve_constraint, Constraint, Evidence},
     Typechecker,
 };
-#[cfg(test)]
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
-#[cfg(test)]
 use ipso_syntax::kind::Kind;
-#[cfg(test)]
 use std::rc::Rc;
 
 #[test]
