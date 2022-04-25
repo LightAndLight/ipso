@@ -4,10 +4,7 @@ use crate::{
     Typechecker,
 };
 #[cfg(test)]
-use ipso_core::{
-    self as core, Binop, Builtin, ClassDeclaration, ClassMember, EVar, Expr, InstanceMember,
-    TypeSig,
-};
+use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 #[cfg(test)]
 use ipso_syntax::kind::Kind;
 #[cfg(test)]
@@ -26,8 +23,8 @@ fn solve_constraint_1() {
                 None,
             ),
         };
-        let expected = solve_constraint(0, &None, &mut tc, &constraint);
-        let actual = Ok(Expr::Int(0));
+        let expected = Ok(Rc::new(Expr::Int(0)));
+        let actual = solve_constraint(0, &None, &mut tc, &constraint);
         assert_eq!(expected, actual)
     })
 }
@@ -45,8 +42,12 @@ fn solve_constraint_2() {
                 None,
             ),
         };
-        let expected = solve_constraint(0, &None, &mut tc, &constraint);
-        let actual = Ok(Expr::mk_binop(Binop::Add, Expr::Int(1), Expr::Int(0)));
+        let expected = Ok(Rc::new(Expr::mk_binop(
+            Binop::Add,
+            Expr::Int(1),
+            Expr::Int(0),
+        )));
+        let actual = solve_constraint(0, &None, &mut tc, &constraint);
         assert_eq!(expected, actual)
     })
 }
@@ -74,7 +75,7 @@ fn solve_constraint_3() {
             ),
         };
 
-        let expected_result = Ok(Expr::Int(2));
+        let expected_result = Ok(Rc::new(Expr::Int(2)));
         let actual_result = solve_constraint(0, &None, &mut tc, &constraint);
         assert_eq!(expected_result, actual_result);
 
@@ -89,7 +90,7 @@ fn solve_constraint_3() {
                     field: Rc::from("z"),
                     rest: var,
                 },
-                expr: Some(Expr::EVar(EVar(0))),
+                expr: Some(Rc::new(Expr::EVar(EVar(0)))),
             }],
         };
         let actual_evidence = tc.evidence;
@@ -127,41 +128,50 @@ fn solve_constraint_4() {
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         tc.register_instance(
-            &Vec::new(),
+            None,
             &Vec::new(),
             &Vec::new(),
             &core::Type::app(eq_ty.clone(), core::Type::Int),
-            &[InstanceMember {
-                name: String::from("MyEq"),
-                body: Expr::Builtin(Builtin::EqInt),
-            }],
+            /*
+            Rc::new(Expr::mk_record(
+                vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))],
+                None,
+            )),
+             */
+            Rc::from("MyEq Int"),
         );
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
+            None,
             &[(Rc::from("a"), a.kind())],
-            &Vec::new(),
             &[core::Type::app(eq_ty.clone(), a.clone())],
             &core::Type::app(
                 eq_ty.clone(),
                 core::Type::app(core::Type::mk_array(tc.common_kinds), a),
             ),
-            &[InstanceMember {
-                name: String::from("MyEq"),
-                body: Expr::Builtin(Builtin::EqArray),
-            }],
+            /*
+            Rc::new(Expr::mk_lam(
+                true,
+                Expr::mk_record(
+                    vec![(
+                        Expr::Int(0),
+                        Expr::mk_app(
+                            Expr::Builtin(Builtin::EqArray),
+                            Expr::mk_app(Expr::Name(Name::definition("myeq")), Expr::Var(0)),
+                        ),
+                    )],
+                    None,
+                ),
+            )),
+             */
+            Rc::from("MyEq a => MyEq (Array a)"),
         );
 
-        let expected = Ok(Expr::mk_record(
-            vec![(
-                Expr::Int(0),
-                Expr::mk_app(
-                    Expr::Builtin(Builtin::EqArray),
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
-                ),
-            )],
-            None,
-        ));
+        let expected = Ok(Rc::new(Expr::mk_app(
+            Expr::Name(Name::evidence("MyEq a => MyEq (Array a)")),
+            Expr::Name(Name::evidence("MyEq Int")),
+        )));
         let constraint = &Constraint::from_type(&core::Type::app(
             eq_ty,
             core::Type::app(core::Type::mk_array(tc.common_kinds), core::Type::Int),

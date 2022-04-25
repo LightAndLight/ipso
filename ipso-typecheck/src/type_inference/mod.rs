@@ -11,7 +11,7 @@ use crate::{
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use ipso_core::{
-    Binop, Branch, CmdPart, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig,
+    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, RowParts, StringPart, Type, TypeSig,
 };
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
@@ -1392,9 +1392,11 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Var(name) => match self.variables.lookup_name(name) {
                 Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
                 None => match self.type_signatures.get(name) {
-                    Some(type_signature) => {
-                        Ok(self.instantiate(expr.pos, Expr::Name(name.clone()), type_signature))
-                    }
+                    Some(type_signature) => Ok(self.instantiate(
+                        expr.pos,
+                        Expr::Name(Name::definition(name.clone())),
+                        type_signature,
+                    )),
                     None => {
                         Err(InferenceError::not_in_scope(self.source, name).with_position(expr.pos))
                     }
@@ -1406,7 +1408,10 @@ impl<'a> InferenceContext<'a> {
                     A module accessor will only be desugared if the module was in scope, so this case
                     is impossible as long as `ctx.modules` is valid w.r.t this expression.
                     */
-                    panic!("module not in scope: {:?}", path)
+                    panic!(
+                        "module not in scope. id: {:?}, path: {:?}, item: {:?}",
+                        id, path, item
+                    )
                 }
                 Some(definitions) => match definitions.get(item) {
                     None => {
@@ -1417,7 +1422,7 @@ impl<'a> InferenceContext<'a> {
                         Expr::Module {
                             id: *id,
                             path: path.clone(),
-                            item: item.clone(),
+                            item: Name::definition(item.clone()),
                         },
                         type_signature,
                     )),

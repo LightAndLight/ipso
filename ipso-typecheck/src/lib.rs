@@ -7,7 +7,6 @@ pub mod type_inference;
 
 use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
-use ipso_builtins as builtins;
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
@@ -18,6 +17,13 @@ use std::{
     todo,
 };
 use syntax::{ModuleId, Modules};
+
+#[derive(Debug, PartialEq, Eq)]
+enum Declarations {
+    Zero,
+    One(core::Declaration),
+    Two(core::Declaration, core::Declaration),
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -113,7 +119,7 @@ pub struct Implication {
     pub ty_vars: Vec<Kind>,
     pub antecedents: Vec<core::Type>,
     pub consequent: core::Type,
-    pub evidence: core::Expr,
+    pub evidence: Rc<core::Expr>,
 }
 
 impl Implication {
@@ -394,12 +400,18 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 #[macro_export]
 macro_rules! with_tc {
     ($location:expr, $f:expr) => {{
+        use ipso_builtins as builtins;
         use ipso_core::CommonKinds;
-        use ipso_syntax::Modules;
+        use ipso_syntax::{self as syntax, ModuleKey, Modules};
 
         let common_kinds = CommonKinds::default();
-        let modules = Modules::new();
-        let tc = Typechecker::new_with_builtins($location, &common_kinds, &modules);
+        let mut modules = Modules::new();
+        let builtins_module_id = modules.insert(
+            ModuleKey::from("builtins"),
+            builtins::builtins(&common_kinds),
+        );
+        let mut tc = Typechecker::new($location, &common_kinds, &modules);
+        tc.register_from_import(builtins_module_id, &syntax::Names::All);
         $f(tc)
     }};
 }
@@ -458,16 +470,6 @@ impl<'modules> Typechecker<'modules> {
             modules,
             module_context: HashMap::new(),
         }
-    }
-
-    pub fn new_with_builtins(
-        location: Source,
-        common_kinds: &'modules CommonKinds,
-        modules: &'modules Modules<core::Module>,
-    ) -> Self {
-        let mut tc = Self::new(location, common_kinds, modules);
-        tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
-        tc
     }
 
     fn eq_zonked_type(&self, t1: &core::Type, t2: &core::Type) -> bool {
@@ -595,10 +597,10 @@ impl<'modules> Typechecker<'modules> {
                         ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
                         antecedents: vec![applied_type.clone()],
                         consequent: superclass.clone(),
-                        evidence: core::Expr::mk_lam(
+                        evidence: Rc::new(core::Expr::mk_lam(
                             true,
                             core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
-                        ),
+                        )),
                     }),
             );
 
@@ -616,119 +618,131 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn register_instance(
         &mut self,
+        module_id: Option<ModuleId>,
         ty_vars: &[(Rc<str>, Kind)],
-        superclass_constructors: &[core::Expr],
         assumes: &[core::Type],
         head: &core::Type,
-        members: &[core::InstanceMember],
+        evidence_name: Rc<str>,
     ) {
-        let mut dictionary: Vec<core::Expr> = superclass_constructors.to_vec();
-        dictionary.extend(members.iter().map(|member| member.body.clone()));
-
-        for (ix, _assume) in assumes.iter().enumerate().rev() {
-            for item in &mut dictionary {
-                *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
-            }
-        }
-
-        let mut evidence = core::Expr::mk_record(
-            dictionary
-                .into_iter()
-                .enumerate()
-                .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
-                .collect(),
-            None,
-        );
-        for _assume in assumes.iter() {
-            evidence = core::Expr::mk_lam(true, evidence);
-        }
-
         self.implications.push(Implication {
             ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
             antecedents: Vec::from(assumes),
             consequent: head.clone(),
-            evidence,
+            evidence: Rc::new(match module_id {
+                Some(module_id) => core::Expr::Module {
+                    id: module_id,
+                    path: vec![],
+                    item: core::Name::Evidence(evidence_name),
+                },
+                None => core::Expr::Name(core::Name::Evidence(evidence_name)),
+            }),
         });
     }
 
-    pub fn register_declaration(&mut self, decl: &core::Declaration) {
+    pub fn register_builtin_type(&mut self, name: &str, kind: &Kind) {
+        self.type_context.insert(Rc::from(name), kind.clone());
+    }
+
+    pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
+        self.context.insert(String::from(name), sig.clone());
+    }
+
+    pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
+        todo!("register TypeAlias {:?}", (name, args, body))
+    }
+
+    pub fn register_declaration(&mut self, module_id: Option<ModuleId>, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                self.type_context
-                    .insert(Rc::from(name.as_str()), kind.clone());
+                self.register_builtin_type(name, kind);
             }
-            core::Declaration::Definition { name, sig, .. } => {
-                self.context.insert(name.clone(), sig.clone());
-            }
+            core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
             core::Declaration::TypeAlias { name, args, body } => {
-                todo!("register TypeAlias {:?}", (name, args, body))
+                self.register_type_alias(name, args, body)
             }
             core::Declaration::Class(decl) => self.register_class(decl),
+            core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
-                superclass_constructors,
                 assumes,
                 head,
-                members,
-            } => self.register_instance(ty_vars, superclass_constructors, assumes, head, members),
+                evidence,
+                ..
+            } => self.register_instance(module_id, ty_vars, assumes, head, evidence.clone()),
         }
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(decl).map(|m_decl| match m_decl {
-                    Option::None => decls,
-                    Option::Some(decl) => {
-                        self.register_declaration(&decl);
-                        decls.push(decl);
-                        decls
-                    }
-                })
+                self.check_declaration(decl)
+                    .map(|checked_decls| match checked_decls {
+                        Declarations::Zero => decls,
+                        Declarations::One(decl) => {
+                            self.register_declaration(None, &decl);
+                            decls.push(decl);
+                            decls
+                        }
+                        Declarations::Two(decl1, decl2) => {
+                            self.register_declaration(None, &decl1);
+                            decls.push(decl1);
+                            self.register_declaration(None, &decl2);
+                            decls.push(decl2);
+                            decls
+                        }
+                    })
             })
         })?;
         Ok(core::Module { decls })
     }
 
-    pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
+    pub fn register_from_import(&mut self, module_id: ModuleId, names: &syntax::Names) {
+        let module = self.modules.lookup(module_id);
+
         let should_import = |expected_name: &str| -> bool {
             match names {
                 syntax::Names::All => true,
                 syntax::Names::Names(names) => names.iter().any(|name| name.item == expected_name),
             }
         };
+
         for decl in &module.decls {
             match decl {
-                core::Declaration::BuiltinType { name, kind: _ } => {
+                core::Declaration::BuiltinType { name, kind } => {
                     if should_import(name) {
-                        self.register_declaration(decl);
+                        self.register_builtin_type(name, kind);
                     }
                 }
-                core::Declaration::Definition {
-                    name,
-                    sig: _,
-                    body: _,
+                core::Declaration::Definition { name, sig, .. } => {
+                    if should_import(name) {
+                        self.register_definition(name, sig);
+                    }
+                }
+                core::Declaration::TypeAlias { name, args, body } => {
+                    if should_import(name) {
+                        self.register_type_alias(name, args, body);
+                    }
+                }
+                core::Declaration::Class(class_decl) => {
+                    if should_import(class_decl.name.as_ref()) {
+                        self.register_class(class_decl);
+                    }
+                }
+                core::Declaration::Evidence { .. } => {}
+                core::Declaration::Instance {
+                    ty_vars,
+                    assumes,
+                    head,
+                    evidence,
+                    ..
                 } => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::TypeAlias {
-                    name,
-                    args: _,
-                    body: _,
-                } => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::Class(core::ClassDeclaration { name, .. }) => {
-                    if should_import(name) {
-                        self.register_declaration(decl);
-                    }
-                }
-                core::Declaration::Instance { .. } => {
-                    self.register_declaration(decl);
+                    self.register_instance(
+                        Some(module_id),
+                        ty_vars,
+                        assumes,
+                        head,
+                        evidence.clone(),
+                    );
                 }
             }
         }
@@ -740,7 +754,7 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
         expr.subst_placeholder(&mut |p| {
             let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
-            Ok(expr)
+            Ok(expr.as_ref().clone())
         })?;
 
         let mut unsolved_constraints: Vec<(core::EVar, core::Type)> = Vec::new();
@@ -1025,7 +1039,35 @@ impl<'modules> Typechecker<'modules> {
             Vec<Spanned<syntax::Pattern>>,
             Spanned<syntax::Expr>,
         )],
-    ) -> Result<core::Declaration, TypeError> {
+    ) -> Result<(core::Declaration, core::Declaration), TypeError> {
+        let evidence_name: Rc<str> = {
+            let mut buffer = String::new();
+
+            if !assumes.is_empty() {
+                let mut assumes = assumes.iter();
+                if let Some(assume) = assumes.next() {
+                    buffer.push_str(&assume.item.render());
+                }
+                for assume in assumes {
+                    buffer.push(',');
+                    buffer.push_str(&assume.item.render());
+                }
+                buffer.push_str("=>");
+            }
+            {
+                buffer.push_str(
+                    args.iter()
+                        .fold(syntax::Type::Name(name.item.clone()), |acc, arg| {
+                            syntax::Type::mk_app(acc, arg.item.clone())
+                        })
+                        .render()
+                        .as_str(),
+                );
+            }
+
+            Rc::from(buffer)
+        };
+
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass {
@@ -1035,11 +1077,11 @@ impl<'modules> Typechecker<'modules> {
             Some(class_decl) => Ok(class_decl.clone()),
         }?;
 
-        let name_item: Rc<str> = Rc::from(name.item.as_ref());
-
-        let head = args.iter().fold(syntax::Type::Name(name_item), |acc, el| {
-            syntax::Type::mk_app(acc, el.item.clone())
-        });
+        let head = args
+            .iter()
+            .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
+                syntax::Type::mk_app(acc, el.item.clone())
+            });
 
         let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
             let mut seen_names: HashSet<&str> = HashSet::new();
@@ -1092,7 +1134,7 @@ impl<'modules> Typechecker<'modules> {
                     self,
                     &evidence::Constraint::from_type(&superclass),
                 )
-                .and_then(|evidence| self.abstract_evidence(evidence))
+                .and_then(|evidence| self.abstract_evidence(evidence.as_ref().clone()))
                 {
                     Err(err) => {
                         return Err(err);
@@ -1117,7 +1159,7 @@ impl<'modules> Typechecker<'modules> {
         let head = with_position!(self, name.pos, self.check_kind(&head, &Kind::Constraint))?;
 
         // type check members
-        let mut new_members = Vec::with_capacity(members.len());
+        let mut checked_members = Vec::with_capacity(members.len());
         for (member_name, member_args, member_body) in members {
             match instantiated_class_members
                 .iter()
@@ -1150,10 +1192,7 @@ impl<'modules> Typechecker<'modules> {
                         Err(err) => return Err(err),
                         Ok((member_body, _)) => {
                             self.bound_tyvars.delete(member_type.sig.ty_vars.len());
-                            new_members.push(core::InstanceMember {
-                                name: member_name.item.clone(),
-                                body: member_body,
-                            });
+                            checked_members.push(member_body);
                         }
                     };
                 }
@@ -1168,22 +1207,53 @@ impl<'modules> Typechecker<'modules> {
             .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
             .collect();
 
-        Ok(core::Declaration::Instance {
+        let evidence = {
+            let mut dictionary: Vec<core::Expr> = superclass_constructors;
+            dictionary.extend(checked_members.into_iter());
+
+            for (ix, _assume) in assumes.iter().enumerate().rev() {
+                for item in &mut dictionary {
+                    *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
+                }
+            }
+
+            let mut evidence = core::Expr::mk_record(
+                dictionary
+                    .into_iter()
+                    .enumerate()
+                    .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
+                    .collect(),
+                None,
+            );
+
+            for _assume in assumes.iter() {
+                evidence = core::Expr::mk_lam(true, evidence);
+            }
+
+            Rc::new(evidence)
+        };
+
+        let evidence_decl = core::Declaration::Evidence {
+            name: evidence_name.clone(),
+            body: evidence,
+        };
+        let instance_decl = core::Declaration::Instance {
             ty_vars,
-            superclass_constructors,
             assumes: assumes
                 .into_iter()
                 .map(|assume| self.zonk_type(assume))
                 .collect(),
             head: self.zonk_type(head),
-            members: new_members,
-        })
+            evidence: evidence_name,
+        };
+
+        Ok((evidence_decl, instance_decl))
     }
 
     fn check_declaration(
         &mut self,
         decl: &syntax::Spanned<syntax::Declaration>,
-    ) -> Result<Option<core::Declaration>, TypeError> {
+    ) -> Result<Declarations, TypeError> {
         match &decl.item {
             syntax::Declaration::Definition {
                 name,
@@ -1192,19 +1262,40 @@ impl<'modules> Typechecker<'modules> {
                 body,
             } => self
                 .check_definition(name, ty, args, body)
-                .map(Option::Some),
+                .map(Declarations::One),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
             syntax::Declaration::Import { resolved, .. }
             | syntax::Declaration::FromImport { resolved, .. } => {
-                let id = resolved.unwrap_or_else(|| panic!("unresolved Import"));
+                let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
 
-                let signatures = self.modules.lookup(id).get_signatures(self.common_kinds);
-                self.module_context.insert(id, signatures);
+                let module = self.modules.lookup(module_id);
+                {
+                    let signatures = module.get_signatures(self.common_kinds);
+                    self.module_context.insert(module_id, signatures);
+                }
+                module.decls.iter().for_each(|decl| {
+                    if let core::Declaration::Instance {
+                        ty_vars,
+                        assumes,
+                        head,
+                        evidence,
+                        ..
+                    } = decl
+                    {
+                        self.register_instance(
+                            Some(module_id),
+                            ty_vars,
+                            assumes,
+                            head,
+                            evidence.clone(),
+                        )
+                    }
+                });
 
-                Ok(None)
+                Ok(Declarations::Zero)
             }
 
             syntax::Declaration::Class {
@@ -1214,7 +1305,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_class(supers, name, args, members)
-                .map(Option::Some),
+                .map(Declarations::One),
             syntax::Declaration::Instance {
                 assumes,
                 name,
@@ -1222,7 +1313,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_instance(assumes, name, args, members)
-                .map(Option::Some),
+                .map(|(a, b)| Declarations::Two(a, b)),
         }
     }
 

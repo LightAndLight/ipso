@@ -196,6 +196,7 @@ dependencies = [
  "ipso-rope",
  "ipso-syntax",
  "ipso-typecheck",
+ "ipso-util",
 ]
 
 [[package]]

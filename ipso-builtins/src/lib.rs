@@ -1,6 +1,6 @@
 use ipso_core::{
-    Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, InstanceMember,
-    Module, Pattern, Type, TypeSig,
+    Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Name,
+    Pattern, Type, TypeSig,
 };
 use ipso_syntax::kind::Kind;
 use std::rc::Rc;
@@ -434,7 +434,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -443,10 +442,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Int,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: Expr::Builtin(Builtin::EqInt),
-                }],
+                evidence: Rc::from("Eq Int"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Eq Int"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))],
+                    None,
+                )),
             },
             /*
             instance Eq Char where
@@ -454,7 +457,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -463,10 +465,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Char,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: Expr::Builtin(Builtin::EqChar),
-                }],
+                evidence: Rc::from("Eq Char"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Eq Char"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))],
+                    None,
+                )),
             },
             /*
             instance Eq String where
@@ -474,7 +480,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -483,10 +488,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::String,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: Expr::Builtin(Builtin::EqString),
-                }],
+                evidence: Rc::from("Eq String"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Eq String"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(Expr::Int(0), Expr::Builtin(Builtin::EqString))],
+                    None,
+                )),
             },
             /*
             instance Eq Bool where
@@ -494,7 +503,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -503,18 +511,21 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Bool,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: Expr::Builtin(Builtin::EqBool),
-                }],
+                evidence: Rc::from("Eq Bool"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Eq Bool"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))],
+                    None,
+                )),
             },
             /*
-            instance Eq a where Eq (Array a) where
+            instance Eq a => Eq (Array a) where
               eq = eqArray eq
              */
             Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                superclass_constructors: vec![],
                 // Eq a
                 assumes: vec![Type::app(
                     Type::Name(
@@ -531,16 +542,24 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("eq"),
-                    body: Expr::mk_lam(
-                        true,
-                        Expr::mk_app(
-                            Expr::Builtin(Builtin::EqArray),
-                            Expr::mk_app(Expr::Name(String::from("eq")), Expr::Var(0)),
-                        ),
+                evidence: Rc::from("Eq a => Eq (Array a)"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Eq a => Eq (Array a)"),
+                // \eqDict -> { eq = builtins.eqArray (eq eqDict) }
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![(
+                            Expr::Int(0),
+                            Expr::mk_app(
+                                Expr::Builtin(Builtin::EqArray),
+                                Expr::mk_app(Expr::Name(Name::definition("eq")), Expr::Var(0)),
+                            ),
+                        )],
+                        None,
                     ),
-                }],
+                )),
             },
             /*
             class Eq a => Ord a where
@@ -589,10 +608,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Bool
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -601,32 +616,61 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Bool,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("compare"),
-                    body: Expr::mk_lam(
-                        true,
-                        Expr::mk_lam(
-                            true,
-                            Expr::mk_ifthenelse(
-                                Expr::Var(1),
-                                Expr::mk_ifthenelse(
-                                    Expr::Var(0),
-                                    // EQ () : (| EQ : (), GT : (), LT : () |)
-                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
-                                    // GT () : (| EQ : (), GT : (), LT : () |)
-                                    Expr::mk_app(Expr::mk_variant(Expr::Int(1)), Expr::Unit),
-                                ),
-                                Expr::mk_ifthenelse(
-                                    Expr::Var(0),
-                                    // LT () : (| EQ : (), GT : (), LT : () |)
-                                    Expr::mk_app(Expr::mk_variant(Expr::Int(2)), Expr::Unit),
-                                    // EQ () : (| EQ : (), GT : (), LT : () |)
-                                    Expr::mk_app(Expr::mk_variant(Expr::Int(0)), Expr::Unit),
+                evidence: Rc::from("Ord Bool"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Ord Bool"),
+                body: Rc::new(Expr::mk_record(
+                    vec![
+                        (
+                            Expr::Int(0),
+                            // dict : Eq Bool
+                            Expr::mk_record(
+                                vec![(Expr::Int(0), Expr::Builtin(Builtin::EqBool))],
+                                None,
+                            ),
+                        ),
+                        (
+                            Expr::Int(1),
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_lam(
+                                    true,
+                                    Expr::mk_ifthenelse(
+                                        Expr::Var(1),
+                                        Expr::mk_ifthenelse(
+                                            Expr::Var(0),
+                                            // EQ () : (| EQ : (), GT : (), LT : () |)
+                                            Expr::mk_app(
+                                                Expr::mk_variant(Expr::Int(0)),
+                                                Expr::Unit,
+                                            ),
+                                            // GT () : (| EQ : (), GT : (), LT : () |)
+                                            Expr::mk_app(
+                                                Expr::mk_variant(Expr::Int(1)),
+                                                Expr::Unit,
+                                            ),
+                                        ),
+                                        Expr::mk_ifthenelse(
+                                            Expr::Var(0),
+                                            // LT () : (| EQ : (), GT : (), LT : () |)
+                                            Expr::mk_app(
+                                                Expr::mk_variant(Expr::Int(2)),
+                                                Expr::Unit,
+                                            ),
+                                            // EQ () : (| EQ : (), GT : (), LT : () |)
+                                            Expr::mk_app(
+                                                Expr::mk_variant(Expr::Int(0)),
+                                                Expr::Unit,
+                                            ),
+                                        ),
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
-                }],
+                    ],
+                    None,
+                )),
             },
             /*
             instance Ord Char where
@@ -634,10 +678,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Char
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -646,10 +686,24 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Char,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("compare"),
-                    body: Expr::Builtin(Builtin::CompareChar),
-                }],
+                evidence: Rc::from("Ord Char"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Ord Char"),
+                body: Rc::new(Expr::mk_record(
+                    vec![
+                        (
+                            Expr::Int(0),
+                            // dict : Eq Char
+                            Expr::mk_record(
+                                vec![(Expr::Int(0), Expr::Builtin(Builtin::EqChar))],
+                                None,
+                            ),
+                        ),
+                        (Expr::Int(1), Expr::Builtin(Builtin::CompareChar)),
+                    ],
+                    None,
+                )),
             },
             /*
             instance Ord String where
@@ -657,10 +711,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq String
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqString))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -669,10 +719,24 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::String,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("compare"),
-                    body: Expr::Builtin(Builtin::CompareString),
-                }],
+                evidence: Rc::from("Ord String"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Ord String"),
+                body: Rc::new(Expr::mk_record(
+                    vec![
+                        (
+                            Expr::Int(0),
+                            // dict : Eq String
+                            Expr::mk_record(
+                                vec![(Expr::Int(0), Expr::Builtin(Builtin::EqString))],
+                                None,
+                            ),
+                        ),
+                        (Expr::Int(1), Expr::Builtin(Builtin::CompareString)),
+                    ],
+                    None,
+                )),
             },
             /*
             instance Ord Int where
@@ -680,10 +744,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![
-                    // dict : Eq Int
-                    Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
-                ],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -692,10 +752,24 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::Int,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("compare"),
-                    body: Expr::Builtin(Builtin::CompareInt),
-                }],
+                evidence: Rc::from("Ord Int"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Ord Int"),
+                body: Rc::new(Expr::mk_record(
+                    vec![
+                        (
+                            Expr::Int(0),
+                            // dict : Eq Int
+                            Expr::mk_record(
+                                vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))],
+                                None,
+                            ),
+                        ),
+                        (Expr::Int(1), Expr::Builtin(Builtin::CompareInt)),
+                    ],
+                    None,
+                )),
             },
             /*
             instance Ord a => Ord (Array a) where
@@ -703,28 +777,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
              */
             Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                superclass_constructors: vec![
-                    /*
-                    dict : Ord a -> Eq (Array a)
-                    dict = \ordDict -> { 0 = eqArray (eq ordDict.0) }
-                    */
-                    Expr::mk_lam(
-                        true,
-                        Expr::mk_record(
-                            vec![(
-                                Expr::Int(0),
-                                Expr::mk_app(
-                                    Expr::Builtin(Builtin::EqArray),
-                                    Expr::mk_app(
-                                        Expr::Name(String::from("eq")),
-                                        Expr::mk_project(Expr::Var(0), Expr::Int(0)),
-                                    ),
-                                ),
-                            )],
-                            None,
-                        ),
-                    ),
-                ],
                 assumes: vec![Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
@@ -742,17 +794,49 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         Type::Var(Kind::Type, 0),
                     ),
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("compare"),
-                    // \ordDict -> compareArray (compare ordDict)
-                    body: Expr::mk_lam(
-                        true,
-                        Expr::mk_app(
-                            Expr::Builtin(Builtin::CompareArray),
-                            Expr::mk_app(Expr::Name(String::from("compare")), Expr::Var(0)),
-                        ),
+                evidence: Rc::from("Ord a => Ord (Array a)"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Ord a => Ord (Array a)"),
+                // \ordDict -> ...
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![
+                            (
+                                // eqDict
+                                Expr::Int(0),
+                                // { eq = builtins.eqArray (eq ordDict.eqDict) }
+                                Expr::mk_record(
+                                    vec![(
+                                        Expr::Int(0),
+                                        Expr::mk_app(
+                                            Expr::Builtin(Builtin::EqArray),
+                                            Expr::mk_app(
+                                                Expr::Name(Name::definition("eq")),
+                                                Expr::mk_project(Expr::Var(0), Expr::Int(0)),
+                                            ),
+                                        ),
+                                    )],
+                                    None,
+                                ),
+                            ),
+                            (
+                                // compare
+                                Expr::Int(1),
+                                // compareArray (compare ordDict)
+                                Expr::mk_app(
+                                    Expr::Builtin(Builtin::CompareArray),
+                                    Expr::mk_app(
+                                        Expr::Name(Name::definition("compare")),
+                                        Expr::Var(0),
+                                    ),
+                                ),
+                            ),
+                        ],
+                        None,
                     ),
-                }],
+                )),
             },
             {
                 let a = Type::Var(Kind::Type, 0);
@@ -787,7 +871,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                     Expr::mk_app(
                                         Expr::mk_app(
                                             Expr::mk_app(
-                                                Expr::Name(String::from("eq")),
+                                                Expr::Name(Name::definition("eq")),
                                                 Expr::Var(2),
                                             ),
                                             Expr::Var(1),
@@ -841,7 +925,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                     Expr::mk_app(
                                         Expr::mk_app(
                                             Expr::mk_app(
-                                                Expr::Name(String::from("compare")),
+                                                Expr::Name(Name::definition("compare")),
                                                 Expr::Var(2),
                                             ),
                                             Expr::Var(1),
@@ -906,7 +990,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                     Expr::mk_app(
                                         Expr::mk_app(
                                             Expr::mk_app(
-                                                Expr::Name(String::from("compare")),
+                                                Expr::Name(Name::definition("compare")),
                                                 Expr::Var(2),
                                             ),
                                             Expr::Var(1),
@@ -971,7 +1055,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                     Expr::mk_app(
                                         Expr::mk_app(
                                             Expr::mk_app(
-                                                Expr::Name(String::from("compare")),
+                                                Expr::Name(Name::definition("compare")),
                                                 Expr::Var(2),
                                             ),
                                             Expr::Var(1),
@@ -1036,7 +1120,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                                     Expr::mk_app(
                                         Expr::mk_app(
                                             Expr::mk_app(
-                                                Expr::Name(String::from("compare")),
+                                                Expr::Name(Name::definition("compare")),
                                                 Expr::Var(2),
                                             ),
                                             Expr::Var(1),
@@ -1128,7 +1212,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             */
             Declaration::Instance {
                 ty_vars: vec![],
-                superclass_constructors: vec![],
                 assumes: vec![],
                 head: Type::app(
                     Type::Name(
@@ -1137,10 +1220,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                     Type::String,
                 ),
-                members: vec![InstanceMember {
-                    name: String::from("toArgs"),
-                    body: Expr::mk_lam(true, Expr::Array(vec![Expr::Var(0)])),
-                }],
+                evidence: Rc::from("ToArgs String"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("ToArgs String"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // toArgs
+                        Expr::Int(0),
+                        // \x -> [x]
+                        Expr::mk_lam(true, Expr::Array(vec![Expr::Var(0)])),
+                    )],
+                    None,
+                )),
             },
             /*
             instance ToArgs a => ToArgs (Array a) where
@@ -1153,21 +1245,29 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 );
                 Declaration::Instance {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                    superclass_constructors: vec![],
                     assumes: vec![Type::app(to_args_ty.clone(), Type::Var(Kind::Type, 0))],
                     head: Type::app(to_args_ty, Type::app(array_ty, Type::Var(Kind::Type, 0))),
-                    members: vec![InstanceMember {
-                        name: String::from("toArgs"),
-                        // \toArgsDict -> flatMap (toArgs toArgsDict)
-                        body: Expr::mk_lam(
-                            true,
-                            Expr::mk_app(
-                                Expr::Name(String::from("flatMap")),
-                                Expr::mk_app(Expr::Name(String::from("toArgs")), Expr::Var(0)),
-                            ),
-                        ),
-                    }],
+                    evidence: Rc::from("ToArgs a => ToArgs (Array a)"),
                 }
+            },
+            Declaration::Evidence {
+                name: Rc::from("ToArgs a => ToArgs (Array a)"),
+                // \toArgsDict -> ...
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![(
+                            // toArgs
+                            Expr::Int(0),
+                            // flatMap (toArgs toArgsDict)
+                            Expr::mk_app(
+                                Expr::Name(Name::definition("flatMap")),
+                                Expr::mk_app(Expr::Name(Name::definition("toArgs")), Expr::Var(0)),
+                            ),
+                        )],
+                        None,
+                    ),
+                )),
             },
         ],
     }

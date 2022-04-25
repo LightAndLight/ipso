@@ -1,16 +1,17 @@
 use diagnostic::{Location, Message};
-use ipso_core::{self as core, CommonKinds, Module};
+use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax};
 use ipso_typecheck::{self as typecheck, Typechecker};
+use ipso_util::hash_multi_set::HashMultiset;
 use std::{
     collections::{HashMap, HashSet},
-    io::{self},
+    io,
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{desugar, ModuleId, Modules};
+use syntax::{desugar, ModuleId, ModuleKey, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -114,164 +115,135 @@ enum ImportedItemInfo {
     ModuleImportedAs { id: ModuleId },
 }
 
-fn rewrite_module_accessors_comp_line(
-    imported_items: &HashMap<String, ImportedItemInfo>,
-    line: &mut syntax::CompLine,
-) {
-    match line {
-        syntax::CompLine::Expr(value) => {
-            rewrite_module_accessors_expr(imported_items, &mut value.item);
-        }
-        syntax::CompLine::Bind(_, value) => {
-            rewrite_module_accessors_expr(imported_items, &mut value.item);
-        }
-        syntax::CompLine::Let(_, value) => {
-            rewrite_module_accessors_expr(imported_items, &mut value.item);
-        }
-    }
-}
-
 fn rewrite_module_accessors_expr(
+    exclude: &mut HashMultiset<Rc<str>>,
     imported_items: &HashMap<String, ImportedItemInfo>,
     expr: &mut syntax::Expr,
 ) {
     match expr {
         syntax::Expr::Var(name) => {
-            if let Some(imported_item_info) = imported_items.get(name) {
-                match imported_item_info {
-                    ImportedItemInfo::DefinitionImportedFrom { id, path, .. } => {
-                        /*
-                        ```
-                        from x import y
+            if !exclude.contains(name.as_str()) {
+                if let Some(imported_item_info) = imported_items.get(name) {
+                    match imported_item_info {
+                        ImportedItemInfo::DefinitionImportedFrom { id, path, .. } => {
+                            /*
+                            ```
+                            from x import y
 
-                        ...
+                            ...
 
-                        y
-                        ```
+                            y
+                            ```
 
-                        is rewritten to
+                            is rewritten to
 
-                        ```
-                        import x
+                            ```
+                            import x
 
-                        ...
+                            ...
 
-                        <x's path>.y
-                        ```
-                        */
-                        *expr = syntax::Expr::Module {
-                            id: *id,
-                            path: path.clone(),
-                            item: name.clone(),
-                        };
-                    }
-                    ImportedItemInfo::ModuleImportedAs { .. } => {
-                        /*
-                        A module can only be used as an expression when an item is projected from it.
+                            <x's path>.y
+                            ```
+                            */
+                            *expr = syntax::Expr::Module {
+                                id: *id,
+                                path: path.clone(),
+                                item: name.clone(),
+                            };
+                        }
+                        ImportedItemInfo::ModuleImportedAs { .. } => {
+                            /*
+                            A module can only be used as an expression when an item is projected from it.
 
-                        i.e.
+                            i.e.
 
-                        ```
-                        import x
+                            ```
+                            import x
 
-                        ...
+                            ...
 
-                        x
-                        ```
+                            x
+                            ```
 
-                        is not allowed, and
+                            is not allowed, and
 
-                        ```
-                        import x
+                            ```
+                            import x
 
-                        ...
+                            ...
 
 
-                        x.y
-                        ```
+                            x.y
+                            ```
 
-                        is allowed.
+                            is allowed.
 
-                        Module item access is rewritten in the `Expr::Project` branch, rather than here.
-                        */
+                            Module item access is rewritten in the `Expr::Project` branch, rather than here.
+                            */
+                        }
                     }
                 }
             }
         }
         syntax::Expr::Module { .. } => {}
         syntax::Expr::App(a, b) => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
         }
         syntax::Expr::Lam { args, body } => {
-            let imported_items = {
-                let mut imported_items: HashMap<String, ImportedItemInfo> = imported_items.clone();
-                for name in args.iter().flat_map(|pattern| pattern.item.iter_names()) {
-                    imported_items.remove(name.item.as_ref());
-                }
-                imported_items
-            };
-            rewrite_module_accessors_expr(&imported_items, &mut Rc::make_mut(body).item)
+            let arg_names: Vec<Rc<str>> = args
+                .iter()
+                .flat_map(|pattern| pattern.item.iter_names())
+                .map(|name| name.item.clone())
+                .collect();
+
+            exclude.insert_all(arg_names.iter().cloned());
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(body).item);
+            exclude.remove_all(arg_names.into_iter());
         }
-        syntax::Expr::Let { value, rest, .. } => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(value).item);
+        syntax::Expr::Let { name, value, rest } => {
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(value).item);
 
-            /*
-            TODO: fix variable shadowing
-
-            ```
-            import x
-
-            ...
-
-
-            let x = {} in x.a
-            ```
-
-            In the above example, `x.a` should be a record projection rather than a module access.
-            */
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(rest).item);
+            exclude.insert(name.clone());
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(rest).item);
+            exclude.remove(name);
         }
-        syntax::Expr::True => {}
-        syntax::Expr::False => {}
         syntax::Expr::IfThenElse(a, b, c) => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(c).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(c).item);
         }
-        syntax::Expr::Int(_) => {}
         syntax::Expr::Binop(_, a, b) => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
         }
-        syntax::Expr::Char(_) => {}
         syntax::Expr::String(parts) => {
             for part in parts {
                 match part {
                     syntax::StringPart::String(_) => {}
                     syntax::StringPart::Expr(e) => {
-                        rewrite_module_accessors_expr(imported_items, &mut e.item);
+                        rewrite_module_accessors_expr(exclude, imported_items, &mut e.item);
                     }
                 }
             }
         }
         syntax::Expr::Array(xs) => {
             for x in xs {
-                rewrite_module_accessors_expr(imported_items, &mut x.item);
+                rewrite_module_accessors_expr(exclude, imported_items, &mut x.item);
             }
         }
         syntax::Expr::Record { fields, rest } => {
             for (_, e) in fields {
-                rewrite_module_accessors_expr(imported_items, &mut e.item);
+                rewrite_module_accessors_expr(exclude, imported_items, &mut e.item);
             }
 
             for e in rest {
-                rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(e).item);
+                rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(e).item);
             }
         }
         syntax::Expr::Project(value, field) => {
             let value = Rc::make_mut(value);
-            rewrite_module_accessors_expr(imported_items, &mut value.item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut value.item);
 
             match &value.item {
                 syntax::Expr::Module { id, path, item } => {
@@ -285,7 +257,7 @@ fn rewrite_module_accessors_expr(
                     };
                 }
 
-                syntax::Expr::Var(name) => {
+                syntax::Expr::Var(name) if !exclude.contains(name.as_str()) => {
                     if let Some(ImportedItemInfo::ModuleImportedAs { id }) =
                         imported_items.get(name)
                     {
@@ -296,50 +268,155 @@ fn rewrite_module_accessors_expr(
                         }
                     }
                 }
+
                 _ => {}
             }
         }
-        syntax::Expr::Variant(_) => {}
         syntax::Expr::Embed(_, a) => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
         }
         syntax::Expr::Case(a, branches) => {
-            rewrite_module_accessors_expr(imported_items, &mut Rc::make_mut(a).item);
+            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
 
             for branch in branches {
-                let module_names = {
-                    // TODO: replace this loop with filter_map/collect
-                    let mut module_names = imported_items.clone();
-                    for name in branch.pattern.item.iter_names() {
-                        module_names.remove(name.item.as_ref());
-                    }
-                    module_names
-                };
-                rewrite_module_accessors_expr(&module_names, &mut branch.body.item);
+                let arg_names: Vec<Rc<str>> = branch
+                    .pattern
+                    .item
+                    .iter_names()
+                    .map(|arg_name| arg_name.item.clone())
+                    .collect();
+
+                exclude.insert_all(arg_names.iter().cloned());
+                rewrite_module_accessors_expr(exclude, imported_items, &mut branch.body.item);
+                exclude.remove_all(arg_names.into_iter());
             }
         }
-        syntax::Expr::Unit => {}
-        syntax::Expr::Comp(lines) => lines
-            .iter_mut()
-            .for_each(|line| rewrite_module_accessors_comp_line(imported_items, &mut line.item)),
         syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {
-                rewrite_module_accessors_expr(imported_items, &mut expr.item)
+                rewrite_module_accessors_expr(exclude, imported_items, &mut expr.item)
             }
         }),
+        syntax::Expr::Comp(_) => {
+            /*
+            Assuming computation expressions have been desugared means that
+            we don't have to re-implement the shadowing rules. `Expr::Lam`
+            does it for us.
+            */
+            panic!("computation expression not desugared")
+        }
+        syntax::Expr::True
+        | syntax::Expr::False
+        | syntax::Expr::Int(_)
+        | syntax::Expr::Char(_)
+        | syntax::Expr::Variant(_)
+        | syntax::Expr::Unit => {}
     }
 }
 
 fn resolve_imports(
     common_kinds: &CommonKinds,
-    builtins: &Module,
     modules: &mut Modules<core::Module>,
+    builtins_module_id: ModuleId,
     working_dir: &Path,
     path: &Path,
     module: &mut syntax::Module,
 ) -> Result<(), ModuleError> {
+    fn resolve_from_import_all(
+        common_kinds: &CommonKinds,
+        imported_items: &mut HashMap<String, ImportedItemInfo>,
+        imported_module_id: ModuleId,
+        imported_module: &core::Module,
+    ) {
+        imported_items.extend(
+            imported_module
+                .get_bindings(common_kinds)
+                .into_keys()
+                .filter_map(|name| match name {
+                    core::Name::Definition(name) => Some((
+                        name,
+                        ImportedItemInfo::DefinitionImportedFrom {
+                            id: imported_module_id,
+                            path: vec![],
+                        },
+                    )),
+                    /*
+                    Only definitions are brought into scope. Evidence values
+                    are internal to their respective modules.
+                    */
+                    core::Name::Evidence(_) => None,
+                }),
+        );
+    }
+
+    fn resolve_from_import(
+        common_kinds: &CommonKinds,
+        modules: &mut Modules<core::Module>,
+        source: Source,
+        imported_items: &mut HashMap<String, ImportedItemInfo>,
+        imported_module_id: ModuleId,
+        names: &syntax::Names,
+    ) -> Result<(), ModuleError> {
+        let imported_module = modules.lookup(imported_module_id);
+
+        match names {
+            syntax::Names::All => {
+                resolve_from_import_all(
+                    common_kinds,
+                    imported_items,
+                    imported_module_id,
+                    imported_module,
+                );
+
+                Ok(())
+            }
+            syntax::Names::Names(names) => {
+                imported_items.extend(names.iter().map(|name| {
+                    (
+                        name.item.clone(),
+                        ImportedItemInfo::DefinitionImportedFrom {
+                            id: imported_module_id,
+                            path: vec![],
+                        },
+                    )
+                }));
+
+                let available_names: HashSet<String> = imported_module
+                    .get_bindings(common_kinds)
+                    .into_keys()
+                    .filter_map(|name| match name {
+                        core::Name::Evidence(_) => None,
+                        core::Name::Definition(name) => Some(name),
+                    })
+                    .collect();
+
+                names
+                    .iter()
+                    .try_for_each(|name| {
+                        if available_names.contains(&name.item) {
+                            Ok(())
+                        } else {
+                            Err(name)
+                        }
+                    })
+                    .map_err(|name| ModuleError::DoesNotDefine {
+                        source,
+                        pos: name.pos,
+                    })
+            }
+        }
+    }
+
     let mut imported_items: HashMap<String, ImportedItemInfo> = HashMap::new();
+    let mut exclude: HashMultiset<Rc<str>> = HashMultiset::new();
+
+    // Resolve the builtins imports, as if the first declaration was `from builtins import *`.
+    resolve_from_import_all(
+        common_kinds,
+        &mut imported_items,
+        builtins_module_id,
+        modules.lookup(builtins_module_id),
+    );
 
     module
         .decls
@@ -353,13 +430,13 @@ fn resolve_imports(
                 } => {
                     let id = import(
                         modules,
+                        builtins_module_id,
                         &Source::File {
                             path: PathBuf::from(path),
                         },
                         module.pos,
                         &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
-                        builtins,
                     )?;
 
                     imported_items.insert(
@@ -382,62 +459,21 @@ fn resolve_imports(
 
                     let imported_module_id = import(
                         modules,
+                        builtins_module_id,
                         &source,
                         module.pos,
                         &working_dir.join(&module.item).with_extension("ipso"),
                         common_kinds,
-                        builtins,
                     )?;
-                    let imported_module = modules.lookup(imported_module_id);
 
-                    match names {
-                        syntax::Names::All => {
-                            imported_items.extend(
-                                imported_module.get_bindings(common_kinds).into_keys().map(
-                                    |name| {
-                                        (
-                                            name,
-                                            ImportedItemInfo::DefinitionImportedFrom {
-                                                id: imported_module_id,
-                                                path: vec![],
-                                            },
-                                        )
-                                    },
-                                ),
-                            );
-                            Ok(())
-                        }
-                        syntax::Names::Names(names) => {
-                            imported_items.extend(names.iter().map(|name| {
-                                (
-                                    name.item.clone(),
-                                    ImportedItemInfo::DefinitionImportedFrom {
-                                        id: imported_module_id,
-                                        path: vec![],
-                                    },
-                                )
-                            }));
-
-                            let available_names: HashSet<String> = imported_module
-                                .get_bindings(common_kinds)
-                                .into_keys()
-                                .collect();
-
-                            names
-                                .iter()
-                                .try_for_each(|name| {
-                                    if available_names.contains(&name.item) {
-                                        Ok(())
-                                    } else {
-                                        Err(name)
-                                    }
-                                })
-                                .map_err(|name| ModuleError::DoesNotDefine {
-                                    source,
-                                    pos: name.pos,
-                                })
-                        }
-                    }?;
+                    resolve_from_import(
+                        common_kinds,
+                        modules,
+                        source,
+                        &mut imported_items,
+                        imported_module_id,
+                        names,
+                    )?;
 
                     *resolved = Some(imported_module_id);
 
@@ -450,51 +486,71 @@ fn resolve_imports(
                     args,
                     body,
                 } => {
-                    let bound_names: HashSet<&str> = std::iter::once(name.as_str())
-                        .chain(args.iter().flat_map(|pattern| {
-                            pattern.item.iter_names().map(|name| name.item.as_ref())
-                        }))
-                        .collect();
-                    let imported_items: HashMap<String, ImportedItemInfo> = imported_items
+                    exclude.insert(Rc::from(name.as_str()));
+
+                    let arg_names: Vec<Rc<str>> = args
                         .iter()
-                        .filter_map(|(name, item)| {
-                            if bound_names.contains(name.as_str()) {
-                                None
-                            } else {
-                                Some((name.clone(), item.clone()))
-                            }
-                        })
+                        .flat_map(|pattern| pattern.item.iter_names().map(|name| name.item.clone()))
                         .collect();
 
-                    rewrite_module_accessors_expr(&imported_items, &mut body.item);
+                    exclude.insert_all(arg_names.iter().cloned());
+                    rewrite_module_accessors_expr(&mut exclude, &imported_items, &mut body.item);
+                    exclude.remove_all(arg_names.into_iter());
+
                     Ok(())
                 }
                 syntax::Declaration::Instance { members, .. } => {
                     for (name, args, body) in members {
-                        let bound_names: HashSet<&str> = std::iter::once(name.item.as_str())
-                            .chain(args.iter().flat_map(|pattern| {
-                                pattern.item.iter_names().map(|name| name.item.as_ref())
-                            }))
-                            .collect();
-                        let imported_items: HashMap<String, ImportedItemInfo> = imported_items
-                            .iter()
-                            .filter_map(|(name, item)| {
-                                if bound_names.contains(name.as_str()) {
-                                    None
-                                } else {
-                                    Some((name.clone(), item.clone()))
-                                }
-                            })
-                            .collect();
+                        let to_exclude: Vec<Rc<str>> =
+                            std::iter::once(Rc::from(name.item.as_str()))
+                                .chain(args.iter().flat_map(|pattern| {
+                                    pattern.item.iter_names().map(|name| name.item.clone())
+                                }))
+                                .collect();
 
-                        rewrite_module_accessors_expr(&imported_items, &mut body.item)
+                        exclude.insert_all(to_exclude.iter().cloned());
+                        rewrite_module_accessors_expr(
+                            &mut exclude,
+                            &imported_items,
+                            &mut body.item,
+                        );
+                        exclude.remove_all(to_exclude.into_iter());
                     }
                     Ok(())
                 }
 
-                syntax::Declaration::Class { .. } | syntax::Declaration::TypeAlias { .. } => Ok(()),
+                syntax::Declaration::Class { name, members, .. } => {
+                    exclude.insert(name.clone());
+                    exclude.insert_all(members.iter().map(|(name, _)| Rc::from(name.as_str())));
+                    Ok(())
+                }
+                syntax::Declaration::TypeAlias { name, .. } => {
+                    exclude.insert(Rc::from(name.as_str()));
+                    Ok(())
+                }
             }
-        })
+        })?;
+
+    /*
+    We insert the resolved `from builtins import *` because the type checker uses the imports in `decls`
+    to decide which names will be in scope with which types.
+    */
+    module.decls.insert(
+        0,
+        syntax::Spanned {
+            pos: 0,
+            item: syntax::Declaration::FromImport {
+                resolved: Some(builtins_module_id),
+                module: syntax::Spanned {
+                    pos: 0,
+                    item: String::from("builtins"),
+                },
+                names: syntax::Names::All,
+            },
+        },
+    );
+
+    Ok(())
 }
 
 /// Import a module.
@@ -506,13 +562,13 @@ fn resolve_imports(
 /// * `path` - file path to import
 pub fn import(
     modules: &mut Modules<core::Module>,
+    builtins_module_id: ModuleId,
     source: &Source,
     pos: usize,
     path: &Path,
     common_kinds: &CommonKinds,
-    builtins: &Module,
 ) -> Result<ModuleId, ModuleError> {
-    match modules.lookup_id(path) {
+    match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
             if path.exists() {
                 let input_location = Source::File {
@@ -526,22 +582,17 @@ pub fn import(
 
                 resolve_imports(
                     common_kinds,
-                    builtins,
                     modules,
+                    builtins_module_id,
                     working_dir,
                     path,
                     &mut module,
                 )?;
 
-                let module = {
-                    let mut tc = {
-                        let mut tc = Typechecker::new(input_location, common_kinds, modules);
-                        tc.register_from_import(builtins, &syntax::Names::All);
-                        tc
-                    };
-                    tc.check_module(&module)
-                }?;
-                let module_id: ModuleId = modules.insert(path.to_path_buf(), module);
+                let module = Typechecker::new(input_location, common_kinds, modules)
+                    .check_module(&module)?;
+                let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
+
                 Ok(module_id)
             } else {
                 Err(ModuleError::NotFound {

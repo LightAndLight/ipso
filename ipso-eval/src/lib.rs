@@ -1,6 +1,8 @@
 mod test;
 
-use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Pattern, StringPart};
+use ipso_core::{
+    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
+};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, Modules};
 use paste::paste;
@@ -202,6 +204,12 @@ pub enum Object<'heap> {
     Closure {
         env: &'heap [Value<'heap>],
         arg: bool,
+        /**
+        The module from which the closure originated.
+
+        Any [`Expr::Name`]s in the closure's body reference definitions in this module.
+        */
+        module: Option<ModuleId>,
         body: Rc<Expr>,
     },
     StaticClosure {
@@ -277,13 +285,22 @@ impl<'heap> Object<'heap> {
             Object::Closure {
                 env,
                 arg: use_arg,
+                module,
                 body,
             } => {
                 let mut env = Env::from(*env);
                 if *use_arg {
                     env.push(arg);
                 }
-                interpreter.eval(&mut env, body)
+
+                if let Some(module) = module {
+                    interpreter.context.modules.push(*module);
+                }
+                let result = interpreter.eval(&mut env, body);
+                if module.is_some() {
+                    interpreter.context.modules.pop();
+                }
+                result
             }
             Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
             a => panic!("expected closure, got {:?}", a),
@@ -292,11 +309,7 @@ impl<'heap> Object<'heap> {
 
     pub fn render(&self) -> String {
         match self {
-            Object::Closure {
-                env: _,
-                arg: _,
-                body: _,
-            } => String::from("<closure>"),
+            Object::Closure { .. } => String::from("<closure>"),
             Object::StaticClosure { env: _, body: _ } => String::from("<static builtin>"),
             Object::IO { env: _, body: _ } => String::from("<io>"),
             Object::String(s) => format!("{:?}", s),
@@ -352,12 +365,18 @@ impl<'heap> Object<'heap> {
 impl<'heap> PartialEq for Object<'heap> {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Object::Closure { env, arg, body } => match other {
+            Object::Closure {
+                env,
+                arg,
+                module,
+                body,
+            } => match other {
                 Object::Closure {
                     env: env2,
                     arg: arg2,
+                    module: module2,
                     body: body2,
-                } => env == env2 && arg == arg2 && body == body2,
+                } => env == env2 && arg == arg2 && module == module2 && body == body2,
                 _ => false,
             },
             Object::StaticClosure { env, body } => match other {
@@ -517,7 +536,12 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module {
-    pub bindings: HashMap<String, Rc<Expr>>,
+    pub bindings: HashMap<Name, Rc<Expr>>,
+}
+
+struct Context<'ctx> {
+    modules: Vec<ModuleId>,
+    base: &'ctx HashMap<Name, Rc<Expr>>,
 }
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
@@ -526,7 +550,7 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
-    context: &'ctx HashMap<String, Rc<Expr>>,
+    context: Context<'ctx>,
     modules: HashMap<ModuleId, Module>,
 }
 
@@ -536,7 +560,7 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
         stdout: &'io mut dyn io::Write,
         common_kinds: &'ctx CommonKinds,
         modules: &'ctx Modules<core::Module>,
-        context: &'ctx HashMap<String, Rc<Expr>>,
+        context: &'ctx HashMap<Name, Rc<Expr>>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
@@ -556,7 +580,10 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
         Interpreter {
             stdin,
             stdout,
-            context,
+            context: Context {
+                modules: Vec::new(),
+                base: context,
+            },
             modules,
             bytes,
             values,
@@ -1312,7 +1339,7 @@ where {
         env: &mut Env<'heap>,
         id: &ModuleId,
         _path: &[String],
-        binding: &str,
+        binding: &Name,
     ) -> Value<'heap> {
         let expr = match self.modules.get(id) {
             None => panic!("{:?} not found", id),
@@ -1322,7 +1349,28 @@ where {
             },
         };
 
-        self.eval(env, &expr)
+        self.context.modules.push(*id);
+        let result = self.eval(env, &expr);
+        self.context.modules.pop();
+
+        result
+    }
+
+    fn lookup_name(&self, name: &Name) -> Rc<Expr> {
+        match self.context.modules.last() {
+            None => match self.context.base.get(name) {
+                None => panic!("{:?} not in base scope", name),
+                Some(body) => body.clone(),
+            },
+            Some(module_id) => match self.modules.get(module_id).unwrap().bindings.get(name) {
+                None => panic!("{:?} not in {:?}'s scope", name, module_id),
+                Some(body) => body.clone(),
+            },
+        }
+    }
+
+    fn current_module(&self) -> Option<ModuleId> {
+        self.context.modules.last().copied()
     }
 
     pub fn eval(&mut self, env: &mut Env<'heap>, expr: &Expr) -> Value<'heap> {
@@ -1331,11 +1379,8 @@ where {
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
             Expr::Name(name) => {
-                let body = match self.context.get(name) {
-                    None => panic!("{:?} not in scope", name),
-                    Some(body) => body,
-                };
-                self.eval(env, body)
+                let body = self.lookup_name(name);
+                self.eval(env, body.as_ref())
             }
             Expr::Module { id, path, item } => self.eval_from_module(env, id, path, item),
             Expr::Builtin(name) => self.eval_builtin(name),
@@ -1350,9 +1395,11 @@ where {
                     Env::Borrowed(env) => env,
                     Env::Owned(env) => self.alloc_values(env.iter().copied()),
                 };
+
                 self.alloc(Object::Closure {
                     env,
                     arg: *arg,
+                    module: self.current_module(),
                     body: body.clone(),
                 })
             }
