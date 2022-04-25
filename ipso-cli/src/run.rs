@@ -1,6 +1,6 @@
 use eval::Env;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, CommonKinds};
+use ipso_core::{self as core, CommonKinds, Name};
 use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
@@ -128,7 +128,8 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action = interpreter.eval_from_module(&mut env, &module_id, &[], entrypoint);
+        let action =
+            interpreter.eval_from_module(&mut env, &module_id, &[], &Name::definition(entrypoint));
         action.perform_io(&mut interpreter)
     };
     Ok(())

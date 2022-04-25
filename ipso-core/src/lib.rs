@@ -786,12 +786,28 @@ pub enum CmdPart {
     Expr(Expr),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Name {
+    Evidence(Rc<str>),
+    Definition(String),
+}
+
+impl Name {
+    pub fn definition<T: Into<String>>(name: T) -> Self {
+        Self::Definition(name.into())
+    }
+
+    pub fn evidence<T: Into<Rc<str>>>(name: T) -> Self {
+        Self::Evidence(name.into())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
     EVar(EVar),
     Placeholder(Placeholder),
-    Name(String),
+    Name(Name),
     Module {
         /// The module's file path.
         id: ModuleId,
@@ -808,7 +824,7 @@ pub enum Expr {
 
         e.g. `module.submodule.item`
         */
-        item: String,
+        item: Name,
     },
     Builtin(Builtin),
 
@@ -1602,28 +1618,37 @@ pub enum Declaration {
         body: Type,
     },
     Class(ClassDeclaration),
+    Evidence {
+        name: Rc<str>,
+        body: Rc<Expr>,
+    },
     Instance {
         ty_vars: Vec<(Rc<str>, Kind)>,
         assumes: Vec<Type>,
         head: Type,
-        evidence: Rc<Expr>,
+        evidence: Rc<str>,
     },
 }
 
 impl Declaration {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Rc<Expr>> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig: _, body } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), body.clone());
+                map.insert(Name::Definition(name.clone()), body.clone());
+                map
+            }
+            Declaration::Evidence { name, body } => {
+                let mut map = HashMap::new();
+                map.insert(Name::Evidence(name.clone()), body.clone());
                 map
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (a, b.1))
+                .map(|(a, b)| (Name::Definition(a), b.1))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
         }
@@ -1637,6 +1662,7 @@ impl Declaration {
                 map.insert(name.clone(), sig.clone());
                 map
             }
+            Declaration::Evidence { .. } => HashMap::new(),
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
@@ -1729,8 +1755,8 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
-        let bindings: HashMap<String, Rc<Expr>> = HashMap::new();
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Rc<Expr>> {
+        let bindings: HashMap<Name, Rc<Expr>> = HashMap::new();
         self.decls.iter().fold(bindings, |mut acc, decl| {
             acc.extend(decl.get_bindings(common_kinds).into_iter());
             acc

@@ -336,14 +336,15 @@ fn resolve_imports(
             imported_module
                 .get_bindings(common_kinds)
                 .into_keys()
-                .map(|name| {
-                    (
+                .filter_map(|name| match name {
+                    core::Name::Evidence(_) => None,
+                    core::Name::Definition(name) => Some((
                         name,
                         ImportedItemInfo::DefinitionImportedFrom {
                             id: imported_module_id,
                             path: vec![],
                         },
-                    )
+                    )),
                 }),
         );
     }
@@ -378,6 +379,10 @@ fn resolve_imports(
                 let available_names: HashSet<String> = imported_module
                     .get_bindings(common_kinds)
                     .into_keys()
+                    .filter_map(|name| match name {
+                        core::Name::Evidence(_) => None,
+                        core::Name::Definition(name) => Some(name),
+                    })
                     .collect();
 
                 names

@@ -1,3 +1,4 @@
+use crate::Declarations;
 #[cfg(test)]
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
@@ -6,7 +7,7 @@ use crate::{
 #[cfg(test)]
 use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
 #[cfg(test)]
-use ipso_syntax::{kind::Kind, r#type::Type, Spanned};
+use ipso_syntax::{kind::Kind, r#type::Type, ModuleId, Spanned};
 #[cfg(test)]
 use ipso_util::void::Void;
 #[cfg(test)]
@@ -302,7 +303,7 @@ fn check_definition_1() {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         assert_eq!(
             tc.check_declaration(&decl),
-            Ok(Some(core::Declaration::Definition {
+            Ok(Declarations::One(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
                     ty_vars: vec![(Rc::from("a"), a.kind())],
@@ -359,7 +360,7 @@ fn check_definition_2() {
         };
 
         let r = core::Type::unsafe_mk_var(0, Kind::Row);
-        let expected = Ok(Some(core::Declaration::Definition {
+        let expected = Ok(Declarations::One(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
                 ty_vars: vec![(Rc::from("r"), r.kind())],
@@ -445,7 +446,7 @@ fn check_definition_3() {
                 },
             },
         };
-        let expected = Ok(Some(core::Declaration::Definition {
+        let expected = Ok(Declarations::One(core::Declaration::Definition {
             name: String::from("thing"),
             sig: core::TypeSig {
                 ty_vars: Vec::new(),
@@ -510,7 +511,7 @@ fn check_definition_4() {
                 },
             },
         };
-        let expected = Ok(Some(core::Declaration::Definition {
+        let expected = Ok(Declarations::One(core::Declaration::Definition {
             name: String::from("getx"),
             sig: {
                 let r = core::Type::unsafe_mk_var(0, Kind::Row);
@@ -553,27 +554,40 @@ fn check_definition_4() {
     })
 }
 
+fn register_declarations(tc: &mut Typechecker, module_id: Option<ModuleId>, decls: &Declarations) {
+    match decls {
+        Declarations::Zero => {}
+        Declarations::One(a) => tc.register_declaration(module_id, a),
+        Declarations::Two(a, b) => {
+            tc.register_declaration(module_id, a);
+            tc.register_declaration(module_id, b);
+        }
+    }
+}
+
 #[test]
 fn check_class_1() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         let expected = {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
-            Ok(Some(core::Declaration::Class(core::ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("MyEq"),
-                args: vec![(Rc::from("a"), a.kind())],
-                members: vec![ClassMember {
-                    name: String::from("myeq"),
-                    sig: TypeSig {
-                        ty_vars: vec![],
-                        body: core::Type::arrow(
-                            tc.common_kinds,
-                            a.clone(),
-                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
-                        ),
-                    },
-                }],
-            })))
+            Ok(Declarations::One(core::Declaration::Class(
+                core::ClassDeclaration {
+                    supers: Vec::new(),
+                    name: Rc::from("MyEq"),
+                    args: vec![(Rc::from("a"), a.kind())],
+                    members: vec![ClassMember {
+                        name: String::from("myeq"),
+                        sig: TypeSig {
+                            ty_vars: vec![],
+                            body: core::Type::arrow(
+                                tc.common_kinds,
+                                a.clone(),
+                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
+                            ),
+                        },
+                    }],
+                },
+            )))
         };
         /*
         class MyEq a where
@@ -599,8 +613,8 @@ fn check_class_1() {
         });
         assert_eq!(expected, actual);
 
-        let decl = actual.unwrap().unwrap();
-        tc.register_declaration(&decl);
+        let decls = actual.unwrap();
+        register_declarations(&mut tc, None, &decls);
 
         let expected_class: core::ClassDeclaration = {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -656,22 +670,24 @@ fn check_class_2() {
         let expected = {
             let a = core::Type::unsafe_mk_var(1, Kind::Type);
             let b = core::Type::unsafe_mk_var(0, Kind::Type);
-            Ok(Some(core::Declaration::Class(core::ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("Wut"),
-                args: vec![(Rc::from("a"), a.kind())],
-                members: vec![ClassMember {
-                    name: String::from("wut"),
-                    sig: TypeSig {
-                        ty_vars: vec![(Rc::from("b"), b.kind())],
-                        body: core::Type::arrow(
-                            tc.common_kinds,
-                            a,
-                            core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
-                        ),
-                    },
-                }],
-            })))
+            Ok(Declarations::One(core::Declaration::Class(
+                core::ClassDeclaration {
+                    supers: Vec::new(),
+                    name: Rc::from("Wut"),
+                    args: vec![(Rc::from("a"), a.kind())],
+                    members: vec![ClassMember {
+                        name: String::from("wut"),
+                        sig: TypeSig {
+                            ty_vars: vec![(Rc::from("b"), b.kind())],
+                            body: core::Type::arrow(
+                                tc.common_kinds,
+                                a,
+                                core::Type::arrow(tc.common_kinds, b, core::Type::Bool),
+                            ),
+                        },
+                    }],
+                },
+            )))
         };
         /*
         class Wut a where
@@ -697,8 +713,8 @@ fn check_class_2() {
         });
         assert_eq!(expected, actual);
 
-        let decl = actual.unwrap().unwrap();
-        tc.register_declaration(&decl);
+        let decls = actual.unwrap();
+        register_declarations(&mut tc, None, &decls);
 
         let expected_class_decl: core::ClassDeclaration = {
             let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -759,39 +775,49 @@ fn check_instance_1() {
                 Rc::from("Eq"),
                 Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
             );
-            Ok(Some(core::Declaration::Instance {
-                ty_vars: Vec::new(),
-                assumes: Vec::new(),
-                head: core::Type::app(eq_ty, core::Type::Unit),
-                evidence: Rc::new(core::Expr::mk_record(
-                    vec![(
-                        // eq
-                        core::Expr::Int(0),
-                        // \a b -> True
-                        core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
-                    )],
-                    None,
-                )),
-            }))
+            let evidence_name: Rc<str> = Rc::from("Eq ()");
+            Ok(Declarations::Two(
+                core::Declaration::Evidence {
+                    name: evidence_name.clone(),
+                    body: Rc::new(core::Expr::mk_record(
+                        vec![(
+                            // eq
+                            core::Expr::Int(0),
+                            // \a b -> True
+                            core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
+                        )],
+                        None,
+                    )),
+                },
+                core::Declaration::Instance {
+                    ty_vars: Vec::new(),
+                    assumes: Vec::new(),
+                    head: core::Type::app(eq_ty, core::Type::Unit),
+                    evidence: evidence_name,
+                },
+            ))
         };
         {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
-            tc.register_declaration(&core::Declaration::Class(core::ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("Eq"),
-                args: vec![(Rc::from("a"), Kind::Type)],
-                members: vec![ClassMember {
-                    name: String::from("eq"),
-                    sig: TypeSig {
-                        ty_vars: vec![],
-                        body: core::Type::arrow(
-                            tc.common_kinds,
-                            a.clone(),
-                            core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
-                        ),
-                    },
-                }],
-            }))
+            tc.register_declaration(
+                None,
+                &core::Declaration::Class(core::ClassDeclaration {
+                    supers: Vec::new(),
+                    name: Rc::from("Eq"),
+                    args: vec![(Rc::from("a"), Kind::Type)],
+                    members: vec![ClassMember {
+                        name: String::from("eq"),
+                        sig: TypeSig {
+                            ty_vars: vec![],
+                            body: core::Type::arrow(
+                                tc.common_kinds,
+                                a.clone(),
+                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
+                            ),
+                        },
+                    }],
+                }),
+            )
         };
         /*
         instance Eq () where

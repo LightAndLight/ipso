@@ -4,7 +4,7 @@ use crate::{
     Typechecker,
 };
 #[cfg(test)]
-use ipso_core::{self as core, Binop, Builtin, ClassDeclaration, ClassMember, EVar, Expr, TypeSig};
+use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 #[cfg(test)]
 use ipso_syntax::kind::Kind;
 #[cfg(test)]
@@ -128,23 +128,29 @@ fn solve_constraint_4() {
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         tc.register_instance(
+            None,
             &Vec::new(),
             &Vec::new(),
             &core::Type::app(eq_ty.clone(), core::Type::Int),
+            /*
             Rc::new(Expr::mk_record(
                 vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))],
                 None,
             )),
+             */
+            Rc::from("MyEq Int"),
         );
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         tc.register_instance(
+            None,
             &[(Rc::from("a"), a.kind())],
             &[core::Type::app(eq_ty.clone(), a.clone())],
             &core::Type::app(
                 eq_ty.clone(),
                 core::Type::app(core::Type::mk_array(tc.common_kinds), a),
             ),
+            /*
             Rc::new(Expr::mk_lam(
                 true,
                 Expr::mk_record(
@@ -152,29 +158,19 @@ fn solve_constraint_4() {
                         Expr::Int(0),
                         Expr::mk_app(
                             Expr::Builtin(Builtin::EqArray),
-                            Expr::mk_app(Expr::Name(String::from("myeq")), Expr::Var(0)),
+                            Expr::mk_app(Expr::Name(Name::definition("myeq")), Expr::Var(0)),
                         ),
                     )],
                     None,
                 ),
             )),
+             */
+            Rc::from("MyEq a => MyEq (Array a)"),
         );
 
         let expected = Ok(Rc::new(Expr::mk_app(
-            Expr::mk_lam(
-                true,
-                Expr::mk_record(
-                    vec![(
-                        Expr::Int(0),
-                        Expr::mk_app(
-                            Expr::Builtin(Builtin::EqArray),
-                            Expr::mk_app(Expr::Name(String::from("myeq")), Expr::Var(0)),
-                        ),
-                    )],
-                    None,
-                ),
-            ),
-            Expr::mk_record(vec![(Expr::Int(0), Expr::Builtin(Builtin::EqInt))], None),
+            Expr::Name(Name::evidence("MyEq a => MyEq (Array a)")),
+            Expr::Name(Name::evidence("MyEq Int")),
         )));
         let constraint = &Constraint::from_type(&core::Type::app(
             eq_ty,

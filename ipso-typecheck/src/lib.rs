@@ -18,6 +18,13 @@ use std::{
 };
 use syntax::{ModuleId, Modules};
 
+#[derive(Debug, PartialEq, Eq)]
+enum Declarations {
+    Zero,
+    One(core::Declaration),
+    Two(core::Declaration, core::Declaration),
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
     indices: HashMap<Rc<str>, Vec<usize>>,
@@ -395,15 +402,16 @@ macro_rules! with_tc {
     ($location:expr, $f:expr) => {{
         use ipso_builtins as builtins;
         use ipso_core::CommonKinds;
-        use ipso_syntax::{self as syntax, Modules};
+        use ipso_syntax::{self as syntax, ModuleKey, Modules};
 
         let common_kinds = CommonKinds::default();
-        let modules = Modules::new();
-        let tc = {
-            let mut tc = Typechecker::new($location, &common_kinds, &modules);
-            tc.register_from_import(&builtins::builtins(tc.common_kinds), &syntax::Names::All);
-            tc
-        };
+        let mut modules = Modules::new();
+        let builtins_module_id = modules.insert(
+            ModuleKey::from("builtins"),
+            builtins::builtins(&common_kinds),
+        );
+        let mut tc = Typechecker::new($location, &common_kinds, &modules);
+        tc.register_from_import(builtins_module_id, &syntax::Names::All);
         $f(tc)
     }};
 }
@@ -610,16 +618,24 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn register_instance(
         &mut self,
+        module_id: Option<ModuleId>,
         ty_vars: &[(Rc<str>, Kind)],
         assumes: &[core::Type],
         head: &core::Type,
-        evidence: Rc<core::Expr>,
+        evidence_name: Rc<str>,
     ) {
         self.implications.push(Implication {
             ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
             antecedents: Vec::from(assumes),
             consequent: head.clone(),
-            evidence,
+            evidence: Rc::new(match module_id {
+                Some(module_id) => core::Expr::Module {
+                    id: module_id,
+                    path: vec![],
+                    item: core::Name::Evidence(evidence_name),
+                },
+                None => core::Expr::Name(core::Name::Evidence(evidence_name)),
+            }),
         });
     }
 
@@ -635,7 +651,7 @@ impl<'modules> Typechecker<'modules> {
         todo!("register TypeAlias {:?}", (name, args, body))
     }
 
-    pub fn register_declaration(&mut self, decl: &core::Declaration) {
+    pub fn register_declaration(&mut self, module_id: Option<ModuleId>, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
                 self.register_builtin_type(name, kind);
@@ -645,33 +661,44 @@ impl<'modules> Typechecker<'modules> {
                 self.register_type_alias(name, args, body)
             }
             core::Declaration::Class(decl) => self.register_class(decl),
+            core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
                 assumes,
                 head,
                 evidence,
                 ..
-            } => self.register_instance(ty_vars, assumes, head, evidence.clone()),
+            } => self.register_instance(module_id, ty_vars, assumes, head, evidence.clone()),
         }
     }
 
     pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
         let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
             acc.and_then(|mut decls| {
-                self.check_declaration(decl).map(|m_decl| match m_decl {
-                    Option::None => decls,
-                    Option::Some(decl) => {
-                        self.register_declaration(&decl);
-                        decls.push(decl);
-                        decls
-                    }
-                })
+                self.check_declaration(decl)
+                    .map(|checked_decls| match checked_decls {
+                        Declarations::Zero => decls,
+                        Declarations::One(decl) => {
+                            self.register_declaration(None, &decl);
+                            decls.push(decl);
+                            decls
+                        }
+                        Declarations::Two(decl1, decl2) => {
+                            self.register_declaration(None, &decl1);
+                            decls.push(decl1);
+                            self.register_declaration(None, &decl2);
+                            decls.push(decl2);
+                            decls
+                        }
+                    })
             })
         })?;
         Ok(core::Module { decls })
     }
 
-    pub fn register_from_import(&mut self, module: &core::Module, names: &syntax::Names) {
+    pub fn register_from_import(&mut self, module_id: ModuleId, names: &syntax::Names) {
+        let module = self.modules.lookup(module_id);
+
         let should_import = |expected_name: &str| -> bool {
             match names {
                 syntax::Names::All => true,
@@ -701,6 +728,7 @@ impl<'modules> Typechecker<'modules> {
                         self.register_class(class_decl);
                     }
                 }
+                core::Declaration::Evidence { .. } => {}
                 core::Declaration::Instance {
                     ty_vars,
                     assumes,
@@ -708,7 +736,13 @@ impl<'modules> Typechecker<'modules> {
                     evidence,
                     ..
                 } => {
-                    self.register_instance(ty_vars, assumes, head, evidence.clone());
+                    self.register_instance(
+                        Some(module_id),
+                        ty_vars,
+                        assumes,
+                        head,
+                        evidence.clone(),
+                    );
                 }
             }
         }
@@ -1005,7 +1039,35 @@ impl<'modules> Typechecker<'modules> {
             Vec<Spanned<syntax::Pattern>>,
             Spanned<syntax::Expr>,
         )],
-    ) -> Result<core::Declaration, TypeError> {
+    ) -> Result<(core::Declaration, core::Declaration), TypeError> {
+        let evidence_name: Rc<str> = {
+            let mut buffer = String::new();
+
+            if !assumes.is_empty() {
+                let mut assumes = assumes.iter();
+                if let Some(assume) = assumes.next() {
+                    buffer.push_str(&assume.item.render());
+                }
+                for assume in assumes {
+                    buffer.push(',');
+                    buffer.push_str(&assume.item.render());
+                }
+                buffer.push_str("=>");
+            }
+            {
+                buffer.push_str(
+                    args.iter()
+                        .fold(syntax::Type::Name(name.item.clone()), |acc, arg| {
+                            syntax::Type::mk_app(acc, arg.item.clone())
+                        })
+                        .render()
+                        .as_str(),
+                );
+            }
+
+            Rc::from(buffer)
+        };
+
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass {
@@ -1171,21 +1233,27 @@ impl<'modules> Typechecker<'modules> {
             Rc::new(evidence)
         };
 
-        Ok(core::Declaration::Instance {
+        let evidence_decl = core::Declaration::Evidence {
+            name: evidence_name.clone(),
+            body: evidence,
+        };
+        let instance_decl = core::Declaration::Instance {
             ty_vars,
             assumes: assumes
                 .into_iter()
                 .map(|assume| self.zonk_type(assume))
                 .collect(),
             head: self.zonk_type(head),
-            evidence,
-        })
+            evidence: evidence_name,
+        };
+
+        Ok((evidence_decl, instance_decl))
     }
 
     fn check_declaration(
         &mut self,
         decl: &syntax::Spanned<syntax::Declaration>,
-    ) -> Result<Option<core::Declaration>, TypeError> {
+    ) -> Result<Declarations, TypeError> {
         match &decl.item {
             syntax::Declaration::Definition {
                 name,
@@ -1194,19 +1262,19 @@ impl<'modules> Typechecker<'modules> {
                 body,
             } => self
                 .check_definition(name, ty, args, body)
-                .map(Option::Some),
+                .map(Declarations::One),
             syntax::Declaration::TypeAlias { name, args, body } => {
                 todo!("check type alias {:?}", (name, args, body))
             }
 
             syntax::Declaration::Import { resolved, .. }
             | syntax::Declaration::FromImport { resolved, .. } => {
-                let id = resolved.unwrap_or_else(|| panic!("unresolved import"));
+                let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
 
-                let module = self.modules.lookup(id);
+                let module = self.modules.lookup(module_id);
                 {
                     let signatures = module.get_signatures(self.common_kinds);
-                    self.module_context.insert(id, signatures);
+                    self.module_context.insert(module_id, signatures);
                 }
                 module.decls.iter().for_each(|decl| {
                     if let core::Declaration::Instance {
@@ -1217,11 +1285,17 @@ impl<'modules> Typechecker<'modules> {
                         ..
                     } = decl
                     {
-                        self.register_instance(ty_vars, assumes, head, evidence.clone())
+                        self.register_instance(
+                            Some(module_id),
+                            ty_vars,
+                            assumes,
+                            head,
+                            evidence.clone(),
+                        )
                     }
                 });
 
-                Ok(None)
+                Ok(Declarations::Zero)
             }
 
             syntax::Declaration::Class {
@@ -1231,7 +1305,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_class(supers, name, args, members)
-                .map(Option::Some),
+                .map(Declarations::One),
             syntax::Declaration::Instance {
                 assumes,
                 name,
@@ -1239,7 +1313,7 @@ impl<'modules> Typechecker<'modules> {
                 members,
             } => self
                 .check_instance(assumes, name, args, members)
-                .map(Option::Some),
+                .map(|(a, b)| Declarations::Two(a, b)),
         }
     }
 

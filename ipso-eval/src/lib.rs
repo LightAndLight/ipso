@@ -1,6 +1,8 @@
 mod test;
 
-use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Pattern, StringPart};
+use ipso_core::{
+    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
+};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, Modules};
 use paste::paste;
@@ -534,12 +536,12 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module {
-    pub bindings: HashMap<String, Rc<Expr>>,
+    pub bindings: HashMap<Name, Rc<Expr>>,
 }
 
 struct Context<'ctx> {
     modules: Vec<ModuleId>,
-    base: &'ctx HashMap<String, Rc<Expr>>,
+    base: &'ctx HashMap<Name, Rc<Expr>>,
 }
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
@@ -558,7 +560,7 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
         stdout: &'io mut dyn io::Write,
         common_kinds: &'ctx CommonKinds,
         modules: &'ctx Modules<core::Module>,
-        context: &'ctx HashMap<String, Rc<Expr>>,
+        context: &'ctx HashMap<Name, Rc<Expr>>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
@@ -1337,7 +1339,7 @@ where {
         env: &mut Env<'heap>,
         id: &ModuleId,
         _path: &[String],
-        binding: &str,
+        binding: &Name,
     ) -> Value<'heap> {
         let expr = match self.modules.get(id) {
             None => panic!("{:?} not found", id),
@@ -1354,7 +1356,7 @@ where {
         result
     }
 
-    fn lookup_name(&self, name: &str) -> Rc<Expr> {
+    fn lookup_name(&self, name: &Name) -> Rc<Expr> {
         match self.context.modules.last() {
             None => match self.context.base.get(name) {
                 None => panic!("{:?} not in base scope", name),
