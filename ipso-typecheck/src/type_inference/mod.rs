@@ -1433,73 +1433,75 @@ impl<'a> InferenceContext<'a> {
                 },
             },
             syntax::Expr::Module { id, path, item } => {
-                match self.modules.get(id) {
-                    None => {
-                        /*
-                        A module accessor will only be desugared if the module was in scope, so this case
-                        is impossible as long as `ctx.modules` is valid w.r.t this expression.
-                        */
-                        panic!(
-                            "module not in scope. id: {:?}, path: {:?}, item: {:?}",
-                            id, path, item
-                        )
-                    }
-                    Some(definitions) => {
-                        fn lookup_path<'a>(
-                            source: &Source,
-                            definitions: &'a HashMap<String, Signature>,
-                            path: &[String],
-                        ) -> Result<&'a HashMap<String, Signature>, InferenceError>
-                        {
-                            if path.is_empty() {
-                                Ok(definitions)
-                            } else {
-                                match definitions.get(&path[0]) {
-                                    None => Err(InferenceError::not_in_scope(source, &path[0])
-                                        // TODO: wrap the `path` items in Spanned, and use the
-                                        // position of the out-of-scope path item.
-                                        .with_position(0)),
-                                    Some(signature) => {
-                                        match signature {
-                                            Signature::TypeSig(_) => {
-                                                Err(InferenceError::not_a_module(source)
-                                                    // TODO: wrap the `path` items in Spanned, and use the
-                                                    // position of the out-of-scope path item.
-                                                    .with_position(0))
-                                            }
-                                            Signature::Module(definitions) => {
-                                                lookup_path(source, definitions, &path[1..])
-                                            }
-                                        }
+                fn lookup_path<'a>(
+                    source: &Source,
+                    definitions: &'a HashMap<String, Signature>,
+                    path: &[String],
+                ) -> Result<&'a HashMap<String, Signature>, InferenceError> {
+                    if path.is_empty() {
+                        Ok(definitions)
+                    } else {
+                        match definitions.get(&path[0]) {
+                            None => Err(InferenceError::not_in_scope(source, &path[0])
+                                // TODO: wrap the `path` items in Spanned, and use the
+                                // position of the out-of-scope path item.
+                                .with_position(0)),
+                            Some(signature) => {
+                                match signature {
+                                    Signature::TypeSig(_) => {
+                                        Err(InferenceError::not_a_module(source)
+                                            // TODO: wrap the `path` items in Spanned, and use the
+                                            // position of the out-of-scope path item.
+                                            .with_position(0))
+                                    }
+                                    Signature::Module(definitions) => {
+                                        lookup_path(source, definitions, &path[1..])
                                     }
                                 }
                             }
                         }
-
-                        let definitions = lookup_path(self.source, definitions, path)?;
-
-                        match definitions.get(item) {
-                            None => Err(InferenceError::not_in_scope(self.source, item)
-                                // TODO: wrap `item` in Spanned and use its position for the error
-                                .with_position(expr.pos)),
-                            Some(signature) => match signature {
-                                Signature::TypeSig(type_signature) => Ok(self.instantiate(
-                                    expr.pos,
-                                    Expr::Module {
-                                        id: *id,
-                                        path: path.clone(),
-                                        item: Name::definition(item.clone()),
-                                    },
-                                    type_signature,
-                                )),
-                                Signature::Module(_) => {
-                                    Err(InferenceError::not_a_value(self.source, item)
-                                        // TODO: wrap `item` in Spanned and use its position for the error
-                                        .with_position(expr.pos))
-                                }
-                            },
-                        }
                     }
+                }
+
+                let definitions = match id {
+                    syntax::ModuleRef::This => self.type_signatures,
+                    syntax::ModuleRef::Id(id) => match self.modules.get(id) {
+                        None => {
+                            /*
+                            A module accessor will only be desugared if the module was in scope, so this case
+                            is impossible as long as `ctx.modules` is valid w.r.t this expression.
+                            */
+                            panic!(
+                                "module not in scope. id: {:?}, path: {:?}, item: {:?}",
+                                id, path, item
+                            )
+                        }
+                        Some(definitions) => definitions,
+                    },
+                };
+
+                let definitions = lookup_path(self.source, definitions, path)?;
+
+                match definitions.get(item) {
+                    None => Err(InferenceError::not_in_scope(self.source, item)
+                        // TODO: wrap `item` in Spanned and use its position for the error
+                        .with_position(expr.pos)),
+                    Some(signature) => match signature {
+                        Signature::TypeSig(type_signature) => Ok(self.instantiate(
+                            expr.pos,
+                            Expr::Module {
+                                id: *id,
+                                path: path.clone(),
+                                item: Name::definition(item.clone()),
+                            },
+                            type_signature,
+                        )),
+                        Signature::Module(_) => {
+                            Err(InferenceError::not_a_value(self.source, item)
+                                // TODO: wrap `item` in Spanned and use its position for the error
+                                .with_position(expr.pos))
+                        }
+                    },
                 }
             }
 

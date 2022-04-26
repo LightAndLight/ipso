@@ -362,11 +362,27 @@ pub enum CmdPart {
     Expr(Spanned<Expr>),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ModuleRef {
+    /// A module self-reference.
+    This,
+
+    /// A reference to another module.
+    Id(ModuleId),
+}
+
+impl From<ModuleId> for ModuleRef {
+    fn from(id: ModuleId) -> Self {
+        Self::Id(id)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
-        id: ModuleId,
+        /// A reference to a module.
+        id: ModuleRef,
 
         /**
         A chain of submodule accessors.

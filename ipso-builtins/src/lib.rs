@@ -2,7 +2,7 @@ use ipso_core::{
     Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Name,
     Pattern, Type, TypeSig,
 };
-use ipso_syntax::{kind::Kind, ModuleId};
+use ipso_syntax::{kind::Kind, ModuleRef};
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
@@ -1315,8 +1315,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             // array.flatMap (toArgs toArgsDict)
                             Expr::mk_app(
                                 Expr::Module {
-                                    // TODO: this should be a distinguished value of "self"
-                                    id: ModuleId::new(0),
+                                    id: ModuleRef::This,
                                     path: vec![String::from("array")],
                                     item: Name::definition("flatMap"),
                                 },

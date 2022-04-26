@@ -10,7 +10,7 @@ use diagnostic::{Location, Message};
 use evidence::{solver::solve_placeholder, Constraint, Evidence};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
-use ipso_syntax::{self as syntax, kind::Kind, Spanned};
+use ipso_syntax::{self as syntax, kind::Kind, ModuleRef, Spanned};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -635,7 +635,7 @@ impl<'modules> Typechecker<'modules> {
             consequent: head.clone(),
             evidence: Rc::new(match module_id {
                 Some(module_id) => core::Expr::Module {
-                    id: module_id,
+                    id: ModuleRef::from(module_id),
                     path: vec![],
                     item: core::Name::Evidence(evidence_name),
                 },

@@ -5,7 +5,7 @@ use ipso_core::{
     self as core, Binding, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
 };
 use ipso_rope::Rope;
-use ipso_syntax::{ModuleId, Modules};
+use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
 use std::{
     cmp::Ordering,
@@ -1336,47 +1336,64 @@ where {
         }
     }
 
+    fn current_bindings(&self) -> &HashMap<Name, Binding> {
+        match self.context.modules.last() {
+            Some(id) => &self.modules.get(id).unwrap().bindings,
+            None => self.context.base,
+        }
+    }
+
     pub fn eval_from_module(
         &mut self,
         env: &mut Env<'heap>,
-        id: &ModuleId,
+        id: &ModuleRef,
         path: &[String],
         item: &Name,
     ) -> Value<'heap> {
-        let expr = match self.modules.get(id) {
-            None => panic!("{:?} not found", id),
-            Some(module) => {
-                fn lookup_path<'a>(
-                    bindings: &'a HashMap<Name, Binding>,
-                    path: &[String],
-                ) -> &'a HashMap<Name, Binding> {
-                    if path.is_empty() {
-                        bindings
-                    } else {
-                        match bindings.get(&Name::definition(&path[0])) {
-                            None => panic!("submodule {:?} not found", path[0]),
-                            Some(binding) => match binding {
-                                Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
-                                Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
-                            },
-                        }
-                    }
-                }
-
-                let bindings = lookup_path(&module.bindings, path);
-                match bindings.get(item) {
-                    None => panic!("{:?} not found in {:?}", item, id),
+        fn lookup_path<'a>(
+            bindings: &'a HashMap<Name, Binding>,
+            path: &[String],
+        ) -> &'a HashMap<Name, Binding> {
+            if path.is_empty() {
+                bindings
+            } else {
+                match bindings.get(&Name::definition(&path[0])) {
+                    None => panic!("submodule {:?} not found", path[0]),
                     Some(binding) => match binding {
-                        Binding::Expr(expr) => expr.clone(),
-                        Binding::Module(module) => panic!("unexpected module {:?}", module),
+                        Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
+                        Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
                     },
                 }
             }
+        }
+
+        let bindings = match id {
+            ModuleRef::This => self.current_bindings(),
+            ModuleRef::Id(id) => match self.modules.get(id) {
+                None => panic!("{:?} not found", id),
+                Some(module) => &module.bindings,
+            },
         };
 
-        self.context.modules.push(*id);
+        let bindings = lookup_path(bindings, path);
+
+        let expr = match bindings.get(item) {
+            None => panic!("{:?} not found in {:?}", item, id),
+            Some(binding) => match binding {
+                Binding::Expr(expr) => expr.clone(),
+                Binding::Module(module) => panic!("unexpected module {:?}", module),
+            },
+        };
+
+        if let ModuleRef::Id(id) = id {
+            self.context.modules.push(*id);
+        }
+
         let result = self.eval(env, &expr);
-        self.context.modules.pop();
+
+        if let ModuleRef::Id(_) = id {
+            self.context.modules.pop();
+        }
 
         result
     }

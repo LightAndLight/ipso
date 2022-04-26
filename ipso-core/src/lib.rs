@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, kind::Kind, r#type};
+use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
 use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
     rc::Rc,
 };
-use syntax::ModuleId;
 
 /**
 Well-kinded types.
@@ -809,8 +808,8 @@ pub enum Expr {
     Placeholder(Placeholder),
     Name(Name),
     Module {
-        /// The module's file path.
-        id: ModuleId,
+        /// A reference to a module.
+        id: ModuleRef,
 
         /**
         A chain of submodule accessors.

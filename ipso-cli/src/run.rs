@@ -5,14 +5,13 @@ use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, kind::Kind};
+use ipso_syntax::{kind::Kind, ModuleKey, ModuleRef, Modules};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
-use syntax::{ModuleKey, Modules};
 use typed_arena::Arena;
 
 pub struct Config {
@@ -129,8 +128,12 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &values,
             &objects,
         );
-        let action =
-            interpreter.eval_from_module(&mut env, &module_id, &[], &Name::definition(entrypoint));
+        let action = interpreter.eval_from_module(
+            &mut env,
+            &ModuleRef::from(module_id),
+            &[],
+            &Name::definition(entrypoint),
+        );
         action.perform_io(&mut interpreter)
     };
     Ok(())

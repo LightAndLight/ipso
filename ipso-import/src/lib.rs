@@ -2,7 +2,7 @@ use diagnostic::{Location, Message};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax};
+use ipso_syntax::{self as syntax, desugar, ModuleId, ModuleKey, ModuleRef, Modules};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use ipso_util::hash_multi_set::HashMultiset;
 use std::{
@@ -11,7 +11,6 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use syntax::{desugar, ModuleId, ModuleKey, Modules};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -146,7 +145,7 @@ fn rewrite_module_accessors_expr(
                             ```
                             */
                             *expr = syntax::Expr::Module {
-                                id: *id,
+                                id: ModuleRef::from(*id),
                                 path: path.clone(),
                                 item: name.clone(),
                             };
@@ -262,7 +261,7 @@ fn rewrite_module_accessors_expr(
                         imported_items.get(name)
                     {
                         *expr = syntax::Expr::Module {
-                            id: *id,
+                            id: ModuleRef::from(*id),
                             path: vec![],
                             item: field.clone(),
                         }
