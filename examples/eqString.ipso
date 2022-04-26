@@ -8,6 +8,6 @@ printBool b =
 
 main : IO ()
 main = 
-  io.andThen (printBool (eqString "yes" "yes")) (\_ ->
-  printBool (eqString "yes" "no")
+  io.andThen (printBool (string.eq "yes" "yes")) (\_ ->
+  printBool (string.eq "yes" "no")
   )

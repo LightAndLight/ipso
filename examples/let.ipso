@@ -22,8 +22,8 @@ d =
 
 main : IO ()
 main = 
-  io.andThen (print (showInt a)) (\_ ->
-  io.andThen (print (showInt b)) (\_ ->
-  io.andThen (print (showInt c)) (\_ ->
-  print (showInt d)
+  io.andThen (print (int.show a)) (\_ ->
+  io.andThen (print (int.show b)) (\_ ->
+  io.andThen (print (int.show c)) (\_ ->
+  print (int.show d)
   )))

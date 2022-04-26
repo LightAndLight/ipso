@@ -2,18 +2,18 @@ class Show a where
   show : a -> String
 
 instance Show Int where
-  show = showInt
+  show = int.show
 
 prettyArray : Show a => Array a -> String
 prettyArray arr = 
   "[${
-    if eqInt (lengthArray arr) 0
+    if int.eq (array.length arr) 0
     then ""
     else 
-      foldlArray 
+      array.foldl 
         (\acc el -> "${acc}, ${show el}") 
-        (show (indexArray 0 arr))
-        (sliceArray 1 (lengthArray arr - 1) arr)
+        (show (array.index 0 arr))
+        (array.slice 1 (array.length arr - 1) arr)
   }]"
 
 main : IO ()

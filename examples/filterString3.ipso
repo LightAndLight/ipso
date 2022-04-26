@@ -3,4 +3,4 @@ not x = if x then false else true
 
 main : IO ()
 main = 
-  println (filterString (\c -> not (eqChar c ' ')) "the quick brown fox")
+  println (string.filter (\c -> not (char.eq c ' ')) "the quick brown fox")

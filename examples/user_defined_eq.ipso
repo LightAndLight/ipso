@@ -2,10 +2,10 @@ class MyEq a where
   myeq : a -> a -> Bool
 
 instance MyEq Int where
-  myeq = eqInt
+  myeq = int.eq
 
 instance (MyEq a) => MyEq (Array a) where
-  myeq = eqArray myeq
+  myeq = array.eq myeq
 
 main : IO ()
 main =
