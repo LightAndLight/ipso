@@ -2,7 +2,7 @@ use ipso_core::{
     Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Name,
     Pattern, Type, TypeSig,
 };
-use ipso_syntax::kind::Kind;
+use ipso_syntax::{kind::Kind, ModuleId};
 use std::rc::Rc;
 
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
@@ -17,6 +17,24 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
 
     Module {
         decls: vec![
+            // trace : a -> b -> b
+            Declaration::Definition {
+                name: String::from("trace"),
+                sig: {
+                    let a = Type::unsafe_mk_var(1, Kind::Type);
+                    let b = Type::unsafe_mk_var(0, Kind::Type);
+                    TypeSig {
+                        ty_vars: vec![
+                            // a : Type
+                            (Rc::from("a"), a.kind()),
+                            // b : Type
+                            (Rc::from("b"), a.kind()),
+                        ],
+                        body: Type::arrow(common_kinds, a, Type::arrow(common_kinds, b.clone(), b)),
+                    }
+                },
+                body: Expr::alloc_builtin(Builtin::Trace),
+            },
             Declaration::Module {
                 name: String::from("io"),
                 decls: vec![
@@ -97,33 +115,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     }),
                 ],
             },
-            // trace : a -> b -> b
-            Declaration::Definition {
-                name: String::from("trace"),
-                sig: {
-                    let a = Type::unsafe_mk_var(1, Kind::Type);
-                    let b = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![
-                            // a : Type
-                            (Rc::from("a"), a.kind()),
-                            // b : Type
-                            (Rc::from("b"), a.kind()),
-                        ],
-                        body: Type::arrow(common_kinds, a, Type::arrow(common_kinds, b.clone(), b)),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::Trace),
-            },
-            // toUtf8 : String -> Bytes
-            Declaration::Definition {
-                name: String::from("toUtf8"),
-                sig: TypeSig {
-                    ty_vars: vec![],
-                    body: Type::arrow(common_kinds, string_ty.clone(), bytes_ty),
-                },
-                body: Expr::alloc_builtin(Builtin::ToUtf8),
-            },
             // println : String -> IO ()
             Declaration::Definition {
                 name: String::from("println"),
@@ -159,267 +150,356 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 },
                 body: Expr::alloc_builtin(Builtin::Readln),
             },
-            // eqString : String -> String -> Bool
-            Declaration::Definition {
-                name: String::from("eqString"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        string_ty.clone(),
-                        Type::arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::EqString),
-            },
-            // eqInt : Int -> Int -> Bool
-            Declaration::Definition {
-                name: String::from("eqInt"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        int_ty.clone(),
-                        Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::EqInt),
-            },
-            // showInt : Int -> String
-            Declaration::Definition {
-                name: String::from("showInt"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(common_kinds, int_ty.clone(), string_ty.clone()),
-                },
-                body: Expr::alloc_builtin(Builtin::ShowInt),
-            },
-            // eqArray : (a -> a -> Bool) -> Array a -> Array a -> Bool
-            Declaration::Definition {
-                name: String::from("eqArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::arrow(
+            Declaration::Module {
+                name: String::from("string"),
+                decls: vec![
+                    // toUtf8 : String -> Bytes
+                    Rc::new(Declaration::Definition {
+                        name: String::from("toUtf8"),
+                        sig: TypeSig {
+                            ty_vars: vec![],
+                            body: Type::arrow(common_kinds, string_ty.clone(), bytes_ty),
+                        },
+                        body: Expr::alloc_builtin(Builtin::ToUtf8),
+                    }),
+                    // eq : String -> String -> Bool
+                    Rc::new(Declaration::Definition {
+                        name: String::from("eq"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(
                                 common_kinds,
-                                a.clone(),
-                                Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
+                                string_ty.clone(),
+                                Type::arrow(common_kinds, string_ty.clone(), bool_ty.clone()),
                             ),
-                            Type::arrow(
+                        },
+                        body: Expr::alloc_builtin(Builtin::EqString),
+                    }),
+                    // filter : (Char -> Bool) -> String -> String
+                    Rc::new(Declaration::Definition {
+                        name: String::from("filter"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(
                                 common_kinds,
-                                Type::app(array_ty.clone(), a.clone()),
+                                Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
+                                Type::arrow(common_kinds, string_ty.clone(), string_ty.clone()),
+                            ),
+                        },
+                        body: Expr::alloc_builtin(Builtin::FilterString),
+                    }),
+                    // split : Char -> String -> Array String
+                    Rc::new(Declaration::Definition {
+                        name: String::from("split"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(
+                                common_kinds,
+                                char_ty.clone(),
                                 Type::arrow(
                                     common_kinds,
-                                    Type::app(array_ty.clone(), a),
-                                    bool_ty.clone(),
+                                    string_ty.clone(),
+                                    Type::app(array_ty.clone(), string_ty.clone()),
                                 ),
                             ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::EqArray),
+                        },
+                        body: Expr::alloc_builtin(Builtin::SplitString),
+                    }),
+                    // foldl : (a -> Char -> a) -> a -> String -> a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("foldl"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::arrow(
+                                        common_kinds,
+                                        a.clone(),
+                                        Type::arrow(common_kinds, char_ty.clone(), a.clone()),
+                                    ),
+                                    Type::arrow(
+                                        common_kinds,
+                                        a.clone(),
+                                        Type::arrow(common_kinds, string_ty.clone(), a),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::FoldlString),
+                    }),
+                ],
             },
-            // foldlArray : (b -> a -> b) -> b -> Array a -> b
-            Declaration::Definition {
-                name: String::from("foldlArray"),
-                sig: {
-                    let b = Type::unsafe_mk_var(1, Kind::Type);
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("b"), b.kind()), (Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::arrow(
+            Declaration::Module {
+                name: String::from("int"),
+                decls: vec![
+                    // eq : Int -> Int -> Bool
+                    Rc::new(Declaration::Definition {
+                        name: String::from("eq"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(
                                 common_kinds,
-                                b.clone(),
-                                Type::arrow(common_kinds, a.clone(), b.clone()),
+                                int_ty.clone(),
+                                Type::arrow(common_kinds, int_ty.clone(), bool_ty.clone()),
                             ),
-                            Type::arrow(
-                                common_kinds,
-                                b.clone(),
-                                Type::arrow(common_kinds, Type::app(array_ty.clone(), a), b),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::FoldlArray),
+                        },
+                        body: Expr::alloc_builtin(Builtin::EqInt),
+                    }),
+                    // show : Int -> String
+                    Rc::new(Declaration::Definition {
+                        name: String::from("show"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(common_kinds, int_ty.clone(), string_ty.clone()),
+                        },
+                        body: Expr::alloc_builtin(Builtin::ShowInt),
+                    }),
+                ],
             },
-            // generateArray : Int -> (Int -> a) -> Array a
-            Declaration::Definition {
-                name: String::from("generateArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            int_ty.clone(),
-                            Type::arrow(
-                                common_kinds,
-                                Type::arrow(common_kinds, int_ty.clone(), a.clone()),
-                                Type::app(array_ty.clone(), a),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::GenerateArray),
-            },
-            // lengthArray : Array a -> Int
-            Declaration::Definition {
-                name: String::from("lengthArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::app(array_ty.clone(), a),
-                            int_ty.clone(),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::LengthArray),
-            },
-            // indexArray : Int -> Array a -> a
-            Declaration::Definition {
-                name: String::from("indexArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            int_ty.clone(),
-                            Type::arrow(common_kinds, Type::app(array_ty.clone(), a.clone()), a),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::IndexArray),
-            },
-            // sliceArray : Int -> Int -> Array a -> Array a
-            Declaration::Definition {
-                name: String::from("sliceArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
-                            int_ty.clone(),
-                            Type::arrow(
-                                common_kinds,
-                                int_ty,
-                                Type::arrow(
+            Declaration::Module {
+                name: String::from("array"),
+                decls: vec![
+                    // eq : (a -> a -> Bool) -> Array a -> Array a -> Bool
+                    Rc::new(Declaration::Definition {
+                        name: String::from("eq"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::arrow(
+                                        common_kinds,
+                                        a.clone(),
+                                        Type::arrow(common_kinds, a.clone(), bool_ty.clone()),
+                                    ),
+                                    Type::arrow(
+                                        common_kinds,
+                                        Type::app(array_ty.clone(), a.clone()),
+                                        Type::arrow(
+                                            common_kinds,
+                                            Type::app(array_ty.clone(), a),
+                                            bool_ty.clone(),
+                                        ),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::EqArray),
+                    }),
+                    // foldl : (b -> a -> b) -> b -> Array a -> b
+                    Rc::new(Declaration::Definition {
+                        name: String::from("foldl"),
+                        sig: {
+                            let b = Type::unsafe_mk_var(1, Kind::Type);
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("b"), b.kind()), (Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::arrow(
+                                        common_kinds,
+                                        b.clone(),
+                                        Type::arrow(common_kinds, a.clone(), b.clone()),
+                                    ),
+                                    Type::arrow(
+                                        common_kinds,
+                                        b.clone(),
+                                        Type::arrow(
+                                            common_kinds,
+                                            Type::app(array_ty.clone(), a),
+                                            b,
+                                        ),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::FoldlArray),
+                    }),
+                    // generate : Int -> (Int -> a) -> Array a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("generate"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    int_ty.clone(),
+                                    Type::arrow(
+                                        common_kinds,
+                                        Type::arrow(common_kinds, int_ty.clone(), a.clone()),
+                                        Type::app(array_ty.clone(), a),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::GenerateArray),
+                    }),
+                    // length : Array a -> Int
+                    Rc::new(Declaration::Definition {
+                        name: String::from("length"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::app(array_ty.clone(), a),
+                                    int_ty.clone(),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::LengthArray),
+                    }),
+                    // index : Int -> Array a -> a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("index"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    int_ty.clone(),
+                                    Type::arrow(
+                                        common_kinds,
+                                        Type::app(array_ty.clone(), a.clone()),
+                                        a,
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::IndexArray),
+                    }),
+                    // slice : Int -> Int -> Array a -> Array a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("slice"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), a.kind())],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    int_ty.clone(),
+                                    Type::arrow(
+                                        common_kinds,
+                                        int_ty,
+                                        Type::arrow(
+                                            common_kinds,
+                                            Type::app(array_ty.clone(), a.clone()),
+                                            Type::app(array_ty.clone(), a),
+                                        ),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::SliceArray),
+                    }),
+                    // snoc : Array a -> a -> Array a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("snoc"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                                body: Type::arrow(
                                     common_kinds,
                                     Type::app(array_ty.clone(), a.clone()),
-                                    Type::app(array_ty.clone(), a),
+                                    Type::arrow(
+                                        common_kinds,
+                                        a.clone(),
+                                        Type::app(array_ty.clone(), a),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::SnocArray),
+                    }),
+                    // flatMap : (a -> Array b) -> Array a -> Array b
+                    Rc::new(Declaration::Definition {
+                        name: String::from("flatMap"),
+                        sig: TypeSig::new(
+                            vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
+                            Type::arrow(
+                                common_kinds,
+                                Type::arrow(
+                                    common_kinds,
+                                    Type::Var(Kind::Type, 1),
+                                    Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
+                                ),
+                                Type::arrow(
+                                    common_kinds,
+                                    Type::app(array_ty.clone(), Type::Var(Kind::Type, 1)),
+                                    Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
                                 ),
                             ),
                         ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::SliceArray),
+                        body: Rc::new(Expr::Builtin(Builtin::FlatMap)),
+                    }),
+                ],
             },
-            // filterString : (Char -> Bool) -> String -> String
-            Declaration::Definition {
-                name: String::from("filterString"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
-                        Type::arrow(common_kinds, string_ty.clone(), string_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::FilterString),
+            Declaration::Module {
+                name: String::from("char"),
+                decls: vec![
+                    // eq : Char -> Char -> Bool
+                    Rc::new(Declaration::Definition {
+                        name: String::from("eq"),
+                        sig: TypeSig {
+                            ty_vars: Vec::new(),
+                            body: Type::arrow(
+                                common_kinds,
+                                char_ty.clone(),
+                                Type::arrow(common_kinds, char_ty, bool_ty.clone()),
+                            ),
+                        },
+                        body: Expr::alloc_builtin(Builtin::EqChar),
+                    }),
+                ],
             },
-            // eqChar : Char -> Char -> Bool
-            Declaration::Definition {
-                name: String::from("eqChar"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        char_ty.clone(),
-                        Type::arrow(common_kinds, char_ty.clone(), bool_ty.clone()),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::EqChar),
-            },
-            // splitString : Char -> String -> Array String
-            Declaration::Definition {
-                name: String::from("splitString"),
-                sig: TypeSig {
-                    ty_vars: Vec::new(),
-                    body: Type::arrow(
-                        common_kinds,
-                        char_ty.clone(),
-                        Type::arrow(
-                            common_kinds,
-                            string_ty.clone(),
-                            Type::app(array_ty.clone(), string_ty.clone()),
-                        ),
-                    ),
-                },
-                body: Expr::alloc_builtin(Builtin::SplitString),
-            },
-            // foldlString : (a -> Char -> a) -> a -> String -> a
-            Declaration::Definition {
-                name: String::from("foldlString"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), a.kind())],
-                        body: Type::arrow(
-                            common_kinds,
+            Declaration::Module {
+                name: String::from("cmd"),
+                decls: vec![
+                    // run : Cmd -> IO ()
+                    Rc::new(Declaration::Definition {
+                        name: String::from("run"),
+                        sig: {
+                            TypeSig {
+                                ty_vars: Vec::new(),
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::Cmd,
+                                    Type::app(io_ty.clone(), Type::Unit),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::Run),
+                    }),
+                    // lines : Cmd -> IO (Array String)
+                    Rc::new(Declaration::Definition {
+                        name: String::from("lines"),
+                        sig: TypeSig::new(
+                            vec![],
                             Type::arrow(
                                 common_kinds,
-                                a.clone(),
-                                Type::arrow(common_kinds, char_ty, a.clone()),
-                            ),
-                            Type::arrow(
-                                common_kinds,
-                                a.clone(),
-                                Type::arrow(common_kinds, string_ty.clone(), a),
+                                Type::Cmd,
+                                Type::app(io_ty, Type::app(array_ty.clone(), string_ty)),
                             ),
                         ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::FoldlString),
-            },
-            // snocArray : Array a -> a -> Array a
-            Declaration::Definition {
-                name: String::from("snocArray"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![(Rc::from("a"), Kind::Type)],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::app(array_ty.clone(), a.clone()),
-                            Type::arrow(common_kinds, a.clone(), Type::app(array_ty.clone(), a)),
+                        body: Rc::new(Expr::Builtin(Builtin::Lines)),
+                    }),
+                    // show : Cmd -> String
+                    Rc::new(Declaration::Definition {
+                        name: String::from("show"),
+                        sig: TypeSig::new(
+                            vec![],
+                            Type::arrow(common_kinds, Type::Cmd, Type::String),
                         ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::SnocArray),
-            },
-            // run : Cmd -> IO ()
-            Declaration::Definition {
-                name: String::from("run"),
-                sig: {
-                    TypeSig {
-                        ty_vars: Vec::new(),
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::Cmd,
-                            Type::app(io_ty.clone(), Type::Unit),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::Run),
+                        body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
+                    }),
+                ],
             },
             /*
             class Eq a where
@@ -1159,46 +1239,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     )),
                 }
             },
-            // lines : Cmd -> IO (Array String)
-            Declaration::Definition {
-                name: String::from("lines"),
-                sig: TypeSig::new(
-                    vec![],
-                    Type::arrow(
-                        common_kinds,
-                        Type::Cmd,
-                        Type::app(io_ty, Type::app(array_ty.clone(), string_ty)),
-                    ),
-                ),
-                body: Rc::new(Expr::Builtin(Builtin::Lines)),
-            },
-            // showCmd : Cmd -> String
-            Declaration::Definition {
-                name: String::from("showCmd"),
-                sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
-                body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
-            },
-            // flatMap : (a -> Array b) -> Array a -> Array b
-            Declaration::Definition {
-                name: String::from("flatMap"),
-                sig: TypeSig::new(
-                    vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
-                    Type::arrow(
-                        common_kinds,
-                        Type::arrow(
-                            common_kinds,
-                            Type::Var(Kind::Type, 1),
-                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
-                        ),
-                        Type::arrow(
-                            common_kinds,
-                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 1)),
-                            Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
-                        ),
-                    ),
-                ),
-                body: Rc::new(Expr::Builtin(Builtin::FlatMap)),
-            },
             /*
             class ToArgs a where
               toArgs : a -> Array String
@@ -1249,7 +1289,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             /*
             instance ToArgs a => ToArgs (Array a) where
-              toArgs = flatMap toArgs
+              toArgs = array.flatMap toArgs
             */
             {
                 let to_args_ty = Type::Name(
@@ -1272,9 +1312,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         vec![(
                             // toArgs
                             Expr::Int(0),
-                            // flatMap (toArgs toArgsDict)
+                            // array.flatMap (toArgs toArgsDict)
                             Expr::mk_app(
-                                Expr::Name(Name::definition("flatMap")),
+                                Expr::Module {
+                                    // TODO: this should be a distinguished value of "self"
+                                    id: ModuleId::new(0),
+                                    path: vec![String::from("array")],
+                                    item: Name::definition("flatMap"),
+                                },
                                 Expr::mk_app(Expr::Name(Name::definition("toArgs")), Expr::Var(0)),
                             ),
                         )],
