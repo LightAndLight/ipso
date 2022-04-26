@@ -24,22 +24,23 @@
 * [Datatypes](#datatypes)
   * [Booleans](#booleans)
   * [Integers](#integers)
-  * [Characters](#characters)
     * [Builtins](#builtins)
-  * [Strings](#strings)
+  * [Characters](#characters)
     * [Builtins](#builtins-1)
+  * [Strings](#strings)
+    * [Builtins](#builtins-2)
   * [Functions](#functions)
   * [Arrays](#arrays)
-    * [Builtins](#builtins-2)
+    * [Builtins](#builtins-3)
   * [Byte Arrays](#byte-arrays)
   * [Records](#records)
   * [Variants](#variants)
     * [Construction](#construction)
     * [Extension](#extension)
   * [IO](#io)
-    * [Builtins](#builtins-3)
-  * [Commands](#commands)
     * [Builtins](#builtins-4)
+  * [Commands](#commands)
+    * [Builtins](#builtins-5)
 * [Type Classes](#type-classes)
   * [Equality](#equality)
   * [Comparison](#comparison)
@@ -366,6 +367,16 @@ Int
 Int
 ```
 
+#### Builtins
+
+```ipso
+module int where
+
+  eq : Int -> Int -> Bool
+
+  show : Int -> String
+```
+
 ### Characters
 
 The `Char` type represents a unicode code point.
@@ -383,9 +394,9 @@ Char
 #### Builtins
 
 ```ipso
-prev : Char -> Char
+module char where
 
-next : Char -> Char
+  eq : Char -> Char -> Bool
 ```
 
 ### Strings
@@ -407,21 +418,17 @@ x : String
 #### Builtins
 
 ```ipso
-foldr : (Char -> a -> a) -> a -> String -> a
+module string where
 
-foldlString : (a -> Char -> a) -> a -> String -> a
+  toUtf8 : String -> Bytes
 
-map : (Char -> Char) -> String -> String
+  eq : String -> String -> Bool
 
-filterString : (Char -> Bool) -> String -> String
+  filter : (Char -> Bool) -> String -> String
 
-splitString : Char -> String -> Array String
+  split : Char -> String -> Array String
 
-pack : Array Char -> String
-
-unpack : String -> Array Char
-
-toUtf8 : String -> Bytes
+  foldl : (a -> Char -> a) -> a -> String -> a
 ```
 
 ### Functions
@@ -476,29 +483,23 @@ Array Int
 #### Builtins
 
 ```ipso
-cons : a -> Array a -> Array a
+module array where
 
-uncons : Array a -> (| None, Some : { first : a, rest : Array a } |)
+  eq : (a -> a -> Bool) -> Array a -> Array a -> Bool
 
-snocArray : Array a -> a -> Array a
+  foldl : (b -> a -> b) -> b -> Array a -> b
 
-unsnoc : Array a -> (| None, Some : { rest : Array a, last : a } |)
+  generate : Int -> (Int -> a) -> Array a
 
-lengthArray : Array a -> Int
+  length : Array a -> Int
 
-indexArray : Int -> Array a -> a
+  index : Int -> Array a -> a
 
-sliceArray : Int -> Int -> Array a -> Array a
+  slice : Int -> Int -> Array a -> Array a
 
-foldr : (a -> b -> b) -> b -> Array a -> b
+  snoc : Array a -> a -> Array a
 
-foldlArray : (b -> a -> b) -> b -> Array a -> b
-
-map : (a -> b) -> Array a -> Array b
-
-generateArray : Int -> (Int -> a) -> Array a
-
-flatMap : (a -> Array b) -> Array a -> Array b
+  flatMap : (a -> Array b) -> Array a -> Array b
 ```
 
 ### Byte Arrays
@@ -608,11 +609,13 @@ Cmd
 #### Builtins
 
 ```ipso
-run : Cmd -> IO ()
+module cmd where
 
-lines : Cmd -> IO (Array String)
+  run : Cmd -> IO ()
 
-showCmd : Cmd -> String
+  lines : Cmd -> IO (Array String)
+
+  show : Cmd -> String
 
 class ToArgs a where
   toArgs : a -> Array String
