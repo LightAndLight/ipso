@@ -1,2 +1,2 @@
 main : IO Int
-main = pure (trace "hello" 0)
+main = io.pure (trace "hello" 0)

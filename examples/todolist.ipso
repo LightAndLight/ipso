@@ -80,7 +80,7 @@ writeTodos todos =
           acc
           println todo
       )
-      (pure ())
+      (io.pure ())
       todos
 
 runCommand :
@@ -90,7 +90,7 @@ runCommand :
 runCommand cmd todos =
   case cmd of
     Quit x ->
-      pure (Quit ())
+      io.pure (Quit ())
     Help x -> 
       comp
         println "help - display this message"
@@ -98,19 +98,19 @@ runCommand cmd todos =
         println "list - display the todolist"
         println "add STRING - add a task to the list"
         println "delete INT - delete a task from the list"
-        pure (Continue todos)
+        io.pure (Continue todos)
     Add todo ->
-      pure (Continue (snocArray todos todo))
+      io.pure (Continue (snocArray todos todo))
     List x ->
-      mapIO
+      io.map
         (\_ -> Continue todos)
         (writeTodos todos)
     Invalid x ->
-      mapIO
+      io.map
         (\_ -> Continue todos)
         (println "error: invalid command \"$x\"")
     Delete ix ->
-      pure (Continue (deleteAt ix todos))
+      io.pure (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
 loop todos = 
@@ -120,7 +120,7 @@ loop todos =
     bind next <- runCommand (parseCommand line) todos
     case next of
       Continue newTodos -> loop newTodos
-      Quit x -> pure ()
+      Quit x -> io.pure ()
 
 main : IO ()
 main = 

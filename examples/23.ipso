@@ -18,6 +18,6 @@ instance B Int where
 
 main : IO ()
 main =
-  bindIO (print (a [1, 2, 3])) (\_ ->
+  io.andThen (print (a [1, 2, 3])) (\_ ->
   print (b [4, 5])
   )

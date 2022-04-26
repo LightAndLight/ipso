@@ -17,72 +17,85 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
 
     Module {
         decls: vec![
-            // mapIO : (a -> b) -> IO a -> IO b
-            Declaration::Definition {
-                name: String::from("mapIO"),
-                sig: {
-                    let a = Type::unsafe_mk_var(1, Kind::Type);
-                    let b = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![
-                            // a : Type
-                            (Rc::from("a"), a.kind()),
-                            // b : Type
-                            (Rc::from("b"), b.kind()),
-                        ],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::arrow(common_kinds, a.clone(), b.clone()),
-                            Type::arrow(
-                                common_kinds,
-                                Type::app(io_ty.clone(), a),
-                                Type::app(io_ty.clone(), b),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::MapIO),
-            },
-            // pure : a -> IO a
-            Declaration::Definition {
-                name: String::from("pure"),
-                sig: {
-                    let a = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![
-                            // a : Type
-                            (Rc::from("a"), a.kind()),
-                        ],
-                        body: Type::arrow(common_kinds, a.clone(), Type::app(io_ty.clone(), a)),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::Pure),
-            },
-            // bindIO : IO a -> (a -> IO b) -> IO b
-            Declaration::Definition {
-                name: String::from("bindIO"),
-                sig: {
-                    let a = Type::unsafe_mk_var(1, Kind::Type);
-                    let b = Type::unsafe_mk_var(0, Kind::Type);
-                    TypeSig {
-                        ty_vars: vec![
-                            // a : Type
-                            (Rc::from("a"), a.kind()),
-                            // b : Type
-                            (Rc::from("b"), a.kind()),
-                        ],
-                        body: Type::arrow(
-                            common_kinds,
-                            Type::app(io_ty.clone(), a.clone()),
-                            Type::arrow(
-                                common_kinds,
-                                Type::arrow(common_kinds, a, Type::app(io_ty.clone(), b.clone())),
-                                Type::app(io_ty.clone(), b),
-                            ),
-                        ),
-                    }
-                },
-                body: Expr::alloc_builtin(Builtin::BindIO),
+            Declaration::Module {
+                name: String::from("io"),
+                decls: vec![
+                    // map : (a -> b) -> IO a -> IO b
+                    Rc::new(Declaration::Definition {
+                        name: String::from("map"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(1, Kind::Type);
+                            let b = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![
+                                    // a : Type
+                                    (Rc::from("a"), a.kind()),
+                                    // b : Type
+                                    (Rc::from("b"), b.kind()),
+                                ],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::arrow(common_kinds, a.clone(), b.clone()),
+                                    Type::arrow(
+                                        common_kinds,
+                                        Type::app(io_ty.clone(), a),
+                                        Type::app(io_ty.clone(), b),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::MapIO),
+                    }),
+                    // pure : a -> IO a
+                    Rc::new(Declaration::Definition {
+                        name: String::from("pure"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![
+                                    // a : Type
+                                    (Rc::from("a"), a.kind()),
+                                ],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    a.clone(),
+                                    Type::app(io_ty.clone(), a),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::Pure),
+                    }),
+                    // andThen : IO a -> (a -> IO b) -> IO b
+                    Rc::new(Declaration::Definition {
+                        name: String::from("andThen"),
+                        sig: {
+                            let a = Type::unsafe_mk_var(1, Kind::Type);
+                            let b = Type::unsafe_mk_var(0, Kind::Type);
+                            TypeSig {
+                                ty_vars: vec![
+                                    // a : Type
+                                    (Rc::from("a"), a.kind()),
+                                    // b : Type
+                                    (Rc::from("b"), a.kind()),
+                                ],
+                                body: Type::arrow(
+                                    common_kinds,
+                                    Type::app(io_ty.clone(), a.clone()),
+                                    Type::arrow(
+                                        common_kinds,
+                                        Type::arrow(
+                                            common_kinds,
+                                            a,
+                                            Type::app(io_ty.clone(), b.clone()),
+                                        ),
+                                        Type::app(io_ty.clone(), b),
+                                    ),
+                                ),
+                            }
+                        },
+                        body: Expr::alloc_builtin(Builtin::BindIO),
+                    }),
+                ],
             },
             // trace : a -> b -> b
             Declaration::Definition {

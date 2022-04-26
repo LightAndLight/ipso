@@ -18,7 +18,7 @@ sayVal val =
 
 main : IO ()
 main =
-  bindIO (sayVal val1) (\_ ->
-  bindIO (sayVal val2) (\_ ->
+  io.andThen (sayVal val1) (\_ ->
+  io.andThen (sayVal val2) (\_ ->
   sayVal val3
   ))

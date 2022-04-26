@@ -265,12 +265,18 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                                 let comp_line_pos = comp_line.pos;
                                 match comp_line.item {
                                     CompLine::Expr(comp_line_expr) => {
-                                        // bindIO <comp_line_expr> (\_ -> <expr>)
+                                        // io.andThen <comp_line_expr> (\_ -> <expr>)
                                         Expr::mk_app(
                                             Expr::mk_app(
                                                 Spanned {
                                                     pos: comp_line_pos,
-                                                    item: Expr::mk_var("bindIO"),
+                                                    item: Expr::mk_project(
+                                                        Spanned {
+                                                            pos: comp_line.pos,
+                                                            item: Expr::mk_var("io"),
+                                                        },
+                                                        String::from("andThen"),
+                                                    ),
                                                 },
                                                 comp_line_expr,
                                             ),
@@ -287,12 +293,18 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                                         )
                                     }
                                     CompLine::Bind(name, value) => {
-                                        // bindIO <value> (\<name> -> <expr>)
+                                        // io.andThen <value> (\<name> -> <expr>)
                                         Expr::mk_app(
                                             Expr::mk_app(
                                                 Spanned {
                                                     pos: comp_line_pos,
-                                                    item: Expr::mk_var("bindIO"),
+                                                    item: Expr::mk_project(
+                                                        Spanned {
+                                                            pos: comp_line.pos,
+                                                            item: Expr::mk_var("io"),
+                                                        },
+                                                        String::from("andThen"),
+                                                    ),
                                                 },
                                                 value,
                                             ),

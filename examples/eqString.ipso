@@ -8,6 +8,6 @@ printBool b =
 
 main : IO ()
 main = 
-  bindIO (printBool (eqString "yes" "yes")) (\_ ->
+  io.andThen (printBool (eqString "yes" "yes")) (\_ ->
   printBool (eqString "yes" "no")
   )
