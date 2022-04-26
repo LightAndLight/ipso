@@ -573,6 +573,12 @@ pub struct Modules<M> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleId(usize);
 
+impl ModuleId {
+    pub fn new(value: usize) -> Self {
+        ModuleId(value)
+    }
+}
+
 impl<M> Default for Modules<M> {
     fn default() -> Self {
         Self::new()
