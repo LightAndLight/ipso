@@ -152,7 +152,7 @@ pub struct Typechecker<'modules> {
     implications: Vec<Implication>,
     evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
-    context: HashMap<String, core::TypeSig>,
+    context: HashMap<String, core::Signature>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
     bound_tyvars: BoundVars<Kind>,
@@ -164,7 +164,7 @@ pub struct Typechecker<'modules> {
     Ideally we would use a module path and item name to look up type signatures
     in `modules`, but that's currently too resource intensive.
     */
-    module_context: HashMap<ModuleId, HashMap<String, core::TypeSig>>,
+    module_context: HashMap<ModuleId, HashMap<String, core::Signature>>,
 }
 
 macro_rules! with_position {
@@ -304,6 +304,8 @@ impl TypeError {
                 type_inference::InferenceErrorInfo::RedundantPattern => {
                     String::from("redundant pattern")
                 }
+                type_inference::InferenceErrorInfo::NotAValue { .. } => String::from("not a value"),
+                type_inference::InferenceErrorInfo::NotAModule => String::from("not a module"),
             },
             TypeError::KindError { error, .. } => render_kind_inference_error(error),
             TypeError::NotInScope { .. } => String::from("not in scope"),
@@ -329,6 +331,8 @@ impl TypeError {
                 type_inference::InferenceErrorInfo::NotInScope { .. } => None,
                 type_inference::InferenceErrorInfo::DuplicateArgument { .. } => None,
                 type_inference::InferenceErrorInfo::RedundantPattern { .. } => None,
+                type_inference::InferenceErrorInfo::NotAValue { .. } => None,
+                type_inference::InferenceErrorInfo::NotAModule => None,
             },
             TypeError::KindError { error, .. } => match error.info {
                 kind_inference::InferenceErrorInfo::NotInScope { .. } => None,
@@ -610,7 +614,7 @@ impl<'modules> Typechecker<'modules> {
         self.context.extend(
             decl_bindings
                 .iter()
-                .map(|(name, (sig, _))| (name.clone(), sig.clone())),
+                .map(|(name, (sig, _))| (name.clone(), core::Signature::TypeSig(sig.clone()))),
         );
 
         // update class context
@@ -645,7 +649,20 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
-        self.context.insert(String::from(name), sig.clone());
+        self.context
+            .insert(String::from(name), core::Signature::TypeSig(sig.clone()));
+    }
+
+    pub fn register_module(&mut self, name: &str, decls: &[Rc<core::Declaration>]) {
+        self.context.insert(
+            String::from(name),
+            core::Signature::Module(
+                decls
+                    .iter()
+                    .flat_map(|decl| decl.get_signatures(self.common_kinds))
+                    .collect(),
+            ),
+        );
     }
 
     pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
@@ -658,6 +675,7 @@ impl<'modules> Typechecker<'modules> {
                 self.register_builtin_type(name, kind);
             }
             core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
+            core::Declaration::Module { name, decls, .. } => self.register_module(name, decls),
             core::Declaration::TypeAlias { name, args, body } => {
                 self.register_type_alias(name, args, body)
             }
@@ -717,6 +735,11 @@ impl<'modules> Typechecker<'modules> {
                 core::Declaration::Definition { name, sig, .. } => {
                     if should_import(name) {
                         self.register_definition(name, sig);
+                    }
+                }
+                core::Declaration::Module { name, decls, .. } => {
+                    if should_import(name) {
+                        self.register_module(name, decls);
                     }
                 }
                 core::Declaration::TypeAlias { name, args, body } => {
@@ -871,7 +894,7 @@ impl<'modules> Typechecker<'modules> {
 
         let _ = self.context.insert(
             name.to_string(),
-            core::TypeSig::new(ty_var_kinds.clone(), ty.clone()),
+            core::Signature::TypeSig(core::TypeSig::new(ty_var_kinds.clone(), ty.clone())),
         );
 
         let (constraints, ty) = ty.unwrap_constraints();

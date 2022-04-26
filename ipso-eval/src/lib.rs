@@ -2,7 +2,7 @@
 mod test;
 
 use ipso_core::{
-    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
+    self as core, Binding, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
 };
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, Modules};
@@ -537,12 +537,12 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module {
-    pub bindings: HashMap<Name, Rc<Expr>>,
+    pub bindings: HashMap<Name, Binding>,
 }
 
 struct Context<'ctx> {
     modules: Vec<ModuleId>,
-    base: &'ctx HashMap<Name, Rc<Expr>>,
+    base: &'ctx HashMap<Name, Binding>,
 }
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
@@ -562,7 +562,7 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
         stdout: &'io mut dyn io::Write,
         common_kinds: &'ctx CommonKinds,
         modules: &'ctx Modules<core::Module>,
-        context: &'ctx HashMap<Name, Rc<Expr>>,
+        context: &'ctx HashMap<Name, Binding>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
@@ -1340,15 +1340,38 @@ where {
         &mut self,
         env: &mut Env<'heap>,
         id: &ModuleId,
-        _path: &[String],
-        binding: &Name,
+        path: &[String],
+        item: &Name,
     ) -> Value<'heap> {
         let expr = match self.modules.get(id) {
             None => panic!("{:?} not found", id),
-            Some(module) => match module.bindings.get(binding) {
-                None => panic!("{:?} not found in {:?}", binding, id),
-                Some(expr) => expr.clone(),
-            },
+            Some(module) => {
+                fn lookup_path<'a>(
+                    bindings: &'a HashMap<Name, Binding>,
+                    path: &[String],
+                ) -> &'a HashMap<Name, Binding> {
+                    if path.is_empty() {
+                        bindings
+                    } else {
+                        match bindings.get(&Name::definition(&path[0])) {
+                            None => panic!("submodule {:?} not found", path[0]),
+                            Some(binding) => match binding {
+                                Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
+                                Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
+                            },
+                        }
+                    }
+                }
+
+                let bindings = lookup_path(&module.bindings, path);
+                match bindings.get(item) {
+                    None => panic!("{:?} not found in {:?}", item, id),
+                    Some(binding) => match binding {
+                        Binding::Expr(expr) => expr.clone(),
+                        Binding::Module(module) => panic!("unexpected module {:?}", module),
+                    },
+                }
+            }
         };
 
         self.context.modules.push(*id);
@@ -1359,15 +1382,20 @@ where {
     }
 
     fn lookup_name(&self, name: &Name) -> Rc<Expr> {
-        match self.context.modules.last() {
+        let binding = match self.context.modules.last() {
             None => match self.context.base.get(name) {
                 None => panic!("{:?} not in base scope", name),
-                Some(body) => body.clone(),
+                Some(binding) => binding.clone(),
             },
             Some(module_id) => match self.modules.get(module_id).unwrap().bindings.get(name) {
                 None => panic!("{:?} not in {:?}'s scope", name, module_id),
-                Some(body) => body.clone(),
+                Some(binding) => binding.clone(),
             },
+        };
+
+        match binding {
+            Binding::Expr(body) => body,
+            Binding::Module(module) => panic!("unexpected module {:?}", module),
         }
     }
 

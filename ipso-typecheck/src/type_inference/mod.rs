@@ -11,7 +11,8 @@ use crate::{
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use ipso_core::{
-    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, RowParts, StringPart, Type, TypeSig,
+    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, RowParts, Signature, StringPart,
+    Type, TypeSig,
 };
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
@@ -881,6 +882,8 @@ pub fn unify(
 pub enum InferenceErrorInfo {
     UnificationError { error: UnificationError },
     NotInScope { name: String },
+    NotAValue { name: String },
+    NotAModule,
     DuplicateArgument { name: Rc<str> },
     RedundantPattern,
 }
@@ -908,6 +911,26 @@ impl InferenceError {
             info: InferenceErrorInfo::NotInScope {
                 name: String::from(name),
             },
+        }
+    }
+
+    /// Construct an [`InferenceErrorInfo::NotAValue`].
+    pub fn not_a_value(source: &Source, name: &str) -> Self {
+        InferenceError {
+            source: source.clone(),
+            position: None,
+            info: InferenceErrorInfo::NotAValue {
+                name: String::from(name),
+            },
+        }
+    }
+
+    /// Construct an [`InferenceErrorInfo::NotAModule`].
+    pub fn not_a_module(source: &Source) -> Self {
+        InferenceError {
+            source: source.clone(),
+            position: None,
+            info: InferenceErrorInfo::NotAModule,
         }
     }
 
@@ -1051,12 +1074,12 @@ impl CheckedPattern {
 pub struct InferenceContext<'a> {
     common_kinds: &'a CommonKinds,
     source: &'a Source,
-    modules: &'a HashMap<ModuleId, HashMap<String, TypeSig>>,
+    modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut kind_inference::Solutions,
     type_solutions: &'a mut Solutions,
-    type_signatures: &'a HashMap<String, TypeSig>,
+    type_signatures: &'a HashMap<String, Signature>,
     variables: &'a mut BoundVars<Type>,
     evidence: &'a mut Evidence,
 }
@@ -1078,12 +1101,12 @@ impl<'a> InferenceContext<'a> {
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
-        modules: &'a HashMap<ModuleId, HashMap<String, TypeSig>>,
+        modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut kind_inference::Solutions,
         type_solutions: &'a mut Solutions,
-        type_signatures: &'a HashMap<String, TypeSig>,
+        type_signatures: &'a HashMap<String, Signature>,
         variables: &'a mut BoundVars<Type>,
         evidence: &'a mut Evidence,
     ) -> Self {
@@ -1393,42 +1416,92 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Var(name) => match self.variables.lookup_name(name) {
                 Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
                 None => match self.type_signatures.get(name) {
-                    Some(type_signature) => Ok(self.instantiate(
-                        expr.pos,
-                        Expr::Name(Name::definition(name.clone())),
-                        type_signature,
-                    )),
+                    Some(signature) => match signature {
+                        Signature::TypeSig(type_signature) => Ok(self.instantiate(
+                            expr.pos,
+                            Expr::Name(Name::definition(name.clone())),
+                            type_signature,
+                        )),
+                        Signature::Module(_) => {
+                            Err(InferenceError::not_a_value(self.source, name)
+                                .with_position(expr.pos))
+                        }
+                    },
                     None => {
                         Err(InferenceError::not_in_scope(self.source, name).with_position(expr.pos))
                     }
                 },
             },
-            syntax::Expr::Module { id, path, item } => match self.modules.get(id) {
-                None => {
-                    /*
-                    A module accessor will only be desugared if the module was in scope, so this case
-                    is impossible as long as `ctx.modules` is valid w.r.t this expression.
-                    */
-                    panic!(
-                        "module not in scope. id: {:?}, path: {:?}, item: {:?}",
-                        id, path, item
-                    )
-                }
-                Some(definitions) => match definitions.get(item) {
+            syntax::Expr::Module { id, path, item } => {
+                match self.modules.get(id) {
                     None => {
-                        Err(InferenceError::not_in_scope(self.source, item).with_position(expr.pos))
+                        /*
+                        A module accessor will only be desugared if the module was in scope, so this case
+                        is impossible as long as `ctx.modules` is valid w.r.t this expression.
+                        */
+                        panic!(
+                            "module not in scope. id: {:?}, path: {:?}, item: {:?}",
+                            id, path, item
+                        )
                     }
-                    Some(type_signature) => Ok(self.instantiate(
-                        expr.pos,
-                        Expr::Module {
-                            id: *id,
-                            path: path.clone(),
-                            item: Name::definition(item.clone()),
-                        },
-                        type_signature,
-                    )),
-                },
-            },
+                    Some(definitions) => {
+                        fn lookup_path<'a>(
+                            source: &Source,
+                            definitions: &'a HashMap<String, Signature>,
+                            path: &[String],
+                        ) -> Result<&'a HashMap<String, Signature>, InferenceError>
+                        {
+                            if path.is_empty() {
+                                Ok(definitions)
+                            } else {
+                                match definitions.get(&path[0]) {
+                                    None => Err(InferenceError::not_in_scope(source, &path[0])
+                                        // TODO: wrap the `path` items in Spanned, and use the
+                                        // position of the out-of-scope path item.
+                                        .with_position(0)),
+                                    Some(signature) => {
+                                        match signature {
+                                            Signature::TypeSig(_) => {
+                                                Err(InferenceError::not_a_module(source)
+                                                    // TODO: wrap the `path` items in Spanned, and use the
+                                                    // position of the out-of-scope path item.
+                                                    .with_position(0))
+                                            }
+                                            Signature::Module(definitions) => {
+                                                lookup_path(source, definitions, &path[1..])
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        let definitions = lookup_path(self.source, definitions, path)?;
+
+                        match definitions.get(item) {
+                            None => Err(InferenceError::not_in_scope(self.source, item)
+                                // TODO: wrap `item` in Spanned and use its position for the error
+                                .with_position(expr.pos)),
+                            Some(signature) => match signature {
+                                Signature::TypeSig(type_signature) => Ok(self.instantiate(
+                                    expr.pos,
+                                    Expr::Module {
+                                        id: *id,
+                                        path: path.clone(),
+                                        item: Name::definition(item.clone()),
+                                    },
+                                    type_signature,
+                                )),
+                                Signature::Module(_) => {
+                                    Err(InferenceError::not_a_value(self.source, item)
+                                        // TODO: wrap `item` in Spanned and use its position for the error
+                                        .with_position(expr.pos))
+                                }
+                            },
+                        }
+                    }
+                }
+            }
 
             syntax::Expr::True => Ok((Expr::True, Type::Bool)),
             syntax::Expr::False => Ok((Expr::False, Type::Bool)),

@@ -1628,38 +1628,63 @@ pub enum Declaration {
         head: Type,
         evidence: Rc<str>,
     },
+    Module {
+        name: String,
+        decls: Vec<Rc<Declaration>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Binding {
+    Expr(Rc<Expr>),
+    Module(HashMap<Name, Binding>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Signature {
+    TypeSig(TypeSig),
+    Module(HashMap<String, Signature>),
 }
 
 impl Declaration {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Rc<Expr>> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Binding> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig: _, body } => {
                 let mut map = HashMap::new();
-                map.insert(Name::Definition(name.clone()), body.clone());
+                map.insert(Name::Definition(name.clone()), Binding::Expr(body.clone()));
                 map
             }
             Declaration::Evidence { name, body } => {
                 let mut map = HashMap::new();
-                map.insert(Name::Evidence(name.clone()), body.clone());
+                map.insert(Name::Evidence(name.clone()), Binding::Expr(body.clone()));
                 map
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (Name::Definition(a), b.1))
+                .map(|(a, b)| (Name::Definition(a), Binding::Expr(b.1)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
+            Declaration::Module { name, decls } => HashMap::from([(
+                Name::Definition(name.clone()),
+                Binding::Module(
+                    decls
+                        .iter()
+                        .flat_map(|decl| decl.get_bindings(common_kinds).into_iter())
+                        .collect(),
+                ),
+            )]),
         }
     }
 
-    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, Signature> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig, body: _ } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), sig.clone());
+                map.insert(name.clone(), Signature::TypeSig(sig.clone()));
                 map
             }
             Declaration::Evidence { .. } => HashMap::new(),
@@ -1667,9 +1692,18 @@ impl Declaration {
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (a, b.0))
+                .map(|(a, b)| (a, Signature::TypeSig(b.0)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
+            Declaration::Module { name, decls } => HashMap::from([(
+                name.clone(),
+                Signature::Module(
+                    decls
+                        .iter()
+                        .flat_map(|decl| decl.get_signatures(common_kinds))
+                        .collect(),
+                ),
+            )]),
         }
     }
 }
@@ -1755,16 +1789,16 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Rc<Expr>> {
-        let bindings: HashMap<Name, Rc<Expr>> = HashMap::new();
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Binding> {
+        let bindings: HashMap<Name, Binding> = HashMap::new();
         self.decls.iter().fold(bindings, |mut acc, decl| {
             acc.extend(decl.get_bindings(common_kinds).into_iter());
             acc
         })
     }
 
-    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
-        let signatures: HashMap<String, TypeSig> = HashMap::new();
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, Signature> {
+        let signatures: HashMap<String, Signature> = HashMap::new();
         self.decls.iter().fold(signatures, |mut acc, decl| {
             acc.extend(decl.get_signatures(common_kinds).into_iter());
             acc
