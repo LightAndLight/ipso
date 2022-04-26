@@ -574,11 +574,13 @@ hello
 #### Builtins
 
 ```ipso
-pure : a -> IO a
+module io where
+  
+  pure : a -> IO a
 
-mapIO : (a -> b) -> IO a -> IO b
+  map : (a -> b) -> IO a -> IO b
 
-bindIO : IO a -> (a -> IO b) -> IO b
+  andThen : IO a -> (a -> IO b) -> IO b
 ```
 
 ```ipso
