@@ -7,7 +7,7 @@
     ''
     25.ipso:15:9: error: expected type "String", got type "a"
        |
-    15 |         (indexArray 0 arr)
+    15 |         (array.index 0 arr)
        |         ^
     '',
   exitcode = 1

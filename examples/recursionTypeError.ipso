@@ -1,9 +1,9 @@
 recount : Int -> Int
 recount n =
-  if eqInt n 0
+  if int.eq n 0
   then 0
   else 1 + recount "hello"
 
 main : IO ()
 main =
-  println (showInt (recount 10))
+  println (int.show (recount 10))

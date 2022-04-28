@@ -5,13 +5,13 @@ repeat : Int -> a -> Array a
 repeat n x =
   if n <= 0
   then []
-  else snocArray (repeat (n - 1) x) x
+  else array.snoc (repeat (n - 1) x) x
 
 main : IO ()
 main =
   println <|
   showBool 
-    (flatMap 
+    (array.flatMap 
       (\x -> repeat x.count x.element) 
       [
         { count = 1, element = 'a'}, 

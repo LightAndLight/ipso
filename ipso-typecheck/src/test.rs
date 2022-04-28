@@ -2,7 +2,7 @@ use crate::{
     evidence::{solver::solve_placeholder, Constraint},
     BoundVars, Declarations, Typechecker,
 };
-use ipso_core::{self as core, ClassMember, Placeholder, TypeSig};
+use ipso_core::{self as core, ClassMember, Placeholder, Signature, TypeSig};
 use ipso_syntax::{kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
 use ipso_util::void::Void;
 use std::collections::HashSet;
@@ -651,7 +651,7 @@ fn check_class_1() {
             }
         };
         assert_eq!(
-            Some(&expected_member),
+            Some(&Signature::TypeSig(expected_member)),
             tc.context.get(&String::from("myeq"))
         );
     })
@@ -753,7 +753,7 @@ fn check_class_2() {
             }
         };
         assert_eq!(
-            Some(&expected_member),
+            Some(&Signature::TypeSig(expected_member)),
             tc.context.get(&String::from("wut")),
             "expected member"
         );

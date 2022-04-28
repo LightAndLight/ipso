@@ -1,4 +1,4 @@
 main : IO ()
 main = 
   print 
-    ("${filterString (\_ -> true) "the quick brown fox"}\n")
+    ("${string.filter (\_ -> true) "the quick brown fox"}\n")

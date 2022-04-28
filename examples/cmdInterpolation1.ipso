@@ -4,6 +4,6 @@ mkEcho a = `echo $a`
 main : IO ()
 main =
   comp
-    println (showCmd (mkEcho "a"))
-    println (showCmd (mkEcho "bb"))
-    println (showCmd (mkEcho "cc dd"))
+    println (cmd.show (mkEcho "a"))
+    println (cmd.show (mkEcho "bb"))
+    println (cmd.show (mkEcho "cc dd"))

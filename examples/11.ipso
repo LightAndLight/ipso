@@ -1,5 +1,5 @@
 main : IO ()
 main = 
-  bindIO
-    (bindIO readln (\x -> print x))
-    (\_ -> bindIO readln (\y -> print y))
+  io.andThen
+    (io.andThen readln (\x -> print x))
+    (\_ -> io.andThen readln (\y -> print y))

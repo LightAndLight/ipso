@@ -6,7 +6,7 @@ instance Show () where
 
 showMany : Show a => Int -> a -> String
 showMany n x =
-  if eqInt n 0
+  if int.eq n 0
   then ""
   else "${show x}${showMany (n - 1) x}"
 

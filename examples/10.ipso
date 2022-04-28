@@ -1,6 +1,6 @@
 main : IO ()
 main = 
-  bindIO readln (\x -> 
-  bindIO readln (\y ->
+  io.andThen readln (\x ->
+  io.andThen readln (\y ->
   print "$x$y"
   ))

@@ -22,8 +22,8 @@ d =
 
 main : IO ()
 main = 
-  bindIO (print (showInt a)) (\_ ->
-  bindIO (print (showInt b)) (\_ ->
-  bindIO (print (showInt c)) (\_ ->
-  print (showInt d)
+  io.andThen (print (int.show a)) (\_ ->
+  io.andThen (print (int.show b)) (\_ ->
+  io.andThen (print (int.show c)) (\_ ->
+  print (int.show d)
   )))

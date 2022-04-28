@@ -2,4 +2,4 @@ getx : { x : Int, r } -> Int
 getx { x, ..r } = x
 
 main : IO ()
-main = trace (getx { x = 0, y = 1, z = 2 }) (pure ())
+main = trace (getx { x = 0, y = 1, z = 2 }) (io.pure ())

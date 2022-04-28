@@ -5,13 +5,13 @@ class (A x) => B x where
   b : x -> String
 
 instance (B a) => A (Array a) where
-  a arr = foldlArray (\acc el -> "${acc} ${b el}") "A Array: " arr
+  a arr = array.foldl (\acc el -> "${acc} ${b el}") "A Array: " arr
 
 instance (B a) => B (Array a) where
-  b = foldlArray (\acc el -> "${acc} ${b el}") "B: Array"
+  b = array.foldl (\acc el -> "${acc} ${b el}") "B: Array"
 
 main : IO ()
 main =
-  bindIO (print (a [1, 2, 3])) (\_ ->
+  io.andThen (print (a [1, 2, 3])) (\_ ->
   print (b [4, 5])
   )
