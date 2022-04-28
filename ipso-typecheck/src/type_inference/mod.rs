@@ -1436,29 +1436,23 @@ impl<'a> InferenceContext<'a> {
                 fn lookup_path<'a>(
                     source: &Source,
                     definitions: &'a HashMap<String, Signature>,
-                    path: &[String],
+                    path: &[Spanned<String>],
                 ) -> Result<&'a HashMap<String, Signature>, InferenceError> {
                     if path.is_empty() {
                         Ok(definitions)
                     } else {
-                        match definitions.get(&path[0]) {
-                            None => Err(InferenceError::not_in_scope(source, &path[0])
-                                // TODO: wrap the `path` items in Spanned, and use the
-                                // position of the out-of-scope path item.
-                                .with_position(0)),
-                            Some(signature) => {
-                                match signature {
-                                    Signature::TypeSig(_) => {
-                                        Err(InferenceError::not_a_module(source)
-                                            // TODO: wrap the `path` items in Spanned, and use the
-                                            // position of the out-of-scope path item.
-                                            .with_position(0))
-                                    }
-                                    Signature::Module(definitions) => {
-                                        lookup_path(source, definitions, &path[1..])
-                                    }
+                        match definitions.get(&path[0].item) {
+                            None => Err(InferenceError::not_in_scope(source, &path[0].item)
+                                .with_position(path[0].pos)),
+                            Some(signature) => match signature {
+                                Signature::TypeSig(_) => {
+                                    Err(InferenceError::not_a_module(source)
+                                        .with_position(path[0].pos))
                                 }
-                            }
+                                Signature::Module(definitions) => {
+                                    lookup_path(source, definitions, &path[1..])
+                                }
+                            },
                         }
                     }
                 }
@@ -1482,24 +1476,22 @@ impl<'a> InferenceContext<'a> {
 
                 let definitions = lookup_path(self.source, definitions, path)?;
 
-                match definitions.get(item) {
-                    None => Err(InferenceError::not_in_scope(self.source, item)
-                        // TODO: wrap `item` in Spanned and use its position for the error
-                        .with_position(expr.pos)),
+                match definitions.get(&item.item) {
+                    None => Err(InferenceError::not_in_scope(self.source, &item.item)
+                        .with_position(item.pos)),
                     Some(signature) => match signature {
                         Signature::TypeSig(type_signature) => Ok(self.instantiate(
                             expr.pos,
                             Expr::Module {
                                 id: *id,
-                                path: path.clone(),
-                                item: Name::definition(item.clone()),
+                                path: path.iter().map(|x| x.item.clone()).collect(),
+                                item: Name::definition(item.item.clone()),
                             },
                             type_signature,
                         )),
                         Signature::Module(_) => {
-                            Err(InferenceError::not_a_value(self.source, item)
-                                // TODO: wrap `item` in Spanned and use its position for the error
-                                .with_position(expr.pos))
+                            Err(InferenceError::not_a_value(self.source, &item.item)
+                                .with_position(item.pos))
                         }
                     },
                 }
@@ -1751,7 +1743,7 @@ impl<'a> InferenceContext<'a> {
                 ))
             }
             syntax::Expr::Project(expr, field) => {
-                let field_name: Rc<str> = Rc::from(field.as_ref());
+                let field_name: Rc<str> = Rc::from(field.item.as_str());
                 let field_ty = self.fresh_type_meta(&Kind::Type);
 
                 let rest_row = self.fresh_type_meta(&Kind::Row);

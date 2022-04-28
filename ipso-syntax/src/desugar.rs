@@ -275,7 +275,10 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                                                             pos: comp_line.pos,
                                                             item: Expr::mk_var("io"),
                                                         },
-                                                        String::from("andThen"),
+                                                        Spanned {
+                                                            pos: comp_line.pos,
+                                                            item: String::from("andThen"),
+                                                        },
                                                     ),
                                                 },
                                                 comp_line_expr,
@@ -303,7 +306,10 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                                                             pos: comp_line.pos,
                                                             item: Expr::mk_var("io"),
                                                         },
-                                                        String::from("andThen"),
+                                                        Spanned {
+                                                            pos: comp_line.pos,
+                                                            item: String::from("andThen"),
+                                                        },
                                                     ),
                                                 },
                                                 value,

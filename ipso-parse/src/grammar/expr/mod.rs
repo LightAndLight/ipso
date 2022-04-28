@@ -371,7 +371,7 @@ pub fn expr_project(parser: &mut Parser) -> ParseResult<Spanned<Expr>> {
     expr_atom(parser).and_then(|val| {
         many!(keep_right!(
             indent!(parser, Relation::Gt, parser.token(&token::Data::Dot)),
-            indent!(parser, Relation::Gt, parser.ident_owned())
+            indent!(parser, Relation::Gt, spanned!(parser, parser.ident_owned()))
         ))
         .map(|fields| {
             let mut expr = val;

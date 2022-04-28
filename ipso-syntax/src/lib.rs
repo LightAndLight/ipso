@@ -389,14 +389,14 @@ pub enum Expr {
 
         e.g. `module.submodule1.submodule2`
         */
-        path: Vec<String>,
+        path: Vec<Spanned<String>>,
 
         /**
         The referenced item.
 
         e.g. `module.submodule.item`
         */
-        item: String,
+        item: Spanned<String>,
     },
 
     App(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
@@ -429,7 +429,7 @@ pub enum Expr {
         fields: Vec<(String, Spanned<Expr>)>,
         rest: Option<Rc<Spanned<Expr>>>,
     },
-    Project(Rc<Spanned<Expr>>, String),
+    Project(Rc<Spanned<Expr>>, Spanned<String>),
 
     Variant(Spanned<String>),
     Embed(Spanned<String>, Rc<Spanned<Expr>>),
@@ -443,7 +443,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn mk_project(val: Spanned<Expr>, field: String) -> Expr {
+    pub fn mk_project(val: Spanned<Expr>, field: Spanned<String>) -> Expr {
         Expr::Project(Rc::new(val), field)
     }
 
@@ -496,7 +496,7 @@ impl Expr {
             match expr {
                 Expr::Project(value, field) => {
                     let expr = go(&(*value).item, fields);
-                    fields.push(field);
+                    fields.push(&field.item);
                     expr
                 }
                 _ => expr,

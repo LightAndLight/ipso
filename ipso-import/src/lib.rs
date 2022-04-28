@@ -2,7 +2,7 @@ use diagnostic::{Location, Message};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, desugar, ModuleId, ModuleKey, ModuleRef, Modules};
+use ipso_syntax::{self as syntax, desugar, ModuleId, ModuleKey, ModuleRef, Modules, Spanned};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use ipso_util::hash_multi_set::HashMultiset;
 use std::{
@@ -103,7 +103,7 @@ enum ImportedItemInfo {
 
         e.g. in `from x.y import z`, `.y` is a submodule reference.
         */
-        path: Vec<String>,
+        path: Vec<Spanned<String>>,
     },
 
     /**
@@ -117,14 +117,14 @@ enum ImportedItemInfo {
 fn rewrite_module_accessors_expr(
     exclude: &mut HashMultiset<Rc<str>>,
     imported_items: &HashMap<String, ImportedItemInfo>,
-    expr: &mut syntax::Expr,
+    expr: &mut Spanned<syntax::Expr>,
 ) {
-    match expr {
+    match &mut expr.item {
         syntax::Expr::Var(name) => {
             if !exclude.contains(name.as_str()) {
                 if let Some(imported_item_info) = imported_items.get(name) {
                     match imported_item_info {
-                        ImportedItemInfo::DefinitionImportedFrom { id, path, .. } => {
+                        ImportedItemInfo::DefinitionImportedFrom { id, path } => {
                             /*
                             ```
                             from x import y
@@ -144,10 +144,13 @@ fn rewrite_module_accessors_expr(
                             <x's path>.y
                             ```
                             */
-                            *expr = syntax::Expr::Module {
+                            expr.item = syntax::Expr::Module {
                                 id: ModuleRef::from(*id),
                                 path: path.clone(),
-                                item: name.clone(),
+                                item: Spanned {
+                                    pos: expr.pos,
+                                    item: name.clone(),
+                                },
                             };
                         }
                         ImportedItemInfo::ModuleImportedAs { .. } => {
@@ -186,8 +189,8 @@ fn rewrite_module_accessors_expr(
         }
         syntax::Expr::Module { .. } => {}
         syntax::Expr::App(a, b) => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(a));
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(b));
         }
         syntax::Expr::Lam { args, body } => {
             let arg_names: Vec<Rc<str>> = args
@@ -197,59 +200,58 @@ fn rewrite_module_accessors_expr(
                 .collect();
 
             exclude.insert_all(arg_names.iter().cloned());
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(body).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(body));
             exclude.remove_all(arg_names.into_iter());
         }
         syntax::Expr::Let { name, value, rest } => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(value).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(value));
 
             exclude.insert(name.clone());
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(rest).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(rest));
             exclude.remove(name);
         }
         syntax::Expr::IfThenElse(a, b, c) => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(c).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(a));
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(b));
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(c));
         }
         syntax::Expr::Binop(_, a, b) => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(b).item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(a));
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(b));
         }
         syntax::Expr::String(parts) => {
             for part in parts {
                 match part {
                     syntax::StringPart::String(_) => {}
-                    syntax::StringPart::Expr(e) => {
-                        rewrite_module_accessors_expr(exclude, imported_items, &mut e.item);
+                    syntax::StringPart::Expr(expr) => {
+                        rewrite_module_accessors_expr(exclude, imported_items, expr);
                     }
                 }
             }
         }
-        syntax::Expr::Array(xs) => {
-            for x in xs {
-                rewrite_module_accessors_expr(exclude, imported_items, &mut x.item);
+        syntax::Expr::Array(exprs) => {
+            for expr in exprs {
+                rewrite_module_accessors_expr(exclude, imported_items, expr);
             }
         }
         syntax::Expr::Record { fields, rest } => {
-            for (_, e) in fields {
-                rewrite_module_accessors_expr(exclude, imported_items, &mut e.item);
+            for (_, expr) in fields {
+                rewrite_module_accessors_expr(exclude, imported_items, expr);
             }
 
-            for e in rest {
-                rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(e).item);
+            for expr in rest {
+                rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(expr));
             }
         }
         syntax::Expr::Project(value, field) => {
-            let value = Rc::make_mut(value);
-            rewrite_module_accessors_expr(exclude, imported_items, &mut value.item);
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(value));
 
             match &value.item {
                 syntax::Expr::Module { id, path, item } => {
                     let mut path = path.clone();
                     path.push(item.clone());
 
-                    *expr = syntax::Expr::Module {
+                    expr.item = syntax::Expr::Module {
                         id: *id,
                         path,
                         item: field.clone(),
@@ -260,7 +262,7 @@ fn rewrite_module_accessors_expr(
                     if let Some(ImportedItemInfo::ModuleImportedAs { id }) =
                         imported_items.get(name)
                     {
-                        *expr = syntax::Expr::Module {
+                        expr.item = syntax::Expr::Module {
                             id: ModuleRef::from(*id),
                             path: vec![],
                             item: field.clone(),
@@ -271,11 +273,11 @@ fn rewrite_module_accessors_expr(
                 _ => {}
             }
         }
-        syntax::Expr::Embed(_, a) => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
+        syntax::Expr::Embed(_, expr) => {
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(expr));
         }
-        syntax::Expr::Case(a, branches) => {
-            rewrite_module_accessors_expr(exclude, imported_items, &mut Rc::make_mut(a).item);
+        syntax::Expr::Case(expr, branches) => {
+            rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(expr));
 
             for branch in branches {
                 let arg_names: Vec<Rc<str>> = branch
@@ -286,14 +288,14 @@ fn rewrite_module_accessors_expr(
                     .collect();
 
                 exclude.insert_all(arg_names.iter().cloned());
-                rewrite_module_accessors_expr(exclude, imported_items, &mut branch.body.item);
+                rewrite_module_accessors_expr(exclude, imported_items, &mut branch.body);
                 exclude.remove_all(arg_names.into_iter());
             }
         }
         syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {
-                rewrite_module_accessors_expr(exclude, imported_items, &mut expr.item)
+                rewrite_module_accessors_expr(exclude, imported_items, expr)
             }
         }),
         syntax::Expr::Comp(_) => {
@@ -493,7 +495,7 @@ fn resolve_imports(
                         .collect();
 
                     exclude.insert_all(arg_names.iter().cloned());
-                    rewrite_module_accessors_expr(&mut exclude, &imported_items, &mut body.item);
+                    rewrite_module_accessors_expr(&mut exclude, &imported_items, body);
                     exclude.remove_all(arg_names.into_iter());
 
                     Ok(())
@@ -511,7 +513,7 @@ fn resolve_imports(
                         rewrite_module_accessors_expr(
                             &mut exclude,
                             &imported_items,
-                            &mut member.body.item,
+                            &mut member.body,
                         );
                         exclude.remove_all(to_exclude.into_iter());
                     }
