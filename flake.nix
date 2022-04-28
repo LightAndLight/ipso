@@ -39,7 +39,6 @@
       in rec {
         packages = {
           ipso-cli = (rustPkgs { release = true; }).workspace.ipso-cli {};
-          ipso-cli-dev = (rustPkgs { release = false; }).workspace.ipso-cli {};
           ipso-golden = import ./tests/golden { inherit pkgs; };
           ipso-shebang = import ./tests/shebang { inherit pkgs; };
         };
@@ -57,16 +56,8 @@
                   "rustfmt"
                 ];
               })
-            ];
-          };
-      devShells.tests =
-        let
-          RUST_BACKTRACE = false;
-        in
-          pkgs.mkShell {
-            RUST_BACKTRACE = if RUST_BACKTRACE then "1" else "0";
-            buildInputs = [
-              packages.ipso-cli-dev
+
+              # for running tests locally
               packages.ipso-golden
               packages.ipso-shebang
             ];
