@@ -5,9 +5,9 @@
   stdout = "",
   stderr =
     ''
-    submoduleNotInScope/main.ipso:2:18: error: variable not in scope
+    submoduleNotInScope/main.ipso:4:18: error: variable not in scope
       |
-    2 | main = println a.b.c
+    4 | main = println a.b.c
       |                  ^
     '',
   exitcode = 1
