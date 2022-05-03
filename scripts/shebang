@@ -1,3 +1,5 @@
 #! /usr/bin/env bash
+set -e
 
-nix develop .#tests -c ipso-shebang --dir examples/shebang "$@"
+cargo build
+env PATH="$PATH:$PWD/target/debug" ipso-shebang --dir examples/shebang "$@"
