@@ -57,17 +57,17 @@ parseCommand line =
 
 writeTodos : Array String -> IO ()
 writeTodos todos =
-  if todos == []
-  then println "nothing to do"
-  else
-    array.foldl
-      (\acc todo ->
-        comp
-          acc
-          println todo
-      )
-      (io.pure ())
-      todos
+  case todos of
+    [] -> println "nothing to do"
+    _ ->
+      array.foldl
+        (\acc todo ->
+          comp
+            acc
+            println todo
+        )
+        (io.pure ())
+        todos
 
 runCommand :
   Command ->
