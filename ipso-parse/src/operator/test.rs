@@ -1,8 +1,5 @@
-#[cfg(test)]
 use crate::{operator::operator, ParseResult};
-use ipso_syntax::Spanned;
-#[cfg(test)]
-use ipso_syntax::{Binop, Expr};
+use ipso_syntax::{Binop, Expr, Spanned};
 
 #[test]
 fn all_left_associative() {
@@ -631,7 +628,7 @@ fn ambiguous() {
         pos: 10,
         item: Expr::Int(3),
     };
-    let expected = ParseResult::ambiguous_use_of(&Spanned {
+    let expected = ParseResult::ambiguous_use_of(Spanned {
         pos: 7,
         item: Binop::Eq,
     });

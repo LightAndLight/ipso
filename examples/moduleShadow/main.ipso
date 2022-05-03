@@ -1,0 +1,17 @@
+from a import x
+import b
+import b as c
+
+main : IO ()
+main =
+  comp
+    let x = "good"
+    println x
+
+    println ((\x -> x) "good")
+
+    let b = { value = "good" }
+    println b.value
+
+    let c = { value = "good" }
+    println c.value

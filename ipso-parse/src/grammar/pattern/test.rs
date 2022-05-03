@@ -1,15 +1,10 @@
-#[cfg(test)]
 use super::pattern;
-#[cfg(test)]
 use crate::{keep_left, map2, Parser};
-#[cfg(test)]
 use ipso_diagnostic::Source;
-#[cfg(test)]
 use ipso_lex::Lexer;
-#[cfg(test)]
 use ipso_syntax::{Pattern, Spanned};
+use std::rc::Rc;
 
-#[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {{
         assert_eq!($output, {
@@ -33,7 +28,7 @@ fn parse_pattern_1() {
         pattern,
         Ok(Pattern::Name(Spanned {
             pos: 0,
-            item: String::from("a")
+            item: Rc::from("a")
         }))
     )
 }

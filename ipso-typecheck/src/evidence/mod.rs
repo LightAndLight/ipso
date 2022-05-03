@@ -8,7 +8,7 @@ use std::rc::Rc;
 struct Item {
     pos: usize,
     constraint: Constraint,
-    expr: Option<Expr>,
+    expr: Option<Rc<Expr>>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -68,12 +68,12 @@ impl Evidence {
         self.environment.push(Item {
             pos,
             constraint,
-            expr: Some(Expr::EVar(ev)),
+            expr: Some(Rc::new(Expr::EVar(ev))),
         });
         ev
     }
 
-    pub fn find(&self, tc: &Typechecker, constraint: &Constraint) -> Option<Expr> {
+    pub fn find(&self, tc: &Typechecker, constraint: &Constraint) -> Option<Rc<Expr>> {
         self.environment.iter().find_map(|c| {
             if tc.eq_zonked_constraint(&c.constraint, constraint) {
                 c.expr.clone()

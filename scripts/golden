@@ -1,3 +1,5 @@
 #! /usr/bin/env bash
+set -e
 
-nix develop .#tests -c ipso-golden --dir examples "$@"
+cargo build
+ipso-golden --bin "$PWD/target/debug/ipso" --dir examples "$@"

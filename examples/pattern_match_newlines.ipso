@@ -1,17 +1,17 @@
 main : IO ()
 main =
   case E () of
-    A x -> pure ()
+    A x -> io.pure ()
     
-    B x -> pure ()
+    B x -> io.pure ()
     
     # a comment
-    C x -> pure ()
+    C x -> io.pure ()
 
     # another comment
 
-    D x -> pure ()
+    D x -> io.pure ()
     
     
     
-    _ -> pure ()
+    _ -> io.pure ()

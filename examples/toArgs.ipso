@@ -1,0 +1,9 @@
+showBool : Bool -> String
+showBool b = if b then "true" else "false"
+
+main : IO ()
+main =
+  comp
+    println <| showBool (toArgs "hello" == ["hello"])
+    println <| showBool (toArgs ["hello", "world"] == ["hello", "world"])
+    println <| showBool (toArgs [["a", "b"], ["c", "d"]] == ["a", "b", "c", "d"])

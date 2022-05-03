@@ -5,7 +5,7 @@
   stdout = "",
   stderr =
     ''
-    comp_expr_error_2.ipso:4:15: error: expected type "IO ?1", got type "Int"
+    comp_expr_error_2.ipso:4:15: error: expected type "IO ?5", got type "Int"
       |
     4 |     bind x <- 666
       |               ^

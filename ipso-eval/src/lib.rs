@@ -1,8 +1,11 @@
+#[cfg(test)]
 mod test;
 
-use ipso_core::{Binop, Builtin, Expr, ModulePath, ModuleUsage, Pattern, StringPart};
+use ipso_core::{
+    self as core, Binding, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
+};
 use ipso_rope::Rope;
-use ipso_syntax::ModuleName;
+use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
 use std::{
     cmp::Ordering,
@@ -10,10 +13,26 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
-    process,
+    process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
 use typed_arena::Arena;
+
+fn check_exit_status(cmd: &str, status: &ExitStatus) {
+    match status.code() {
+        Some(code) => {
+            if code == 0 {
+            } else {
+                println!("process {:?} exited with code {:?}", cmd, code);
+                process::exit(1);
+            }
+        }
+        None => {
+            println!("process {:?} terminated unexpectedly", cmd);
+            process::exit(1);
+        }
+    }
+}
 
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
@@ -186,6 +205,12 @@ pub enum Object<'heap> {
     Closure {
         env: &'heap [Value<'heap>],
         arg: bool,
+        /**
+        The module from which the closure originated.
+
+        Any [`Expr::Name`]s in the closure's body reference definitions in this module.
+        */
+        module: Option<ModuleId>,
         body: Rc<Expr>,
     },
     StaticClosure {
@@ -245,7 +270,7 @@ impl<'heap> Object<'heap> {
         }
     }
 
-    pub fn unpack_cmd(&'heap self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&'heap self) -> &'heap [Rc<str>] {
         match self {
             Object::Cmd(values) => values,
             val => panic!("expected command, got {:?}", val),
@@ -261,13 +286,22 @@ impl<'heap> Object<'heap> {
             Object::Closure {
                 env,
                 arg: use_arg,
+                module,
                 body,
             } => {
                 let mut env = Env::from(*env);
                 if *use_arg {
                     env.push(arg);
                 }
-                interpreter.eval(&mut env, body)
+
+                if let Some(module) = module {
+                    interpreter.context.modules.push(*module);
+                }
+                let result = interpreter.eval(&mut env, body);
+                if module.is_some() {
+                    interpreter.context.modules.pop();
+                }
+                result
             }
             Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
             a => panic!("expected closure, got {:?}", a),
@@ -276,11 +310,7 @@ impl<'heap> Object<'heap> {
 
     pub fn render(&self) -> String {
         match self {
-            Object::Closure {
-                env: _,
-                arg: _,
-                body: _,
-            } => String::from("<closure>"),
+            Object::Closure { .. } => String::from("<closure>"),
             Object::StaticClosure { env: _, body: _ } => String::from("<static builtin>"),
             Object::IO { env: _, body: _ } => String::from("<io>"),
             Object::String(s) => format!("{:?}", s),
@@ -336,12 +366,18 @@ impl<'heap> Object<'heap> {
 impl<'heap> PartialEq for Object<'heap> {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Object::Closure { env, arg, body } => match other {
+            Object::Closure {
+                env,
+                arg,
+                module,
+                body,
+            } => match other {
                 Object::Closure {
                     env: env2,
                     arg: arg2,
+                    module: module2,
                     body: body2,
-                } => env == env2 && arg == arg2 && body == body2,
+                } => env == env2 && arg == arg2 && module == module2 && body == body2,
                 _ => false,
             },
             Object::StaticClosure { env, body } => match other {
@@ -429,7 +465,7 @@ impl<'heap> Value<'heap> {
         self.unpack_object().unpack_variant()
     }
 
-    pub fn unpack_cmd(&self) -> &'heap Vec<Rc<str>> {
+    pub fn unpack_cmd(&self) -> &'heap [Rc<str>] {
         self.unpack_object().unpack_cmd()
     }
 
@@ -501,8 +537,12 @@ impl<'heap> PartialEq for Value<'heap> {
 }
 
 pub struct Module {
-    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
-    pub bindings: HashMap<String, Rc<Expr>>,
+    pub bindings: HashMap<Name, Binding>,
+}
+
+struct Context<'ctx> {
+    modules: Vec<ModuleId>,
+    base: &'ctx HashMap<Name, Binding>,
 }
 
 pub struct Interpreter<'io, 'ctx, 'heap> {
@@ -511,27 +551,42 @@ pub struct Interpreter<'io, 'ctx, 'heap> {
     bytes: &'heap Arena<u8>,
     values: &'heap Arena<Value<'heap>>,
     objects: &'heap Arena<Object<'heap>>,
-    context: &'ctx HashMap<String, Rc<Expr>>,
-    module_context: HashMap<ModulePath, Module>,
-    module_unmapping: Vec<HashMap<ModuleName, ModulePath>>,
+    context: Context<'ctx>,
+    modules: HashMap<ModuleId, Module>,
 }
 
 impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
-        context: &'ctx HashMap<String, Rc<Expr>>,
-        module_context: HashMap<ModulePath, Module>,
+        common_kinds: &'ctx CommonKinds,
+        modules: &'ctx Modules<core::Module>,
+        context: &'ctx HashMap<Name, Binding>,
         bytes: &'heap Arena<u8>,
         values: &'heap Arena<Value<'heap>>,
         objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
+        let modules = modules
+            .iter_ids()
+            .map(|(module_id, module)| {
+                (
+                    module_id,
+                    Module {
+                        bindings: module.get_bindings(common_kinds),
+                    },
+                )
+            })
+            .collect();
+
         Interpreter {
             stdin,
             stdout,
-            context,
-            module_context,
-            module_unmapping: Vec::with_capacity(1),
+            context: Context {
+                modules: Vec::new(),
+                base: context,
+            },
+            modules,
             bytes,
             values,
             objects,
@@ -1146,23 +1201,9 @@ where {
                                         process::exit(1);
                                     });
 
-                                match status.code() {
-                                    Some(code) => {
-                                        if code == 0 {
-                                            Value::Unit
-                                        } else {
-                                            println!(
-                                                "process {:?} exited with code {:?}",
-                                                cmd[0], code
-                                            );
-                                            process::exit(1);
-                                        }
-                                    }
-                                    None => {
-                                        println!("process {:?} terminated unexpectedly", cmd[0]);
-                                        process::exit(1);
-                                    }
-                                }
+                                check_exit_status(&cmd[0], &status);
+
+                                Value::Unit
                             }
                         }
                         let env = interpreter.alloc_values({
@@ -1193,38 +1234,190 @@ where {
                     }
                 }
             ),
+            Builtin::Lines => function1!(
+                lines,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    fn lines_io_body<'heap>(
+                        interpreter: &mut Interpreter<'_, '_, 'heap>,
+                        env: &[Value],
+                    ) -> Value<'heap> {
+                        let cmd: &[Rc<str>] = env[0].unpack_cmd();
+                        if cmd.is_empty() {
+                            Value::Unit
+                        } else {
+                            let output = process::Command::new(cmd[0].as_ref())
+                                .args(cmd[1..].iter().map(|arg| arg.as_ref()))
+                                .stdin(Stdio::inherit())
+                                .stdout(Stdio::piped())
+                                .stderr(Stdio::inherit())
+                                .output()
+                                .unwrap_or_else(|err| {
+                                    panic!("failed to start process {:?}: {}", cmd[0], err)
+                                });
+
+                            check_exit_status(&cmd[0], &output.status);
+
+                            let lines: Vec<Value> = output
+                                .stdout
+                                .lines()
+                                .map(|line| {
+                                    let line = line.unwrap_or_else(|err| {
+                                        panic!("failed to decode line: {}", err)
+                                    });
+                                    let line = interpreter.alloc_str(&line);
+                                    interpreter.alloc(Object::String(line))
+                                })
+                                .collect();
+
+                            let lines = interpreter.alloc_values(lines);
+                            interpreter.alloc(Object::Array(lines))
+                        }
+                    }
+
+                    let env = interpreter.alloc_values([arg]);
+                    interpreter.alloc(Object::IO {
+                        env,
+                        body: IOBody(lines_io_body),
+                    })
+                }
+            ),
+            Builtin::ShowCmd => function1!(
+                show_cmd,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let cmd = arg
+                        .unpack_cmd()
+                        .iter()
+                        .map(|value| {
+                            if value.contains(' ') {
+                                let mut string = String::with_capacity(value.len() + 2);
+
+                                string.push('"');
+                                value.chars().for_each(|c| {
+                                    if c == '"' {
+                                        string.push('\\');
+                                    }
+                                    string.push(c);
+                                });
+                                string.push('"');
+
+                                string
+                            } else {
+                                String::from(value.as_ref())
+                            }
+                        })
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
+                }
+            ),
+            Builtin::FlatMap => function2!(
+                flat_map,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 env: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let f = env[0];
+                    let xs = arg.unpack_array();
+
+                    let mut result: Vec<Value> = Vec::new();
+                    for x in xs {
+                        result.extend(f.apply(interpreter, *x).unpack_array())
+                    }
+
+                    interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
+                }
+            ),
+        }
+    }
+
+    fn current_bindings(&self) -> &HashMap<Name, Binding> {
+        match self.context.modules.last() {
+            Some(id) => &self.modules.get(id).unwrap().bindings,
+            None => self.context.base,
         }
     }
 
     pub fn eval_from_module(
         &mut self,
         env: &mut Env<'heap>,
-        path: &ModulePath,
-        binding: &str,
+        id: &ModuleRef,
+        path: &[String],
+        item: &Name,
     ) -> Value<'heap> {
-        let (expr, next_module_mapping) = match self.module_context.get(path) {
-            None => panic!("no module found at {:?}", path),
-            Some(module) => match module.bindings.get(binding) {
-                None => panic!("{:?} not found in {:?}", binding, path),
-                Some(expr) => (expr.clone(), module.module_mapping.clone()),
+        fn lookup_path<'a>(
+            bindings: &'a HashMap<Name, Binding>,
+            path: &[String],
+        ) -> &'a HashMap<Name, Binding> {
+            if path.is_empty() {
+                bindings
+            } else {
+                match bindings.get(&Name::definition(&path[0])) {
+                    None => panic!("submodule {:?} not found", path[0]),
+                    Some(binding) => match binding {
+                        Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
+                        Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
+                    },
+                }
+            }
+        }
+
+        let bindings = match id {
+            ModuleRef::This => self.current_bindings(),
+            ModuleRef::Id(id) => match self.modules.get(id) {
+                None => panic!("{:?} not found", id),
+                Some(module) => &module.bindings,
             },
         };
-        self.module_unmapping.push(
-            next_module_mapping
-                .into_iter()
-                .filter_map(|(module_path, module_usage)| {
-                    let m_module_name = match module_usage {
-                        ModuleUsage::All => module_path.get_module_name().cloned(),
-                        ModuleUsage::Items(_) => module_path.get_module_name().cloned(),
-                        ModuleUsage::Named(name) => Some(ModuleName(vec![name])),
-                    };
-                    m_module_name.map(|module_name| (module_name, module_path))
-                })
-                .collect(),
-        );
-        let res = self.eval(env, &expr);
-        self.module_unmapping.pop();
-        res
+
+        let bindings = lookup_path(bindings, path);
+
+        let expr = match bindings.get(item) {
+            None => panic!("{:?} not found in {:?}", item, id),
+            Some(binding) => match binding {
+                Binding::Expr(expr) => expr.clone(),
+                Binding::Module(module) => panic!("unexpected module {:?}", module),
+            },
+        };
+
+        if let ModuleRef::Id(id) = id {
+            self.context.modules.push(*id);
+        }
+
+        let result = self.eval(env, &expr);
+
+        if let ModuleRef::Id(_) = id {
+            self.context.modules.pop();
+        }
+
+        result
+    }
+
+    fn lookup_name(&self, name: &Name) -> Rc<Expr> {
+        let binding = match self.context.modules.last() {
+            None => match self.context.base.get(name) {
+                None => panic!("{:?} not in base scope", name),
+                Some(binding) => binding.clone(),
+            },
+            Some(module_id) => match self.modules.get(module_id).unwrap().bindings.get(name) {
+                None => panic!("{:?} not in {:?}'s scope", name, module_id),
+                Some(binding) => binding.clone(),
+            },
+        };
+
+        match binding {
+            Binding::Expr(body) => body,
+            Binding::Module(module) => panic!("unexpected module {:?}", module),
+        }
+    }
+
+    fn current_module(&self) -> Option<ModuleId> {
+        self.context.modules.last().copied()
     }
 
     pub fn eval(&mut self, env: &mut Env<'heap>, expr: &Expr) -> Value<'heap> {
@@ -1233,22 +1426,10 @@ where {
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
             Expr::Name(name) => {
-                let body = match self.context.get(name) {
-                    None => panic!("{:?} not in scope", name),
-                    Some(body) => body,
-                };
-                self.eval(env, body)
+                let body = self.lookup_name(name);
+                self.eval(env, body.as_ref())
             }
-            Expr::Module(name, item) => {
-                let path: ModulePath = self
-                    .module_unmapping
-                    .last()
-                    .unwrap()
-                    .get(name)
-                    .unwrap()
-                    .clone();
-                self.eval_from_module(env, &path, item)
-            }
+            Expr::Module { id, path, item } => self.eval_from_module(env, id, path, item),
             Expr::Builtin(name) => self.eval_builtin(name),
 
             Expr::App(a, b) => {
@@ -1261,9 +1442,11 @@ where {
                     Env::Borrowed(env) => env,
                     Env::Owned(env) => self.alloc_values(env.iter().copied()),
                 };
+
                 self.alloc(Object::Closure {
                     env,
                     arg: *arg,
+                    module: self.current_module(),
                     body: body.clone(),
                 })
             }
@@ -1595,7 +1778,20 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
-            Expr::Cmd(parts) => self.alloc(Object::Cmd(parts.clone())),
+            Expr::Cmd(parts) => {
+                let mut new_parts: Vec<Rc<str>> = Vec::with_capacity(parts.len());
+                for part in parts {
+                    match part {
+                        CmdPart::Literal(value) => new_parts.push(value.clone()),
+                        CmdPart::Expr(expr) => {
+                            let args = self.eval(env, expr).unpack_array();
+                            new_parts
+                                .extend(args.iter().map(|value| Rc::from(value.unpack_string())));
+                        }
+                    }
+                }
+                self.alloc(Object::Cmd(new_parts))
+            }
         };
         out
     }

@@ -10,7 +10,10 @@ use crate::{
     BoundVars,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use ipso_core::{Binop, Branch, CommonKinds, Expr, Pattern, RowParts, StringPart, Type, TypeSig};
+use ipso_core::{
+    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, RowParts, Signature, StringPart,
+    Type, TypeSig,
+};
 use ipso_diagnostic::Source;
 use ipso_rope::Rope;
 use ipso_syntax::{self as syntax, Spanned};
@@ -18,7 +21,7 @@ use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
 };
-use syntax::{kind::Kind, ModuleName};
+use syntax::{kind::Kind, ModuleId};
 
 /// A mapping from type metavariables to their solutions.
 #[derive(Default)]
@@ -874,21 +877,14 @@ pub fn unify(
     }
 }
 
-/// An invalid ending for a computation expression.
-#[derive(PartialEq, Eq, Debug)]
-pub enum CompExprEnd {
-    None,
-    Let,
-    Bind,
-}
-
 /// Type inference error information.
 #[derive(PartialEq, Eq, Debug)]
 pub enum InferenceErrorInfo {
     UnificationError { error: UnificationError },
-    CompExprEndsWith { end: CompExprEnd },
     NotInScope { name: String },
-    DuplicateArgument { name: String },
+    NotAValue { name: String },
+    NotAModule,
+    DuplicateArgument { name: Rc<str> },
     RedundantPattern,
 }
 
@@ -918,17 +914,28 @@ impl InferenceError {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::CompExprEndsWith`].
-    pub fn comp_expr_ends_with(source: &Source, end: CompExprEnd) -> Self {
+    /// Construct an [`InferenceErrorInfo::NotAValue`].
+    pub fn not_a_value(source: &Source, name: &str) -> Self {
         InferenceError {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::CompExprEndsWith { end },
+            info: InferenceErrorInfo::NotAValue {
+                name: String::from(name),
+            },
+        }
+    }
+
+    /// Construct an [`InferenceErrorInfo::NotAModule`].
+    pub fn not_a_module(source: &Source) -> Self {
+        InferenceError {
+            source: source.clone(),
+            position: None,
+            info: InferenceErrorInfo::NotAModule,
         }
     }
 
     /// Construct an [`InferenceErrorInfo::DuplicateArgument`].
-    pub fn duplicate_argument(source: &Source, name: String) -> Self {
+    pub fn duplicate_argument(source: &Source, name: Rc<str>) -> Self {
         InferenceError {
             source: source.clone(),
             position: None,
@@ -1067,12 +1074,12 @@ impl CheckedPattern {
 pub struct InferenceContext<'a> {
     common_kinds: &'a CommonKinds,
     source: &'a Source,
-    modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+    modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut kind_inference::Solutions,
     type_solutions: &'a mut Solutions,
-    type_signatures: &'a HashMap<String, TypeSig>,
+    type_signatures: &'a HashMap<String, Signature>,
     variables: &'a mut BoundVars<Type>,
     evidence: &'a mut Evidence,
 }
@@ -1084,21 +1091,22 @@ fn pattern_is_redundant(
 ) -> bool {
     saw_catchall
         || match pattern {
-            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_str()),
+            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_ref()),
             _ => false,
         }
 }
 
 impl<'a> InferenceContext<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         common_kinds: &'a CommonKinds,
         source: &'a Source,
-        modules: &'a HashMap<ModuleName, HashMap<String, TypeSig>>,
+        modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut kind_inference::Solutions,
         type_solutions: &'a mut Solutions,
-        type_signatures: &'a HashMap<String, TypeSig>,
+        type_signatures: &'a HashMap<String, Signature>,
         variables: &'a mut BoundVars<Type>,
         evidence: &'a mut Evidence,
     ) -> Self {
@@ -1228,7 +1236,7 @@ impl<'a> InferenceContext<'a> {
         args.iter()
             .flat_map(|arg| arg.item.get_arg_names().into_iter())
             .try_for_each(|arg| {
-                if seen.contains(&arg.item.as_str()) {
+                if seen.contains(&arg.item.as_ref()) {
                     Err(
                         InferenceError::duplicate_argument(self.source, arg.item.clone())
                             .with_position(arg.pos),
@@ -1240,11 +1248,11 @@ impl<'a> InferenceContext<'a> {
             })
     }
 
-    fn infer_name_pattern(&mut self, name: &Spanned<String>) -> InferredPattern {
+    fn infer_name_pattern(&mut self, name: &Spanned<Rc<str>>) -> InferredPattern {
         let name_ty = self.fresh_type_meta(&Kind::Type);
         InferredPattern::Any {
             pattern: Pattern::Name,
-            names: vec![(Rc::from(name.item.as_str()), name_ty.clone())],
+            names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
             ty: name_ty,
         }
     }
@@ -1275,8 +1283,8 @@ impl<'a> InferenceContext<'a> {
 
     fn infer_record_pattern(
         &mut self,
-        names: &[Spanned<String>],
-        rest: Option<&Spanned<String>>,
+        names: &[Spanned<Rc<str>>],
+        rest: Option<&Spanned<Rc<str>>>,
     ) -> InferredPattern {
         let mut names_to_positions: FnvHashMap<&str, usize> =
             FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
@@ -1311,7 +1319,7 @@ impl<'a> InferenceContext<'a> {
             }
             if let Some(rest) = rest {
                 names_tys.push((
-                    Rc::from(rest.item.as_str()),
+                    Rc::from(rest.item.as_ref()),
                     Type::app(Type::mk_record_ctor(self.common_kinds), row.clone()),
                 ));
             }
@@ -1333,7 +1341,7 @@ impl<'a> InferenceContext<'a> {
         &mut self,
         pos: usize,
         ctor: &str,
-        arg: &Spanned<String>,
+        arg: &Spanned<Rc<str>>,
     ) -> InferredPattern {
         let ctor: Rc<str> = Rc::from(ctor);
         let arg_ty = self.fresh_type_meta(&Kind::Type);
@@ -1348,7 +1356,7 @@ impl<'a> InferenceContext<'a> {
         InferredPattern::Variant {
             tag: Rc::new(tag),
             ctor,
-            arg_name: Rc::from(arg.item.as_str()),
+            arg_name: Rc::from(arg.item.as_ref()),
             arg_ty,
             rest: rest_row,
         }
@@ -1408,33 +1416,86 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Var(name) => match self.variables.lookup_name(name) {
                 Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
                 None => match self.type_signatures.get(name) {
-                    Some(type_signature) => {
-                        Ok(self.instantiate(expr.pos, Expr::Name(name.clone()), type_signature))
-                    }
+                    Some(signature) => match signature {
+                        Signature::TypeSig(type_signature) => Ok(self.instantiate(
+                            expr.pos,
+                            Expr::Name(Name::definition(name.clone())),
+                            type_signature,
+                        )),
+                        Signature::Module(_) => {
+                            Err(InferenceError::not_a_value(self.source, name)
+                                .with_position(expr.pos))
+                        }
+                    },
                     None => {
                         Err(InferenceError::not_in_scope(self.source, name).with_position(expr.pos))
                     }
                 },
             },
-            syntax::Expr::Module { name, item } => match self.modules.get(name) {
-                None => {
-                    /*
-                    A module accessor will only be desugared if the module was in scope, so this case
-                    is impossible as long as `ctx.modules` is valid w.r.t this expression.
-                    */
-                    panic!("module not in scope: {:?}", name)
-                }
-                Some(definitions) => match definitions.get(item) {
-                    None => {
-                        Err(InferenceError::not_in_scope(self.source, item).with_position(expr.pos))
+            syntax::Expr::Module { id, path, item } => {
+                fn lookup_path<'a>(
+                    source: &Source,
+                    definitions: &'a HashMap<String, Signature>,
+                    path: &[Spanned<String>],
+                ) -> Result<&'a HashMap<String, Signature>, InferenceError> {
+                    if path.is_empty() {
+                        Ok(definitions)
+                    } else {
+                        match definitions.get(&path[0].item) {
+                            None => Err(InferenceError::not_in_scope(source, &path[0].item)
+                                .with_position(path[0].pos)),
+                            Some(signature) => match signature {
+                                Signature::TypeSig(_) => {
+                                    Err(InferenceError::not_a_module(source)
+                                        .with_position(path[0].pos))
+                                }
+                                Signature::Module(definitions) => {
+                                    lookup_path(source, definitions, &path[1..])
+                                }
+                            },
+                        }
                     }
-                    Some(type_signature) => Ok(self.instantiate(
-                        expr.pos,
-                        Expr::Module(name.clone(), item.clone()),
-                        type_signature,
-                    )),
-                },
-            },
+                }
+
+                let definitions = match id {
+                    syntax::ModuleRef::This => self.type_signatures,
+                    syntax::ModuleRef::Id(id) => match self.modules.get(id) {
+                        None => {
+                            /*
+                            A module accessor will only be desugared if the module was in scope, so this case
+                            is impossible as long as `ctx.modules` is valid w.r.t this expression.
+                            */
+                            panic!(
+                                "module not in scope. id: {:?}, path: {:?}, item: {:?}",
+                                id, path, item
+                            )
+                        }
+                        Some(definitions) => definitions,
+                    },
+                };
+
+                let definitions = lookup_path(self.source, definitions, path)?;
+
+                match definitions.get(&item.item) {
+                    None => Err(InferenceError::not_in_scope(self.source, &item.item)
+                        .with_position(item.pos)),
+                    Some(signature) => match signature {
+                        Signature::TypeSig(type_signature) => Ok(self.instantiate(
+                            expr.pos,
+                            Expr::Module {
+                                id: *id,
+                                path: path.iter().map(|x| x.item.clone()).collect(),
+                                item: Name::definition(item.item.clone()),
+                            },
+                            type_signature,
+                        )),
+                        Signature::Module(_) => {
+                            Err(InferenceError::not_a_value(self.source, &item.item)
+                                .with_position(item.pos))
+                        }
+                    },
+                }
+            }
 
             syntax::Expr::True => Ok((Expr::True, Type::Bool)),
             syntax::Expr::False => Ok((Expr::False, Type::Bool)),
@@ -1451,7 +1512,24 @@ impl<'a> InferenceContext<'a> {
             syntax::Expr::Int(n) => Ok((Expr::Int(*n), Type::Int)),
             syntax::Expr::Char(c) => Ok((Expr::Char(*c), Type::Char)),
             syntax::Expr::Unit => Ok((Expr::Unit, Type::Unit)),
-            syntax::Expr::Cmd(cmd_parts) => Ok((Expr::Cmd(cmd_parts.clone()), Type::Cmd)),
+            syntax::Expr::Cmd(cmd_parts) => {
+                let cmd_parts = cmd_parts
+                    .iter()
+                    .map(|cmd_part| match cmd_part {
+                        syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
+                        syntax::CmdPart::Expr(expr) => self
+                            .check(
+                                expr,
+                                &Type::app(
+                                    Type::Array(self.common_kinds.type_to_type.clone()),
+                                    Type::String,
+                                ),
+                            )
+                            .map(CmdPart::Expr),
+                    })
+                    .collect::<Result<Vec<CmdPart>, _>>()?;
+                Ok((Expr::Cmd(cmd_parts), Type::Cmd))
+            }
             syntax::Expr::String(string_parts) => {
                 let string_parts: Vec<StringPart> = string_parts
                     .iter()
@@ -1478,137 +1556,67 @@ impl<'a> InferenceContext<'a> {
                 ))
             }
 
-            syntax::Expr::Binop(op, left, right) => {
-                fn infer_desugared_op(
-                    this: &mut InferenceContext,
-                    expr_pos: usize,
-                    op_name: &str,
-                    op_pos: usize,
-                    left: Rc<Spanned<syntax::Expr>>,
-                    right: Rc<Spanned<syntax::Expr>>,
-                ) -> Result<(Expr, Type), InferenceError> {
-                    this.infer(&Spanned {
-                        pos: expr_pos,
-                        item: syntax::Expr::App(
-                            Rc::new(Spanned {
-                                pos: expr_pos,
-                                item: syntax::Expr::App(
-                                    Rc::new(Spanned {
-                                        pos: op_pos,
-                                        item: syntax::Expr::Var(String::from(op_name)),
-                                    }),
-                                    left,
-                                ),
-                            }),
-                            right,
-                        ),
-                    })
+            syntax::Expr::Binop(op, left, right) => match op.item {
+                syntax::Binop::Add => {
+                    let left = self.check(left, &Type::Int)?;
+                    let right = self.check(right, &Type::Int)?;
+                    Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
                 }
-
-                match op.item {
-                    syntax::Binop::Add => {
-                        let left = self.check(left, &Type::Int)?;
-                        let right = self.check(right, &Type::Int)?;
-                        Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
-                    }
-                    syntax::Binop::Multiply => {
-                        let left = self.check(left, &Type::Int)?;
-                        let right = self.check(right, &Type::Int)?;
-                        Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
-                    }
-                    syntax::Binop::Subtract => {
-                        let left = self.check(left, &Type::Int)?;
-                        let right = self.check(right, &Type::Int)?;
-                        Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
-                    }
-                    syntax::Binop::Divide => {
-                        let left = self.check(left, &Type::Int)?;
-                        let right = self.check(right, &Type::Int)?;
-                        Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
-                    }
-                    syntax::Binop::Append => {
-                        let item_ty = self.fresh_type_meta(&Kind::Type);
-                        let array_ty = Type::app(Type::mk_array(self.common_kinds), item_ty);
-                        let left = self.check(left, &array_ty)?;
-                        let right = self.check(right, &array_ty)?;
-                        Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
-                    }
-                    syntax::Binop::Or => {
-                        let left = self.check(left, &Type::Bool)?;
-                        let right = self.check(right, &Type::Bool)?;
-                        Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
-                    }
-                    syntax::Binop::And => {
-                        let left = self.check(left, &Type::Bool)?;
-                        let right = self.check(right, &Type::Bool)?;
-                        Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
-                    }
-                    syntax::Binop::LApply => {
-                        let in_ty = self.fresh_type_meta(&Kind::Type);
-                        let out_ty = self.fresh_type_meta(&Kind::Type);
-                        let left =
-                            self.check(left, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
-                        let right = self.check(right, &in_ty)?;
-                        Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
-                    }
-                    syntax::Binop::RApply => {
-                        let in_ty = self.fresh_type_meta(&Kind::Type);
-                        let out_ty = self.fresh_type_meta(&Kind::Type);
-                        let left = self.check(left, &in_ty)?;
-                        let right =
-                            self.check(right, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
-                        Ok((Expr::mk_binop(Binop::RApply, left, right), out_ty))
-                    }
-                    syntax::Binop::Eq => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "eq",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
-                    syntax::Binop::Neq => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "neq",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
-                    syntax::Binop::Gt => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "gt",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
-                    syntax::Binop::Gte => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "gte",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
-                    syntax::Binop::Lt => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "lt",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
-                    syntax::Binop::Lte => infer_desugared_op(
-                        self,
-                        expr.pos,
-                        "lte",
-                        op.pos,
-                        left.clone(),
-                        right.clone(),
-                    ),
+                syntax::Binop::Multiply => {
+                    let left = self.check(left, &Type::Int)?;
+                    let right = self.check(right, &Type::Int)?;
+                    Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
                 }
-            }
+                syntax::Binop::Subtract => {
+                    let left = self.check(left, &Type::Int)?;
+                    let right = self.check(right, &Type::Int)?;
+                    Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
+                }
+                syntax::Binop::Divide => {
+                    let left = self.check(left, &Type::Int)?;
+                    let right = self.check(right, &Type::Int)?;
+                    Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
+                }
+                syntax::Binop::Append => {
+                    let item_ty = self.fresh_type_meta(&Kind::Type);
+                    let array_ty = Type::app(Type::mk_array(self.common_kinds), item_ty);
+                    let left = self.check(left, &array_ty)?;
+                    let right = self.check(right, &array_ty)?;
+                    Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
+                }
+                syntax::Binop::Or => {
+                    let left = self.check(left, &Type::Bool)?;
+                    let right = self.check(right, &Type::Bool)?;
+                    Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
+                }
+                syntax::Binop::And => {
+                    let left = self.check(left, &Type::Bool)?;
+                    let right = self.check(right, &Type::Bool)?;
+                    Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
+                }
+                syntax::Binop::LApply => {
+                    let in_ty = self.fresh_type_meta(&Kind::Type);
+                    let out_ty = self.fresh_type_meta(&Kind::Type);
+                    let left =
+                        self.check(left, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
+                    let right = self.check(right, &in_ty)?;
+                    Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
+                }
+                syntax::Binop::RApply => {
+                    let in_ty = self.fresh_type_meta(&Kind::Type);
+                    let out_ty = self.fresh_type_meta(&Kind::Type);
+                    let left = self.check(left, &in_ty)?;
+                    let right =
+                        self.check(right, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
+                    Ok((Expr::mk_binop(Binop::RApply, left, right), out_ty))
+                }
+                syntax::Binop::Eq
+                | syntax::Binop::Neq
+                | syntax::Binop::Gt
+                | syntax::Binop::Gte
+                | syntax::Binop::Lt
+                | syntax::Binop::Lte => panic!("overloaded binop not desugared: {:?}", op.item),
+            },
 
             syntax::Expr::App(fun, arg) => {
                 let in_ty = self.fresh_type_meta(&Kind::Type);
@@ -1735,7 +1743,7 @@ impl<'a> InferenceContext<'a> {
                 ))
             }
             syntax::Expr::Project(expr, field) => {
-                let field_name: Rc<str> = Rc::from(field.as_ref());
+                let field_name: Rc<str> = Rc::from(field.item.as_str());
                 let field_ty = self.fresh_type_meta(&Kind::Type);
 
                 let rest_row = self.fresh_type_meta(&Kind::Row);
@@ -1815,114 +1823,8 @@ impl<'a> InferenceContext<'a> {
             }
             syntax::Expr::Case(expr, branches) => self.check_case(expr, branches),
 
-            syntax::Expr::Comp(comp_lines) => {
-                enum CheckedCompLine {
-                    Bind { vars_bound: usize, value: Expr },
-                    Let { vars_bound: usize, value: Expr },
-                    Expr(Expr),
-                }
-
-                let mut ret_ty = Err(CompExprEnd::None);
-                let mut checked_lines: Vec<CheckedCompLine> = comp_lines
-                    .iter()
-                    .map(|line| match line {
-                        syntax::CompLine::Expr(value) => {
-                            let ret_ty_var = self.fresh_type_meta(&Kind::Type);
-                            let value = self.check(
-                                value,
-                                &Type::app(Type::mk_io(self.common_kinds), ret_ty_var.clone()),
-                            )?;
-
-                            ret_ty = Ok(ret_ty_var);
-                            Ok(CheckedCompLine::Expr(value))
-                        }
-                        syntax::CompLine::Bind(name, value) => {
-                            let name_ty = self.fresh_type_meta(&Kind::Type);
-                            let value = self.check(
-                                value,
-                                &Type::app(Type::mk_io(self.common_kinds), name_ty.clone()),
-                            )?;
-
-                            // [note: checking `bind`s]
-                            //
-                            // Register the variables bound by this line so the variables
-                            // can be references by subsequent lines.
-                            self.variables.insert(&[(name.clone(), name_ty)]);
-
-                            ret_ty = Err(CompExprEnd::Bind);
-                            Ok(CheckedCompLine::Bind {
-                                vars_bound: 1,
-                                value,
-                            })
-                        }
-                        syntax::CompLine::Let(name, value) => {
-                            let (value, value_ty) = self.infer(value)?;
-
-                            self.variables.insert(&[(name.clone(), value_ty)]);
-
-                            ret_ty = Err(CompExprEnd::Let);
-                            Ok(CheckedCompLine::Let {
-                                vars_bound: 1,
-                                value,
-                            })
-                        }
-                    })
-                    .collect::<Result<_, _>>()?;
-
-                match ret_ty {
-                    Err(end) => {
-                        debug_assert!(match checked_lines.last() {
-                            Some(_) => matches!(end, CompExprEnd::Bind | CompExprEnd::Let),
-                            None => matches!(end, CompExprEnd::None),
-                        });
-
-                        Err(InferenceError::comp_expr_ends_with(self.source, end)
-                            .with_position(expr.pos))
-                    }
-                    Ok(ret_ty) => {
-                        debug_assert!(matches!(
-                            checked_lines.last(),
-                            Some(CheckedCompLine::Expr { .. })
-                        ));
-
-                        let desugared: Expr = match checked_lines.pop().unwrap() {
-                            CheckedCompLine::Bind { .. } | CheckedCompLine::Let { .. } => {
-                                unreachable!()
-                            }
-                            CheckedCompLine::Expr(value) => value,
-                        };
-                        let desugared = checked_lines.into_iter().rev().fold(
-                            desugared,
-                            |desugared, checked_line| match checked_line {
-                                CheckedCompLine::Expr(value) => {
-                                    // Desugar[comp { value; rest }] -> bindIO value (\_ -> Desugar[rest])
-                                    Expr::mk_app(
-                                        Expr::mk_app(Expr::Name(String::from("bindIO")), value),
-                                        Expr::mk_lam(false, desugared),
-                                    )
-                                }
-                                CheckedCompLine::Bind { vars_bound, value } => {
-                                    // Delete the variables that were bound in [note: checking `bind`s]
-                                    self.variables.delete(vars_bound);
-
-                                    // Desugar[comp { bind name <- value; rest }] -> bindIO value (\name -> Desugar[rest])
-                                    Expr::mk_app(
-                                        Expr::mk_app(Expr::Name(String::from("bindIO")), value),
-                                        Expr::mk_lam(true, desugared),
-                                    )
-                                }
-                                CheckedCompLine::Let { vars_bound, value } => {
-                                    self.variables.delete(vars_bound);
-
-                                    // Desugar[comp { let name = value; rest }] -> let x = value in Desugar[rest]
-                                    Expr::mk_let(value, desugared)
-                                }
-                            },
-                        );
-
-                        Ok((desugared, Type::app(Type::mk_io(self.common_kinds), ret_ty)))
-                    }
-                }
+            syntax::Expr::Comp(_) => {
+                panic!("computation expression was not desugared")
             }
         }
     }

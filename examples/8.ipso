@@ -1,2 +1,2 @@
 main : IO ()
-main = bindIO readln (\x -> print "hello $x")
+main = io.andThen readln (\x -> print "hello $x")

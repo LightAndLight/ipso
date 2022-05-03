@@ -1,20 +1,14 @@
-#[cfg(test)]
 use super::{expr_app, expr_case, string};
-#[cfg(test)]
 use crate::ParseError;
-#[cfg(test)]
 use crate::{keep_left, map2, Parser};
-#[cfg(test)]
 use ipso_diagnostic::Source;
-#[cfg(test)]
 use ipso_lex::{
     token::{self, Relation},
     Lexer,
 };
-#[cfg(test)]
 use ipso_syntax::{Branch, Expr, Keyword, Pattern, Spanned, StringPart};
+use std::rc::Rc;
 
-#[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {{
         assert_eq!($output, {
@@ -94,7 +88,7 @@ fn parse_case_1() {
                         pos: 12,
                         item: Pattern::Name(Spanned {
                             pos: 12,
-                            item: String::from("a")
+                            item: Rc::from("a")
                         })
                     },
                     body: Spanned {
@@ -125,7 +119,7 @@ fn parse_case_2() {
                             pos: 12,
                             item: Pattern::Name(Spanned {
                                 pos: 12,
-                                item: String::from("a")
+                                item: Rc::from("a")
                             })
                         },
                         body: Spanned {
@@ -138,7 +132,7 @@ fn parse_case_2() {
                             pos: 21,
                             item: Pattern::Name(Spanned {
                                 pos: 21,
-                                item: String::from("c")
+                                item: Rc::from("c")
                             })
                         },
                         body: Spanned {
@@ -176,7 +170,7 @@ fn parse_case_3() {
                             pos: 12,
                             item: Pattern::Name(Spanned {
                                 pos: 12,
-                                item: String::from("a")
+                                item: Rc::from("a")
                             })
                         },
                         body: Spanned {
@@ -189,7 +183,7 @@ fn parse_case_3() {
                             pos: 25,
                             item: Pattern::Name(Spanned {
                                 pos: 25,
-                                item: String::from("c")
+                                item: Rc::from("c")
                             })
                         },
                         body: Spanned {

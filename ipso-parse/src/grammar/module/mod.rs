@@ -1,5 +1,6 @@
 //! Parsing modules
 
+#[cfg(test)]
 mod test;
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
     indent, indent_scope, keep_left, keep_right, many, many_, map0, optional, sep_by, spanned,
     ParseResult, Parser,
 };
-use ipso_syntax::{Declaration, Expr, Keyword, Module, Names, Pattern, Spanned, Type};
+use ipso_syntax::{Declaration, InstanceMember, Keyword, Module, Names, Spanned, Type};
 use std::rc::Rc;
 
 /**
@@ -100,7 +101,11 @@ pub fn import(parser: &mut Parser) -> ParseResult<Declaration> {
                         indent!(parser, Relation::Gt, parser.keyword(&Keyword::As)),
                         spanned!(parser, indent!(parser, Relation::Gt, parser.ident_owned()))
                     ))
-                    .map(|name| Declaration::Import { module, name })
+                    .map(|as_name| Declaration::Import {
+                        resolved: None,
+                        module,
+                        as_name,
+                    })
                 }
             )
         )
@@ -130,12 +135,16 @@ pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Asterisk))
                         ),
                         sep_by!(
-                            indent!(parser, Relation::Gt, parser.ident_owned()),
+                            indent!(parser, Relation::Gt, spanned!(parser, parser.ident_owned())),
                             indent!(parser, Relation::Gt, parser.token(&token::Data::Comma))
                         )
                         .map(Names::Names)
                     )
-                    .map(|names| Declaration::FromImport { module, names })
+                    .map(|names| Declaration::FromImport {
+                        resolved: None,
+                        module,
+                        names
+                    })
                 )
             )
         )
@@ -233,9 +242,7 @@ instance_member ::=
   ident pattern* '=' expr
 ```
 */
-pub fn instance_member(
-    parser: &mut Parser,
-) -> ParseResult<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)> {
+pub fn instance_member(parser: &mut Parser) -> ParseResult<InstanceMember> {
     spanned!(parser, parser.ident_owned()).and_then(|name| {
         many!(indent!(
             parser,
@@ -245,7 +252,7 @@ pub fn instance_member(
         .and_then(|args| {
             keep_right!(
                 indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
-                expr(parser).map(|body| (name, args, body))
+                expr(parser).map(|body| InstanceMember { name, args, body })
             )
         })
     })

@@ -1,0 +1,22 @@
+showBool : Bool -> String
+showBool b = if b then "true" else "false"
+
+repeat : Int -> a -> Array a
+repeat n x =
+  if n <= 0
+  then []
+  else array.snoc (repeat (n - 1) x) x
+
+main : IO ()
+main =
+  println <|
+  showBool 
+    (array.flatMap 
+      (\x -> repeat x.count x.element) 
+      [
+        { count = 1, element = 'a'}, 
+        { count = 2, element = 'b'}, 
+        { count = 3, element = 'c'}
+      ] == 
+      [ 'a', 'b', 'b', 'c', 'c', 'c' ]
+    )

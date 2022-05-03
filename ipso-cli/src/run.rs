@@ -1,13 +1,14 @@
 use eval::Env;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, CommonKinds, ModulePath};
+use ipso_core::{self as core, Binding, CommonKinds, Name};
 use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{self as syntax, kind::Kind};
+use ipso_syntax::{kind::Kind, ModuleKey, ModuleRef, Modules};
 use ipso_typecheck::{self as typecheck, Typechecker};
 use std::{
+    collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
@@ -63,12 +64,9 @@ fn find_entrypoint_signature(
 }
 
 pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
-    let working_dir = std::env::current_dir().unwrap();
-
     let main = String::from("main");
 
-    let modules_data = Arena::new();
-    let mut modules = import::Modules::new(&modules_data);
+    let mut modules = Modules::new();
     let source = Source::Interactive {
         label: main.clone(),
     };
@@ -76,10 +74,20 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     if !target_path.exists() {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
-    let target_module_path: ModulePath = ModulePath::from_file(&target_path);
     let common_kinds = CommonKinds::default();
-    let builtins = builtins::builtins(&common_kinds);
-    let module = modules.import(&source, 0, &target_module_path, &common_kinds, &builtins)?;
+    let builtins_module_id = {
+        let builtins = builtins::builtins(&common_kinds);
+        modules.insert(ModuleKey::from("builtins"), builtins)
+    };
+    let module_id = import::import(
+        &mut modules,
+        builtins_module_id,
+        &source,
+        0,
+        &target_path,
+        &common_kinds,
+    )?;
+    let module = modules.lookup(module_id);
 
     let entrypoint: &String = match &config.entrypoint {
         None => &main,
@@ -87,12 +95,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc = {
-            let mut tc =
-                Typechecker::new(working_dir.as_path(), source, &common_kinds, &modules.index);
-            tc.register_from_import(&builtins, &syntax::Names::All);
-            tc
-        };
+        let mut tc = Typechecker::new(source, &common_kinds, &modules);
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
             tc.fresh_type_meta(&Kind::Type),
@@ -110,39 +113,27 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let mut stdin = config
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
-        let eval_modules = modules
-            .iter()
-            .map(|(module_path, module)| {
-                (
-                    module_path.clone(),
-                    eval::Module {
-                        module_mapping: module.module_mapping.clone(),
-                        bindings: module.get_bindings(&common_kinds),
-                    },
-                )
-            })
-            .collect();
-        let context = builtins
+        let context: HashMap<Name, Binding> = module
             .decls
             .iter()
             .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
-            .chain(
-                module
-                    .decls
-                    .iter()
-                    .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter()),
-            )
             .collect();
         let mut interpreter = Interpreter::new(
             &mut stdin,
             &mut stdout,
+            &common_kinds,
+            &modules,
             &context,
-            eval_modules,
             &bytes,
             &values,
             &objects,
         );
-        let action = interpreter.eval_from_module(&mut env, &target_module_path, entrypoint);
+        let action = interpreter.eval_from_module(
+            &mut env,
+            &ModuleRef::from(module_id),
+            &[],
+            &Name::definition(entrypoint),
+        );
         action.perform_io(&mut interpreter)
     };
     Ok(())

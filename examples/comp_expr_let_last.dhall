@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    comp_expr_let_last.ipso:3:3: error: computation expression ends with a let
+    comp_expr_let_last.ipso:7:5: error: computation expression ends with a let
       |
-    3 |   comp
-      |   ^
+    7 |     let c = "3"
+      |     ^
     '',
   exitcode = 1
 }

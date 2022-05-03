@@ -1,12 +1,13 @@
+#[cfg(test)]
+mod test;
+
+use super::Constraint;
 use crate::{metavariables, Implication, SolveConstraintContext, TypeError, Typechecker};
 use ipso_core::{self as core, Binop, Expr, Placeholder};
 use ipso_syntax::kind::Kind;
+use std::rc::Rc;
 
-use super::Constraint;
-
-mod test;
-
-pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<core::Expr> {
+pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<core::Expr>> {
     tc.evidence.environment.iter().find_map(
         |super::Item {
              constraint: other_constraint,
@@ -27,7 +28,7 @@ pub fn solve_constraint(
     context: &Option<SolveConstraintContext>,
     tc: &mut Typechecker,
     constraint: &Constraint,
-) -> Result<core::Expr, TypeError> {
+) -> Result<Rc<core::Expr>, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
             debug_assert!(tc.zonk_kind(false, constraint.kind()) == Kind::Constraint);
@@ -81,7 +82,8 @@ pub fn solve_constraint(
                                     break;
                                 }
                                 Ok(arg) => {
-                                    evidence = evidence.map(|evidence| Expr::mk_app(evidence, arg));
+                                    evidence =
+                                        evidence.map(|evidence| Rc::new(Expr::app(evidence, arg)));
                                 }
                             }
                         }
@@ -111,8 +113,8 @@ pub fn solve_constraint(
         Constraint::HasField { field, rest } => {
             debug_assert!(tc.zonk_kind(false, rest.kind()) == Kind::Row);
 
-            let new_evidence = match rest {
-                core::Type::RowNil => Ok(core::Expr::Int(0)),
+            let new_evidence: Rc<core::Expr> = match rest {
+                core::Type::RowNil => Ok(Rc::new(core::Expr::Int(0))),
                 core::Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
@@ -134,7 +136,12 @@ pub fn solve_constraint(
                                 rest: other_rest.as_ref().clone(),
                             },
                         )?;
-                        Ok(core::Expr::mk_binop(Binop::Add, core::Expr::Int(1), ev))
+
+                        Ok(Rc::new(core::Expr::mk_binop_l(
+                            Binop::Add,
+                            core::Expr::Int(1),
+                            ev,
+                        )))
                     }
                 }
 
@@ -148,7 +155,7 @@ pub fn solve_constraint(
                             // so the user doesn't have to write them
                             let ev = tc.evidence.assume(0, constraint.clone());
                             debug_assert!(tc.evidence.lookup_evar(&ev) != None);
-                            Ok(core::Expr::EVar(ev))
+                            Ok(Rc::new(core::Expr::EVar(ev)))
                         }
                         Some(evidence) => Ok(evidence),
                     }
@@ -217,6 +224,7 @@ pub fn solve_constraint(
                 | core::Type::Unit
                 | core::Type::Cmd => panic!("impossible"),
             }?;
+
             Ok(new_evidence)
         }
     }
@@ -225,7 +233,7 @@ pub fn solve_constraint(
 pub fn solve_placeholder(
     tc: &mut Typechecker,
     p: Placeholder,
-) -> Result<(core::Expr, Constraint), TypeError> {
+) -> Result<(Rc<core::Expr>, Constraint), TypeError> {
     let item = tc.evidence.environment[p.0].clone();
     match item.expr {
         None => {

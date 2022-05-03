@@ -1,0 +1,21 @@
+#! /usr/bin/env ipso
+
+# Translated from http://blog.ielliott.io/docker-cleanup-commands/
+
+# This example is not automatically run because it requires a docker installation.
+
+main : IO ()
+main =
+  comp
+    bind containerIds <- lines `docker ps --all --format "{{.ID}}"`
+    if lengthArray containerIds == 0
+      then println "No containers to remove."
+      else run `docker rm $containerIds`
+
+    bind imageIds <- lines `docker images --format "{{.ID}}"`
+    if lengthArray imageIds == 0
+      then println "No images to remove."
+      else run `docker rmi -f $imageIds`
+
+    run `docker volume prune -f`
+    run `docker builder prune -f`

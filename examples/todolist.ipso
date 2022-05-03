@@ -1,6 +1,3 @@
-import array
-import string
-
 parseDigit : Char -> (| Err, Ok(Int) |)
 parseDigit c =
   case c of
@@ -69,7 +66,7 @@ writeTodos todos =
           acc
           println todo
       )
-      (pure ())
+      (io.pure ())
       todos
 
 runCommand :
@@ -79,7 +76,7 @@ runCommand :
 runCommand cmd todos =
   case cmd of
     Quit ->
-      pure Quit
+      io.pure Quit
     Help ->
       comp
         println "help - display this message"
@@ -87,19 +84,19 @@ runCommand cmd todos =
         println "list - display the todolist"
         println "add STRING - add a task to the list"
         println "delete INT - delete a task from the list"
-        pure Continue{ todos }
+        io.pure Continue{ todos }
     Add{ item } ->
-      pure Continue{ todos = array.snoc todos item }
+      io.pure Continue{ todos = array.snoc todos item }
     List ->
       comp
         writeTodos todos
-        pure Continue{ todos }
+        io.pure Continue{ todos }
     Invalid{ input } ->
       comp
         println "error: invalid command \"$input\""
-        pure Continue{ todos }
+        io.pure Continue{ todos }
     Delete{ index } ->
-      pure Continue{ todos = array.delete index todos }
+      io.pure Continue{ todos = array.delete index todos }
 
 loop : Array String -> IO ()
 loop todos =
@@ -109,7 +106,7 @@ loop todos =
     bind next <- runCommand (parseCommand line) todos
     case next of
       Continue{ todos = newTodos } -> loop newTodos
-      Quit -> pure ()
+      Quit -> io.pure ()
 
 main : IO ()
 main =

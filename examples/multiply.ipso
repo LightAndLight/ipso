@@ -1,2 +1,2 @@
 main : IO ()
-main = print (showInt (5 * 9))
+main = print (int.show (5 * 9))

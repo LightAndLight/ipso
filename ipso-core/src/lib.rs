@@ -1,12 +1,11 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleName};
+use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
 use ipso_util::iter::Step;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -753,6 +752,9 @@ pub enum Builtin {
     SnocArray,
     Run,
     EqBool,
+    Lines,
+    ShowCmd,
+    FlatMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -778,18 +780,63 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CmdPart {
+    Literal(Rc<str>),
+    Expr(Expr),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Name {
+    Evidence(Rc<str>),
+    Definition(String),
+}
+
+impl Name {
+    pub fn definition<T: Into<String>>(name: T) -> Self {
+        Self::Definition(name.into())
+    }
+
+    pub fn evidence<T: Into<Rc<str>>>(name: T) -> Self {
+        Self::Evidence(name.into())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(usize),
     EVar(EVar),
     Placeholder(Placeholder),
-    Name(String),
-    Module(ModuleName, String),
+    Name(Name),
+    Module {
+        /// A reference to a module.
+        id: ModuleRef,
+
+        /**
+        A chain of submodule accessors.
+
+        e.g. `module.submodule1.submodule2`
+        */
+        path: Vec<String>,
+
+        /**
+        The referenced item.
+
+        e.g. `module.submodule.item`
+        */
+        item: Name,
+    },
     Builtin(Builtin),
 
     App(Rc<Expr>, Rc<Expr>),
-    Lam { arg: bool, body: Rc<Expr> },
+    Lam {
+        arg: bool,
+        body: Rc<Expr>,
+    },
 
-    Let { value: Rc<Expr>, rest: Rc<Expr> },
+    Let {
+        value: Rc<Expr>,
+        rest: Rc<Expr>,
+    },
 
     True,
     False,
@@ -814,7 +861,7 @@ pub enum Expr {
     Case(Rc<Expr>, Vec<Branch>),
     Unit,
 
-    Cmd(Vec<Rc<str>>),
+    Cmd(Vec<CmdPart>),
 }
 
 impl Expr {
@@ -834,6 +881,21 @@ impl Expr {
                 }
             }
             a => Expr::App(Rc::new(a), Rc::new(b)),
+        }
+    }
+
+    pub fn app(a: Rc<Expr>, b: Rc<Expr>) -> Expr {
+        match a.as_ref() {
+            Expr::Lam { arg, body } => {
+                if *arg {
+                    // this potentially increases the number of redexes in the term.
+                    // todo: bind the arg with a let?
+                    body.instantiate(&b)
+                } else {
+                    body.as_ref().clone()
+                }
+            }
+            _ => Expr::App(a, b),
         }
     }
 
@@ -902,6 +964,15 @@ impl Expr {
         Expr::Binop(op, Rc::new(a), Rc::new(b))
     }
 
+    pub fn mk_binop_l(op: Binop, a: Expr, b: Rc<Expr>) -> Expr {
+        if op == Binop::Add {
+            if let (Expr::Int(a), Expr::Int(b)) = (&a, b.as_ref()) {
+                return Expr::Int(*a + *b);
+            }
+        }
+        Expr::Binop(op, Rc::new(a), b)
+    }
+
     pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
         Expr::Case(Rc::new(expr), branches)
     }
@@ -934,7 +1005,11 @@ impl Expr {
         fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
             match expr {
                 Expr::Var(v) => Expr::Var(f.apply(*v)),
-                Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+                Expr::Module { id, path, item } => Expr::Module {
+                    id: *id,
+                    path: path.clone(),
+                    item: item.clone(),
+                },
                 Expr::EVar(v) => Expr::EVar(*v),
                 Expr::Placeholder(p) => Expr::Placeholder(*p),
                 Expr::Name(n) => Expr::Name(n.clone()),
@@ -988,7 +1063,15 @@ impl Expr {
                         .collect(),
                 ),
                 Expr::Unit => Expr::Unit,
-                Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+                Expr::Cmd(parts) => Expr::Cmd(
+                    parts
+                        .iter()
+                        .map(|part| match part {
+                            CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                            CmdPart::Expr(expr) => CmdPart::Expr(go(expr, f)),
+                        })
+                        .collect(),
+                ),
             }
         }
 
@@ -1032,7 +1115,11 @@ impl Expr {
                 cmp::Ordering::Equal => val.map_vars(|n| n + depth),
                 cmp::Ordering::Greater => Expr::Var(*n - 1),
             },
-            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+            Expr::Module { id, path, item } => Expr::Module {
+                id: *id,
+                path: path.clone(),
+                item: item.clone(),
+            },
             Expr::EVar(v) => Expr::EVar(*v),
             Expr::Placeholder(v) => Expr::Placeholder(*v),
             Expr::Name(n) => Expr::Name(n.clone()),
@@ -1096,7 +1183,15 @@ impl Expr {
             ),
 
             Expr::Unit => Expr::Unit,
-            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+            Expr::Cmd(parts) => Expr::Cmd(
+                parts
+                    .iter()
+                    .map(|part| match part {
+                        CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                        CmdPart::Expr(expr) => CmdPart::Expr(expr.__instantiate(depth, val)),
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -1107,7 +1202,7 @@ impl Expr {
         match self {
             Expr::Var(_) => Ok(()),
             Expr::EVar(_) => Ok(()),
-            Expr::Module(_, _) => Ok(()),
+            Expr::Module { .. } => Ok(()),
             Expr::Placeholder(v) => {
                 let new_value = f(v)?;
                 *self = new_value;
@@ -1199,7 +1294,10 @@ impl Expr {
 
             Expr::Unit => Ok(()),
 
-            Expr::Cmd(_) => Ok(()),
+            Expr::Cmd(parts) => parts.iter_mut().try_for_each(|part| match part {
+                CmdPart::Literal(_) => Ok(()),
+                CmdPart::Expr(expr) => expr.subst_placeholder(f),
+            }),
         }
     }
 
@@ -1214,7 +1312,11 @@ impl Expr {
                 }
             }
             Expr::Name(n) => Expr::Name(n.clone()),
-            Expr::Module(n, f) => Expr::Module(n.clone(), f.clone()),
+            Expr::Module { id, path, item } => Expr::Module {
+                id: *id,
+                path: path.clone(),
+                item: item.clone(),
+            },
             Expr::Placeholder(n) => Expr::Placeholder(*n),
             Expr::Builtin(b) => Expr::Builtin(*b),
             Expr::App(a, b) => {
@@ -1277,7 +1379,15 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
-            Expr::Cmd(parts) => Expr::Cmd(parts.clone()),
+            Expr::Cmd(parts) => Expr::Cmd(
+                parts
+                    .iter()
+                    .map(|part| match part {
+                        CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
+                        CmdPart::Expr(expr) => CmdPart::Expr(expr.__abstract_evar(depth, ev)),
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -1356,7 +1466,7 @@ impl<'a> Iterator for IterEVars<'a> {
                 Expr::EVar(a) => Step::Yield(a),
                 Expr::Placeholder(_) => Step::Skip,
                 Expr::Name(_) => Step::Skip,
-                Expr::Module(_, _) => Step::Skip,
+                Expr::Module { .. } => Step::Skip,
                 Expr::Builtin(_) => Step::Skip,
                 Expr::App(a, b) => Step::Continue2(a, b),
                 Expr::Lam { arg: _, body } => Step::Continue1(body),
@@ -1403,7 +1513,15 @@ impl<'a> Iterator for IterEVars<'a> {
                     xs
                 }),
                 Expr::Unit => Step::Skip,
-                Expr::Cmd(_) => Step::Skip,
+                Expr::Cmd(parts) => Step::Continue(
+                    parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            CmdPart::Literal(_) => None,
+                            CmdPart::Expr(expr) => Some(expr),
+                        })
+                        .collect(),
+                ),
             }
         }
 
@@ -1483,12 +1601,6 @@ pub struct ClassMember {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstanceMember {
-    pub name: String,
-    pub body: Expr,
-}
-
-#[derive(Debug, PartialEq, Eq)]
 pub enum Declaration {
     BuiltinType {
         name: String,
@@ -1505,49 +1617,92 @@ pub enum Declaration {
         body: Type,
     },
     Class(ClassDeclaration),
+    Evidence {
+        name: Rc<str>,
+        body: Rc<Expr>,
+    },
     Instance {
         ty_vars: Vec<(Rc<str>, Kind)>,
-        superclass_constructors: Vec<Expr>,
         assumes: Vec<Type>,
         head: Type,
-        members: Vec<InstanceMember>,
+        evidence: Rc<str>,
+    },
+    Module {
+        name: String,
+        decls: Vec<Rc<Declaration>>,
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Binding {
+    Expr(Rc<Expr>),
+    Module(HashMap<Name, Binding>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Signature {
+    TypeSig(TypeSig),
+    Module(HashMap<String, Signature>),
+}
+
 impl Declaration {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Binding> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig: _, body } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), body.clone());
+                map.insert(Name::Definition(name.clone()), Binding::Expr(body.clone()));
+                map
+            }
+            Declaration::Evidence { name, body } => {
+                let mut map = HashMap::new();
+                map.insert(Name::Evidence(name.clone()), Binding::Expr(body.clone()));
                 map
             }
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (a, b.1))
+                .map(|(a, b)| (Name::Definition(a), Binding::Expr(b.1)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
+            Declaration::Module { name, decls } => HashMap::from([(
+                Name::Definition(name.clone()),
+                Binding::Module(
+                    decls
+                        .iter()
+                        .flat_map(|decl| decl.get_bindings(common_kinds).into_iter())
+                        .collect(),
+                ),
+            )]),
         }
     }
 
-    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, Signature> {
         match self {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig, body: _ } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), sig.clone());
+                map.insert(name.clone(), Signature::TypeSig(sig.clone()));
                 map
             }
+            Declaration::Evidence { .. } => HashMap::new(),
             Declaration::TypeAlias { .. } => HashMap::new(),
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (a, b.0))
+                .map(|(a, b)| (a, Signature::TypeSig(b.0)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
+            Declaration::Module { name, decls } => HashMap::from([(
+                name.clone(),
+                Signature::Module(
+                    decls
+                        .iter()
+                        .flat_map(|decl| decl.get_signatures(common_kinds))
+                        .collect(),
+                ),
+            )]),
         }
     }
 }
@@ -1627,83 +1782,22 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ModuleUsage {
-    /// A module was given a particular name during importing
-    Named(String),
-    /// Specific names were imported from a module
-    Items(Vec<String>),
-    /// The entire contents of a module were imported
-    All,
-}
-
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
-pub enum ModulePath {
-    Module {
-        module_name: ModuleName,
-        path: PathBuf,
-    },
-    File {
-        path: PathBuf,
-    },
-}
-
-impl ModulePath {
-    pub fn from_module(dir: &Path, module_name: &ModuleName) -> Self {
-        let mut path = module_name
-            .iter()
-            .fold(PathBuf::from(dir), |acc, el| acc.join(el));
-        path.set_extension("ipso");
-        ModulePath::Module {
-            module_name: module_name.clone(),
-            path,
-        }
-    }
-
-    pub fn from_file(file: &Path) -> Self {
-        ModulePath::File {
-            path: PathBuf::from(file),
-        }
-    }
-
-    pub fn as_path(&self) -> &Path {
-        let path = match self {
-            ModulePath::Module { path, .. } => path,
-            ModulePath::File { path, .. } => path,
-        };
-        path.as_path()
-    }
-
-    pub fn to_str(&self) -> &str {
-        self.as_path().to_str().unwrap()
-    }
-
-    pub fn get_module_name(&self) -> Option<&ModuleName> {
-        match self {
-            ModulePath::Module { module_name, .. } => Option::Some(module_name),
-            ModulePath::File { .. } => None,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
-    /// Describes how each imported file is referenced by this module.
-    pub module_mapping: HashMap<ModulePath, ModuleUsage>,
     pub decls: Vec<Declaration>,
 }
 
 impl Module {
-    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<String, Rc<Expr>> {
-        let bindings: HashMap<String, Rc<Expr>> = HashMap::new();
+    pub fn get_bindings(&self, common_kinds: &CommonKinds) -> HashMap<Name, Binding> {
+        let bindings: HashMap<Name, Binding> = HashMap::new();
         self.decls.iter().fold(bindings, |mut acc, decl| {
             acc.extend(decl.get_bindings(common_kinds).into_iter());
             acc
         })
     }
 
-    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, TypeSig> {
-        let signatures: HashMap<String, TypeSig> = HashMap::new();
+    pub fn get_signatures(&self, common_kinds: &CommonKinds) -> HashMap<String, Signature> {
+        let signatures: HashMap<String, Signature> = HashMap::new();
         self.decls.iter().fold(signatures, |mut acc, decl| {
             acc.extend(decl.get_signatures(common_kinds).into_iter());
             acc

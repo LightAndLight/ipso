@@ -1,20 +1,13 @@
-#[cfg(test)]
 use super::{definition, from_import, import, type_alias};
-#[cfg(test)]
 use crate::{keep_left, map2, ParseError, Parser};
-#[cfg(test)]
 use ipso_diagnostic::Source;
-#[cfg(test)]
 use ipso_lex::{
     token::{self, Relation},
     Lexer,
 };
-#[cfg(test)]
 use ipso_syntax::{r#type::Type, Declaration, Expr, Names, Pattern, Spanned};
-#[cfg(test)]
 use std::rc::Rc;
 
-#[cfg(test)]
 macro_rules! parse_test {
     ($input:expr, $function:ident, $output:expr) => {{
         assert_eq!($output, {
@@ -37,11 +30,12 @@ fn parse_import_1() {
         "import yes",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
             },
-            name: None
+            as_name: None
         })
     )
 }
@@ -52,11 +46,12 @@ fn parse_import_as_1() {
         "import yes as no",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
             },
-            name: Some(Spanned {
+            as_name: Some(Spanned {
                 pos: 14,
                 item: String::from("no")
             })
@@ -70,11 +65,12 @@ fn parse_import_as_2() {
         "import yes\n as no",
         import,
         Ok(Declaration::Import {
+            resolved: None,
             module: Spanned {
                 pos: 7,
                 item: String::from("yes")
             },
-            name: Some(Spanned {
+            as_name: Some(Spanned {
                 pos: 15,
                 item: String::from("no")
             })
@@ -180,7 +176,7 @@ fn parse_definition_4() {
                     pos: 10,
                     item: Pattern::Name(Spanned {
                         pos: 10,
-                        item: String::from("y")
+                        item: Rc::from("y")
                     })
                 },
                 Spanned {
@@ -251,6 +247,7 @@ fn parse_from_import_1() {
         "from asdf import *",
         from_import,
         Ok(Declaration::FromImport {
+            resolved: None,
             module: Spanned {
                 pos: 5,
                 item: String::from("asdf")
@@ -266,14 +263,24 @@ fn parse_from_import_2() {
         "from asdf import b, c, d",
         from_import,
         Ok(Declaration::FromImport {
+            resolved: None,
             module: Spanned {
                 pos: 5,
                 item: String::from("asdf")
             },
             names: Names::Names(vec![
-                String::from("b"),
-                String::from("c"),
-                String::from("d")
+                Spanned {
+                    pos: 17,
+                    item: String::from("b")
+                },
+                Spanned {
+                    pos: 20,
+                    item: String::from("c")
+                },
+                Spanned {
+                    pos: 23,
+                    item: String::from("d")
+                }
             ])
         })
     )

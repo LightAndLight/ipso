@@ -13,4 +13,4 @@ apply =
   )
 
 main : IO ()
-main = pure ()
+main = io.pure ()

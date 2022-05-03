@@ -1,11 +1,19 @@
-pub mod kind;
 #[cfg(test)]
 mod test;
+
+pub mod desugar;
+pub mod kind;
 pub mod r#type;
 
 use quickcheck::Arbitrary;
 pub use r#type::Type;
-use std::{cmp::Ordering, hash::Hash, rc::Rc};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    hash::Hash,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<A> {
@@ -235,14 +243,14 @@ pub enum StringPart {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pattern {
-    Name(Spanned<String>),
+    Name(Spanned<Rc<str>>),
     Record {
-        names: Vec<Spanned<String>>,
-        rest: Option<Spanned<String>>,
+        names: Vec<Spanned<Rc<str>>>,
+        rest: Option<Spanned<Rc<str>>>,
     },
     Variant {
-        name: String,
-        arg: Spanned<String>,
+        name: Rc<str>,
+        arg: Spanned<Rc<str>>,
     },
     Char(Spanned<char>),
     Int(Spanned<u32>),
@@ -251,12 +259,12 @@ pub enum Pattern {
 }
 
 pub struct IterNames<'a> {
-    items: Vec<&'a Spanned<String>>,
+    items: Vec<&'a Spanned<Rc<str>>>,
     pattern: Option<&'a Pattern>,
 }
 
 impl<'a> Iterator for IterNames<'a> {
-    type Item = &'a Spanned<String>;
+    type Item = &'a Spanned<Rc<str>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.pattern {
@@ -297,7 +305,7 @@ impl Pattern {
         }
     }
 
-    pub fn get_arg_names(&self) -> Vec<&Spanned<String>> {
+    pub fn get_arg_names(&self) -> Vec<&Spanned<Rc<str>>> {
         let mut arg_names = Vec::new();
         match self {
             Pattern::Name(n) => {
@@ -331,6 +339,7 @@ pub struct Branch {
     pub pattern: Spanned<Pattern>,
     pub body: Spanned<Expr>,
 }
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ModuleName(pub Vec<String>);
 
@@ -343,16 +352,51 @@ impl ModuleName {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompLine {
     Expr(Spanned<Expr>),
-    Bind(Rc<str>, Spanned<Expr>),
-    Let(Rc<str>, Spanned<Expr>),
+    Bind(Spanned<Rc<str>>, Spanned<Expr>),
+    Let(Spanned<Rc<str>>, Spanned<Expr>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CmdPart {
+    Literal(Rc<str>),
+    Expr(Spanned<Expr>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ModuleRef {
+    /// A module self-reference.
+    This,
+
+    /// A reference to another module.
+    Id(ModuleId),
+}
+
+impl From<ModuleId> for ModuleRef {
+    fn from(id: ModuleId) -> Self {
+        Self::Id(id)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Var(String),
     Module {
-        name: ModuleName,
-        item: String,
+        /// A reference to a module.
+        id: ModuleRef,
+
+        /**
+        A chain of submodule accessors.
+
+        e.g. `module.submodule1.submodule2`
+        */
+        path: Vec<Spanned<String>>,
+
+        /**
+        The referenced item.
+
+        e.g. `module.submodule.item`
+        */
+        item: Spanned<String>,
     },
 
     App(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
@@ -385,7 +429,7 @@ pub enum Expr {
         fields: Vec<(String, Spanned<Expr>)>,
         rest: Option<Rc<Spanned<Expr>>>,
     },
-    Project(Rc<Spanned<Expr>>, String),
+    Project(Rc<Spanned<Expr>>, Spanned<String>),
 
     Variant(Spanned<String>),
     Embed(Spanned<String>, Rc<Spanned<Expr>>),
@@ -393,13 +437,13 @@ pub enum Expr {
 
     Unit,
 
-    Comp(Vec<CompLine>),
+    Comp(Vec<Spanned<CompLine>>),
 
-    Cmd(Vec<Rc<str>>),
+    Cmd(Vec<CmdPart>),
 }
 
 impl Expr {
-    pub fn mk_project(val: Spanned<Expr>, field: String) -> Expr {
+    pub fn mk_project(val: Spanned<Expr>, field: Spanned<String>) -> Expr {
         Expr::Project(Rc::new(val), field)
     }
 
@@ -452,7 +496,7 @@ impl Expr {
             match expr {
                 Expr::Project(value, field) => {
                     let expr = go(&(*value).item, fields);
-                    fields.push(field);
+                    fields.push(&field.item);
                     expr
                 }
                 _ => expr,
@@ -467,7 +511,14 @@ impl Expr {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Names {
     All,
-    Names(Vec<String>),
+    Names(Vec<Spanned<String>>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct InstanceMember {
+    pub name: Spanned<String>,
+    pub args: Vec<Spanned<Pattern>>,
+    pub body: Spanned<Expr>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -488,7 +539,7 @@ pub enum Declaration {
         assumes: Vec<Spanned<Type<Rc<str>>>>,
         name: Spanned<Rc<str>>,
         args: Vec<Spanned<Type<Rc<str>>>>,
-        members: Vec<(Spanned<String>, Vec<Spanned<Pattern>>, Spanned<Expr>)>,
+        members: Vec<InstanceMember>,
     },
     TypeAlias {
         name: String,
@@ -496,10 +547,12 @@ pub enum Declaration {
         body: Type<Rc<str>>,
     },
     Import {
+        resolved: Option<ModuleId>,
         module: Spanned<String>,
-        name: Option<Spanned<String>>,
+        as_name: Option<Spanned<String>>,
     },
     FromImport {
+        resolved: Option<ModuleId>,
         module: Spanned<String>,
         names: Names,
     },
@@ -508,4 +561,80 @@ pub enum Declaration {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Module {
     pub decls: Vec<Spanned<Declaration>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ModuleKey {
+    Path(PathBuf),
+    Name(String),
+}
+
+impl From<&Path> for ModuleKey {
+    fn from(path: &Path) -> Self {
+        Self::Path(PathBuf::from(path))
+    }
+}
+
+impl From<&str> for ModuleKey {
+    fn from(name: &str) -> Self {
+        Self::Name(String::from(name))
+    }
+}
+
+pub struct Modules<M> {
+    data: Vec<M>,
+    key_to_index: HashMap<ModuleKey, usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModuleId(usize);
+
+impl ModuleId {
+    pub fn new(value: usize) -> Self {
+        ModuleId(value)
+    }
+}
+
+impl<M> Default for Modules<M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> Modules<M> {
+    pub fn new() -> Self {
+        Modules {
+            data: vec![],
+            key_to_index: HashMap::new(),
+        }
+    }
+
+    pub fn iter_keys(&self) -> impl Iterator<Item = (&ModuleKey, &M)> {
+        let data = &self.data;
+        self.key_to_index
+            .iter()
+            .map(move |(key, index)| (key, &data[*index]))
+    }
+
+    pub fn iter_ids(&self) -> impl Iterator<Item = (ModuleId, &M)> {
+        let data = &self.data;
+        self.key_to_index
+            .iter()
+            .map(move |(_, index)| (ModuleId(*index), &data[*index]))
+    }
+
+    pub fn lookup(&self, id: ModuleId) -> &M {
+        &self.data[id.0]
+    }
+
+    pub fn lookup_id(&self, key: &ModuleKey) -> Option<ModuleId> {
+        self.key_to_index.get(key).map(|index| ModuleId(*index))
+    }
+
+    pub fn insert(&mut self, key: ModuleKey, module: M) -> ModuleId {
+        let index = self.data.len();
+        self.data.push(module);
+        self.key_to_index.insert(key, index);
+        ModuleId(index)
+    }
 }

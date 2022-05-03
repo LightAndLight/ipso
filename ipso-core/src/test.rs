@@ -1,4 +1,3 @@
-#[cfg(test)]
 use crate::{Binop, Expr};
 
 #[test]

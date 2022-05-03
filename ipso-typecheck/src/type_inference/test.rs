@@ -70,7 +70,7 @@ fn infer_pattern_1() {
             pos: 0,
             item: syntax::Pattern::Name(Spanned {
                 pos: 0,
-                item: String::from("x"),
+                item: Rc::from("x"),
             }),
         };
         assert_eq!(
@@ -93,15 +93,15 @@ fn infer_pattern_2() {
                 names: vec![
                     syntax::Spanned {
                         pos: 0,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     },
                     syntax::Spanned {
                         pos: 2,
-                        item: String::from("y"),
+                        item: Rc::from("y"),
                     },
                     syntax::Spanned {
                         pos: 4,
-                        item: String::from("z"),
+                        item: Rc::from("z"),
                     },
                 ],
                 rest: None,
@@ -145,20 +145,20 @@ fn infer_pattern_3() {
                 names: vec![
                     syntax::Spanned {
                         pos: 0,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     },
                     syntax::Spanned {
                         pos: 2,
-                        item: String::from("y"),
+                        item: Rc::from("y"),
                     },
                     syntax::Spanned {
                         pos: 4,
-                        item: String::from("z"),
+                        item: Rc::from("z"),
                     },
                 ],
                 rest: Some(syntax::Spanned {
                     pos: 6,
-                    item: String::from("w"),
+                    item: Rc::from("w"),
                 }),
             },
         };
@@ -201,10 +201,10 @@ fn infer_pattern_4() {
         let pat = syntax::Spanned {
             pos: 0,
             item: syntax::Pattern::Variant {
-                name: String::from("just"),
+                name: Rc::from("just"),
                 arg: syntax::Spanned {
                     pos: 5,
-                    item: String::from("x"),
+                    item: Rc::from("x"),
                 },
             },
         };
@@ -231,7 +231,7 @@ fn infer_lam_1() {
                     pos: 1,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 1,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 syntax::Spanned {
@@ -266,11 +266,11 @@ fn infer_lam_2() {
                         names: vec![
                             syntax::Spanned {
                                 pos: 2,
-                                item: String::from("x"),
+                                item: Rc::from("x"),
                             },
                             syntax::Spanned {
                                 pos: 5,
-                                item: String::from("y"),
+                                item: Rc::from("y"),
                             },
                         ],
                         rest: None,
@@ -327,11 +327,11 @@ fn infer_lam_3() {
                         names: vec![
                             syntax::Spanned {
                                 pos: 2,
-                                item: String::from("x"),
+                                item: Rc::from("x"),
                             },
                             syntax::Spanned {
                                 pos: 5,
-                                item: String::from("y"),
+                                item: Rc::from("y"),
                             },
                         ],
                         rest: None,
@@ -388,16 +388,16 @@ fn infer_lam_4() {
                         names: vec![
                             syntax::Spanned {
                                 pos: 2,
-                                item: String::from("x"),
+                                item: Rc::from("x"),
                             },
                             syntax::Spanned {
                                 pos: 5,
-                                item: String::from("y"),
+                                item: Rc::from("y"),
                             },
                         ],
                         rest: Some(syntax::Spanned {
                             pos: 11,
-                            item: String::from("z"),
+                            item: Rc::from("z"),
                         }),
                     },
                 }],
@@ -451,14 +451,14 @@ fn infer_lam_5() {
                         pos: 1,
                         item: syntax::Pattern::Name(syntax::Spanned {
                             pos: 1,
-                            item: String::from("f"),
+                            item: Rc::from("f"),
                         }),
                     },
                     syntax::Spanned {
                         pos: 3,
                         item: syntax::Pattern::Name(syntax::Spanned {
                             pos: 3,
-                            item: String::from("x"),
+                            item: Rc::from("x"),
                         }),
                     },
                 ],
@@ -886,7 +886,7 @@ fn infer_case_1() {
                     pos: 1,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 1,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 syntax::Spanned {
@@ -900,10 +900,10 @@ fn infer_case_1() {
                             pattern: syntax::Spanned {
                                 pos: 18,
                                 item: syntax::Pattern::Variant {
-                                    name: String::from("X"),
+                                    name: Rc::from("X"),
                                     arg: syntax::Spanned {
                                         pos: 20,
-                                        item: String::from("a"),
+                                        item: Rc::from("a"),
                                     },
                                 },
                             },
@@ -957,7 +957,7 @@ fn infer_case_2() {
                     pos: 1,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 1,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 syntax::Spanned {
@@ -972,10 +972,10 @@ fn infer_case_2() {
                                 pattern: syntax::Spanned {
                                     pos: 18,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Left"),
+                                        name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: String::from("a"),
+                                            item: Rc::from("a"),
                                         },
                                     },
                                 },
@@ -988,10 +988,10 @@ fn infer_case_2() {
                                 pattern: syntax::Spanned {
                                     pos: 32,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Right"),
+                                        name: Rc::from("Right"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: String::from("b"),
+                                            item: Rc::from("b"),
                                         },
                                     },
                                 },
@@ -1056,7 +1056,7 @@ fn infer_case_3() {
                     pos: 1,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 1,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 syntax::Spanned {
@@ -1071,10 +1071,10 @@ fn infer_case_3() {
                                 pattern: syntax::Spanned {
                                     pos: 18,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Left"),
+                                        name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: String::from("a"),
+                                            item: Rc::from("a"),
                                         },
                                     },
                                 },
@@ -1087,10 +1087,10 @@ fn infer_case_3() {
                                 pattern: syntax::Spanned {
                                     pos: 32,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Right"),
+                                        name: Rc::from("Right"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: String::from("b"),
+                                            item: Rc::from("b"),
                                         },
                                     },
                                 },
@@ -1169,7 +1169,7 @@ fn infer_case_4() {
                     pos: 1,
                     item: syntax::Pattern::Name(syntax::Spanned {
                         pos: 1,
-                        item: String::from("x"),
+                        item: Rc::from("x"),
                     }),
                 }],
                 syntax::Spanned {
@@ -1184,10 +1184,10 @@ fn infer_case_4() {
                                 pattern: syntax::Spanned {
                                     pos: 18,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Left"),
+                                        name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: String::from("a"),
+                                            item: Rc::from("a"),
                                         },
                                     },
                                 },
@@ -1200,10 +1200,10 @@ fn infer_case_4() {
                                 pattern: syntax::Spanned {
                                     pos: 32,
                                     item: syntax::Pattern::Variant {
-                                        name: String::from("Left"),
+                                        name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: String::from("b"),
+                                            item: Rc::from("b"),
                                         },
                                     },
                                 },
