@@ -206,7 +206,7 @@ fn infer_record_1() {
         };
         let actual_result = tc
             .infer_type(&expr)
-            .map(|(expr, ty)| (expr, tc.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, tc.type_solutions.zonk(&tc.kind_solutions, ty)));
         assert_eq!(expected_result, actual_result, "checking results");
 
         let (mut actual_expr, _actual_ty) = actual_result.unwrap();

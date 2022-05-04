@@ -614,7 +614,11 @@ impl<'modules> Typechecker<'modules> {
             if !seen_evars.contains(ev) {
                 seen_evars.insert(*ev);
                 let constraint = self.evidence.lookup_evar(ev).unwrap();
-                unsolved_constraints.push((*ev, self.zonk_type(constraint.to_type())));
+                unsolved_constraints.push((
+                    *ev,
+                    self.type_solutions
+                        .zonk(&self.kind_solutions, constraint.to_type()),
+                ));
             }
         }
 
@@ -642,7 +646,7 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
 
-        let mut ty = self.zonk_type(ty);
+        let mut ty = self.type_solutions.zonk(&self.kind_solutions, ty);
         for constraint in unsolved_constraints.into_iter().rev() {
             ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
         }
@@ -651,7 +655,7 @@ impl<'modules> Typechecker<'modules> {
             .bound_tyvars
             .info
             .iter()
-            .map(|(name, kind)| (name.clone(), self.zonk_kind(true, kind.clone())))
+            .map(|(name, kind)| (name.clone(), self.kind_solutions.zonk(true, kind.clone())))
             .collect();
         let sig = core::TypeSig::new(ty_vars, ty);
 
@@ -800,9 +804,9 @@ impl<'modules> Typechecker<'modules> {
 
         let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
             .into_iter()
-            .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
+            .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
             .collect();
-        let sig = core::TypeSig::new(ty_vars, self.zonk_type(ty));
+        let sig = core::TypeSig::new(ty_vars, self.type_solutions.zonk(&self.kind_solutions, ty));
         Ok(core::ClassMember {
             name: name.to_string(),
             sig,
@@ -868,7 +872,7 @@ impl<'modules> Typechecker<'modules> {
             name: name.clone(),
             args: args_kinds
                 .into_iter()
-                .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
+                .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
                 .collect::<Vec<(Rc<str>, Kind)>>(),
             members,
         }))
@@ -1071,7 +1075,7 @@ impl<'modules> Typechecker<'modules> {
 
         let ty_vars = ty_var_kinds
             .into_iter()
-            .map(|(name, kind)| (name, self.zonk_kind(true, kind)))
+            .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
             .collect();
 
         let evidence = {
@@ -1108,9 +1112,9 @@ impl<'modules> Typechecker<'modules> {
             ty_vars,
             assumes: assumes
                 .into_iter()
-                .map(|assume| self.zonk_type(assume))
+                .map(|assume| self.type_solutions.zonk(&self.kind_solutions, assume))
                 .collect(),
-            head: self.zonk_type(head),
+            head: self.type_solutions.zonk(&self.kind_solutions, head),
             evidence: evidence_name,
         };
 
@@ -1189,18 +1193,12 @@ impl<'modules> Typechecker<'modules> {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
                 field: field.clone(),
-                rest: self.zonk_type(rest.clone()),
+                rest: self.type_solutions.zonk(&self.kind_solutions, rest.clone()),
             },
-            Constraint::Type(ty) => Constraint::Type(self.zonk_type(ty.clone())),
+            Constraint::Type(ty) => {
+                Constraint::Type(self.type_solutions.zonk(&self.kind_solutions, ty.clone()))
+            }
         }
-    }
-
-    pub fn zonk_type(&self, ty: core::Type) -> core::Type {
-        self.type_solutions.zonk(&self.kind_solutions, ty)
-    }
-
-    pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {
-        self.kind_solutions.zonk(close_unsolved, kind)
     }
 
     fn type_inference_context(&mut self) -> type_inference::InferenceContext {
