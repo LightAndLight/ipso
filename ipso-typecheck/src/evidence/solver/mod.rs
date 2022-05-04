@@ -107,7 +107,7 @@ pub fn solve_constraint(
             match result {
                 None => Err(TypeError::CannotDeduce {
                     pos,
-                    source: tc.source(),
+                    source: tc.source.clone(),
                     context: context.clone(),
                 }),
                 Some(evidence) => Ok(evidence),

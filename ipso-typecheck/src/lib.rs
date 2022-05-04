@@ -677,7 +677,7 @@ impl<'modules> Typechecker<'modules> {
             &mut self.kind_solutions,
         );
         kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
-            source: self.source(),
+            source: self.source.clone(),
             pos: self.current_position(),
             error,
         })
@@ -695,7 +695,7 @@ impl<'modules> Typechecker<'modules> {
             &mut self.kind_solutions,
         );
         kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
-            source: self.source(),
+            source: self.source.clone(),
             pos,
             error,
         })
@@ -851,7 +851,7 @@ impl<'modules> Typechecker<'modules> {
                         ))
                     } else {
                         Err(TypeError::DuplicateClassArgument {
-                            source: self.source(),
+                            source: self.source.clone(),
                             pos: arg.pos,
                         })
                     }
@@ -928,7 +928,7 @@ impl<'modules> Typechecker<'modules> {
         let class_context = &self.class_context;
         let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
             None => Err(TypeError::NoSuchClass {
-                source: self.source(),
+                source: self.source.clone(),
                 pos: name.pos,
             }),
             Some(class_decl) => Ok(class_decl.clone()),
@@ -1024,7 +1024,7 @@ impl<'modules> Typechecker<'modules> {
             {
                 None => {
                     return Err(TypeError::NotAMember {
-                        source: self.source(),
+                        source: self.source.clone(),
                         pos: member.name.pos,
                         cls: name.item.clone(),
                     })
@@ -1173,10 +1173,6 @@ impl<'modules> Typechecker<'modules> {
                 .check_instance(assumes, name, args, members)
                 .map(|(a, b)| Declarations::Two(a, b)),
         }
-    }
-
-    pub fn source(&self) -> Source {
-        self.source.clone()
     }
 
     fn current_position(&self) -> usize {
