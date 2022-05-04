@@ -678,7 +678,7 @@ impl<'modules> Typechecker<'modules> {
         );
         kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
             source: self.source.clone(),
-            pos: self.current_position(),
+            pos: self.position.unwrap_or(0),
             error,
         })
     }
@@ -1173,10 +1173,6 @@ impl<'modules> Typechecker<'modules> {
                 .check_instance(assumes, name, args, members)
                 .map(|(a, b)| Declarations::Two(a, b)),
         }
-    }
-
-    fn current_position(&self) -> usize {
-        self.position.unwrap_or(0)
     }
 
     pub fn zonk_constraint(&self, constraint: &Constraint) -> Constraint {
