@@ -655,24 +655,6 @@ impl<'modules> Typechecker<'modules> {
         Ok((expr, sig))
     }
 
-    fn infer_kind(
-        &mut self,
-        pos: usize,
-        ty: &syntax::Type<Rc<str>>,
-    ) -> Result<(core::Type, Kind), TypeError> {
-        let mut ctx = kind_inference::InferenceContext::new(
-            self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
-            &mut self.kind_solutions,
-        );
-        kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
-            source: self.source.clone(),
-            pos,
-            error,
-        })
-    }
-
     fn check_definition(
         &mut self,
         name: &str,
@@ -959,7 +941,15 @@ impl<'modules> Typechecker<'modules> {
         let args: Vec<core::Type> = args
             .iter()
             .map(|arg| {
-                let res = self.infer_kind(arg.pos, &arg.item)?;
+                let res = infer_kind(
+                    self.common_kinds,
+                    &self.type_context,
+                    &self.bound_tyvars,
+                    &mut self.kind_solutions,
+                    &self.source,
+                    arg.pos,
+                    &arg.item,
+                )?;
                 Ok(res.0)
             })
             .collect::<Result<_, TypeError>>()?;
@@ -1259,6 +1249,28 @@ impl<'modules> Typechecker<'modules> {
         type_inference::check(&mut self.type_inference_context(), expr, ty)
             .map_err(|error| TypeError::TypeError { error })
     }
+}
+
+fn infer_kind(
+    common_kinds: &CommonKinds,
+    type_context: &HashMap<Rc<str>, Kind>,
+    bound_tyvars: &BoundVars<Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    source: &Source,
+    pos: usize,
+    ty: &syntax::Type<Rc<str>>,
+) -> Result<(core::Type, Kind), TypeError> {
+    let mut ctx = kind_inference::InferenceContext::new(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+    );
+    kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
+        source: source.clone(),
+        pos,
+        error,
+    })
 }
 
 fn check_kind(
