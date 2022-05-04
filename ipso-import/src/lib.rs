@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
+use typecheck::type_inference;
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -590,8 +591,10 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let module = Typechecker::new(input_location, common_kinds, modules)
-                    .check_module(&module)?;
+                let mut type_solutions = type_inference::Solutions::new();
+                let module =
+                    Typechecker::new(input_location, common_kinds, modules, &mut type_solutions)
+                        .check_module(&module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)

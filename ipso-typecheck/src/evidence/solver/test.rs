@@ -51,7 +51,7 @@ fn solve_constraint_2() {
 #[test]
 fn solve_constraint_3() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
-        let var = tc.fresh_type_meta(&Kind::Row);
+        let var = core::Type::Meta(Kind::Row, tc.type_solutions.fresh_meta());
         tc.evidence.assume(
             0,
             Constraint::HasField {

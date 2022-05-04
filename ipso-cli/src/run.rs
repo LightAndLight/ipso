@@ -12,6 +12,7 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
+use typecheck::type_inference;
 use typed_arena::Arena;
 
 pub struct Config {
@@ -95,12 +96,15 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc = Typechecker::new(source, &common_kinds, &modules);
+        let mut type_solutions = type_inference::Solutions::new();
+
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
-            tc.fresh_type_meta(&Kind::Type),
+            core::Type::Meta(Kind::Type, type_solutions.fresh_meta()),
         );
         let actual = target_sig.body;
+
+        let mut tc = Typechecker::new(source, &common_kinds, &modules, &mut type_solutions);
         let _ = tc.unify_type(&expected, &actual)?;
     }
 

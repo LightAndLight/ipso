@@ -75,7 +75,7 @@ impl Evidence {
 
     pub fn find(&self, tc: &Typechecker, constraint: &Constraint) -> Option<Rc<Expr>> {
         self.environment.iter().find_map(|c| {
-            if eq_zonked_constraint(&tc.type_solutions, &c.constraint, constraint) {
+            if eq_zonked_constraint(tc.type_solutions, &c.constraint, constraint) {
                 c.expr.clone()
             } else {
                 None

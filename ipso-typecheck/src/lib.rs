@@ -148,7 +148,7 @@ pub struct Typechecker<'modules> {
     common_kinds: &'modules CommonKinds,
     source: Source,
     kind_solutions: kind_inference::Solutions,
-    type_solutions: type_inference::Solutions,
+    type_solutions: &'modules mut type_inference::Solutions,
     implications: Vec<Implication>,
     evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
@@ -395,6 +395,7 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 #[macro_export]
 macro_rules! with_tc {
     ($location:expr, $f:expr) => {{
+        use crate::type_inference;
         use ipso_builtins as builtins;
         use ipso_core::CommonKinds;
         use ipso_syntax::{self as syntax, ModuleKey, Modules};
@@ -405,7 +406,8 @@ macro_rules! with_tc {
             ModuleKey::from("builtins"),
             builtins::builtins(&common_kinds),
         );
-        let mut tc = Typechecker::new($location, &common_kinds, &modules);
+        let mut type_solutions = type_inference::Solutions::new();
+        let mut tc = Typechecker::new($location, &common_kinds, &modules, &mut type_solutions);
         tc.register_from_import(builtins_module_id, &syntax::Names::All);
         $f(tc)
     }};
@@ -448,12 +450,13 @@ impl<'modules> Typechecker<'modules> {
         source: Source,
         common_kinds: &'modules CommonKinds,
         modules: &'modules Modules<core::Module>,
+        type_solutions: &'modules mut type_inference::Solutions,
     ) -> Self {
         Typechecker {
             common_kinds,
             source,
             kind_solutions: kind_inference::Solutions::new(),
-            type_solutions: type_inference::Solutions::new(),
+            type_solutions,
             implications: Vec::new(),
             evidence: Evidence::new(),
             type_context: HashMap::new(),
@@ -711,7 +714,7 @@ impl<'modules> Typechecker<'modules> {
             .iter()
             .map(|arg| self.type_inference_context().infer_pattern(arg))
             .collect();
-        let out_ty = self.fresh_type_meta(&Kind::Type);
+        let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
 
         self.unify_type(
             ty,
@@ -1198,10 +1201,6 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {
         self.kind_solutions.zonk(close_unsolved, kind)
-    }
-
-    pub fn fresh_type_meta(&mut self, kind: &Kind) -> core::Type {
-        core::Type::Meta(kind.clone(), self.type_solutions.fresh_meta())
     }
 
     fn type_inference_context(&mut self) -> type_inference::InferenceContext {

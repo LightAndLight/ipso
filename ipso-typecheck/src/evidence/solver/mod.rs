@@ -17,7 +17,7 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<c
              expr: other_evidence,
              ..
          }| {
-            if eq_zonked_constraint(&tc.type_solutions, constraint, other_constraint) {
+            if eq_zonked_constraint(tc.type_solutions, constraint, other_constraint) {
                 other_evidence.as_ref().cloned()
             } else {
                 None
@@ -50,7 +50,7 @@ pub fn solve_constraint(
                 let metas: Vec<core::Type> = implication
                     .ty_vars
                     .iter()
-                    .map(|kind| tc.fresh_type_meta(kind))
+                    .map(|kind| core::Type::Meta(kind.clone(), tc.type_solutions.fresh_meta()))
                     .collect();
 
                 let implication = implication.instantiate_many(&metas);
