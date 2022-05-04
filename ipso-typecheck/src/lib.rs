@@ -167,16 +167,6 @@ pub struct Typechecker<'modules> {
     module_context: HashMap<ModuleId, HashMap<String, core::Signature>>,
 }
 
-macro_rules! with_position {
-    ($self:expr, $pos:expr, $val:expr) => {{
-        let old = $self.position;
-        $self.position = Some($pos);
-        let res = $val;
-        $self.position = old;
-        res
-    }};
-}
-
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyKindContext<A> {
     ty: syntax::Type<A>,
@@ -712,6 +702,7 @@ impl<'modules> Typechecker<'modules> {
             &self.bound_tyvars,
             &mut self.kind_solutions,
             &self.source,
+            // TODO: make `ty` `Spanned` and use its position here.
             self.position,
             ty,
             &Kind::Type,
@@ -815,6 +806,7 @@ impl<'modules> Typechecker<'modules> {
             &self.bound_tyvars,
             &mut self.kind_solutions,
             &self.source,
+            // TODO: make `ty` `Spanned` and use its position here.
             self.position,
             ty,
             &Kind::Type,
@@ -864,18 +856,16 @@ impl<'modules> Typechecker<'modules> {
         let supers = supers
             .iter()
             .map(|superclass| {
-                with_position!(self, superclass.pos, {
-                    check_kind(
-                        self.common_kinds,
-                        &self.type_context,
-                        &self.bound_tyvars,
-                        &mut self.kind_solutions,
-                        &self.source,
-                        self.position,
-                        &superclass.item,
-                        &Kind::Constraint,
-                    )
-                })
+                check_kind(
+                    self.common_kinds,
+                    &self.type_context,
+                    &self.bound_tyvars,
+                    &mut self.kind_solutions,
+                    &self.source,
+                    Some(superclass.pos),
+                    &superclass.item,
+                    &Kind::Constraint,
+                )
             })
             .collect::<Result<_, _>>()?;
 
@@ -983,7 +973,7 @@ impl<'modules> Typechecker<'modules> {
                     &self.bound_tyvars,
                     &mut self.kind_solutions,
                     &self.source,
-                    self.position,
+                    Some(assume.pos),
                     &assume.item,
                     &Kind::Constraint,
                 )?;
@@ -1031,19 +1021,15 @@ impl<'modules> Typechecker<'modules> {
             })
             .collect();
 
-        let head = with_position!(
-            self,
-            name.pos,
-            check_kind(
-                self.common_kinds,
-                &self.type_context,
-                &self.bound_tyvars,
-                &mut self.kind_solutions,
-                &self.source,
-                self.position,
-                &head,
-                &Kind::Constraint
-            )
+        let head = check_kind(
+            self.common_kinds,
+            &self.type_context,
+            &self.bound_tyvars,
+            &mut self.kind_solutions,
+            &self.source,
+            Some(name.pos),
+            &head,
+            &Kind::Constraint,
         )?;
 
         // type check members
