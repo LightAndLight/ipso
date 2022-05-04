@@ -2,7 +2,10 @@
 mod test;
 
 use super::Constraint;
-use crate::{metavariables, Implication, SolveConstraintContext, TypeError, Typechecker};
+use crate::{
+    eq_zonked_constraint, metavariables, Implication, SolveConstraintContext, TypeError,
+    Typechecker,
+};
 use ipso_core::{self as core, Binop, Expr, Placeholder};
 use ipso_syntax::kind::Kind;
 use std::rc::Rc;
@@ -14,7 +17,7 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<c
              expr: other_evidence,
              ..
          }| {
-            if tc.eq_zonked_constraint(constraint, other_constraint) {
+            if eq_zonked_constraint(&tc.type_solutions, constraint, other_constraint) {
                 other_evidence.as_ref().cloned()
             } else {
                 None

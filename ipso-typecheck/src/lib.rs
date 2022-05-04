@@ -477,26 +477,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn eq_zonked_constraint(
-        &self,
-        c1: &evidence::Constraint,
-        c2: &evidence::Constraint,
-    ) -> bool {
-        match c1 {
-            evidence::Constraint::HasField { field, rest } => match c2 {
-                evidence::Constraint::HasField {
-                    field: field2,
-                    rest: rest2,
-                } => field == field2 && eq_zonked_type(&self.type_solutions, rest, rest2),
-                _ => false,
-            },
-            evidence::Constraint::Type(ty) => match c2 {
-                evidence::Constraint::Type(ty2) => eq_zonked_type(&self.type_solutions, ty, ty2),
-                _ => false,
-            },
-        }
-    }
-
     pub fn register_class(&mut self, decl: &core::ClassDeclaration) {
         let decl_name: Rc<str> = Rc::from(decl.name.as_ref());
         let decl_name_kind = decl
@@ -1423,6 +1403,26 @@ fn eq_zonked_type(
                 _ => false,
             },
             metavariables::Solution::Solved(sol) => eq_zonked_type(type_solutions, sol, t2),
+        },
+    }
+}
+
+pub fn eq_zonked_constraint(
+    type_solutions: &type_inference::Solutions,
+    c1: &evidence::Constraint,
+    c2: &evidence::Constraint,
+) -> bool {
+    match c1 {
+        evidence::Constraint::HasField { field, rest } => match c2 {
+            evidence::Constraint::HasField {
+                field: field2,
+                rest: rest2,
+            } => field == field2 && eq_zonked_type(type_solutions, rest, rest2),
+            _ => false,
+        },
+        evidence::Constraint::Type(ty) => match c2 {
+            evidence::Constraint::Type(ty2) => eq_zonked_type(type_solutions, ty, ty2),
+            _ => false,
         },
     }
 }
