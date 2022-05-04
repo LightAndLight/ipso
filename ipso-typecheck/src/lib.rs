@@ -665,24 +665,6 @@ impl<'modules> Typechecker<'modules> {
         Ok((expr, sig))
     }
 
-    fn check_kind(
-        &mut self,
-        ty: &syntax::Type<Rc<str>>,
-        kind: &Kind,
-    ) -> Result<core::Type, TypeError> {
-        let mut ctx = kind_inference::InferenceContext::new(
-            self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
-            &mut self.kind_solutions,
-        );
-        kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
-            source: self.source.clone(),
-            pos: self.position.unwrap_or(0),
-            error,
-        })
-    }
-
     fn infer_kind(
         &mut self,
         pos: usize,
@@ -724,7 +706,16 @@ impl<'modules> Typechecker<'modules> {
 
         self.bound_tyvars.insert(&ty_var_kinds);
 
-        let ty = self.check_kind(ty, &Kind::Type)?;
+        let ty = check_kind(
+            self.common_kinds,
+            &self.type_context,
+            &self.bound_tyvars,
+            &mut self.kind_solutions,
+            &self.source,
+            self.position,
+            ty,
+            &Kind::Type,
+        )?;
 
         let _ = self.context.insert(
             name.to_string(),
@@ -818,7 +809,16 @@ impl<'modules> Typechecker<'modules> {
         };
 
         self.bound_tyvars.insert(&ty_var_kinds);
-        let ty = self.check_kind(ty, &Kind::Type)?;
+        let ty = check_kind(
+            self.common_kinds,
+            &self.type_context,
+            &self.bound_tyvars,
+            &mut self.kind_solutions,
+            &self.source,
+            self.position,
+            ty,
+            &Kind::Type,
+        )?;
         self.bound_tyvars.delete(ty_var_kinds.len());
 
         let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
@@ -865,7 +865,16 @@ impl<'modules> Typechecker<'modules> {
             .iter()
             .map(|superclass| {
                 with_position!(self, superclass.pos, {
-                    self.check_kind(&superclass.item, &Kind::Constraint)
+                    check_kind(
+                        self.common_kinds,
+                        &self.type_context,
+                        &self.bound_tyvars,
+                        &mut self.kind_solutions,
+                        &self.source,
+                        self.position,
+                        &superclass.item,
+                        &Kind::Constraint,
+                    )
                 })
             })
             .collect::<Result<_, _>>()?;
@@ -968,7 +977,16 @@ impl<'modules> Typechecker<'modules> {
         let assumes: Vec<core::Type> = assumes
             .iter()
             .map(|assume| {
-                let constraint = self.check_kind(&assume.item, &Kind::Constraint)?;
+                let constraint = check_kind(
+                    self.common_kinds,
+                    &self.type_context,
+                    &self.bound_tyvars,
+                    &mut self.kind_solutions,
+                    &self.source,
+                    self.position,
+                    &assume.item,
+                    &Kind::Constraint,
+                )?;
                 let _ = self
                     .evidence
                     .assume(assume.pos, evidence::Constraint::from_type(&constraint));
@@ -1013,7 +1031,20 @@ impl<'modules> Typechecker<'modules> {
             })
             .collect();
 
-        let head = with_position!(self, name.pos, self.check_kind(&head, &Kind::Constraint))?;
+        let head = with_position!(
+            self,
+            name.pos,
+            check_kind(
+                self.common_kinds,
+                &self.type_context,
+                &self.bound_tyvars,
+                &mut self.kind_solutions,
+                &self.source,
+                self.position,
+                &head,
+                &Kind::Constraint
+            )
+        )?;
 
         // type check members
         let mut checked_members = Vec::with_capacity(members.len());
@@ -1242,6 +1273,29 @@ impl<'modules> Typechecker<'modules> {
         type_inference::check(&mut self.type_inference_context(), expr, ty)
             .map_err(|error| TypeError::TypeError { error })
     }
+}
+
+fn check_kind(
+    common_kinds: &CommonKinds,
+    type_context: &HashMap<Rc<str>, Kind>,
+    bound_tyvars: &BoundVars<Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    source: &Source,
+    pos: Option<usize>,
+    ty: &syntax::Type<Rc<str>>,
+    kind: &Kind,
+) -> Result<core::Type, TypeError> {
+    let mut ctx = kind_inference::InferenceContext::new(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+    );
+    kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
+        source: source.clone(),
+        pos: pos.unwrap_or(0),
+        error,
+    })
 }
 
 pub fn register_class(
