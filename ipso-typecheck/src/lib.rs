@@ -477,60 +477,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn register_class(&mut self, decl: &core::ClassDeclaration) {
-        let decl_name: Rc<str> = Rc::from(decl.name.as_ref());
-        let decl_name_kind = decl
-            .args
-            .iter()
-            .rev()
-            .fold(Kind::Constraint, |acc, (_, arg_kind)| {
-                Kind::mk_arrow(arg_kind, &acc)
-            });
-        let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
-
-        // generate constraint's kind
-        let mut constraint_kind = Kind::Constraint;
-        for (_, kind) in decl.args.iter().rev() {
-            constraint_kind = Kind::mk_arrow(kind, &Kind::Constraint);
-        }
-        self.type_context.insert(decl_name.clone(), constraint_kind);
-
-        // generate superclass accessors
-        let applied_type =
-            decl.args
-                .iter()
-                .enumerate()
-                .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
-                    core::Type::app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
-                });
-        self.implications
-            .extend(
-                decl.supers
-                    .iter()
-                    .enumerate()
-                    .map(|(pos, superclass)| Implication {
-                        ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
-                        antecedents: vec![applied_type.clone()],
-                        consequent: superclass.clone(),
-                        evidence: Rc::new(core::Expr::mk_lam(
-                            true,
-                            core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
-                        )),
-                    }),
-            );
-
-        // generate class members
-        let decl_bindings = decl.get_bindings(self.common_kinds);
-        self.context.extend(
-            decl_bindings
-                .iter()
-                .map(|(name, (sig, _))| (name.clone(), core::Signature::TypeSig(sig.clone()))),
-        );
-
-        // update class context
-        self.class_context.insert(decl_name, decl.clone());
-    }
-
     pub fn register_instance(
         &mut self,
         module_id: Option<ModuleId>,
@@ -589,7 +535,14 @@ impl<'modules> Typechecker<'modules> {
             core::Declaration::TypeAlias { name, args, body } => {
                 self.register_type_alias(name, args, body)
             }
-            core::Declaration::Class(decl) => self.register_class(decl),
+            core::Declaration::Class(decl) => register_class(
+                self.common_kinds,
+                &mut self.type_context,
+                &mut self.implications,
+                &mut self.context,
+                &mut self.class_context,
+                decl,
+            ),
             core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
@@ -659,7 +612,14 @@ impl<'modules> Typechecker<'modules> {
                 }
                 core::Declaration::Class(class_decl) => {
                     if should_import(class_decl.name.as_ref()) {
-                        self.register_class(class_decl);
+                        register_class(
+                            self.common_kinds,
+                            &mut self.type_context,
+                            &mut self.implications,
+                            &mut self.context,
+                            &mut self.class_context,
+                            class_decl,
+                        );
                     }
                 }
                 core::Declaration::Evidence { .. } => {}
@@ -1326,6 +1286,66 @@ impl<'modules> Typechecker<'modules> {
         type_inference::check(&mut self.type_inference_context(), expr, ty)
             .map_err(|error| TypeError::TypeError { error })
     }
+}
+
+pub fn register_class(
+    common_kinds: &CommonKinds,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    implications: &mut Vec<Implication>,
+    context: &mut HashMap<String, core::Signature>,
+    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
+    decl: &core::ClassDeclaration,
+) {
+    let decl_name: Rc<str> = Rc::from(decl.name.as_ref());
+    let decl_name_kind = decl
+        .args
+        .iter()
+        .rev()
+        .fold(Kind::Constraint, |acc, (_, arg_kind)| {
+            Kind::mk_arrow(arg_kind, &acc)
+        });
+    let decl_ty = core::Type::unsafe_mk_name(decl_name.clone(), decl_name_kind);
+
+    // generate constraint's kind
+    let mut constraint_kind = Kind::Constraint;
+    for (_, kind) in decl.args.iter().rev() {
+        constraint_kind = Kind::mk_arrow(kind, &Kind::Constraint);
+    }
+    type_context.insert(decl_name.clone(), constraint_kind);
+
+    // generate superclass accessors
+    let applied_type =
+        decl.args
+            .iter()
+            .enumerate()
+            .fold(decl_ty, |acc, (arg_index, (_, arg_kind))| {
+                core::Type::app(acc, core::Type::unsafe_mk_var(arg_index, arg_kind.clone()))
+            });
+    implications.extend(
+        decl.supers
+            .iter()
+            .enumerate()
+            .map(|(pos, superclass)| Implication {
+                ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
+                antecedents: vec![applied_type.clone()],
+                consequent: superclass.clone(),
+                evidence: Rc::new(core::Expr::mk_lam(
+                    true,
+                    core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
+                )),
+            }),
+    );
+
+    // generate class members
+    let decl_bindings = decl.get_bindings(common_kinds);
+    context.extend(
+        decl_bindings
+            .iter()
+            .map(|(name, (sig, _))| (name.clone(), core::Signature::TypeSig(sig.clone()))),
+    );
+
+    // update class context
+    class_context.insert(decl_name, decl.clone());
 }
 
 fn eq_zonked_type(

@@ -1,6 +1,6 @@
 use crate::{
     evidence::{solver::solve_constraint, Constraint, Evidence},
-    Typechecker,
+    register_class, Typechecker,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_syntax::kind::Kind;
@@ -99,24 +99,31 @@ fn solve_constraint_4() {
     crate::current_dir_with_tc!(|mut tc: Typechecker| {
         {
             let a = core::Type::unsafe_mk_var(0, Kind::Type);
-            tc.register_class(&ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("MyEq"),
-                args: vec![(Rc::from("a"), a.kind())],
-                members: vec![ClassMember {
-                    name: String::from("myeq"),
-                    sig: {
-                        TypeSig {
-                            ty_vars: Vec::new(),
-                            body: core::Type::arrow(
-                                tc.common_kinds,
-                                a.clone(),
-                                core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
-                            ),
-                        }
-                    },
-                }],
-            });
+            register_class(
+                tc.common_kinds,
+                &mut tc.type_context,
+                &mut tc.implications,
+                &mut tc.context,
+                &mut tc.class_context,
+                &ClassDeclaration {
+                    supers: Vec::new(),
+                    name: Rc::from("MyEq"),
+                    args: vec![(Rc::from("a"), a.kind())],
+                    members: vec![ClassMember {
+                        name: String::from("myeq"),
+                        sig: {
+                            TypeSig {
+                                ty_vars: Vec::new(),
+                                body: core::Type::arrow(
+                                    tc.common_kinds,
+                                    a.clone(),
+                                    core::Type::arrow(tc.common_kinds, a, core::Type::Bool),
+                                ),
+                            }
+                        },
+                    }],
+                },
+            );
         }
 
         let eq_ty = core::Type::unsafe_mk_name(
