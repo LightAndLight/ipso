@@ -477,63 +477,19 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    pub fn register_instance(
-        &mut self,
-        module_id: Option<ModuleId>,
-        ty_vars: &[(Rc<str>, Kind)],
-        assumes: &[core::Type],
-        head: &core::Type,
-        evidence_name: Rc<str>,
-    ) {
-        self.implications.push(Implication {
-            ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
-            antecedents: Vec::from(assumes),
-            consequent: head.clone(),
-            evidence: Rc::new(match module_id {
-                Some(module_id) => core::Expr::Module {
-                    id: ModuleRef::from(module_id),
-                    path: vec![],
-                    item: core::Name::Evidence(evidence_name),
-                },
-                None => core::Expr::Name(core::Name::Evidence(evidence_name)),
-            }),
-        });
-    }
-
-    pub fn register_builtin_type(&mut self, name: &str, kind: &Kind) {
-        self.type_context.insert(Rc::from(name), kind.clone());
-    }
-
-    pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
-        self.context
-            .insert(String::from(name), core::Signature::TypeSig(sig.clone()));
-    }
-
-    pub fn register_module(&mut self, name: &str, decls: &[Rc<core::Declaration>]) {
-        self.context.insert(
-            String::from(name),
-            core::Signature::Module(
-                decls
-                    .iter()
-                    .flat_map(|decl| decl.get_signatures(self.common_kinds))
-                    .collect(),
-            ),
-        );
-    }
-
-    pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
-        todo!("register TypeAlias {:?}", (name, args, body))
-    }
-
     pub fn register_declaration(&mut self, module_id: Option<ModuleId>, decl: &core::Declaration) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                self.register_builtin_type(name, kind);
+                register_builtin_type(&mut self.type_context, name, kind);
             }
-            core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
-            core::Declaration::Module { name, decls, .. } => self.register_module(name, decls),
+            core::Declaration::Definition { name, sig, .. } => {
+                register_definition(&mut self.context, name, sig)
+            }
+            core::Declaration::Module { name, decls, .. } => {
+                register_module(self.common_kinds, &mut self.context, name, decls)
+            }
             core::Declaration::TypeAlias { name, args, body } => {
-                self.register_type_alias(name, args, body)
+                register_type_alias(name, args, body)
             }
             core::Declaration::Class(decl) => register_class(
                 self.common_kinds,
@@ -550,7 +506,14 @@ impl<'modules> Typechecker<'modules> {
                 head,
                 evidence,
                 ..
-            } => self.register_instance(module_id, ty_vars, assumes, head, evidence.clone()),
+            } => register_instance(
+                &mut self.implications,
+                module_id,
+                ty_vars,
+                assumes,
+                head,
+                evidence.clone(),
+            ),
         }
     }
 
@@ -592,22 +555,22 @@ impl<'modules> Typechecker<'modules> {
             match decl {
                 core::Declaration::BuiltinType { name, kind } => {
                     if should_import(name) {
-                        self.register_builtin_type(name, kind);
+                        register_builtin_type(&mut self.type_context, name, kind);
                     }
                 }
                 core::Declaration::Definition { name, sig, .. } => {
                     if should_import(name) {
-                        self.register_definition(name, sig);
+                        register_definition(&mut self.context, name, sig);
                     }
                 }
                 core::Declaration::Module { name, decls, .. } => {
                     if should_import(name) {
-                        self.register_module(name, decls);
+                        register_module(self.common_kinds, &mut self.context, name, decls);
                     }
                 }
                 core::Declaration::TypeAlias { name, args, body } => {
                     if should_import(name) {
-                        self.register_type_alias(name, args, body);
+                        register_type_alias(name, args, body);
                     }
                 }
                 core::Declaration::Class(class_decl) => {
@@ -630,7 +593,8 @@ impl<'modules> Typechecker<'modules> {
                     evidence,
                     ..
                 } => {
-                    self.register_instance(
+                    register_instance(
+                        &mut self.implications,
                         Some(module_id),
                         ty_vars,
                         assumes,
@@ -1175,7 +1139,8 @@ impl<'modules> Typechecker<'modules> {
                         ..
                     } = decl
                     {
-                        self.register_instance(
+                        register_instance(
+                            &mut self.implications,
                             Some(module_id),
                             ty_vars,
                             assumes,
@@ -1346,6 +1311,62 @@ pub fn register_class(
 
     // update class context
     class_context.insert(decl_name, decl.clone());
+}
+
+pub fn register_instance(
+    implications: &mut Vec<Implication>,
+    module_id: Option<ModuleId>,
+    ty_vars: &[(Rc<str>, Kind)],
+    assumes: &[core::Type],
+    head: &core::Type,
+    evidence_name: Rc<str>,
+) {
+    implications.push(Implication {
+        ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
+        antecedents: Vec::from(assumes),
+        consequent: head.clone(),
+        evidence: Rc::new(match module_id {
+            Some(module_id) => core::Expr::Module {
+                id: ModuleRef::from(module_id),
+                path: vec![],
+                item: core::Name::Evidence(evidence_name),
+            },
+            None => core::Expr::Name(core::Name::Evidence(evidence_name)),
+        }),
+    });
+}
+
+pub fn register_builtin_type(type_context: &mut HashMap<Rc<str>, Kind>, name: &str, kind: &Kind) {
+    type_context.insert(Rc::from(name), kind.clone());
+}
+
+pub fn register_definition(
+    context: &mut HashMap<String, core::Signature>,
+    name: &str,
+    sig: &core::TypeSig,
+) {
+    context.insert(String::from(name), core::Signature::TypeSig(sig.clone()));
+}
+
+pub fn register_module(
+    common_kinds: &CommonKinds,
+    context: &mut HashMap<String, core::Signature>,
+    name: &str,
+    decls: &[Rc<core::Declaration>],
+) {
+    context.insert(
+        String::from(name),
+        core::Signature::Module(
+            decls
+                .iter()
+                .flat_map(|decl| decl.get_signatures(common_kinds))
+                .collect(),
+        ),
+    );
+}
+
+pub fn register_type_alias(name: &str, args: &[Kind], body: &core::Type) {
+    todo!("register TypeAlias {:?}", (name, args, body))
 }
 
 fn eq_zonked_type(

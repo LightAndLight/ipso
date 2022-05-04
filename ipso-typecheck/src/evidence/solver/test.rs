@@ -1,6 +1,6 @@
 use crate::{
     evidence::{solver::solve_constraint, Constraint, Evidence},
-    register_class, Typechecker,
+    register_class, register_instance, Typechecker,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_syntax::kind::Kind;
@@ -130,7 +130,8 @@ fn solve_constraint_4() {
             Rc::from("MyEq"),
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
-        tc.register_instance(
+        register_instance(
+            &mut tc.implications,
             None,
             &Vec::new(),
             &Vec::new(),
@@ -145,7 +146,8 @@ fn solve_constraint_4() {
         );
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
-        tc.register_instance(
+        register_instance(
+            &mut tc.implications,
             None,
             &[(Rc::from("a"), a.kind())],
             &[core::Type::app(eq_ty.clone(), a.clone())],
