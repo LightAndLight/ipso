@@ -714,7 +714,7 @@ impl<'modules> Typechecker<'modules> {
                 .filter_map(|name| {
                     if !seen_names.contains(name.as_ref()) {
                         seen_names.insert(name);
-                        Some((name.clone(), self.fresh_kind_meta()))
+                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
                     } else {
                         None
                     }
@@ -809,7 +809,7 @@ impl<'modules> Typechecker<'modules> {
                 .filter_map(|name| {
                     if !seen_names.contains(name.as_ref()) {
                         seen_names.insert(name);
-                        Some((name.clone(), self.fresh_kind_meta()))
+                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
                     } else {
                         None
                     }
@@ -845,7 +845,10 @@ impl<'modules> Typechecker<'modules> {
                 .map(|arg| {
                     if !seen_names.contains(arg.item.as_ref()) {
                         seen_names.insert(arg.item.as_ref());
-                        Ok((arg.item.clone(), self.fresh_kind_meta()))
+                        Ok((
+                            arg.item.clone(),
+                            Kind::Meta(self.kind_solutions.fresh_meta()),
+                        ))
                     } else {
                         Err(TypeError::DuplicateClassArgument {
                             source: self.source(),
@@ -944,7 +947,7 @@ impl<'modules> Typechecker<'modules> {
                 .filter_map(|name| {
                     if !seen_names.contains(name.as_ref()) {
                         seen_names.insert(name);
-                        Some((name.clone(), self.fresh_kind_meta()))
+                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
                     } else {
                         None
                     }
@@ -1200,10 +1203,6 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn fresh_type_meta(&mut self, kind: &Kind) -> core::Type {
         core::Type::Meta(kind.clone(), self.type_solutions.fresh_meta())
-    }
-
-    fn fresh_kind_meta(&mut self) -> Kind {
-        Kind::Meta(self.kind_solutions.fresh_meta())
     }
 
     fn type_inference_context(&mut self) -> type_inference::InferenceContext {
