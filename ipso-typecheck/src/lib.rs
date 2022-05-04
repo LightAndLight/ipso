@@ -477,76 +477,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn eq_zonked_type(&self, t1: &core::Type, t2: &core::Type) -> bool {
-        fn zonk_just_enough<'a>(tc: &'a Typechecker, t: &'a core::Type) -> &'a core::Type {
-            match t {
-                core::Type::Meta(_, n) => match &tc.type_solutions.get(*n) {
-                    metavariables::Solution::Unsolved => t,
-                    metavariables::Solution::Solved(sol) => zonk_just_enough(tc, sol),
-                },
-                t => t,
-            }
-        }
-        let t2: &core::Type = zonk_just_enough(self, t2);
-        match t1 {
-            core::Type::Name(_, n) => match t2 {
-                core::Type::Name(_, n2) => n == n2,
-                _ => false,
-            },
-            core::Type::Var(_, v) => match t2 {
-                core::Type::Var(_, v2) => v == v2,
-                _ => false,
-            },
-            core::Type::Bool => matches!(t2, core::Type::Bool),
-            core::Type::Int => matches!(t2, core::Type::Int),
-            core::Type::Char => matches!(t2, core::Type::Char),
-            core::Type::String => matches!(t2, core::Type::String),
-            core::Type::Bytes => matches!(t2, core::Type::Bytes),
-            core::Type::Cmd => matches!(t2, core::Type::Cmd),
-            core::Type::Arrow(_) => matches!(t2, core::Type::Arrow(_)),
-            core::Type::FatArrow(_) => matches!(t2, core::Type::FatArrow(_)),
-            core::Type::Array(_) => matches!(t2, core::Type::Arrow(_)),
-            core::Type::Record(_) => matches!(t2, core::Type::Record(_)),
-            core::Type::Variant(_) => matches!(t2, core::Type::Variant(_)),
-            core::Type::IO(_) => matches!(t2, core::Type::IO(_)),
-            core::Type::RowNil => matches!(t2, core::Type::RowNil),
-            core::Type::Unit => matches!(t2, core::Type::Unit),
-            core::Type::Constraints(cs) => match t2 {
-                core::Type::Constraints(cs2) => {
-                    cs.len() == cs2.len()
-                        && cs
-                            .iter()
-                            .zip(cs2.iter())
-                            .all(|(a, b)| self.eq_zonked_type(a, b))
-                }
-                _ => false,
-            },
-            core::Type::App(_, a, b) => match t2 {
-                core::Type::App(_, a2, b2) => {
-                    self.eq_zonked_type(a, a2) && self.eq_zonked_type(b, b2)
-                }
-                _ => false,
-            },
-            core::Type::RowCons(a, b, c) => match t2 {
-                core::Type::RowCons(a2, b2, c2) => {
-                    a == a2 && self.eq_zonked_type(b, b2) && self.eq_zonked_type(c, c2)
-                }
-                _ => false,
-            },
-            core::Type::HasField(a, b) => match t2 {
-                core::Type::HasField(a2, b2) => a == a2 && self.eq_zonked_type(b, b2),
-                _ => false,
-            },
-            core::Type::Meta(_, n) => match &self.type_solutions.get(*n) {
-                metavariables::Solution::Unsolved => match t2 {
-                    core::Type::Meta(_, n2) => n == n2,
-                    _ => false,
-                },
-                metavariables::Solution::Solved(sol) => self.eq_zonked_type(sol, t2),
-            },
-        }
-    }
-
     pub fn eq_zonked_constraint(
         &self,
         c1: &evidence::Constraint,
@@ -557,11 +487,11 @@ impl<'modules> Typechecker<'modules> {
                 evidence::Constraint::HasField {
                     field: field2,
                     rest: rest2,
-                } => field == field2 && self.eq_zonked_type(rest, rest2),
+                } => field == field2 && eq_zonked_type(&self.type_solutions, rest, rest2),
                 _ => false,
             },
             evidence::Constraint::Type(ty) => match c2 {
-                evidence::Constraint::Type(ty2) => self.eq_zonked_type(ty, ty2),
+                evidence::Constraint::Type(ty2) => eq_zonked_type(&self.type_solutions, ty, ty2),
                 _ => false,
             },
         }
@@ -1415,5 +1345,84 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<core::Expr, TypeError> {
         type_inference::check(&mut self.type_inference_context(), expr, ty)
             .map_err(|error| TypeError::TypeError { error })
+    }
+}
+
+fn eq_zonked_type(
+    type_solutions: &type_inference::Solutions,
+    t1: &core::Type,
+    t2: &core::Type,
+) -> bool {
+    fn zonk_just_enough<'a>(
+        type_solutions: &'a type_inference::Solutions,
+        t: &'a core::Type,
+    ) -> &'a core::Type {
+        match t {
+            core::Type::Meta(_, n) => match type_solutions.get(*n) {
+                metavariables::Solution::Unsolved => t,
+                metavariables::Solution::Solved(sol) => zonk_just_enough(type_solutions, sol),
+            },
+            t => t,
+        }
+    }
+    let t2: &core::Type = zonk_just_enough(type_solutions, t2);
+    match t1 {
+        core::Type::Name(_, n) => match t2 {
+            core::Type::Name(_, n2) => n == n2,
+            _ => false,
+        },
+        core::Type::Var(_, v) => match t2 {
+            core::Type::Var(_, v2) => v == v2,
+            _ => false,
+        },
+        core::Type::Bool => matches!(t2, core::Type::Bool),
+        core::Type::Int => matches!(t2, core::Type::Int),
+        core::Type::Char => matches!(t2, core::Type::Char),
+        core::Type::String => matches!(t2, core::Type::String),
+        core::Type::Bytes => matches!(t2, core::Type::Bytes),
+        core::Type::Cmd => matches!(t2, core::Type::Cmd),
+        core::Type::Arrow(_) => matches!(t2, core::Type::Arrow(_)),
+        core::Type::FatArrow(_) => matches!(t2, core::Type::FatArrow(_)),
+        core::Type::Array(_) => matches!(t2, core::Type::Arrow(_)),
+        core::Type::Record(_) => matches!(t2, core::Type::Record(_)),
+        core::Type::Variant(_) => matches!(t2, core::Type::Variant(_)),
+        core::Type::IO(_) => matches!(t2, core::Type::IO(_)),
+        core::Type::RowNil => matches!(t2, core::Type::RowNil),
+        core::Type::Unit => matches!(t2, core::Type::Unit),
+        core::Type::Constraints(cs) => match t2 {
+            core::Type::Constraints(cs2) => {
+                cs.len() == cs2.len()
+                    && cs
+                        .iter()
+                        .zip(cs2.iter())
+                        .all(|(a, b)| eq_zonked_type(type_solutions, a, b))
+            }
+            _ => false,
+        },
+        core::Type::App(_, a, b) => match t2 {
+            core::Type::App(_, a2, b2) => {
+                eq_zonked_type(type_solutions, a, a2) && eq_zonked_type(type_solutions, b, b2)
+            }
+            _ => false,
+        },
+        core::Type::RowCons(a, b, c) => match t2 {
+            core::Type::RowCons(a2, b2, c2) => {
+                a == a2
+                    && eq_zonked_type(type_solutions, b, b2)
+                    && eq_zonked_type(type_solutions, c, c2)
+            }
+            _ => false,
+        },
+        core::Type::HasField(a, b) => match t2 {
+            core::Type::HasField(a2, b2) => a == a2 && eq_zonked_type(type_solutions, b, b2),
+            _ => false,
+        },
+        core::Type::Meta(_, n) => match type_solutions.get(*n) {
+            metavariables::Solution::Unsolved => match t2 {
+                core::Type::Meta(_, n2) => n == n2,
+                _ => false,
+            },
+            metavariables::Solution::Solved(sol) => eq_zonked_type(type_solutions, sol, t2),
+        },
     }
 }
