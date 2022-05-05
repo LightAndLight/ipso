@@ -591,7 +591,7 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let mut type_solutions = type_inference::Solutions::new();
+                let mut type_solutions = type_inference::unification::Solutions::new();
                 let module =
                     Typechecker::new(input_location, common_kinds, modules, &mut type_solutions)
                         .check_module(&module)?;

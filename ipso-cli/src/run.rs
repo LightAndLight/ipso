@@ -102,7 +102,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut type_solutions = type_inference::Solutions::new();
+        let mut type_solutions = type_inference::unification::Solutions::new();
 
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
