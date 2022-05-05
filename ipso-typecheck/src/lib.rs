@@ -738,7 +738,7 @@ impl<'modules> Typechecker<'modules> {
             .flat_map(|arg_ty| arg_ty.names().into_iter())
             .collect::<Vec<_>>();
         self.bound_vars.insert(&arg_bound_vars);
-        let body = self.check_type(body, &out_ty)?;
+        let body = type_inference::check(&mut self.type_inference_context(), body, &out_ty)?;
         self.bound_vars.delete(arg_bound_vars.len());
 
         let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
@@ -1052,8 +1052,9 @@ impl<'modules> Typechecker<'modules> {
                 Some(member_type) => {
                     self.bound_tyvars.insert(&member_type.sig.ty_vars);
 
-                    match self
-                        .check_type(
+                    match {
+                        let member_body = type_inference::check(
+                            &mut self.type_inference_context(),
                             &Spanned {
                                 pos: member.name.pos,
                                 item: syntax::Expr::mk_lam(
@@ -1062,10 +1063,9 @@ impl<'modules> Typechecker<'modules> {
                                 ),
                             },
                             &member_type.sig.body,
-                        )
-                        .and_then(|member_body| {
-                            self.generalise(member_body, member_type.sig.body.clone())
-                        }) {
+                        )?;
+                        self.generalise(member_body, member_type.sig.body.clone())
+                    } {
                         Err(err) => return Err(err),
                         Ok((member_body, _)) => {
                             self.bound_tyvars.delete(member_type.sig.ty_vars.len());
@@ -1235,23 +1235,6 @@ impl<'modules> Typechecker<'modules> {
 
     pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {
         ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
-    }
-
-    pub fn infer_type(
-        &mut self,
-        expr: &syntax::Spanned<syntax::Expr>,
-    ) -> Result<(core::Expr, core::Type), TypeError> {
-        let result = type_inference::infer(&mut self.type_inference_context(), expr)?;
-        Ok(result)
-    }
-
-    pub fn check_type(
-        &mut self,
-        expr: &syntax::Spanned<syntax::Expr>,
-        ty: &core::Type,
-    ) -> Result<core::Expr, TypeError> {
-        let result = type_inference::check(&mut self.type_inference_context(), expr, ty)?;
-        Ok(result)
     }
 }
 
