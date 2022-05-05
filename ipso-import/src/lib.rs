@@ -590,32 +590,7 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let mut kind_solutions = Default::default();
-                let mut type_solutions = Default::default();
-                let mut implications = Default::default();
-                let mut evidence = Default::default();
-                let mut types = Default::default();
-                let mut context = Default::default();
-                let mut class_context = Default::default();
-                let mut variables = Default::default();
-                let mut type_variables = Default::default();
-                let mut module_context = Default::default();
-                let module = typecheck::check_module(
-                    common_kinds,
-                    &mut kind_solutions,
-                    &mut type_solutions,
-                    &mut implications,
-                    &mut evidence,
-                    &mut types,
-                    &mut context,
-                    &mut class_context,
-                    &mut variables,
-                    &mut type_variables,
-                    modules,
-                    &mut module_context,
-                    source,
-                    &module,
-                )?;
+                let module = typecheck::check_module(common_kinds, modules, source, &module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)
