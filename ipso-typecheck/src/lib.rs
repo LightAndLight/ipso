@@ -421,7 +421,7 @@ pub fn register_declaration(
     }
 }
 
-pub fn check_module(
+pub fn check_module_with(
     common_kinds: &CommonKinds,
     kind_solutions: &mut kind_inference::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
@@ -497,6 +497,40 @@ pub fn check_module(
         })
     })?;
     Ok(core::Module { decls })
+}
+
+pub fn check_module(
+    common_kinds: &CommonKinds,
+    modules: &Modules<core::Module>,
+    source: &Source,
+    module: &syntax::Module,
+) -> Result<core::Module, TypeError> {
+    let mut kind_solutions = Default::default();
+    let mut type_solutions = Default::default();
+    let mut implications = Default::default();
+    let mut evidence = Default::default();
+    let mut types = Default::default();
+    let mut context = Default::default();
+    let mut class_context = Default::default();
+    let mut variables = Default::default();
+    let mut type_variables = Default::default();
+    let mut module_context = Default::default();
+    check_module_with(
+        common_kinds,
+        &mut kind_solutions,
+        &mut type_solutions,
+        &mut implications,
+        &mut evidence,
+        &mut types,
+        &mut context,
+        &mut class_context,
+        &mut variables,
+        &mut type_variables,
+        modules,
+        &mut module_context,
+        source,
+        module,
+    )
 }
 
 pub fn register_from_import(
