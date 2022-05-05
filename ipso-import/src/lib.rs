@@ -3,7 +3,7 @@ use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax, desugar, ModuleId, ModuleKey, ModuleRef, Modules, Spanned};
-use ipso_typecheck::{self as typecheck, Typechecker};
+use ipso_typecheck::{self as typecheck};
 use ipso_util::hash_multi_set::HashMultiset;
 use std::{
     collections::{HashMap, HashSet},
@@ -11,7 +11,6 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use typecheck::{kind_inference, type_inference, BoundVars};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -591,20 +590,32 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let mut types = HashMap::new();
-                let mut type_variables = BoundVars::new();
-                let mut kind_solutions = kind_inference::Solutions::new();
-                let mut type_solutions = type_inference::unification::Solutions::new();
-                let module = Typechecker::new(
-                    input_location,
+                let mut kind_solutions = Default::default();
+                let mut type_solutions = Default::default();
+                let mut implications = Default::default();
+                let mut evidence = Default::default();
+                let mut types = Default::default();
+                let mut context = Default::default();
+                let mut class_context = Default::default();
+                let mut variables = Default::default();
+                let mut type_variables = Default::default();
+                let mut module_context = Default::default();
+                let module = typecheck::check_module(
                     common_kinds,
-                    &mut types,
-                    &mut type_variables,
-                    modules,
                     &mut kind_solutions,
                     &mut type_solutions,
-                )
-                .check_module(&module)?;
+                    &mut implications,
+                    &mut evidence,
+                    &mut types,
+                    &mut context,
+                    &mut class_context,
+                    &mut variables,
+                    &mut type_variables,
+                    modules,
+                    &mut module_context,
+                    source,
+                    &module,
+                )?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)
