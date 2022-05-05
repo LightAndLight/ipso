@@ -42,8 +42,8 @@ impl From<typecheck::TypeError> for InterpreterError {
     }
 }
 
-impl From<type_inference::InferenceError> for InterpreterError {
-    fn from(err: type_inference::InferenceError) -> Self {
+impl From<type_inference::Error> for InterpreterError {
+    fn from(err: type_inference::Error) -> Self {
         InterpreterError::TypeError(typecheck::TypeError::from(err))
     }
 }
