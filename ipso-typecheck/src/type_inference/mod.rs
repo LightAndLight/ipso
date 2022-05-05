@@ -64,13 +64,13 @@ pub struct Error {
 }
 
 impl Error {
-    /// Attach a position to an [`InferenceError`].
+    /// Attach a position to an [`Error`].
     pub fn with_position(mut self, position: usize) -> Self {
         self.position = Some(position);
         self
     }
 
-    /// Construct an [`InferenceErrorInfo::NotInScope`].
+    /// Construct an [`ErrorInfo::NotInScope`].
     pub fn not_in_scope(source: &Source, name: &str) -> Self {
         Error {
             source: source.clone(),
@@ -81,7 +81,7 @@ impl Error {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::NotAValue`].
+    /// Construct an [`ErrorInfo::NotAValue`].
     pub fn not_a_value(source: &Source, name: &str) -> Self {
         Error {
             source: source.clone(),
@@ -92,7 +92,7 @@ impl Error {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::NotAModule`].
+    /// Construct an [`ErrorInfo::NotAModule`].
     pub fn not_a_module(source: &Source) -> Self {
         Error {
             source: source.clone(),
@@ -101,7 +101,7 @@ impl Error {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::DuplicateArgument`].
+    /// Construct an [`ErrorInfo::DuplicateArgument`].
     pub fn duplicate_argument(source: &Source, name: Rc<str>) -> Self {
         Error {
             source: source.clone(),
@@ -110,7 +110,7 @@ impl Error {
         }
     }
 
-    /// Construct an [`InferenceErrorInfo::RedundantPattern`].
+    /// Construct an [`ErrorInfo::RedundantPattern`].
     pub fn redundant_pattern(source: &Source) -> Self {
         Error {
             source: source.clone(),
