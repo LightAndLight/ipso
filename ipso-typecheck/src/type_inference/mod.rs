@@ -305,304 +305,306 @@ impl<'a> InferenceContext<'a> {
 
         (expr, ty.clone())
     }
+}
 
-    fn check_duplicate_args(
-        &self,
-        args: &[Spanned<syntax::Pattern>],
-    ) -> Result<(), InferenceError> {
-        let mut seen: HashSet<&str> = HashSet::new();
-        args.iter()
-            .flat_map(|arg| arg.item.get_arg_names().into_iter())
-            .try_for_each(|arg| {
-                if seen.contains(&arg.item.as_ref()) {
-                    Err(
-                        InferenceError::duplicate_argument(self.source, arg.item.clone())
-                            .with_position(arg.pos),
-                    )
-                } else {
-                    seen.insert(&arg.item);
-                    Ok(())
-                }
-            })
-    }
-
-    fn infer_name_pattern(&mut self, name: &Spanned<Rc<str>>) -> InferredPattern {
-        let name_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
-        InferredPattern::Any {
-            pattern: Pattern::Name,
-            names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
-            ty: name_ty,
-        }
-    }
-
-    fn infer_string_pattern(&self, s: &Spanned<Rc<str>>) -> InferredPattern {
-        InferredPattern::Any {
-            pattern: Pattern::String(s.item.clone()),
-            names: Vec::new(),
-            ty: Type::String,
-        }
-    }
-
-    fn infer_int_pattern(&self, n: &Spanned<u32>) -> InferredPattern {
-        InferredPattern::Any {
-            pattern: Pattern::Int(n.item),
-            names: Vec::new(),
-            ty: Type::Int,
-        }
-    }
-
-    fn infer_char_pattern(&self, c: &Spanned<char>) -> InferredPattern {
-        InferredPattern::Any {
-            pattern: Pattern::Char(c.item),
-            names: Vec::new(),
-            ty: Type::Char,
-        }
-    }
-
-    fn infer_record_pattern(
-        &mut self,
-        names: &[Spanned<Rc<str>>],
-        rest: Option<&Spanned<Rc<str>>>,
-    ) -> InferredPattern {
-        let mut names_to_positions: FnvHashMap<&str, usize> =
-            FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
-        let entire_row = {
-            let fields = names
-                .iter()
-                .map(|name| {
-                    let name_item_ref = name.item.as_ref();
-                    names_to_positions.insert(name_item_ref, name.pos);
-                    (
-                        Rc::from(name_item_ref),
-                        fresh_type_meta(self.type_solutions, &Kind::Type),
-                    )
-                })
-                .collect();
-            let rest = rest.map(|_| fresh_type_meta(self.type_solutions, &Kind::Row));
-            Type::mk_rows(fields, rest)
-        };
-
-        let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = {
-            let mut names: Vec<Expr> = Vec::with_capacity(names.len());
-            let mut names_tys: Vec<(Rc<str>, Type)> = Vec::with_capacity(names.len());
-
-            let mut row: &Type = &entire_row;
-            while let Type::RowCons(field, ty, rest) = row {
-                names.push(Expr::Placeholder(self.evidence.placeholder(
-                    names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
-                    evidence::Constraint::HasField {
-                        field: field.clone(),
-                        rest: (**rest).clone(),
-                    },
-                )));
-                names_tys.push((field.clone(), (**ty).clone()));
-                row = rest.as_ref();
+fn check_duplicate_args(
+    ctx: &InferenceContext,
+    args: &[Spanned<syntax::Pattern>],
+) -> Result<(), InferenceError> {
+    let mut seen: HashSet<&str> = HashSet::new();
+    args.iter()
+        .flat_map(|arg| arg.item.get_arg_names().into_iter())
+        .try_for_each(|arg| {
+            if seen.contains(&arg.item.as_ref()) {
+                Err(
+                    InferenceError::duplicate_argument(ctx.source, arg.item.clone())
+                        .with_position(arg.pos),
+                )
+            } else {
+                seen.insert(&arg.item);
+                Ok(())
             }
-            if let Some(rest) = rest {
-                names_tys.push((
-                    Rc::from(rest.item.as_ref()),
-                    Type::app(Type::mk_record_ctor(self.common_kinds), row.clone()),
-                ));
-            }
-
-            (names, names_tys)
-        };
-
-        InferredPattern::Any {
-            pattern: Pattern::Record {
-                names,
-                rest: rest.is_some(),
-            },
-            names: names_tys,
-            ty: Type::app(Type::mk_record_ctor(self.common_kinds), entire_row),
-        }
-    }
-
-    fn infer_variant_pattern(
-        &mut self,
-        pos: usize,
-        ctor: &str,
-        arg: &Spanned<Rc<str>>,
-    ) -> InferredPattern {
-        let ctor: Rc<str> = Rc::from(ctor);
-        let arg_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
-        let rest_row = fresh_type_meta(self.type_solutions, &Kind::Row);
-        let tag = Expr::Placeholder(self.evidence.placeholder(
-            pos,
-            evidence::Constraint::HasField {
-                field: ctor.clone(),
-                rest: rest_row.clone(),
-            },
-        ));
-        InferredPattern::Variant {
-            tag: Rc::new(tag),
-            ctor,
-            arg_name: Rc::from(arg.item.as_ref()),
-            arg_ty,
-            rest: rest_row,
-        }
-    }
-
-    fn infer_wildcard_pattern(&mut self) -> InferredPattern {
-        InferredPattern::Any {
-            pattern: Pattern::Wildcard,
-            names: Vec::new(),
-            ty: fresh_type_meta(self.type_solutions, &Kind::Type),
-        }
-    }
-
-    pub fn infer_pattern(&mut self, pattern: &Spanned<syntax::Pattern>) -> InferredPattern {
-        match &pattern.item {
-            syntax::Pattern::Name(name) => self.infer_name_pattern(name),
-            syntax::Pattern::Record { names, rest } => {
-                self.infer_record_pattern(names, rest.as_ref())
-            }
-            syntax::Pattern::Variant { name, arg } => {
-                self.infer_variant_pattern(pattern.pos, name, arg)
-            }
-            syntax::Pattern::Char(c) => self.infer_char_pattern(c),
-            syntax::Pattern::Int(n) => self.infer_int_pattern(n),
-            syntax::Pattern::String(s) => self.infer_string_pattern(s),
-            syntax::Pattern::Wildcard => self.infer_wildcard_pattern(),
-        }
-    }
-
-    fn check_pattern(
-        &mut self,
-        pattern: &Spanned<syntax::Pattern>,
-        expected: &Type,
-    ) -> Result<CheckedPattern, InferenceError> {
-        let result = self.infer_pattern(pattern);
-        unify(
-            self.common_kinds,
-            self.types,
-            self.type_variables,
-            self.kind_solutions,
-            self.type_solutions,
-            self.source,
-            Some(pattern.pos),
-            expected,
-            &result.ty(self.common_kinds),
-        )?;
-        Ok(match result {
-            InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
-            InferredPattern::Variant {
-                tag,
-                arg_name,
-                arg_ty,
-                rest,
-                ..
-            } => CheckedPattern::Variant {
-                tag,
-                arg_name,
-                arg_ty,
-                rest,
-            },
         })
+}
+
+fn infer_name_pattern(ctx: &mut InferenceContext, name: &Spanned<Rc<str>>) -> InferredPattern {
+    let name_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+    InferredPattern::Any {
+        pattern: Pattern::Name,
+        names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
+        ty: name_ty,
     }
+}
 
-    fn check_case(
-        &mut self,
-        expr: &Spanned<syntax::Expr>,
-        branches: &[syntax::Branch],
-    ) -> Result<(Expr, Type), InferenceError> {
-        let (expr, mut expr_ty) = infer(self, expr)?;
+fn infer_string_pattern(s: &Spanned<Rc<str>>) -> InferredPattern {
+    InferredPattern::Any {
+        pattern: Pattern::String(s.item.clone()),
+        names: Vec::new(),
+        ty: Type::String,
+    }
+}
 
-        /*
-        [note: peeling constructors when matching on variants]
+fn infer_int_pattern(n: &Spanned<u32>) -> InferredPattern {
+    InferredPattern::Any {
+        pattern: Pattern::Int(n.item),
+        names: Vec::new(),
+        ty: Type::Int,
+    }
+}
 
-        As each variant constructor is checked, the constructor needs to be 'peeled'
-        off the original expression type before checking the next branch.
+fn infer_char_pattern(c: &Spanned<char>) -> InferredPattern {
+    InferredPattern::Any {
+        pattern: Pattern::Char(c.item),
+        names: Vec::new(),
+        ty: Type::Char,
+    }
+}
 
-        When a catch-all pattern is reached, it can be assigned a variant type that's
-        missing all the constructors that have already been matched.
-
-        e.g.
-
-        ```
-        # expr : (| A : a, B : b, c : C, d : D |)
-        case expr of
-          # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
-          A x -> ...
-
-          # check that `B y` has type `(| B : b, c : C, d : D |)`
-          B y -> ...
-
-          # check that `c` has type `(| c : C, d : D |)`
-          c -> ...
-        ```
-
-        A consequence of ctx is that the tags associated with each variant pattern
-        aren't unique. The above example gives:
-
-        ```
-        case expr of
-          # A's tag is 0
-          A x -> ...
-
-          # B's tag is also 0 (because `B` is lexicographically the first constructor
-          # in `(| B : b, c : C, d : D |)`)
-          B y -> ...
-
-          c -> ...
-
-        The interpreter needs to account for ctx when checking pattern matches.
-        ```
-        */
-
-        let out_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
-        let mut seen_ctors = FnvHashSet::default();
-        let mut saw_catchall = false;
-        let branches: Vec<Branch> = branches
+fn infer_record_pattern(
+    ctx: &mut InferenceContext,
+    names: &[Spanned<Rc<str>>],
+    rest: Option<&Spanned<Rc<str>>>,
+) -> InferredPattern {
+    let mut names_to_positions: FnvHashMap<&str, usize> =
+        FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
+    let entire_row = {
+        let fields = names
             .iter()
-            .map(|branch| {
-                if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                    return Err(InferenceError::redundant_pattern(self.source)
-                        .with_position(branch.pattern.pos));
-                }
-
-                if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
-                    seen_ctors.insert(name.as_ref());
-                }
-
-                let result = self.check_pattern(&branch.pattern, &expr_ty)?;
-
-                if let CheckedPattern::Variant { rest, .. } = &result {
-                    expr_ty = Type::app(Type::mk_variant_ctor(self.common_kinds), rest.clone())
-                }
-
-                let names = result.names();
-                self.variables.insert(&names);
-                let body = check(self, &branch.body, &out_ty)?;
-                self.variables.delete(names.len());
-
-                let pattern = result.pattern();
-                if let Pattern::Wildcard | Pattern::Name = pattern {
-                    saw_catchall = true;
-                }
-
-                Ok(Branch { pattern, body })
+            .map(|name| {
+                let name_item_ref = name.item.as_ref();
+                names_to_positions.insert(name_item_ref, name.pos);
+                (
+                    Rc::from(name_item_ref),
+                    fresh_type_meta(ctx.type_solutions, &Kind::Type),
+                )
             })
-            .collect::<Result<_, _>>()?;
-        zonk_type_mut(self.kind_solutions, self.type_solutions, &mut expr_ty);
-        match expr_ty.unwrap_variant() {
-            Some(RowParts {
-                rest: Some(rest), ..
-            }) if !saw_catchall => unify(
-                self.common_kinds,
-                self.types,
-                self.type_variables,
-                self.kind_solutions,
-                self.type_solutions,
-                self.source,
-                None,
-                &Type::RowNil,
-                rest,
-            ),
-            _ => Ok(()),
-        }?;
-        Ok((Expr::mk_case(expr, branches), out_ty))
+            .collect();
+        let rest = rest.map(|_| fresh_type_meta(ctx.type_solutions, &Kind::Row));
+        Type::mk_rows(fields, rest)
+    };
+
+    let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = {
+        let mut names: Vec<Expr> = Vec::with_capacity(names.len());
+        let mut names_tys: Vec<(Rc<str>, Type)> = Vec::with_capacity(names.len());
+
+        let mut row: &Type = &entire_row;
+        while let Type::RowCons(field, ty, rest) = row {
+            names.push(Expr::Placeholder(ctx.evidence.placeholder(
+                names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
+                evidence::Constraint::HasField {
+                    field: field.clone(),
+                    rest: (**rest).clone(),
+                },
+            )));
+            names_tys.push((field.clone(), (**ty).clone()));
+            row = rest.as_ref();
+        }
+        if let Some(rest) = rest {
+            names_tys.push((
+                Rc::from(rest.item.as_ref()),
+                Type::app(Type::mk_record_ctor(ctx.common_kinds), row.clone()),
+            ));
+        }
+
+        (names, names_tys)
+    };
+
+    InferredPattern::Any {
+        pattern: Pattern::Record {
+            names,
+            rest: rest.is_some(),
+        },
+        names: names_tys,
+        ty: Type::app(Type::mk_record_ctor(ctx.common_kinds), entire_row),
     }
+}
+
+fn infer_variant_pattern(
+    ctx: &mut InferenceContext,
+    pos: usize,
+    ctor: &str,
+    arg: &Spanned<Rc<str>>,
+) -> InferredPattern {
+    let ctor: Rc<str> = Rc::from(ctor);
+    let arg_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+    let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
+    let tag = Expr::Placeholder(ctx.evidence.placeholder(
+        pos,
+        evidence::Constraint::HasField {
+            field: ctor.clone(),
+            rest: rest_row.clone(),
+        },
+    ));
+    InferredPattern::Variant {
+        tag: Rc::new(tag),
+        ctor,
+        arg_name: Rc::from(arg.item.as_ref()),
+        arg_ty,
+        rest: rest_row,
+    }
+}
+
+fn infer_wildcard_pattern(ctx: &mut InferenceContext) -> InferredPattern {
+    InferredPattern::Any {
+        pattern: Pattern::Wildcard,
+        names: Vec::new(),
+        ty: fresh_type_meta(ctx.type_solutions, &Kind::Type),
+    }
+}
+
+pub fn infer_pattern(
+    ctx: &mut InferenceContext,
+    pattern: &Spanned<syntax::Pattern>,
+) -> InferredPattern {
+    match &pattern.item {
+        syntax::Pattern::Name(name) => infer_name_pattern(ctx, name),
+        syntax::Pattern::Record { names, rest } => infer_record_pattern(ctx, names, rest.as_ref()),
+        syntax::Pattern::Variant { name, arg } => {
+            infer_variant_pattern(ctx, pattern.pos, name, arg)
+        }
+        syntax::Pattern::Char(c) => infer_char_pattern(c),
+        syntax::Pattern::Int(n) => infer_int_pattern(n),
+        syntax::Pattern::String(s) => infer_string_pattern(s),
+        syntax::Pattern::Wildcard => infer_wildcard_pattern(ctx),
+    }
+}
+
+fn check_pattern(
+    ctx: &mut InferenceContext,
+    pattern: &Spanned<syntax::Pattern>,
+    expected: &Type,
+) -> Result<CheckedPattern, InferenceError> {
+    let result = infer_pattern(ctx, pattern);
+    unify(
+        ctx.common_kinds,
+        ctx.types,
+        ctx.type_variables,
+        ctx.kind_solutions,
+        ctx.type_solutions,
+        ctx.source,
+        Some(pattern.pos),
+        expected,
+        &result.ty(ctx.common_kinds),
+    )?;
+    Ok(match result {
+        InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
+        InferredPattern::Variant {
+            tag,
+            arg_name,
+            arg_ty,
+            rest,
+            ..
+        } => CheckedPattern::Variant {
+            tag,
+            arg_name,
+            arg_ty,
+            rest,
+        },
+    })
+}
+
+fn check_case(
+    ctx: &mut InferenceContext,
+    expr: &Spanned<syntax::Expr>,
+    branches: &[syntax::Branch],
+) -> Result<(Expr, Type), InferenceError> {
+    let (expr, mut expr_ty) = infer(ctx, expr)?;
+
+    /*
+    [note: peeling constructors when matching on variants]
+
+    As each variant constructor is checked, the constructor needs to be 'peeled'
+    off the original expression type before checking the next branch.
+
+    When a catch-all pattern is reached, it can be assigned a variant type that's
+    missing all the constructors that have already been matched.
+
+    e.g.
+
+    ```
+    # expr : (| A : a, B : b, c : C, d : D |)
+    case expr of
+      # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
+      A x -> ...
+
+      # check that `B y` has type `(| B : b, c : C, d : D |)`
+      B y -> ...
+
+      # check that `c` has type `(| c : C, d : D |)`
+      c -> ...
+    ```
+
+    A consequence of ctx is that the tags associated with each variant pattern
+    aren't unique. The above example gives:
+
+    ```
+    case expr of
+      # A's tag is 0
+      A x -> ...
+
+      # B's tag is also 0 (because `B` is lexicographically the first constructor
+      # in `(| B : b, c : C, d : D |)`)
+      B y -> ...
+
+      c -> ...
+
+    The interpreter needs to account for ctx when checking pattern matches.
+    ```
+    */
+
+    let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+    let mut seen_ctors = FnvHashSet::default();
+    let mut saw_catchall = false;
+    let branches: Vec<Branch> = branches
+        .iter()
+        .map(|branch| {
+            if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
+                return Err(
+                    InferenceError::redundant_pattern(ctx.source).with_position(branch.pattern.pos)
+                );
+            }
+
+            if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
+                seen_ctors.insert(name.as_ref());
+            }
+
+            let result = check_pattern(ctx, &branch.pattern, &expr_ty)?;
+
+            if let CheckedPattern::Variant { rest, .. } = &result {
+                expr_ty = Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest.clone())
+            }
+
+            let names = result.names();
+            ctx.variables.insert(&names);
+            let body = check(ctx, &branch.body, &out_ty)?;
+            ctx.variables.delete(names.len());
+
+            let pattern = result.pattern();
+            if let Pattern::Wildcard | Pattern::Name = pattern {
+                saw_catchall = true;
+            }
+
+            Ok(Branch { pattern, body })
+        })
+        .collect::<Result<_, _>>()?;
+    zonk_type_mut(ctx.kind_solutions, ctx.type_solutions, &mut expr_ty);
+    match expr_ty.unwrap_variant() {
+        Some(RowParts {
+            rest: Some(rest), ..
+        }) if !saw_catchall => unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &Type::RowNil,
+            rest,
+        ),
+        _ => Ok(()),
+    }?;
+    Ok((Expr::mk_case(expr, branches), out_ty))
 }
 
 /// Generate a fresh kind metavariable.
@@ -854,13 +856,13 @@ pub fn infer(
             Ok((Expr::mk_app(fun, arg), out_ty))
         }
         syntax::Expr::Lam { args, body } => {
-            ctx.check_duplicate_args(args)?;
+            check_duplicate_args(ctx, args)?;
 
             let mut inferred_args: Vec<(Pattern, Type)> = Vec::with_capacity(args.len());
             let bound_variables: Vec<(Rc<str>, Type)> = args
                 .iter()
                 .flat_map(|arg| {
-                    let result = ctx.infer_pattern(arg);
+                    let result = infer_pattern(ctx, arg);
                     inferred_args.push((result.pattern(), result.ty(ctx.common_kinds)));
                     result.names().into_iter()
                 })
@@ -1064,7 +1066,7 @@ pub fn infer(
                 ),
             ))
         }
-        syntax::Expr::Case(expr, branches) => ctx.check_case(expr, branches),
+        syntax::Expr::Case(expr, branches) => check_case(ctx, expr, branches),
 
         syntax::Expr::Comp(_) => {
             panic!("computation expression was not desugared")

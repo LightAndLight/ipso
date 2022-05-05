@@ -1,7 +1,7 @@
 use super::{unification, InferenceContext, InferenceError, InferredPattern};
 use crate::{
     evidence, kind_inference,
-    type_inference::{fresh_type_meta, infer, unify, zonk_type},
+    type_inference::{fresh_type_meta, infer, infer_pattern, unify, zonk_type},
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
@@ -88,7 +88,7 @@ fn infer_pattern_1() {
             }),
         };
         assert_eq!(
-            ctx.infer_pattern(&pattern),
+            infer_pattern(ctx, &pattern),
             InferredPattern::Any {
                 pattern: Pattern::Name,
                 names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
@@ -145,7 +145,7 @@ fn infer_pattern_2() {
                 (Rc::from("z"), Type::Meta(Kind::Type, 2)),
             ],
         };
-        let actual = ctx.infer_pattern(&pat);
+        let actual = infer_pattern(ctx, &pat);
         assert_eq!(expected, actual)
     })
 }
@@ -204,7 +204,7 @@ fn infer_pattern_3() {
                 ),
             ],
         };
-        let actual = ctx.infer_pattern(&pat);
+        let actual = infer_pattern(ctx, &pat);
         assert_eq!(expected, actual)
     })
 }
@@ -229,7 +229,7 @@ fn infer_pattern_4() {
             arg_ty: Type::Meta(Kind::Type, 0),
             rest: Type::Meta(Kind::Row, 1),
         };
-        let actual = ctx.infer_pattern(&pat);
+        let actual = infer_pattern(ctx, &pat);
         assert_eq!(expected, actual)
     })
 }

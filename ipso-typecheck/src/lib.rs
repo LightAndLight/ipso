@@ -18,6 +18,7 @@ use std::{
     todo,
 };
 use syntax::{ModuleId, Modules};
+use type_inference::infer_pattern;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Declarations {
@@ -717,7 +718,7 @@ impl<'modules> Typechecker<'modules> {
 
         let arg_tys: Vec<type_inference::InferredPattern> = args
             .iter()
-            .map(|arg| self.type_inference_context().infer_pattern(arg))
+            .map(|arg| infer_pattern(&mut self.type_inference_context(), arg))
             .collect();
         let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
 
