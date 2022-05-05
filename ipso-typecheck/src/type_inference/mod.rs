@@ -1,4 +1,24 @@
-//! Type checking and inference.
+/*!
+Type checking and inference.
+
+## Checking and inference
+
+* [`check`]
+* [`infer`]
+
+## Unification
+
+* [`unify`]
+* [`unification`]
+
+## Metavariable generation & zonking
+
+* [`fresh_kind_meta`]
+* [`fresh_type_meta`]
+* [`zonk_type`]
+* [`zonk_type_mut`]
+
+*/
 
 #[cfg(test)]
 mod test;
@@ -433,6 +453,7 @@ fn infer_wildcard_pattern(type_solutions: &mut unification::Solutions) -> Inferr
     }
 }
 
+/// Infer a pattern's type.
 pub fn infer_pattern(
     common_kinds: &CommonKinds,
     type_solutions: &mut unification::Solutions,
