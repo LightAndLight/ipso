@@ -1229,17 +1229,19 @@ impl<'modules> Typechecker<'modules> {
                 .map(|(a, b)| Declarations::Two(a, b)),
         }
     }
+}
 
-    pub fn zonk_constraint(&self, constraint: &Constraint) -> Constraint {
-        match constraint {
-            Constraint::HasField { field, rest } => Constraint::HasField {
-                field: field.clone(),
-                rest: self.type_solutions.zonk(self.kind_solutions, rest.clone()),
-            },
-            Constraint::Type(ty) => {
-                Constraint::Type(self.type_solutions.zonk(self.kind_solutions, ty.clone()))
-            }
-        }
+pub fn zonk_constraint(
+    kind_solutions: &kind_inference::Solutions,
+    type_solutions: &type_inference::unification::Solutions,
+    constraint: &Constraint,
+) -> Constraint {
+    match constraint {
+        Constraint::HasField { field, rest } => Constraint::HasField {
+            field: field.clone(),
+            rest: type_solutions.zonk(kind_solutions, rest.clone()),
+        },
+        Constraint::Type(ty) => Constraint::Type(type_solutions.zonk(kind_solutions, ty.clone())),
     }
 }
 

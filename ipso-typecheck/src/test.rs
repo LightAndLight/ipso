@@ -1,6 +1,6 @@
 use crate::{
     evidence::{solver::solve_placeholder, Constraint},
-    BoundVars, Declarations, Typechecker,
+    zonk_constraint, BoundVars, Declarations, Typechecker,
 };
 use ipso_core::{self as core, ClassMember, Placeholder, Signature, TypeSig};
 use ipso_syntax::{kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
@@ -250,8 +250,10 @@ fn infer_record_1() {
                     )
                 }
             )),
-            solve_placeholder(&mut tc, *p0)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+            solve_placeholder(&mut tc, *p0).map(|(expr, constraint)| (
+                expr,
+                zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
+            ))
         );
 
         assert_eq!(
@@ -262,8 +264,10 @@ fn infer_record_1() {
                     rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
                 }
             )),
-            solve_placeholder(&mut tc, *p1)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+            solve_placeholder(&mut tc, *p1).map(|(expr, constraint)| (
+                expr,
+                zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
+            ))
         );
 
         assert_eq!(
@@ -274,8 +278,10 @@ fn infer_record_1() {
                     rest: core::Type::RowNil
                 }
             )),
-            solve_placeholder(&mut tc, *p2)
-                .map(|(expr, constraint)| (expr, tc.zonk_constraint(&constraint)))
+            solve_placeholder(&mut tc, *p2).map(|(expr, constraint)| (
+                expr,
+                zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
+            ))
         );
     })
 }
