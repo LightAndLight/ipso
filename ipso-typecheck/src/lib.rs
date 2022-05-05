@@ -154,29 +154,6 @@ impl Implication {
     }
 }
 
-pub struct Typechecker<'modules> {
-    common_kinds: &'modules CommonKinds,
-    source: Source,
-    kind_solutions: &'modules mut kind_inference::Solutions,
-    type_solutions: &'modules mut type_inference::unification::Solutions,
-    implications: Vec<Implication>,
-    evidence: Evidence,
-    type_context: &'modules mut HashMap<Rc<str>, Kind>,
-    context: HashMap<String, core::Signature>,
-    class_context: HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: BoundVars<core::Type>,
-    bound_tyvars: &'modules mut BoundVars<Kind>,
-    position: Option<usize>,
-    modules: &'modules Modules<core::Module>,
-    /**
-    Cached context for modules that have been imported.
-
-    Ideally we would use a module path and item name to look up type signatures
-    in `modules`, but that's currently too resource intensive.
-    */
-    module_context: HashMap<ModuleId, HashMap<String, core::Signature>>,
-}
-
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SolveConstraintContext {
     pub constraint: syntax::Type<Rc<str>>,
@@ -380,51 +357,6 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
     }
 }
 
-#[macro_export]
-macro_rules! with_tc {
-    ($location:expr, $f:expr) => {{
-        use crate::{kind_inference, type_inference, BoundVars};
-        use ipso_builtins as builtins;
-        use ipso_core::CommonKinds;
-        use ipso_syntax::{self as syntax, ModuleKey, Modules};
-        use std::collections::HashMap;
-
-        let common_kinds = CommonKinds::default();
-        let mut modules = Modules::new();
-        let builtins_module_id = modules.insert(
-            ModuleKey::from("builtins"),
-            builtins::builtins(&common_kinds),
-        );
-        let mut types = HashMap::new();
-        let mut type_variables = BoundVars::new();
-        let mut kind_solutions = kind_inference::Solutions::new();
-        let mut type_solutions = type_inference::unification::Solutions::new();
-        let mut tc = Typechecker::new(
-            $location,
-            &common_kinds,
-            &mut types,
-            &mut type_variables,
-            &modules,
-            &mut kind_solutions,
-            &mut type_solutions,
-        );
-        tc.register_from_import(builtins_module_id, &syntax::Names::All);
-        $f(tc)
-    }};
-}
-
-#[macro_export]
-macro_rules! current_dir_with_tc {
-    ($f:expr) => {{
-        crate::with_tc!(
-            ipso_diagnostic::Source::Interactive {
-                label: String::from("(typechecker)")
-            },
-            $f
-        )
-    }};
-}
-
 /// The results of typechecking a pattern
 #[derive(Debug, PartialEq, Eq)]
 pub struct CheckedPattern {
@@ -445,56 +377,181 @@ pub struct InferredPattern {
     pub bindings: Vec<(Rc<str>, core::Type)>,
 }
 
-impl<'modules> Typechecker<'modules> {
-    pub fn new(
-        source: Source,
-        common_kinds: &'modules CommonKinds,
-        types: &'modules mut HashMap<Rc<str>, Kind>,
-        type_variables: &'modules mut BoundVars<Kind>,
-        modules: &'modules Modules<core::Module>,
-        kind_solutions: &'modules mut kind_inference::Solutions,
-        type_solutions: &'modules mut type_inference::unification::Solutions,
-    ) -> Self {
-        Typechecker {
-            common_kinds,
-            source,
-            kind_solutions,
-            type_solutions,
-            implications: Vec::new(),
-            evidence: Evidence::new(),
-            type_context: types,
-            context: HashMap::new(),
-            class_context: HashMap::new(),
-            bound_vars: BoundVars::new(),
-            bound_tyvars: type_variables,
-            position: None,
-            modules,
-            module_context: HashMap::new(),
+pub fn register_declaration(
+    common_kinds: &CommonKinds,
+    implications: &mut Vec<Implication>,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &mut HashMap<String, core::Signature>,
+    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
+    module_id: Option<ModuleId>,
+    decl: &core::Declaration,
+) {
+    match decl {
+        core::Declaration::BuiltinType { name, kind } => {
+            register_builtin_type(type_context, name, kind);
         }
+        core::Declaration::Definition { name, sig, .. } => register_definition(context, name, sig),
+        core::Declaration::Module { name, decls, .. } => {
+            register_module(common_kinds, context, name, decls)
+        }
+        core::Declaration::TypeAlias { name, args, body } => register_type_alias(name, args, body),
+        core::Declaration::Class(decl) => register_class(
+            common_kinds,
+            type_context,
+            implications,
+            context,
+            class_context,
+            decl,
+        ),
+        core::Declaration::Evidence { .. } => {}
+        core::Declaration::Instance {
+            ty_vars,
+            assumes,
+            head,
+            evidence,
+            ..
+        } => register_instance(
+            implications,
+            module_id,
+            ty_vars,
+            assumes,
+            head,
+            evidence.clone(),
+        ),
     }
+}
 
-    pub fn register_declaration(&mut self, module_id: Option<ModuleId>, decl: &core::Declaration) {
+pub fn check_module(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &mut Vec<Implication>,
+    evidence: &mut Evidence,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &mut HashMap<String, core::Signature>,
+    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
+    bound_vars: &mut BoundVars<core::Type>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    modules: &Modules<core::Module>,
+    module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
+    source: &Source,
+    module: &syntax::Module,
+) -> Result<core::Module, TypeError> {
+    let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
+        acc.and_then(|mut decls| {
+            check_declaration(
+                common_kinds,
+                kind_solutions,
+                type_solutions,
+                implications,
+                evidence,
+                type_context,
+                context,
+                class_context,
+                bound_vars,
+                bound_tyvars,
+                modules,
+                module_context,
+                source,
+                decl,
+            )
+            .map(|checked_decls| match checked_decls {
+                Declarations::Zero => decls,
+                Declarations::One(decl) => {
+                    register_declaration(
+                        common_kinds,
+                        implications,
+                        type_context,
+                        context,
+                        class_context,
+                        None,
+                        &decl,
+                    );
+                    decls.push(decl);
+                    decls
+                }
+                Declarations::Two(decl1, decl2) => {
+                    register_declaration(
+                        common_kinds,
+                        implications,
+                        type_context,
+                        context,
+                        class_context,
+                        None,
+                        &decl1,
+                    );
+                    decls.push(decl1);
+                    register_declaration(
+                        common_kinds,
+                        implications,
+                        type_context,
+                        context,
+                        class_context,
+                        None,
+                        &decl2,
+                    );
+                    decls.push(decl2);
+                    decls
+                }
+            })
+        })
+    })?;
+    Ok(core::Module { decls })
+}
+
+pub fn register_from_import(
+    common_kinds: &CommonKinds,
+    implications: &mut Vec<Implication>,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &mut HashMap<String, core::Signature>,
+    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
+    modules: &Modules<core::Module>,
+    module_id: ModuleId,
+    names: &syntax::Names,
+) {
+    let module = modules.lookup(module_id);
+
+    let should_import = |expected_name: &str| -> bool {
+        match names {
+            syntax::Names::All => true,
+            syntax::Names::Names(names) => names.iter().any(|name| name.item == expected_name),
+        }
+    };
+
+    for decl in &module.decls {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                register_builtin_type(&mut self.type_context, name, kind);
+                if should_import(name) {
+                    register_builtin_type(type_context, name, kind);
+                }
             }
             core::Declaration::Definition { name, sig, .. } => {
-                register_definition(&mut self.context, name, sig)
+                if should_import(name) {
+                    register_definition(context, name, sig);
+                }
             }
             core::Declaration::Module { name, decls, .. } => {
-                register_module(self.common_kinds, &mut self.context, name, decls)
+                if should_import(name) {
+                    register_module(common_kinds, context, name, decls);
+                }
             }
             core::Declaration::TypeAlias { name, args, body } => {
-                register_type_alias(name, args, body)
+                if should_import(name) {
+                    register_type_alias(name, args, body);
+                }
             }
-            core::Declaration::Class(decl) => register_class(
-                self.common_kinds,
-                &mut self.type_context,
-                &mut self.implications,
-                &mut self.context,
-                &mut self.class_context,
-                decl,
-            ),
+            core::Declaration::Class(class_decl) => {
+                if should_import(class_decl.name.as_ref()) {
+                    register_class(
+                        common_kinds,
+                        type_context,
+                        implications,
+                        context,
+                        class_context,
+                        class_decl,
+                    );
+                }
+            }
             core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
@@ -502,714 +559,704 @@ impl<'modules> Typechecker<'modules> {
                 head,
                 evidence,
                 ..
-            } => register_instance(
-                &mut self.implications,
-                module_id,
-                ty_vars,
-                assumes,
-                head,
-                evidence.clone(),
-            ),
+            } => {
+                register_instance(
+                    implications,
+                    Some(module_id),
+                    ty_vars,
+                    assumes,
+                    head,
+                    evidence.clone(),
+                );
+            }
         }
     }
+}
 
-    pub fn check_module(&mut self, module: &syntax::Module) -> Result<core::Module, TypeError> {
-        let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
-            acc.and_then(|mut decls| {
-                self.check_declaration(decl)
-                    .map(|checked_decls| match checked_decls {
-                        Declarations::Zero => decls,
-                        Declarations::One(decl) => {
-                            self.register_declaration(None, &decl);
-                            decls.push(decl);
-                            decls
-                        }
-                        Declarations::Two(decl1, decl2) => {
-                            self.register_declaration(None, &decl1);
-                            decls.push(decl1);
-                            self.register_declaration(None, &decl2);
-                            decls.push(decl2);
-                            decls
-                        }
-                    })
+fn check_definition(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &[Implication],
+    evidence: &mut Evidence,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &mut HashMap<String, core::Signature>,
+    bound_vars: &mut BoundVars<core::Type>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
+    source: &Source,
+    name: &str,
+    ty: &syntax::Type<Rc<str>>,
+    args: &[Spanned<syntax::Pattern>],
+    body: &Spanned<syntax::Expr>,
+) -> Result<core::Declaration, TypeError> {
+    let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
+        let mut seen_names: HashSet<&str> = HashSet::new();
+        ty.iter_vars()
+            .filter_map(|name| {
+                if !seen_names.contains(name.as_ref()) {
+                    seen_names.insert(name);
+                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                } else {
+                    None
+                }
             })
-        })?;
-        Ok(core::Module { decls })
+            .collect()
+    };
+
+    bound_tyvars.insert(&ty_var_kinds);
+
+    let ty = check_kind(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+        source,
+        // TODO: make `ty` `Spanned` and use its position here.
+        None,
+        ty,
+        &Kind::Type,
+    )?;
+
+    let _ = context.insert(
+        name.to_string(),
+        core::Signature::TypeSig(core::TypeSig::new(ty_var_kinds.clone(), ty.clone())),
+    );
+
+    let (constraints, ty) = ty.unwrap_constraints();
+    for constraint in constraints {
+        evidence.assume(
+            /*
+            TODO: use the constraint's textual position. unwrap constraints before
+            type checking to get those positions.
+            */
+            0,
+            evidence::Constraint::from_type(constraint),
+        );
     }
 
-    pub fn register_from_import(&mut self, module_id: ModuleId, names: &syntax::Names) {
-        let module = self.modules.lookup(module_id);
+    let arg_tys: Vec<type_inference::InferredPattern> = args
+        .iter()
+        .map(|arg| infer_pattern(common_kinds, type_solutions, evidence, arg))
+        .collect();
+    let out_ty = core::Type::Meta(Kind::Type, type_solutions.fresh_meta());
 
-        let should_import = |expected_name: &str| -> bool {
-            match names {
-                syntax::Names::All => true,
-                syntax::Names::Names(names) => names.iter().any(|name| name.item == expected_name),
+    type_inference::unify(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+        type_solutions,
+        source,
+        None,
+        ty,
+        &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
+            core::Type::mk_arrow(common_kinds, &el.ty(common_kinds), &acc)
+        }),
+    )?;
+
+    let arg_bound_vars = arg_tys
+        .iter()
+        .flat_map(|arg_ty| arg_ty.names().into_iter())
+        .collect::<Vec<_>>();
+    bound_vars.insert(&arg_bound_vars);
+    let body = type_inference::check(
+        &mut type_inference::InferenceContext {
+            common_kinds,
+            modules: module_context,
+            types: type_context,
+            type_variables: bound_tyvars,
+            kind_solutions,
+            type_solutions,
+            type_signatures: context,
+            variables: bound_vars,
+            evidence,
+            source,
+        },
+        body,
+        &out_ty,
+    )?;
+    bound_vars.delete(arg_bound_vars.len());
+
+    let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
+        let pattern = arg_ty.pattern();
+        match &pattern {
+            core::Pattern::Char(_)
+            | core::Pattern::Int(_)
+            | core::Pattern::String(_)
+            | core::Pattern::Record { .. }
+            | core::Pattern::Variant { .. } => core::Expr::mk_lam(
+                true,
+                core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
+            ),
+            core::Pattern::Name => core::Expr::mk_lam(true, body),
+            core::Pattern::Wildcard => core::Expr::mk_lam(false, body),
+        }
+    });
+
+    let (body, sig) = generalise(
+        common_kinds,
+        type_context,
+        kind_solutions,
+        type_solutions,
+        implications,
+        bound_tyvars,
+        evidence,
+        source,
+        body,
+        ty.clone(),
+    )?;
+    *evidence = Evidence::new();
+
+    bound_tyvars.delete(ty_var_kinds.len());
+
+    context.remove(name);
+
+    Ok(core::Declaration::Definition {
+        name: name.to_string(),
+        sig,
+        body: Rc::new(body),
+    })
+}
+
+fn check_class_member(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    source: &Source,
+    class_args_kinds: &[(Rc<str>, Kind)],
+    name: &str,
+    ty: &syntax::Type<Rc<str>>,
+) -> Result<core::ClassMember, TypeError> {
+    let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
+        let mut seen_names: HashSet<&str> = class_args_kinds
+            .iter()
+            .map(|(name, _)| name.as_ref())
+            .collect();
+        ty.iter_vars()
+            .filter_map(|name| {
+                if !seen_names.contains(name.as_ref()) {
+                    seen_names.insert(name);
+                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+
+    bound_tyvars.insert(&ty_var_kinds);
+    let ty = check_kind(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+        source,
+        // TODO: make `ty` `Spanned` and use its position here.
+        None,
+        ty,
+        &Kind::Type,
+    )?;
+    bound_tyvars.delete(ty_var_kinds.len());
+
+    let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
+        .into_iter()
+        .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+        .collect();
+    let sig = core::TypeSig::new(ty_vars, type_solutions.zonk(kind_solutions, ty));
+    Ok(core::ClassMember {
+        name: name.to_string(),
+        sig,
+    })
+}
+
+fn check_class(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    source: &Source,
+    supers: &[Spanned<syntax::Type<Rc<str>>>],
+    name: &Rc<str>,
+    args: &[Spanned<Rc<str>>],
+    members: &[(String, syntax::Type<Rc<str>>)],
+) -> Result<core::Declaration, TypeError> {
+    let args_kinds: Vec<(Rc<str>, Kind)> = {
+        let mut seen_names: HashSet<&str> = HashSet::new();
+        args.iter()
+            .map(|arg| {
+                if !seen_names.contains(arg.item.as_ref()) {
+                    seen_names.insert(arg.item.as_ref());
+                    Ok((arg.item.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                } else {
+                    Err(TypeError::DuplicateClassArgument {
+                        source: source.clone(),
+                        pos: arg.pos,
+                    })
+                }
+            })
+            .collect::<Result<_, _>>()
+    }?;
+
+    bound_tyvars.insert(&args_kinds);
+
+    let supers = supers
+        .iter()
+        .map(|superclass| {
+            check_kind(
+                common_kinds,
+                type_context,
+                bound_tyvars,
+                kind_solutions,
+                source,
+                Some(superclass.pos),
+                &superclass.item,
+                &Kind::Constraint,
+            )
+        })
+        .collect::<Result<_, _>>()?;
+
+    let members = members
+        .iter()
+        .map(|(member_name, member_type)| {
+            check_class_member(
+                common_kinds,
+                kind_solutions,
+                type_solutions,
+                type_context,
+                bound_tyvars,
+                source,
+                &args_kinds,
+                member_name,
+                member_type,
+            )
+        })
+        .collect::<Result<_, _>>()?;
+
+    bound_tyvars.delete(args_kinds.len());
+
+    Ok(core::Declaration::Class(core::ClassDeclaration {
+        supers,
+        name: name.clone(),
+        args: args_kinds
+            .into_iter()
+            .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+            .collect::<Vec<(Rc<str>, Kind)>>(),
+        members,
+    }))
+}
+
+fn check_instance(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &[Implication],
+    evidence: &mut Evidence,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &HashMap<String, core::Signature>,
+    class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
+    bound_vars: &mut BoundVars<core::Type>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
+    source: &Source,
+    assumes: &[Spanned<syntax::Type<Rc<str>>>],
+    name: &Spanned<Rc<str>>,
+    args: &[Spanned<syntax::Type<Rc<str>>>],
+    members: &[syntax::InstanceMember],
+) -> Result<(core::Declaration, core::Declaration), TypeError> {
+    let evidence_name: Rc<str> = {
+        let mut buffer = String::new();
+
+        if !assumes.is_empty() {
+            let mut assumes = assumes.iter();
+            if let Some(assume) = assumes.next() {
+                buffer.push_str(&assume.item.render());
             }
-        };
+            for assume in assumes {
+                buffer.push(',');
+                buffer.push_str(&assume.item.render());
+            }
+            buffer.push_str("=>");
+        }
+        {
+            buffer.push_str(
+                args.iter()
+                    .fold(syntax::Type::Name(name.item.clone()), |acc, arg| {
+                        syntax::Type::mk_app(acc, arg.item.clone())
+                    })
+                    .render()
+                    .as_str(),
+            );
+        }
 
-        for decl in &module.decls {
-            match decl {
-                core::Declaration::BuiltinType { name, kind } => {
-                    if should_import(name) {
-                        register_builtin_type(&mut self.type_context, name, kind);
-                    }
+        Rc::from(buffer)
+    };
+
+    let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
+        None => Err(TypeError::NoSuchClass {
+            source: source.clone(),
+            pos: name.pos,
+        }),
+        Some(class_decl) => Ok(class_decl.clone()),
+    }?;
+
+    let head = args
+        .iter()
+        .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
+            syntax::Type::mk_app(acc, el.item.clone())
+        });
+
+    let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
+        let mut seen_names: HashSet<&str> = HashSet::new();
+        args.iter()
+            .flat_map(|arg| arg.item.iter_vars())
+            .filter_map(|name| {
+                if !seen_names.contains(name.as_ref()) {
+                    seen_names.insert(name);
+                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                } else {
+                    None
                 }
-                core::Declaration::Definition { name, sig, .. } => {
-                    if should_import(name) {
-                        register_definition(&mut self.context, name, sig);
-                    }
+            })
+            .collect()
+    };
+
+    bound_tyvars.insert(&ty_var_kinds);
+
+    let args: Vec<core::Type> = args
+        .iter()
+        .map(|arg| {
+            let res = infer_kind(
+                common_kinds,
+                type_context,
+                bound_tyvars,
+                kind_solutions,
+                source,
+                arg.pos,
+                &arg.item,
+            )?;
+            Ok(res.0)
+        })
+        .collect::<Result<_, TypeError>>()?;
+
+    let assumes: Vec<core::Type> = assumes
+        .iter()
+        .map(|assume| {
+            let constraint = check_kind(
+                common_kinds,
+                type_context,
+                bound_tyvars,
+                kind_solutions,
+                source,
+                Some(assume.pos),
+                &assume.item,
+                &Kind::Constraint,
+            )?;
+            let _ = evidence.assume(assume.pos, evidence::Constraint::from_type(&constraint));
+            Ok(constraint)
+        })
+        .collect::<Result<_, TypeError>>()?;
+
+    // locate evidence for superclasses
+    let superclass_constructors: Vec<core::Expr> = {
+        let mut superclass_constructors = Vec::new();
+
+        for superclass in &class_decl.supers {
+            let superclass = superclass.instantiate_many(&args);
+
+            match evidence::solver::solve_constraint(
+                &mut solver::Context {
+                    common_kinds,
+                    types: type_context,
+                    kind_solutions,
+                    type_solutions,
+                    implications,
+                    type_variables: bound_tyvars,
+                    evidence,
+                    source,
+                },
+                name.pos,
+                &Some(SolveConstraintContext {
+                    constraint: fill_ty_names(bound_tyvars, superclass.to_syntax()),
+                }),
+                &evidence::Constraint::from_type(&superclass),
+            )
+            .and_then(|evidence_expr| {
+                abstract_evidence(
+                    common_kinds,
+                    type_context,
+                    kind_solutions,
+                    type_solutions,
+                    implications,
+                    bound_tyvars,
+                    evidence,
+                    source,
+                    evidence_expr.as_ref().clone(),
+                )
+            }) {
+                Err(err) => {
+                    return Err(err);
                 }
-                core::Declaration::Module { name, decls, .. } => {
-                    if should_import(name) {
-                        register_module(self.common_kinds, &mut self.context, name, decls);
-                    }
+                Ok((evidence, _)) => {
+                    superclass_constructors.push(evidence);
                 }
-                core::Declaration::TypeAlias { name, args, body } => {
-                    if should_import(name) {
-                        register_type_alias(name, args, body);
+            }
+        }
+        superclass_constructors
+    };
+
+    let instantiated_class_members: Vec<core::ClassMember> = class_decl
+        .members
+        .iter()
+        .map(|class_member| core::ClassMember {
+            name: class_member.name.clone(),
+            sig: class_member.sig.clone().instantiate_many(&args),
+        })
+        .collect();
+
+    let head = check_kind(
+        common_kinds,
+        type_context,
+        bound_tyvars,
+        kind_solutions,
+        source,
+        Some(name.pos),
+        &head,
+        &Kind::Constraint,
+    )?;
+
+    // type check members
+    let mut checked_members = Vec::with_capacity(members.len());
+    for member in members {
+        match instantiated_class_members
+            .iter()
+            .find(|class_member| class_member.name == member.name.item)
+        {
+            None => {
+                return Err(TypeError::NotAMember {
+                    source: source.clone(),
+                    pos: member.name.pos,
+                    cls: name.item.clone(),
+                })
+            }
+            Some(member_type) => {
+                bound_tyvars.insert(&member_type.sig.ty_vars);
+
+                match {
+                    let member_body = type_inference::check(
+                        &mut type_inference::InferenceContext {
+                            common_kinds,
+                            modules: module_context,
+                            types: type_context,
+                            type_variables: bound_tyvars,
+                            kind_solutions,
+                            type_solutions,
+                            type_signatures: context,
+                            variables: bound_vars,
+                            evidence,
+                            source,
+                        },
+                        &Spanned {
+                            pos: member.name.pos,
+                            item: syntax::Expr::mk_lam(member.args.clone(), member.body.clone()),
+                        },
+                        &member_type.sig.body,
+                    )?;
+                    generalise(
+                        common_kinds,
+                        type_context,
+                        kind_solutions,
+                        type_solutions,
+                        implications,
+                        bound_tyvars,
+                        evidence,
+                        source,
+                        member_body,
+                        member_type.sig.body.clone(),
+                    )
+                } {
+                    Err(err) => return Err(err),
+                    Ok((member_body, _)) => {
+                        bound_tyvars.delete(member_type.sig.ty_vars.len());
+                        checked_members.push(member_body);
                     }
-                }
-                core::Declaration::Class(class_decl) => {
-                    if should_import(class_decl.name.as_ref()) {
-                        register_class(
-                            self.common_kinds,
-                            &mut self.type_context,
-                            &mut self.implications,
-                            &mut self.context,
-                            &mut self.class_context,
-                            class_decl,
-                        );
-                    }
-                }
-                core::Declaration::Evidence { .. } => {}
-                core::Declaration::Instance {
+                };
+            }
+        }
+    }
+    *evidence = Evidence::new();
+
+    bound_tyvars.delete(ty_var_kinds.len());
+
+    let ty_vars = ty_var_kinds
+        .into_iter()
+        .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+        .collect();
+
+    let evidence = {
+        let mut dictionary: Vec<core::Expr> = superclass_constructors;
+        dictionary.extend(checked_members.into_iter());
+
+        for (ix, _assume) in assumes.iter().enumerate().rev() {
+            for item in &mut dictionary {
+                *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
+            }
+        }
+
+        let mut evidence = core::Expr::mk_record(
+            dictionary
+                .into_iter()
+                .enumerate()
+                .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
+                .collect(),
+            None,
+        );
+
+        for _assume in assumes.iter() {
+            evidence = core::Expr::mk_lam(true, evidence);
+        }
+
+        Rc::new(evidence)
+    };
+
+    let evidence_decl = core::Declaration::Evidence {
+        name: evidence_name.clone(),
+        body: evidence,
+    };
+    let instance_decl = core::Declaration::Instance {
+        ty_vars,
+        assumes: assumes
+            .into_iter()
+            .map(|assume| type_solutions.zonk(kind_solutions, assume))
+            .collect(),
+        head: type_solutions.zonk(kind_solutions, head),
+        evidence: evidence_name,
+    };
+
+    Ok((evidence_decl, instance_decl))
+}
+
+fn check_declaration(
+    common_kinds: &CommonKinds,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &mut Vec<Implication>,
+    evidence: &mut Evidence,
+    type_context: &mut HashMap<Rc<str>, Kind>,
+    context: &mut HashMap<String, core::Signature>,
+    class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
+    bound_vars: &mut BoundVars<core::Type>,
+    bound_tyvars: &mut BoundVars<Kind>,
+    modules: &Modules<core::Module>,
+    module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
+    source: &Source,
+    decl: &syntax::Spanned<syntax::Declaration>,
+) -> Result<Declarations, TypeError> {
+    match &decl.item {
+        syntax::Declaration::Definition {
+            name,
+            ty,
+            args,
+            body,
+        } => check_definition(
+            common_kinds,
+            kind_solutions,
+            type_solutions,
+            implications,
+            evidence,
+            type_context,
+            context,
+            bound_vars,
+            bound_tyvars,
+            module_context,
+            source,
+            name,
+            ty,
+            args,
+            body,
+        )
+        .map(Declarations::One),
+        syntax::Declaration::TypeAlias { name, args, body } => {
+            todo!("check type alias {:?}", (name, args, body))
+        }
+
+        syntax::Declaration::Import { resolved, .. }
+        | syntax::Declaration::FromImport { resolved, .. } => {
+            let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
+
+            let module = modules.lookup(module_id);
+            {
+                let signatures = module.get_signatures(common_kinds);
+                module_context.insert(module_id, signatures);
+            }
+            module.decls.iter().for_each(|decl| {
+                if let core::Declaration::Instance {
                     ty_vars,
                     assumes,
                     head,
                     evidence,
                     ..
-                } => {
+                } = decl
+                {
                     register_instance(
-                        &mut self.implications,
+                        implications,
                         Some(module_id),
                         ty_vars,
                         assumes,
                         head,
                         evidence.clone(),
-                    );
+                    )
                 }
-            }
-        }
-    }
-
-    fn check_definition(
-        &mut self,
-        name: &str,
-        ty: &syntax::Type<Rc<str>>,
-        args: &[Spanned<syntax::Pattern>],
-        body: &Spanned<syntax::Expr>,
-    ) -> Result<core::Declaration, TypeError> {
-        let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
-            let mut seen_names: HashSet<&str> = HashSet::new();
-            ty.iter_vars()
-                .filter_map(|name| {
-                    if !seen_names.contains(name.as_ref()) {
-                        seen_names.insert(name);
-                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        };
-
-        self.bound_tyvars.insert(&ty_var_kinds);
-
-        let ty = check_kind(
-            self.common_kinds,
-            self.type_context,
-            self.bound_tyvars,
-            &mut self.kind_solutions,
-            &self.source,
-            // TODO: make `ty` `Spanned` and use its position here.
-            self.position,
-            ty,
-            &Kind::Type,
-        )?;
-
-        let _ = self.context.insert(
-            name.to_string(),
-            core::Signature::TypeSig(core::TypeSig::new(ty_var_kinds.clone(), ty.clone())),
-        );
-
-        let (constraints, ty) = ty.unwrap_constraints();
-        for constraint in constraints {
-            self.evidence.assume(
-                /*
-                TODO: use the constraint's textual position. unwrap constraints before
-                type checking to get those positions.
-                */
-                0,
-                evidence::Constraint::from_type(constraint),
-            );
-        }
-
-        let arg_tys: Vec<type_inference::InferredPattern> = args
-            .iter()
-            .map(|arg| {
-                infer_pattern(
-                    self.common_kinds,
-                    self.type_solutions,
-                    &mut self.evidence,
-                    arg,
-                )
-            })
-            .collect();
-        let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
-
-        let common_kinds = &self.common_kinds;
-        type_inference::unify(
-            self.common_kinds,
-            self.type_context,
-            self.bound_tyvars,
-            &mut self.kind_solutions,
-            &mut self.type_solutions,
-            &self.source,
-            None,
-            ty,
-            &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
-                core::Type::mk_arrow(common_kinds, &el.ty(common_kinds), &acc)
-            }),
-        )?;
-
-        let arg_bound_vars = arg_tys
-            .iter()
-            .flat_map(|arg_ty| arg_ty.names().into_iter())
-            .collect::<Vec<_>>();
-        self.bound_vars.insert(&arg_bound_vars);
-        let body = type_inference::check(
-            &mut type_inference::InferenceContext {
-                common_kinds: self.common_kinds,
-                modules: &self.module_context,
-                types: self.type_context,
-                type_variables: self.bound_tyvars,
-                kind_solutions: &mut self.kind_solutions,
-                type_solutions: &mut self.type_solutions,
-                type_signatures: &self.context,
-                variables: &mut self.bound_vars,
-                evidence: &mut self.evidence,
-                source: &self.source,
-            },
-            body,
-            &out_ty,
-        )?;
-        self.bound_vars.delete(arg_bound_vars.len());
-
-        let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
-            let pattern = arg_ty.pattern();
-            match &pattern {
-                core::Pattern::Char(_)
-                | core::Pattern::Int(_)
-                | core::Pattern::String(_)
-                | core::Pattern::Record { .. }
-                | core::Pattern::Variant { .. } => core::Expr::mk_lam(
-                    true,
-                    core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
-                ),
-                core::Pattern::Name => core::Expr::mk_lam(true, body),
-                core::Pattern::Wildcard => core::Expr::mk_lam(false, body),
-            }
-        });
-
-        let (body, sig) = generalise(
-            self.common_kinds,
-            self.type_context,
-            self.kind_solutions,
-            self.type_solutions,
-            &self.implications,
-            self.bound_tyvars,
-            &mut self.evidence,
-            &self.source,
-            body,
-            ty.clone(),
-        )?;
-        self.evidence = Evidence::new();
-
-        self.bound_tyvars.delete(ty_var_kinds.len());
-
-        self.context.remove(name);
-
-        Ok(core::Declaration::Definition {
-            name: name.to_string(),
-            sig,
-            body: Rc::new(body),
-        })
-    }
-
-    fn check_class_member(
-        &mut self,
-        class_args_kinds: &[(Rc<str>, Kind)],
-        name: &str,
-        ty: &syntax::Type<Rc<str>>,
-    ) -> Result<core::ClassMember, TypeError> {
-        let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
-            let mut seen_names: HashSet<&str> = class_args_kinds
-                .iter()
-                .map(|(name, _)| name.as_ref())
-                .collect();
-            ty.iter_vars()
-                .filter_map(|name| {
-                    if !seen_names.contains(name.as_ref()) {
-                        seen_names.insert(name);
-                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        };
-
-        self.bound_tyvars.insert(&ty_var_kinds);
-        let ty = check_kind(
-            self.common_kinds,
-            self.type_context,
-            self.bound_tyvars,
-            &mut self.kind_solutions,
-            &self.source,
-            // TODO: make `ty` `Spanned` and use its position here.
-            self.position,
-            ty,
-            &Kind::Type,
-        )?;
-        self.bound_tyvars.delete(ty_var_kinds.len());
-
-        let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
-            .into_iter()
-            .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
-            .collect();
-        let sig = core::TypeSig::new(ty_vars, self.type_solutions.zonk(self.kind_solutions, ty));
-        Ok(core::ClassMember {
-            name: name.to_string(),
-            sig,
-        })
-    }
-
-    fn check_class(
-        &mut self,
-        supers: &[Spanned<syntax::Type<Rc<str>>>],
-        name: &Rc<str>,
-        args: &[Spanned<Rc<str>>],
-        members: &[(String, syntax::Type<Rc<str>>)],
-    ) -> Result<core::Declaration, TypeError> {
-        let args_kinds: Vec<(Rc<str>, Kind)> = {
-            let mut seen_names: HashSet<&str> = HashSet::new();
-            args.iter()
-                .map(|arg| {
-                    if !seen_names.contains(arg.item.as_ref()) {
-                        seen_names.insert(arg.item.as_ref());
-                        Ok((
-                            arg.item.clone(),
-                            Kind::Meta(self.kind_solutions.fresh_meta()),
-                        ))
-                    } else {
-                        Err(TypeError::DuplicateClassArgument {
-                            source: self.source.clone(),
-                            pos: arg.pos,
-                        })
-                    }
-                })
-                .collect::<Result<_, _>>()
-        }?;
-
-        self.bound_tyvars.insert(&args_kinds);
-
-        let supers = supers
-            .iter()
-            .map(|superclass| {
-                check_kind(
-                    self.common_kinds,
-                    self.type_context,
-                    self.bound_tyvars,
-                    &mut self.kind_solutions,
-                    &self.source,
-                    Some(superclass.pos),
-                    &superclass.item,
-                    &Kind::Constraint,
-                )
-            })
-            .collect::<Result<_, _>>()?;
-
-        let members = members
-            .iter()
-            .map(|(member_name, member_type)| {
-                self.check_class_member(&args_kinds, member_name, member_type)
-            })
-            .collect::<Result<_, _>>()?;
-
-        self.bound_tyvars.delete(args_kinds.len());
-
-        Ok(core::Declaration::Class(core::ClassDeclaration {
-            supers,
-            name: name.clone(),
-            args: args_kinds
-                .into_iter()
-                .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
-                .collect::<Vec<(Rc<str>, Kind)>>(),
-            members,
-        }))
-    }
-
-    fn check_instance(
-        &mut self,
-        assumes: &[Spanned<syntax::Type<Rc<str>>>],
-        name: &Spanned<Rc<str>>,
-        args: &[Spanned<syntax::Type<Rc<str>>>],
-        members: &[syntax::InstanceMember],
-    ) -> Result<(core::Declaration, core::Declaration), TypeError> {
-        let evidence_name: Rc<str> = {
-            let mut buffer = String::new();
-
-            if !assumes.is_empty() {
-                let mut assumes = assumes.iter();
-                if let Some(assume) = assumes.next() {
-                    buffer.push_str(&assume.item.render());
-                }
-                for assume in assumes {
-                    buffer.push(',');
-                    buffer.push_str(&assume.item.render());
-                }
-                buffer.push_str("=>");
-            }
-            {
-                buffer.push_str(
-                    args.iter()
-                        .fold(syntax::Type::Name(name.item.clone()), |acc, arg| {
-                            syntax::Type::mk_app(acc, arg.item.clone())
-                        })
-                        .render()
-                        .as_str(),
-                );
-            }
-
-            Rc::from(buffer)
-        };
-
-        let class_context = &self.class_context;
-        let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
-            None => Err(TypeError::NoSuchClass {
-                source: self.source.clone(),
-                pos: name.pos,
-            }),
-            Some(class_decl) => Ok(class_decl.clone()),
-        }?;
-
-        let head = args
-            .iter()
-            .fold(syntax::Type::Name(name.item.clone()), |acc, el| {
-                syntax::Type::mk_app(acc, el.item.clone())
             });
 
-        let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
-            let mut seen_names: HashSet<&str> = HashSet::new();
-            args.iter()
-                .flat_map(|arg| arg.item.iter_vars())
-                .filter_map(|name| {
-                    if !seen_names.contains(name.as_ref()) {
-                        seen_names.insert(name);
-                        Some((name.clone(), Kind::Meta(self.kind_solutions.fresh_meta())))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        };
-
-        self.bound_tyvars.insert(&ty_var_kinds);
-
-        let args: Vec<core::Type> = args
-            .iter()
-            .map(|arg| {
-                let res = infer_kind(
-                    self.common_kinds,
-                    self.type_context,
-                    self.bound_tyvars,
-                    &mut self.kind_solutions,
-                    &self.source,
-                    arg.pos,
-                    &arg.item,
-                )?;
-                Ok(res.0)
-            })
-            .collect::<Result<_, TypeError>>()?;
-
-        let assumes: Vec<core::Type> = assumes
-            .iter()
-            .map(|assume| {
-                let constraint = check_kind(
-                    self.common_kinds,
-                    self.type_context,
-                    self.bound_tyvars,
-                    &mut self.kind_solutions,
-                    &self.source,
-                    Some(assume.pos),
-                    &assume.item,
-                    &Kind::Constraint,
-                )?;
-                let _ = self
-                    .evidence
-                    .assume(assume.pos, evidence::Constraint::from_type(&constraint));
-                Ok(constraint)
-            })
-            .collect::<Result<_, TypeError>>()?;
-
-        // locate evidence for superclasses
-        let superclass_constructors: Vec<core::Expr> = {
-            let mut superclass_constructors = Vec::new();
-
-            for superclass in &class_decl.supers {
-                let superclass = superclass.instantiate_many(&args);
-
-                match evidence::solver::solve_constraint(
-                    &mut solver::Context {
-                        common_kinds: self.common_kinds,
-                        types: self.type_context,
-                        kind_solutions: self.kind_solutions,
-                        type_solutions: self.type_solutions,
-                        implications: &self.implications,
-                        type_variables: self.bound_tyvars,
-                        evidence: &mut self.evidence,
-                        source: &self.source,
-                    },
-                    name.pos,
-                    &Some(SolveConstraintContext {
-                        constraint: fill_ty_names(self.bound_tyvars, superclass.to_syntax()),
-                    }),
-                    &evidence::Constraint::from_type(&superclass),
-                )
-                .and_then(|evidence| {
-                    abstract_evidence(
-                        self.common_kinds,
-                        self.type_context,
-                        self.kind_solutions,
-                        self.type_solutions,
-                        &self.implications,
-                        self.bound_tyvars,
-                        &mut self.evidence,
-                        &self.source,
-                        evidence.as_ref().clone(),
-                    )
-                }) {
-                    Err(err) => {
-                        return Err(err);
-                    }
-                    Ok((evidence, _)) => {
-                        superclass_constructors.push(evidence);
-                    }
-                }
-            }
-            superclass_constructors
-        };
-
-        let instantiated_class_members: Vec<core::ClassMember> = class_decl
-            .members
-            .iter()
-            .map(|class_member| core::ClassMember {
-                name: class_member.name.clone(),
-                sig: class_member.sig.clone().instantiate_many(&args),
-            })
-            .collect();
-
-        let head = check_kind(
-            self.common_kinds,
-            self.type_context,
-            self.bound_tyvars,
-            &mut self.kind_solutions,
-            &self.source,
-            Some(name.pos),
-            &head,
-            &Kind::Constraint,
-        )?;
-
-        // type check members
-        let mut checked_members = Vec::with_capacity(members.len());
-        for member in members {
-            match instantiated_class_members
-                .iter()
-                .find(|class_member| class_member.name == member.name.item)
-            {
-                None => {
-                    return Err(TypeError::NotAMember {
-                        source: self.source.clone(),
-                        pos: member.name.pos,
-                        cls: name.item.clone(),
-                    })
-                }
-                Some(member_type) => {
-                    self.bound_tyvars.insert(&member_type.sig.ty_vars);
-
-                    match {
-                        let member_body = type_inference::check(
-                            &mut type_inference::InferenceContext {
-                                common_kinds: self.common_kinds,
-                                modules: &self.module_context,
-                                types: self.type_context,
-                                type_variables: self.bound_tyvars,
-                                kind_solutions: &mut self.kind_solutions,
-                                type_solutions: &mut self.type_solutions,
-                                type_signatures: &self.context,
-                                variables: &mut self.bound_vars,
-                                evidence: &mut self.evidence,
-                                source: &self.source,
-                            },
-                            &Spanned {
-                                pos: member.name.pos,
-                                item: syntax::Expr::mk_lam(
-                                    member.args.clone(),
-                                    member.body.clone(),
-                                ),
-                            },
-                            &member_type.sig.body,
-                        )?;
-                        generalise(
-                            self.common_kinds,
-                            self.type_context,
-                            self.kind_solutions,
-                            self.type_solutions,
-                            &self.implications,
-                            self.bound_tyvars,
-                            &mut self.evidence,
-                            &self.source,
-                            member_body,
-                            member_type.sig.body.clone(),
-                        )
-                    } {
-                        Err(err) => return Err(err),
-                        Ok((member_body, _)) => {
-                            self.bound_tyvars.delete(member_type.sig.ty_vars.len());
-                            checked_members.push(member_body);
-                        }
-                    };
-                }
-            }
+            Ok(Declarations::Zero)
         }
-        self.evidence = Evidence::new();
 
-        self.bound_tyvars.delete(ty_var_kinds.len());
-
-        let ty_vars = ty_var_kinds
-            .into_iter()
-            .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
-            .collect();
-
-        let evidence = {
-            let mut dictionary: Vec<core::Expr> = superclass_constructors;
-            dictionary.extend(checked_members.into_iter());
-
-            for (ix, _assume) in assumes.iter().enumerate().rev() {
-                for item in &mut dictionary {
-                    *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
-                }
-            }
-
-            let mut evidence = core::Expr::mk_record(
-                dictionary
-                    .into_iter()
-                    .enumerate()
-                    .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
-                    .collect(),
-                None,
-            );
-
-            for _assume in assumes.iter() {
-                evidence = core::Expr::mk_lam(true, evidence);
-            }
-
-            Rc::new(evidence)
-        };
-
-        let evidence_decl = core::Declaration::Evidence {
-            name: evidence_name.clone(),
-            body: evidence,
-        };
-        let instance_decl = core::Declaration::Instance {
-            ty_vars,
-            assumes: assumes
-                .into_iter()
-                .map(|assume| self.type_solutions.zonk(self.kind_solutions, assume))
-                .collect(),
-            head: self.type_solutions.zonk(self.kind_solutions, head),
-            evidence: evidence_name,
-        };
-
-        Ok((evidence_decl, instance_decl))
-    }
-
-    fn check_declaration(
-        &mut self,
-        decl: &syntax::Spanned<syntax::Declaration>,
-    ) -> Result<Declarations, TypeError> {
-        match &decl.item {
-            syntax::Declaration::Definition {
-                name,
-                ty,
-                args,
-                body,
-            } => self
-                .check_definition(name, ty, args, body)
-                .map(Declarations::One),
-            syntax::Declaration::TypeAlias { name, args, body } => {
-                todo!("check type alias {:?}", (name, args, body))
-            }
-
-            syntax::Declaration::Import { resolved, .. }
-            | syntax::Declaration::FromImport { resolved, .. } => {
-                let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
-
-                let module = self.modules.lookup(module_id);
-                {
-                    let signatures = module.get_signatures(self.common_kinds);
-                    self.module_context.insert(module_id, signatures);
-                }
-                module.decls.iter().for_each(|decl| {
-                    if let core::Declaration::Instance {
-                        ty_vars,
-                        assumes,
-                        head,
-                        evidence,
-                        ..
-                    } = decl
-                    {
-                        register_instance(
-                            &mut self.implications,
-                            Some(module_id),
-                            ty_vars,
-                            assumes,
-                            head,
-                            evidence.clone(),
-                        )
-                    }
-                });
-
-                Ok(Declarations::Zero)
-            }
-
-            syntax::Declaration::Class {
-                supers,
-                name,
-                args,
-                members,
-            } => self
-                .check_class(supers, name, args, members)
-                .map(Declarations::One),
-            syntax::Declaration::Instance {
-                assumes,
-                name,
-                args,
-                members,
-            } => self
-                .check_instance(assumes, name, args, members)
-                .map(|(a, b)| Declarations::Two(a, b)),
-        }
+        syntax::Declaration::Class {
+            supers,
+            name,
+            args,
+            members,
+        } => check_class(
+            common_kinds,
+            kind_solutions,
+            type_solutions,
+            type_context,
+            bound_tyvars,
+            source,
+            supers,
+            name,
+            args,
+            members,
+        )
+        .map(Declarations::One),
+        syntax::Declaration::Instance {
+            assumes,
+            name,
+            args,
+            members,
+        } => check_instance(
+            common_kinds,
+            kind_solutions,
+            type_solutions,
+            implications,
+            evidence,
+            type_context,
+            context,
+            class_context,
+            bound_vars,
+            bound_tyvars,
+            module_context,
+            source,
+            assumes,
+            name,
+            args,
+            members,
+        )
+        .map(|(a, b)| Declarations::Two(a, b)),
     }
 }
 

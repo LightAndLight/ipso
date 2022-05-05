@@ -3,7 +3,7 @@ use crate::{
         solver::{self, solve_constraint},
         Constraint, Evidence,
     },
-    register_class, register_instance, Typechecker,
+    register_class, register_instance,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_syntax::kind::Kind;

@@ -3,7 +3,7 @@ use crate::{
         solver::{self, solve_placeholder},
         Constraint,
     },
-    zonk_constraint, BoundVars, Declarations, Typechecker,
+    zonk_constraint, BoundVars, Declarations,
 };
 use ipso_core::{self as core, ClassMember, Placeholder, Signature, TypeSig};
 use ipso_syntax::{kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
@@ -356,7 +356,7 @@ fn check_definition_1() {
 
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         assert_eq!(
-            tc.check_declaration(&decl),
+            check_declaration(&decl),
             Ok(Declarations::One(core::Declaration::Definition {
                 name: String::from("id"),
                 sig: core::TypeSig {
