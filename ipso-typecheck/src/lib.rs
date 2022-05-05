@@ -182,7 +182,7 @@ pub struct SolveConstraintContext {
 #[derive(PartialEq, Eq, Debug)]
 pub enum TypeError {
     TypeError {
-        error: type_inference::InferenceError,
+        error: type_inference::Error,
     },
     DuplicateClassArgument {
         source: Source,
@@ -249,7 +249,7 @@ impl TypeError {
     pub fn message(&self) -> String {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
-                type_inference::InferenceErrorInfo::UnificationError { error } => match error {
+                type_inference::ErrorInfo::UnificationError { error } => match error {
                     type_inference::unification::Error::Mismatch { expected, actual } => format!(
                         "expected type \"{}\", got type \"{}\"",
                         expected.render(),
@@ -266,17 +266,15 @@ impl TypeError {
                     }
                 },
 
-                type_inference::InferenceErrorInfo::NotInScope { .. } => {
+                type_inference::ErrorInfo::NotInScope { .. } => {
                     String::from("variable not in scope")
                 }
-                type_inference::InferenceErrorInfo::DuplicateArgument { .. } => {
+                type_inference::ErrorInfo::DuplicateArgument { .. } => {
                     String::from("duplicate argument")
                 }
-                type_inference::InferenceErrorInfo::RedundantPattern => {
-                    String::from("redundant pattern")
-                }
-                type_inference::InferenceErrorInfo::NotAValue { .. } => String::from("not a value"),
-                type_inference::InferenceErrorInfo::NotAModule => String::from("not a module"),
+                type_inference::ErrorInfo::RedundantPattern => String::from("redundant pattern"),
+                type_inference::ErrorInfo::NotAValue { .. } => String::from("not a value"),
+                type_inference::ErrorInfo::NotAModule => String::from("not a module"),
             },
             TypeError::KindError { error, .. } => render_kind_inference_error(error),
             TypeError::NotInScope { .. } => String::from("not in scope"),
@@ -298,12 +296,12 @@ impl TypeError {
     pub fn addendum(&self) -> Option<String> {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
-                type_inference::InferenceErrorInfo::UnificationError { .. } => None,
-                type_inference::InferenceErrorInfo::NotInScope { .. } => None,
-                type_inference::InferenceErrorInfo::DuplicateArgument { .. } => None,
-                type_inference::InferenceErrorInfo::RedundantPattern { .. } => None,
-                type_inference::InferenceErrorInfo::NotAValue { .. } => None,
-                type_inference::InferenceErrorInfo::NotAModule => None,
+                type_inference::ErrorInfo::UnificationError { .. } => None,
+                type_inference::ErrorInfo::NotInScope { .. } => None,
+                type_inference::ErrorInfo::DuplicateArgument { .. } => None,
+                type_inference::ErrorInfo::RedundantPattern { .. } => None,
+                type_inference::ErrorInfo::NotAValue { .. } => None,
+                type_inference::ErrorInfo::NotAModule => None,
             },
             TypeError::KindError { error, .. } => match error.info {
                 kind_inference::InferenceErrorInfo::NotInScope { .. } => None,
@@ -345,8 +343,8 @@ impl TypeError {
     }
 }
 
-impl From<type_inference::InferenceError> for TypeError {
-    fn from(error: type_inference::InferenceError) -> Self {
+impl From<type_inference::Error> for TypeError {
+    fn from(error: type_inference::Error) -> Self {
         TypeError::TypeError { error }
     }
 }

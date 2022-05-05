@@ -46,7 +46,7 @@ use syntax::{kind::Kind, ModuleId};
 
 /// Type inference error information.
 #[derive(PartialEq, Eq, Debug)]
-pub enum InferenceErrorInfo {
+pub enum ErrorInfo {
     UnificationError { error: unification::Error },
     NotInScope { name: String },
     NotAValue { name: String },
@@ -57,13 +57,13 @@ pub enum InferenceErrorInfo {
 
 /// A type inference error.
 #[derive(PartialEq, Eq, Debug)]
-pub struct InferenceError {
+pub struct Error {
     pub source: Source,
     pub position: Option<usize>,
-    pub info: InferenceErrorInfo,
+    pub info: ErrorInfo,
 }
 
-impl InferenceError {
+impl Error {
     /// Attach a position to an [`InferenceError`].
     pub fn with_position(mut self, position: usize) -> Self {
         self.position = Some(position);
@@ -72,10 +72,10 @@ impl InferenceError {
 
     /// Construct an [`InferenceErrorInfo::NotInScope`].
     pub fn not_in_scope(source: &Source, name: &str) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::NotInScope {
+            info: ErrorInfo::NotInScope {
                 name: String::from(name),
             },
         }
@@ -83,10 +83,10 @@ impl InferenceError {
 
     /// Construct an [`InferenceErrorInfo::NotAValue`].
     pub fn not_a_value(source: &Source, name: &str) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::NotAValue {
+            info: ErrorInfo::NotAValue {
                 name: String::from(name),
             },
         }
@@ -94,34 +94,34 @@ impl InferenceError {
 
     /// Construct an [`InferenceErrorInfo::NotAModule`].
     pub fn not_a_module(source: &Source) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::NotAModule,
+            info: ErrorInfo::NotAModule,
         }
     }
 
     /// Construct an [`InferenceErrorInfo::DuplicateArgument`].
     pub fn duplicate_argument(source: &Source, name: Rc<str>) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::DuplicateArgument { name },
+            info: ErrorInfo::DuplicateArgument { name },
         }
     }
 
     /// Construct an [`InferenceErrorInfo::RedundantPattern`].
     pub fn redundant_pattern(source: &Source) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::RedundantPattern,
+            info: ErrorInfo::RedundantPattern,
         }
     }
 
     /// Construct a [`unification::Error::Occurs`].
     pub fn occurs(source: &Source, meta: Meta, ty: syntax::Type<Rc<str>>) -> Self {
-        InferenceError::unification_error(source, unification::Error::Occurs { meta, ty })
+        Error::unification_error(source, unification::Error::Occurs { meta, ty })
     }
 
     /// Construct a [`unification::Error::Mismatch`].
@@ -130,15 +130,15 @@ impl InferenceError {
         expected: syntax::Type<Rc<str>>,
         actual: syntax::Type<Rc<str>>,
     ) -> Self {
-        InferenceError::unification_error(source, unification::Error::Mismatch { expected, actual })
+        Error::unification_error(source, unification::Error::Mismatch { expected, actual })
     }
 
     /// Lift a [`unification::Error`].
     pub fn unification_error(source: &Source, error: unification::Error) -> Self {
-        InferenceError {
+        Error {
             source: source.clone(),
             position: None,
-            info: InferenceErrorInfo::UnificationError { error },
+            info: ErrorInfo::UnificationError { error },
         }
     }
 }
@@ -304,17 +304,13 @@ pub fn instantiate(
     (expr, ty.clone())
 }
 
-fn check_duplicate_args(
-    source: &Source,
-    args: &[Spanned<syntax::Pattern>],
-) -> Result<(), InferenceError> {
+fn check_duplicate_args(source: &Source, args: &[Spanned<syntax::Pattern>]) -> Result<(), Error> {
     let mut seen: HashSet<&str> = HashSet::new();
     args.iter()
         .flat_map(|arg| arg.item.get_arg_names().into_iter())
         .try_for_each(|arg| {
             if seen.contains(&arg.item.as_ref()) {
-                Err(InferenceError::duplicate_argument(source, arg.item.clone())
-                    .with_position(arg.pos))
+                Err(Error::duplicate_argument(source, arg.item.clone()).with_position(arg.pos))
             } else {
                 seen.insert(&arg.item);
                 Ok(())
@@ -485,7 +481,7 @@ fn check_pattern(
     source: &Source,
     pattern: &Spanned<syntax::Pattern>,
     expected: &Type,
-) -> Result<CheckedPattern, InferenceError> {
+) -> Result<CheckedPattern, Error> {
     let result = infer_pattern(common_kinds, type_solutions, evidence, pattern);
     unify(
         common_kinds,
@@ -547,7 +543,7 @@ pub fn zonk_type_mut(
 pub fn infer(
     ctx: &mut InferenceContext,
     expr: &Spanned<syntax::Expr>,
-) -> Result<(Expr, Type), InferenceError> {
+) -> Result<(Expr, Type), Error> {
     match &expr.item {
         syntax::Expr::Var(name) => match ctx.variables.lookup_name(name) {
             Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
@@ -562,10 +558,10 @@ pub fn infer(
                         type_signature,
                     )),
                     Signature::Module(_) => {
-                        Err(InferenceError::not_a_value(ctx.source, name).with_position(expr.pos))
+                        Err(Error::not_a_value(ctx.source, name).with_position(expr.pos))
                     }
                 },
-                None => Err(InferenceError::not_in_scope(ctx.source, name).with_position(expr.pos)),
+                None => Err(Error::not_in_scope(ctx.source, name).with_position(expr.pos)),
             },
         },
         syntax::Expr::Module { id, path, item } => {
@@ -573,16 +569,18 @@ pub fn infer(
                 source: &Source,
                 definitions: &'a HashMap<String, Signature>,
                 path: &[Spanned<String>],
-            ) -> Result<&'a HashMap<String, Signature>, InferenceError> {
+            ) -> Result<&'a HashMap<String, Signature>, Error> {
                 if path.is_empty() {
                     Ok(definitions)
                 } else {
                     match definitions.get(&path[0].item) {
-                        None => Err(InferenceError::not_in_scope(source, &path[0].item)
-                            .with_position(path[0].pos)),
+                        None => {
+                            Err(Error::not_in_scope(source, &path[0].item)
+                                .with_position(path[0].pos))
+                        }
                         Some(signature) => match signature {
                             Signature::TypeSig(_) => {
-                                Err(InferenceError::not_a_module(source).with_position(path[0].pos))
+                                Err(Error::not_a_module(source).with_position(path[0].pos))
                             }
                             Signature::Module(definitions) => {
                                 lookup_path(source, definitions, &path[1..])
@@ -612,10 +610,7 @@ pub fn infer(
             let definitions = lookup_path(ctx.source, definitions, path)?;
 
             match definitions.get(&item.item) {
-                None => {
-                    Err(InferenceError::not_in_scope(ctx.source, &item.item)
-                        .with_position(item.pos))
-                }
+                None => Err(Error::not_in_scope(ctx.source, &item.item).with_position(item.pos)),
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
                         ctx.kind_solutions,
@@ -630,8 +625,7 @@ pub fn infer(
                         type_signature,
                     )),
                     Signature::Module(_) => {
-                        Err(InferenceError::not_a_value(ctx.source, &item.item)
-                            .with_position(item.pos))
+                        Err(Error::not_a_value(ctx.source, &item.item).with_position(item.pos))
                     }
                 },
             }
@@ -993,7 +987,7 @@ fn infer_case(
     ctx: &mut InferenceContext,
     expr: &Spanned<syntax::Expr>,
     branches: &[syntax::Branch],
-) -> Result<(Expr, Type), InferenceError> {
+) -> Result<(Expr, Type), Error> {
     let (expr, mut expr_ty) = infer(ctx, expr)?;
 
     /*
@@ -1045,9 +1039,7 @@ fn infer_case(
         .iter()
         .map(|branch| {
             if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                return Err(
-                    InferenceError::redundant_pattern(ctx.source).with_position(branch.pattern.pos)
-                );
+                return Err(Error::redundant_pattern(ctx.source).with_position(branch.pattern.pos));
             }
 
             if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
@@ -1108,7 +1100,7 @@ pub fn check(
     ctx: &mut InferenceContext,
     expr: &Spanned<syntax::Expr>,
     expected: &Type,
-) -> Result<Expr, InferenceError> {
+) -> Result<Expr, Error> {
     let position = expr.pos;
     let (expr, expr_ty) = infer(ctx, expr)?;
     unify(
@@ -1136,7 +1128,7 @@ pub fn unify(
     position: Option<usize>,
     expected: &Type,
     actual: &Type,
-) -> Result<(), InferenceError> {
+) -> Result<(), Error> {
     unification::unify(
         common_kinds,
         types,
@@ -1147,7 +1139,7 @@ pub fn unify(
         actual,
     )
     .map_err(|error| {
-        let error = InferenceError::unification_error(
+        let error = Error::unification_error(
             source,
             /*
             At the level of an `InferenceError`, a type mismatch should

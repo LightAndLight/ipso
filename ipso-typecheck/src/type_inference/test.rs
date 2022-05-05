@@ -1,4 +1,4 @@
-use super::{unification, InferenceContext, InferenceError, InferredPattern};
+use super::{unification, Error, InferenceContext, InferredPattern};
 use crate::{
     evidence, kind_inference,
     type_inference::{fresh_type_meta, infer, infer_pattern, unify, zonk_type},
@@ -50,7 +50,7 @@ fn occurs_1() {
     with_empty_ctx(|ctx| {
         let v1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
         let v2 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-        let expected = Err(InferenceError::occurs(
+        let expected = Err(Error::occurs(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
@@ -572,7 +572,7 @@ fn infer_array_2() {
         };
         assert_eq!(
             infer(ctx, &term),
-            Err(InferenceError::mismatch(
+            Err(Error::mismatch(
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL)
                 },
@@ -741,7 +741,7 @@ fn unify_rows_4() {
             ],
             None,
         );
-        let expected = Err(InferenceError::mismatch(
+        let expected = Err(Error::mismatch(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
@@ -915,7 +915,7 @@ fn infer_record_4() {
                 item: syntax::Expr::Int(1),
             }),
         );
-        let expected = Err(InferenceError::mismatch(
+        let expected = Err(Error::mismatch(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
@@ -1287,7 +1287,7 @@ fn infer_case_4() {
                 },
             ),
         };
-        let expected = Err(InferenceError::redundant_pattern(&Source::Interactive {
+        let expected = Err(Error::redundant_pattern(&Source::Interactive {
             label: String::from(SOURCE_LABEL),
         })
         .with_position(32));
@@ -1324,7 +1324,7 @@ fn unify_variant_1() {
             Some(r),
         );
 
-        let expected = Err(InferenceError::mismatch(
+        let expected = Err(Error::mismatch(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
