@@ -747,7 +747,22 @@ impl<'modules> Typechecker<'modules> {
             .flat_map(|arg_ty| arg_ty.names().into_iter())
             .collect::<Vec<_>>();
         self.bound_vars.insert(&arg_bound_vars);
-        let body = type_inference::check(&mut self.type_inference_context(), body, &out_ty)?;
+        let body = type_inference::check(
+            &mut type_inference::InferenceContext {
+                common_kinds: self.common_kinds,
+                modules: &self.module_context,
+                types: self.type_context,
+                type_variables: self.bound_tyvars,
+                kind_solutions: &mut self.kind_solutions,
+                type_solutions: &mut self.type_solutions,
+                type_signatures: &self.context,
+                variables: &mut self.bound_vars,
+                evidence: &mut self.evidence,
+                source: &self.source,
+            },
+            body,
+            &out_ty,
+        )?;
         self.bound_vars.delete(arg_bound_vars.len());
 
         let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
@@ -1063,7 +1078,18 @@ impl<'modules> Typechecker<'modules> {
 
                     match {
                         let member_body = type_inference::check(
-                            &mut self.type_inference_context(),
+                            &mut type_inference::InferenceContext {
+                                common_kinds: self.common_kinds,
+                                modules: &self.module_context,
+                                types: self.type_context,
+                                type_variables: self.bound_tyvars,
+                                kind_solutions: &mut self.kind_solutions,
+                                type_solutions: &mut self.type_solutions,
+                                type_signatures: &self.context,
+                                variables: &mut self.bound_vars,
+                                evidence: &mut self.evidence,
+                                source: &self.source,
+                            },
                             &Spanned {
                                 pos: member.name.pos,
                                 item: syntax::Expr::mk_lam(
@@ -1213,21 +1239,6 @@ impl<'modules> Typechecker<'modules> {
             Constraint::Type(ty) => {
                 Constraint::Type(self.type_solutions.zonk(self.kind_solutions, ty.clone()))
             }
-        }
-    }
-
-    pub fn type_inference_context(&mut self) -> type_inference::InferenceContext {
-        type_inference::InferenceContext {
-            common_kinds: self.common_kinds,
-            modules: &self.module_context,
-            types: self.type_context,
-            type_variables: self.bound_tyvars,
-            kind_solutions: &mut self.kind_solutions,
-            type_solutions: &mut self.type_solutions,
-            type_signatures: &self.context,
-            variables: &mut self.bound_vars,
-            evidence: &mut self.evidence,
-            source: &self.source,
         }
     }
 
