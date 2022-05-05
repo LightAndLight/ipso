@@ -11,7 +11,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use typecheck::type_inference;
+use typecheck::{kind_inference, type_inference, BoundVars};
 
 #[derive(Debug)]
 pub enum ModuleError {
@@ -591,10 +591,20 @@ pub fn import(
                     &mut module,
                 )?;
 
+                let mut types = HashMap::new();
+                let mut type_variables = BoundVars::new();
+                let mut kind_solutions = kind_inference::Solutions::new();
                 let mut type_solutions = type_inference::unification::Solutions::new();
-                let module =
-                    Typechecker::new(input_location, common_kinds, modules, &mut type_solutions)
-                        .check_module(&module)?;
+                let module = Typechecker::new(
+                    input_location,
+                    common_kinds,
+                    &mut types,
+                    &mut type_variables,
+                    modules,
+                    &mut kind_solutions,
+                    &mut type_solutions,
+                )
+                .check_module(&module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)

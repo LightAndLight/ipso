@@ -6,13 +6,12 @@ use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
 use ipso_syntax::{kind::Kind, ModuleKey, ModuleRef, Modules};
-use ipso_typecheck::{self as typecheck, Typechecker};
+use ipso_typecheck::{self as typecheck, kind_inference, type_inference, BoundVars};
 use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
-use typecheck::type_inference;
 use typed_arena::Arena;
 
 pub struct Config {
@@ -102,6 +101,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
+        let mut kind_solutions = kind_inference::Solutions::new();
         let mut type_solutions = type_inference::unification::Solutions::new();
 
         let expected = core::Type::app(
@@ -110,10 +110,17 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         );
         let actual = target_sig.body;
 
-        let mut tc = Typechecker::new(source, &common_kinds, &modules, &mut type_solutions);
-        let _ = tc
-            .type_inference_context()
-            .unify(None, &expected, &actual)?;
+        let _ = type_inference::unify(
+            &common_kinds,
+            &HashMap::new(),
+            &BoundVars::new(),
+            &mut kind_solutions,
+            &mut type_solutions,
+            &source,
+            None,
+            &expected,
+            &actual,
+        )?;
     }
 
     let bytes = Arena::new();
