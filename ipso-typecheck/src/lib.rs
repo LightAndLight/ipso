@@ -364,6 +364,12 @@ impl TypeError {
     }
 }
 
+impl From<type_inference::InferenceError> for TypeError {
+    fn from(error: type_inference::InferenceError) -> Self {
+        TypeError::TypeError { error }
+    }
+}
+
 fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String {
     match &error.info {
         kind_inference::InferenceErrorInfo::NotInScope { .. } => String::from("type not in scope"),
@@ -603,7 +609,7 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         mut expr: core::Expr,
     ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
-        expr.subst_placeholder(&mut |p| {
+        expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
             let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
             Ok(expr.as_ref().clone())
         })?;
@@ -979,7 +985,7 @@ impl<'modules> Typechecker<'modules> {
                     .assume(assume.pos, evidence::Constraint::from_type(&constraint));
                 Ok(constraint)
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<_, TypeError>>()?;
 
         // locate evidence for superclasses
         let superclass_constructors: Vec<core::Expr> = {
@@ -1222,8 +1228,9 @@ impl<'modules> Typechecker<'modules> {
         actual: &core::Type,
     ) -> Result<(), TypeError> {
         self.type_inference_context()
-            .unify(None, expected, actual)
-            .map_err(|error| TypeError::TypeError { error })
+            .unify(None, expected, actual)?;
+
+        Ok(())
     }
 
     pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {
@@ -1234,8 +1241,8 @@ impl<'modules> Typechecker<'modules> {
         &mut self,
         expr: &syntax::Spanned<syntax::Expr>,
     ) -> Result<(core::Expr, core::Type), TypeError> {
-        type_inference::infer(&mut self.type_inference_context(), expr)
-            .map_err(|error| TypeError::TypeError { error })
+        let result = type_inference::infer(&mut self.type_inference_context(), expr)?;
+        Ok(result)
     }
 
     pub fn check_type(
@@ -1243,8 +1250,8 @@ impl<'modules> Typechecker<'modules> {
         expr: &syntax::Spanned<syntax::Expr>,
         ty: &core::Type,
     ) -> Result<core::Expr, TypeError> {
-        type_inference::check(&mut self.type_inference_context(), expr, ty)
-            .map_err(|error| TypeError::TypeError { error })
+        let result = type_inference::check(&mut self.type_inference_context(), expr, ty)?;
+        Ok(result)
     }
 }
 
