@@ -223,20 +223,11 @@ impl UnificationError {
     }
 }
 
-/**
-Type unification context.
-
-See [`unify`].
-*/
-pub struct UnificationContext<'a> {
-    pub common_kinds: &'a CommonKinds,
-    pub types: &'a HashMap<Rc<str>, Kind>,
-    pub type_variables: &'a BoundVars<Kind>,
-}
-
 /// Unify two types.
 pub fn unify(
-    unification_ctx: &UnificationContext,
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
     kind_solutions: &mut kind_inference::Solutions,
     type_solutions: &mut Solutions,
     expected: &Type,
@@ -316,7 +307,9 @@ pub fn unify(
     }
 
     fn unify_meta_left(
-        unification_ctx: &UnificationContext,
+        common_kinds: &CommonKinds,
+        types: &HashMap<Rc<str>, Kind>,
+        type_variables: &BoundVars<Kind>,
         kind_solutions: &mut kind_inference::Solutions,
         type_solutions: &mut Solutions,
         meta: &usize,
@@ -327,13 +320,15 @@ pub fn unify(
             actual => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_left(
                     kind_solutions,
-                    unification_ctx.type_variables,
+                    type_variables,
                     type_solutions,
                     *meta,
                     &actual,
                 ),
                 Solution::Solved(expected) => unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     &expected,
@@ -344,7 +339,9 @@ pub fn unify(
     }
 
     fn unify_meta_right(
-        unification_ctx: &UnificationContext,
+        common_kinds: &CommonKinds,
+        types: &HashMap<Rc<str>, Kind>,
+        type_variables: &BoundVars<Kind>,
         kind_solutions: &mut kind_inference::Solutions,
         type_solutions: &mut Solutions,
         expected: &Type,
@@ -355,13 +352,15 @@ pub fn unify(
             expected => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_right(
                     kind_solutions,
-                    unification_ctx.type_variables,
+                    type_variables,
                     type_solutions,
                     &expected,
                     *meta,
                 ),
                 Solution::Solved(actual) => unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     &expected,
@@ -373,28 +372,20 @@ pub fn unify(
 
     let hint: &dyn Fn() -> kind_inference::InferenceErrorHint =
         &|| kind_inference::InferenceErrorHint::WhileChecking {
-            ty: actual.to_syntax().map(&mut |ix| {
-                unification_ctx
-                    .type_variables
-                    .lookup_index(*ix)
-                    .unwrap()
-                    .0
-                    .clone()
-            }),
+            ty: actual
+                .to_syntax()
+                .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
             has_kind: expected.kind(),
         };
-    kind_inference::InferenceContext::new(
-        unification_ctx.common_kinds,
-        unification_ctx.types,
-        unification_ctx.type_variables,
-        kind_solutions,
-    )
-    .unify(hint, &expected.kind(), &actual.kind())
-    .map_err(|error| UnificationError::KindError { error })?;
+    kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions)
+        .unify(hint, &expected.kind(), &actual.kind())
+        .map_err(|error| UnificationError::KindError { error })?;
 
     match expected {
         Type::Meta(_, meta) => unify_meta_left(
-            unification_ctx,
+            common_kinds,
+            types,
+            type_variables,
             kind_solutions,
             type_solutions,
             meta,
@@ -403,7 +394,9 @@ pub fn unify(
         Type::Bool => match actual {
             Type::Bool => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -412,7 +405,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -420,7 +413,9 @@ pub fn unify(
         Type::Int => match actual {
             Type::Int => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -429,7 +424,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -437,7 +432,9 @@ pub fn unify(
         Type::Char => match actual {
             Type::Char => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -446,7 +443,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -454,7 +451,9 @@ pub fn unify(
         Type::String => match actual {
             Type::String => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -463,7 +462,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -471,7 +470,9 @@ pub fn unify(
         Type::Bytes => match actual {
             Type::Bytes => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -480,7 +481,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -488,7 +489,9 @@ pub fn unify(
         Type::RowNil => match actual {
             Type::RowNil => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -497,7 +500,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -505,7 +508,9 @@ pub fn unify(
         Type::Unit => match actual {
             Type::Unit => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -514,7 +519,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -522,7 +527,9 @@ pub fn unify(
         Type::Cmd => match actual {
             Type::Cmd => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -531,7 +538,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -539,7 +546,9 @@ pub fn unify(
         Type::Name(_, expected_name) => match actual {
             Type::Name(_, actual_name) if expected_name == actual_name => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -548,7 +557,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -556,7 +565,9 @@ pub fn unify(
         Type::Var(_, expected_index) => match actual {
             Type::Var(_, actual_index) if expected_index == actual_index => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -565,7 +576,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -573,7 +584,9 @@ pub fn unify(
         Type::Arrow(_) => match actual {
             Type::Arrow(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -582,7 +595,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -590,7 +603,9 @@ pub fn unify(
         Type::FatArrow(_) => match actual {
             Type::FatArrow(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -599,7 +614,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -607,7 +622,9 @@ pub fn unify(
         Type::Array(_) => match actual {
             Type::Array(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -616,7 +633,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -624,7 +641,9 @@ pub fn unify(
         Type::Record(_) => match actual {
             Type::Record(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -633,7 +652,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -641,7 +660,9 @@ pub fn unify(
         Type::Variant(_) => match actual {
             Type::Variant(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -650,7 +671,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -658,7 +679,9 @@ pub fn unify(
         Type::IO(_) => match actual {
             Type::IO(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -667,7 +690,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -675,14 +698,18 @@ pub fn unify(
         Type::App(_, expected_a, expected_b) => match actual {
             Type::App(_, actual_a, actual_b) => {
                 unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     expected_a,
                     actual_a,
                 )?;
                 unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     expected_b,
@@ -690,7 +717,9 @@ pub fn unify(
                 )
             }
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -699,21 +728,25 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
         },
         Type::HasField(expected_field, expected_row) => match actual {
             Type::HasField(actual_field, actual_row) if expected_field == actual_field => unify(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected_row,
                 actual_row,
             ),
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -722,7 +755,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -736,7 +769,9 @@ pub fn unify(
                     .zip(actual_constraints.iter())
                     .try_for_each(|(expected_constraint, actual_constraint)| {
                         unify(
-                            unification_ctx,
+                            common_kinds,
+                            types,
+                            type_variables,
                             kind_solutions,
                             type_solutions,
                             expected_constraint,
@@ -745,7 +780,9 @@ pub fn unify(
                     })
             }
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -754,7 +791,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -824,7 +861,9 @@ pub fn unify(
 
                 common_fields.into_iter().try_for_each(|common_field| {
                     unify(
-                        unification_ctx,
+                        common_kinds,
+                        types,
+                        type_variables,
                         kind_solutions,
                         type_solutions,
                         common_field.expected,
@@ -844,7 +883,9 @@ pub fn unify(
                 let actual_tail = actual_row_parts.rest.unwrap_or(&Type::RowNil);
 
                 unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     &Type::mk_rows(remaining_expected_fields, Some(common_tail.clone())),
@@ -852,7 +893,9 @@ pub fn unify(
                 )?;
 
                 unify(
-                    unification_ctx,
+                    common_kinds,
+                    types,
+                    type_variables,
                     kind_solutions,
                     type_solutions,
                     expected_tail,
@@ -860,7 +903,9 @@ pub fn unify(
                 )
             }
             Type::Meta(_, meta) => unify_meta_right(
-                unification_ctx,
+                common_kinds,
+                types,
+                type_variables,
                 kind_solutions,
                 type_solutions,
                 expected,
@@ -869,7 +914,7 @@ pub fn unify(
             _ => Err(UnificationError::mismatch(
                 kind_solutions,
                 type_solutions,
-                unification_ctx.type_variables,
+                type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -1132,11 +1177,9 @@ impl<'a> InferenceContext<'a> {
         actual: &Type,
     ) -> Result<(), InferenceError> {
         unify(
-            &UnificationContext {
-                common_kinds: self.common_kinds,
-                types: self.types,
-                type_variables: self.type_variables,
-            },
+            self.common_kinds,
+            self.types,
+            self.type_variables,
             self.kind_solutions,
             self.type_solutions,
             expected,
