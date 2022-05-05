@@ -99,12 +99,12 @@ impl InferenceError {
         }
     }
 
-    /// Construct a [`UnificationError::Occurs`].
+    /// Construct a [`unification::Error::Occurs`].
     pub fn occurs(source: &Source, meta: Meta, ty: syntax::Type<Rc<str>>) -> Self {
         InferenceError::unification_error(source, unification::Error::Occurs { meta, ty })
     }
 
-    /// Construct a [`UnificationError::Mismatch`].
+    /// Construct a [`unification::Error::Mismatch`].
     pub fn mismatch(
         source: &Source,
         expected: syntax::Type<Rc<str>>,
@@ -113,7 +113,7 @@ impl InferenceError {
         InferenceError::unification_error(source, unification::Error::Mismatch { expected, actual })
     }
 
-    /// Lift a [`InferenceErrorInfo::UnificationError`].
+    /// Lift a [`unification::Error`].
     pub fn unification_error(source: &Source, error: unification::Error) -> Self {
         InferenceError {
             source: source.clone(),
