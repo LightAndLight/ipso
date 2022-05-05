@@ -168,20 +168,6 @@ pub struct Typechecker<'modules> {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyKindContext<A> {
-    ty: syntax::Type<A>,
-    has_kind: Kind,
-    unifying_types: Option<UnifyTypeContext>,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyKindContextRefs<'a> {
-    ty: &'a core::Type,
-    has_kind: &'a Kind,
-    unifying_types: Option<&'a UnifyTypeContextRefs<'a>>,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct UnifyTypeContext {
     pub expected: syntax::Type<Rc<str>>,
     pub actual: syntax::Type<Rc<str>>,
