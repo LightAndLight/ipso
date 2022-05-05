@@ -220,7 +220,7 @@ impl CheckedPattern {
 /**
 Type inference context.
 
-[`infer`], [`check`], and [`check_case`] are mutually recursive and take many arguments. This
+[`infer`] and [`check`] are mutually recursive and take many arguments. This
 struct bundles all those arguments for convenience.
 */
 pub struct InferenceContext<'a> {
@@ -492,120 +492,6 @@ fn check_pattern(
             rest,
         },
     })
-}
-
-fn check_case(
-    ctx: &mut InferenceContext,
-    expr: &Spanned<syntax::Expr>,
-    branches: &[syntax::Branch],
-) -> Result<(Expr, Type), InferenceError> {
-    let (expr, mut expr_ty) = infer(ctx, expr)?;
-
-    /*
-    [note: peeling constructors when matching on variants]
-
-    As each variant constructor is checked, the constructor needs to be 'peeled'
-    off the original expression type before checking the next branch.
-
-    When a catch-all pattern is reached, it can be assigned a variant type that's
-    missing all the constructors that have already been matched.
-
-    e.g.
-
-    ```
-    # expr : (| A : a, B : b, c : C, d : D |)
-    case expr of
-      # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
-      A x -> ...
-
-      # check that `B y` has type `(| B : b, c : C, d : D |)`
-      B y -> ...
-
-      # check that `c` has type `(| c : C, d : D |)`
-      c -> ...
-    ```
-
-    A consequence of this is that the tags associated with each variant pattern
-    aren't unique. The above example gives:
-
-    ```
-    case expr of
-      # A's tag is 0
-      A x -> ...
-
-      # B's tag is also 0 (because `B` is lexicographically the first constructor
-      # in `(| B : b, c : C, d : D |)`)
-      B y -> ...
-
-      c -> ...
-
-    The interpreter needs to account for this when checking pattern matches.
-    ```
-    */
-
-    let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-    let mut seen_ctors = FnvHashSet::default();
-    let mut saw_catchall = false;
-    let branches: Vec<Branch> = branches
-        .iter()
-        .map(|branch| {
-            if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                return Err(
-                    InferenceError::redundant_pattern(ctx.source).with_position(branch.pattern.pos)
-                );
-            }
-
-            if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
-                seen_ctors.insert(name.as_ref());
-            }
-
-            let result = check_pattern(
-                ctx.common_kinds,
-                ctx.types,
-                ctx.type_variables,
-                ctx.kind_solutions,
-                ctx.type_solutions,
-                ctx.evidence,
-                ctx.source,
-                &branch.pattern,
-                &expr_ty,
-            )?;
-
-            if let CheckedPattern::Variant { rest, .. } = &result {
-                expr_ty = Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest.clone())
-            }
-
-            let names = result.names();
-            ctx.variables.insert(&names);
-            let body = check(ctx, &branch.body, &out_ty)?;
-            ctx.variables.delete(names.len());
-
-            let pattern = result.pattern();
-            if let Pattern::Wildcard | Pattern::Name = pattern {
-                saw_catchall = true;
-            }
-
-            Ok(Branch { pattern, body })
-        })
-        .collect::<Result<_, _>>()?;
-    zonk_type_mut(ctx.kind_solutions, ctx.type_solutions, &mut expr_ty);
-    match expr_ty.unwrap_variant() {
-        Some(RowParts {
-            rest: Some(rest), ..
-        }) if !saw_catchall => unify(
-            ctx.common_kinds,
-            ctx.types,
-            ctx.type_variables,
-            ctx.kind_solutions,
-            ctx.type_solutions,
-            ctx.source,
-            None,
-            &Type::RowNil,
-            rest,
-        ),
-        _ => Ok(()),
-    }?;
-    Ok((Expr::mk_case(expr, branches), out_ty))
 }
 
 /// Generate a fresh kind metavariable.
@@ -1074,12 +960,126 @@ pub fn infer(
                 ),
             ))
         }
-        syntax::Expr::Case(expr, branches) => check_case(ctx, expr, branches),
+        syntax::Expr::Case(expr, branches) => infer_case(ctx, expr, branches),
 
         syntax::Expr::Comp(_) => {
             panic!("computation expression was not desugared")
         }
     }
+}
+
+fn infer_case(
+    ctx: &mut InferenceContext,
+    expr: &Spanned<syntax::Expr>,
+    branches: &[syntax::Branch],
+) -> Result<(Expr, Type), InferenceError> {
+    let (expr, mut expr_ty) = infer(ctx, expr)?;
+
+    /*
+    [note: peeling constructors when matching on variants]
+
+    As each variant constructor is checked, the constructor needs to be 'peeled'
+    off the original expression type before checking the next branch.
+
+    When a catch-all pattern is reached, it can be assigned a variant type that's
+    missing all the constructors that have already been matched.
+
+    e.g.
+
+    ```
+    # expr : (| A : a, B : b, c : C, d : D |)
+    case expr of
+      # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
+      A x -> ...
+
+      # check that `B y` has type `(| B : b, c : C, d : D |)`
+      B y -> ...
+
+      # check that `c` has type `(| c : C, d : D |)`
+      c -> ...
+    ```
+
+    A consequence of this is that the tags associated with each variant pattern
+    aren't unique. The above example gives:
+
+    ```
+    case expr of
+      # A's tag is 0
+      A x -> ...
+
+      # B's tag is also 0 (because `B` is lexicographically the first constructor
+      # in `(| B : b, c : C, d : D |)`)
+      B y -> ...
+
+      c -> ...
+
+    The interpreter needs to account for this when checking pattern matches.
+    ```
+    */
+
+    let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+    let mut seen_ctors = FnvHashSet::default();
+    let mut saw_catchall = false;
+    let branches: Vec<Branch> = branches
+        .iter()
+        .map(|branch| {
+            if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
+                return Err(
+                    InferenceError::redundant_pattern(ctx.source).with_position(branch.pattern.pos)
+                );
+            }
+
+            if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
+                seen_ctors.insert(name.as_ref());
+            }
+
+            let result = check_pattern(
+                ctx.common_kinds,
+                ctx.types,
+                ctx.type_variables,
+                ctx.kind_solutions,
+                ctx.type_solutions,
+                ctx.evidence,
+                ctx.source,
+                &branch.pattern,
+                &expr_ty,
+            )?;
+
+            if let CheckedPattern::Variant { rest, .. } = &result {
+                expr_ty = Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest.clone())
+            }
+
+            let names = result.names();
+            ctx.variables.insert(&names);
+            let body = check(ctx, &branch.body, &out_ty)?;
+            ctx.variables.delete(names.len());
+
+            let pattern = result.pattern();
+            if let Pattern::Wildcard | Pattern::Name = pattern {
+                saw_catchall = true;
+            }
+
+            Ok(Branch { pattern, body })
+        })
+        .collect::<Result<_, _>>()?;
+    zonk_type_mut(ctx.kind_solutions, ctx.type_solutions, &mut expr_ty);
+    match expr_ty.unwrap_variant() {
+        Some(RowParts {
+            rest: Some(rest), ..
+        }) if !saw_catchall => unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &Type::RowNil,
+            rest,
+        ),
+        _ => Ok(()),
+    }?;
+    Ok((Expr::mk_case(expr, branches), out_ty))
 }
 
 /// Check an expression's type.
