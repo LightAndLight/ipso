@@ -205,7 +205,7 @@ fn infer_record_1() {
             ),
         };
         let actual_result = type_inference::infer(&mut tc.type_inference_context(), &expr)
-            .map(|(expr, ty)| (expr, tc.type_solutions.zonk(&tc.kind_solutions, ty)));
+            .map(|(expr, ty)| (expr, tc.type_solutions.zonk(tc.kind_solutions, ty)));
         assert_eq!(expected_result, actual_result, "checking results");
 
         let (mut actual_expr, _actual_ty) = actual_result.unwrap();

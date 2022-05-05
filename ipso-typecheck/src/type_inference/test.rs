@@ -1,7 +1,7 @@
 use super::{unification, InferenceContext, InferenceError, InferredPattern};
 use crate::{
     evidence, kind_inference,
-    type_inference::{fresh_type_meta, zonk_type},
+    type_inference::{fresh_type_meta, unify, zonk_type},
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
@@ -62,7 +62,17 @@ fn occurs_1() {
                     .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
             ),
         ));
-        let actual = ctx.unify(None, &v1, &Type::mk_arrow(ctx.common_kinds, &v1, &v2));
+        let actual = unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &v1,
+            &Type::mk_arrow(ctx.common_kinds, &v1, &v2),
+        );
         assert_eq!(expected, actual)
     })
 }
@@ -600,9 +610,18 @@ fn unify_1() {
         let m_1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
         let holey = Type::arrow(ctx.common_kinds, m_1, m_0);
         let expected = Ok(real.clone());
-        let actual = ctx
-            .unify(None, &real, &holey)
-            .map(|_| zonk_type(ctx.kind_solutions, ctx.type_solutions, holey));
+        let actual = unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &real,
+            &holey,
+        )
+        .map(|_| zonk_type(ctx.kind_solutions, ctx.type_solutions, holey));
         assert_eq!(expected, actual)
     })
 }
@@ -611,7 +630,13 @@ fn unify_1() {
 fn unify_rows_1() {
     with_empty_ctx(|ctx| {
         assert_eq!(
-            ctx.unify(
+            unify(
+                ctx.common_kinds,
+                ctx.types,
+                ctx.type_variables,
+                ctx.kind_solutions,
+                ctx.type_solutions,
+                ctx.source,
                 None,
                 &Type::mk_record(
                     ctx.common_kinds,
@@ -633,7 +658,13 @@ fn unify_rows_1() {
 fn unify_rows_2() {
     with_empty_ctx(|ctx| {
         assert_eq!(
-            ctx.unify(
+            unify(
+                ctx.common_kinds,
+                ctx.types,
+                ctx.type_variables,
+                ctx.kind_solutions,
+                ctx.type_solutions,
+                ctx.source,
                 None,
                 &Type::mk_record(
                     ctx.common_kinds,
@@ -663,7 +694,13 @@ fn unify_rows_2() {
 fn unify_rows_3() {
     with_empty_ctx(|ctx| {
         assert_eq!(
-            ctx.unify(
+            unify(
+                ctx.common_kinds,
+                ctx.types,
+                ctx.type_variables,
+                ctx.kind_solutions,
+                ctx.type_solutions,
+                ctx.source,
                 None,
                 &Type::mk_record(
                     ctx.common_kinds,
@@ -721,7 +758,17 @@ fn unify_rows_4() {
                 .to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
         ));
-        let actual = ctx.unify(None, &ty1, &ty2);
+        let actual = unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &ty1,
+            &ty2,
+        );
         assert_eq!(expected, actual)
     })
 }
@@ -1298,7 +1345,17 @@ fn unify_variant_1() {
             ty2.to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
         ));
-        let actual = ctx.unify(None, &ty1, &ty2);
+        let actual = unify(
+            ctx.common_kinds,
+            ctx.types,
+            ctx.type_variables,
+            ctx.kind_solutions,
+            ctx.type_solutions,
+            ctx.source,
+            None,
+            &ty1,
+            &ty2,
+        );
 
         assert_eq!(expected, actual);
     })

@@ -271,59 +271,6 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    /// Unify two types.
-    pub fn unify(
-        &mut self,
-        position: Option<usize>,
-        expected: &Type,
-        actual: &Type,
-    ) -> Result<(), InferenceError> {
-        unification::unify(
-            self.common_kinds,
-            self.types,
-            self.type_variables,
-            self.kind_solutions,
-            self.type_solutions,
-            expected,
-            actual,
-        )
-        .map_err(|error| {
-            let error = InferenceError::unification_error(
-                self.source,
-                /*
-                At the level of an `InferenceError`, a type mismatch should
-                describe full types involved, rather than the specific components
-                that don't match.
-
-                e.g. when `a -> b` and `a -> c` mismatch (because `b` != `c`),
-                `InferenceError` should report that `a -> b` != `a -> c`, instead
-                of saying `b` != `c`.
-                */
-                match error {
-                    unification::Error::Mismatch { .. } => unification::Error::Mismatch {
-                        expected: zonk_type(
-                            self.kind_solutions,
-                            self.type_solutions,
-                            expected.clone(),
-                        )
-                        .to_syntax()
-                        .map(&mut |ix| self.type_variables.lookup_index(*ix).unwrap().0.clone()),
-                        actual: zonk_type(self.kind_solutions, self.type_solutions, actual.clone())
-                            .to_syntax()
-                            .map(&mut |ix| {
-                                self.type_variables.lookup_index(*ix).unwrap().0.clone()
-                            }),
-                    },
-                    _ => error,
-                },
-            );
-            match position {
-                Some(position) => error.with_position(position),
-                None => error,
-            }
-        })
-    }
-
     /**
     Instantiate a type signature.
 
@@ -526,7 +473,17 @@ impl<'a> InferenceContext<'a> {
         expected: &Type,
     ) -> Result<CheckedPattern, InferenceError> {
         let result = self.infer_pattern(pattern);
-        self.unify(Some(pattern.pos), expected, &result.ty(self.common_kinds))?;
+        unify(
+            self.common_kinds,
+            self.types,
+            self.type_variables,
+            self.kind_solutions,
+            self.type_solutions,
+            self.source,
+            Some(pattern.pos),
+            expected,
+            &result.ty(self.common_kinds),
+        )?;
         Ok(match result {
             InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
             InferredPattern::Variant {
@@ -868,7 +825,17 @@ impl<'a> InferenceContext<'a> {
                         Ok((Some(rest), Some(row.clone())))
                     }
                     None => {
-                        self.unify(None, &Type::RowNil, row)?;
+                        unify(
+                            self.common_kinds,
+                            self.types,
+                            self.type_variables,
+                            self.kind_solutions,
+                            self.type_solutions,
+                            self.source,
+                            None,
+                            &Type::RowNil,
+                            row,
+                        )?;
                         Ok((None, None))
                     }
                 }?;
@@ -1052,7 +1019,17 @@ impl<'a> InferenceContext<'a> {
         match expr_ty.unwrap_variant() {
             Some(RowParts {
                 rest: Some(rest), ..
-            }) if !saw_catchall => self.unify(None, &Type::RowNil, rest),
+            }) if !saw_catchall => unify(
+                self.common_kinds,
+                self.types,
+                self.type_variables,
+                self.kind_solutions,
+                self.type_solutions,
+                self.source,
+                None,
+                &Type::RowNil,
+                rest,
+            ),
             _ => Ok(()),
         }?;
         Ok((Expr::mk_case(expr, branches), out_ty))
@@ -1066,7 +1043,17 @@ impl<'a> InferenceContext<'a> {
     ) -> Result<Expr, InferenceError> {
         let position = expr.pos;
         let (expr, expr_ty) = self.infer(expr)?;
-        self.unify(Some(position), expected, &expr_ty)?;
+        unify(
+            self.common_kinds,
+            self.types,
+            self.type_variables,
+            self.kind_solutions,
+            self.type_solutions,
+            self.source,
+            Some(position),
+            expected,
+            &expr_ty,
+        )?;
         Ok(expr)
     }
 }
@@ -1114,4 +1101,56 @@ pub fn check(
     expected: &Type,
 ) -> Result<Expr, InferenceError> {
     ctx.check(expr, expected)
+}
+
+/// Unify two types.
+pub fn unify(
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut unification::Solutions,
+    source: &Source,
+    position: Option<usize>,
+    expected: &Type,
+    actual: &Type,
+) -> Result<(), InferenceError> {
+    unification::unify(
+        common_kinds,
+        types,
+        type_variables,
+        kind_solutions,
+        type_solutions,
+        expected,
+        actual,
+    )
+    .map_err(|error| {
+        let error = InferenceError::unification_error(
+            source,
+            /*
+            At the level of an `InferenceError`, a type mismatch should
+            describe full types involved, rather than the specific components
+            that don't match.
+
+            e.g. when `a -> b` and `a -> c` mismatch (because `b` != `c`),
+            `InferenceError` should report that `a -> b` != `a -> c`, instead
+            of saying `b` != `c`.
+            */
+            match error {
+                unification::Error::Mismatch { .. } => unification::Error::Mismatch {
+                    expected: zonk_type(kind_solutions, type_solutions, expected.clone())
+                        .to_syntax()
+                        .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
+                    actual: zonk_type(kind_solutions, type_solutions, actual.clone())
+                        .to_syntax()
+                        .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
+                },
+                _ => error,
+            },
+        );
+        match position {
+            Some(position) => error.with_position(position),
+            None => error,
+        }
+    })
 }

@@ -33,7 +33,7 @@ pub struct BoundVars<A> {
 }
 
 impl<A> BoundVars<A> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         BoundVars {
             indices: HashMap::new(),
             info: Vec::new(),
@@ -115,6 +115,12 @@ impl<A> BoundVars<A> {
     }
 }
 
+impl<A> Default for BoundVars<A> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Implication {
     pub ty_vars: Vec<Kind>,
@@ -147,15 +153,15 @@ impl Implication {
 pub struct Typechecker<'modules> {
     common_kinds: &'modules CommonKinds,
     source: Source,
-    kind_solutions: kind_inference::Solutions,
+    kind_solutions: &'modules mut kind_inference::Solutions,
     type_solutions: &'modules mut type_inference::unification::Solutions,
     implications: Vec<Implication>,
     evidence: Evidence,
-    type_context: HashMap<Rc<str>, Kind>,
+    type_context: &'modules mut HashMap<Rc<str>, Kind>,
     context: HashMap<String, core::Signature>,
     class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     bound_vars: BoundVars<core::Type>,
-    bound_tyvars: BoundVars<Kind>,
+    bound_tyvars: &'modules mut BoundVars<Kind>,
     position: Option<usize>,
     modules: &'modules Modules<core::Module>,
     /**
@@ -375,10 +381,11 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
 #[macro_export]
 macro_rules! with_tc {
     ($location:expr, $f:expr) => {{
-        use crate::type_inference;
+        use crate::{kind_inference, type_inference, BoundVars};
         use ipso_builtins as builtins;
         use ipso_core::CommonKinds;
         use ipso_syntax::{self as syntax, ModuleKey, Modules};
+        use std::collections::HashMap;
 
         let common_kinds = CommonKinds::default();
         let mut modules = Modules::new();
@@ -386,8 +393,19 @@ macro_rules! with_tc {
             ModuleKey::from("builtins"),
             builtins::builtins(&common_kinds),
         );
+        let mut types = HashMap::new();
+        let mut type_variables = BoundVars::new();
+        let mut kind_solutions = kind_inference::Solutions::new();
         let mut type_solutions = type_inference::unification::Solutions::new();
-        let mut tc = Typechecker::new($location, &common_kinds, &modules, &mut type_solutions);
+        let mut tc = Typechecker::new(
+            $location,
+            &common_kinds,
+            &mut types,
+            &mut type_variables,
+            &modules,
+            &mut kind_solutions,
+            &mut type_solutions,
+        );
         tc.register_from_import(builtins_module_id, &syntax::Names::All);
         $f(tc)
     }};
@@ -429,21 +447,24 @@ impl<'modules> Typechecker<'modules> {
     pub fn new(
         source: Source,
         common_kinds: &'modules CommonKinds,
+        types: &'modules mut HashMap<Rc<str>, Kind>,
+        type_variables: &'modules mut BoundVars<Kind>,
         modules: &'modules Modules<core::Module>,
+        kind_solutions: &'modules mut kind_inference::Solutions,
         type_solutions: &'modules mut type_inference::unification::Solutions,
     ) -> Self {
         Typechecker {
             common_kinds,
             source,
-            kind_solutions: kind_inference::Solutions::new(),
+            kind_solutions,
             type_solutions,
             implications: Vec::new(),
             evidence: Evidence::new(),
-            type_context: HashMap::new(),
+            type_context: types,
             context: HashMap::new(),
             class_context: HashMap::new(),
             bound_vars: BoundVars::new(),
-            bound_tyvars: BoundVars::new(),
+            bound_tyvars: type_variables,
             position: None,
             modules,
             module_context: HashMap::new(),
@@ -597,7 +618,7 @@ impl<'modules> Typechecker<'modules> {
                 unsolved_constraints.push((
                     *ev,
                     self.type_solutions
-                        .zonk(&self.kind_solutions, constraint.to_type()),
+                        .zonk(self.kind_solutions, constraint.to_type()),
                 ));
             }
         }
@@ -626,7 +647,7 @@ impl<'modules> Typechecker<'modules> {
     ) -> Result<(core::Expr, core::TypeSig), TypeError> {
         let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
 
-        let mut ty = self.type_solutions.zonk(&self.kind_solutions, ty);
+        let mut ty = self.type_solutions.zonk(self.kind_solutions, ty);
         for constraint in unsolved_constraints.into_iter().rev() {
             ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
         }
@@ -667,8 +688,8 @@ impl<'modules> Typechecker<'modules> {
 
         let ty = check_kind(
             self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
+            self.type_context,
+            self.bound_tyvars,
             &mut self.kind_solutions,
             &self.source,
             // TODO: make `ty` `Spanned` and use its position here.
@@ -701,19 +722,13 @@ impl<'modules> Typechecker<'modules> {
         let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
 
         let common_kinds = &self.common_kinds;
-        type_inference::InferenceContext::new(
+        type_inference::unify(
             self.common_kinds,
-            &self.source,
-            &self.module_context,
-            &self.type_context,
-            &self.bound_tyvars,
+            self.type_context,
+            self.bound_tyvars,
             &mut self.kind_solutions,
             &mut self.type_solutions,
-            &self.context,
-            &mut self.bound_vars,
-            &mut self.evidence,
-        )
-        .unify(
+            &self.source,
             None,
             ty,
             &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
@@ -785,8 +800,8 @@ impl<'modules> Typechecker<'modules> {
         self.bound_tyvars.insert(&ty_var_kinds);
         let ty = check_kind(
             self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
+            self.type_context,
+            self.bound_tyvars,
             &mut self.kind_solutions,
             &self.source,
             // TODO: make `ty` `Spanned` and use its position here.
@@ -800,7 +815,7 @@ impl<'modules> Typechecker<'modules> {
             .into_iter()
             .map(|(name, kind)| (name, self.kind_solutions.zonk(true, kind)))
             .collect();
-        let sig = core::TypeSig::new(ty_vars, self.type_solutions.zonk(&self.kind_solutions, ty));
+        let sig = core::TypeSig::new(ty_vars, self.type_solutions.zonk(self.kind_solutions, ty));
         Ok(core::ClassMember {
             name: name.to_string(),
             sig,
@@ -841,8 +856,8 @@ impl<'modules> Typechecker<'modules> {
             .map(|superclass| {
                 check_kind(
                     self.common_kinds,
-                    &self.type_context,
-                    &self.bound_tyvars,
+                    self.type_context,
+                    self.bound_tyvars,
                     &mut self.kind_solutions,
                     &self.source,
                     Some(superclass.pos),
@@ -944,8 +959,8 @@ impl<'modules> Typechecker<'modules> {
             .map(|arg| {
                 let res = infer_kind(
                     self.common_kinds,
-                    &self.type_context,
-                    &self.bound_tyvars,
+                    self.type_context,
+                    self.bound_tyvars,
                     &mut self.kind_solutions,
                     &self.source,
                     arg.pos,
@@ -960,8 +975,8 @@ impl<'modules> Typechecker<'modules> {
             .map(|assume| {
                 let constraint = check_kind(
                     self.common_kinds,
-                    &self.type_context,
-                    &self.bound_tyvars,
+                    self.type_context,
+                    self.bound_tyvars,
                     &mut self.kind_solutions,
                     &self.source,
                     Some(assume.pos),
@@ -1014,8 +1029,8 @@ impl<'modules> Typechecker<'modules> {
 
         let head = check_kind(
             self.common_kinds,
-            &self.type_context,
-            &self.bound_tyvars,
+            self.type_context,
+            self.bound_tyvars,
             &mut self.kind_solutions,
             &self.source,
             Some(name.pos),
@@ -1106,9 +1121,9 @@ impl<'modules> Typechecker<'modules> {
             ty_vars,
             assumes: assumes
                 .into_iter()
-                .map(|assume| self.type_solutions.zonk(&self.kind_solutions, assume))
+                .map(|assume| self.type_solutions.zonk(self.kind_solutions, assume))
                 .collect(),
-            head: self.type_solutions.zonk(&self.kind_solutions, head),
+            head: self.type_solutions.zonk(self.kind_solutions, head),
             evidence: evidence_name,
         };
 
@@ -1187,10 +1202,10 @@ impl<'modules> Typechecker<'modules> {
         match constraint {
             Constraint::HasField { field, rest } => Constraint::HasField {
                 field: field.clone(),
-                rest: self.type_solutions.zonk(&self.kind_solutions, rest.clone()),
+                rest: self.type_solutions.zonk(self.kind_solutions, rest.clone()),
             },
             Constraint::Type(ty) => {
-                Constraint::Type(self.type_solutions.zonk(&self.kind_solutions, ty.clone()))
+                Constraint::Type(self.type_solutions.zonk(self.kind_solutions, ty.clone()))
             }
         }
     }
@@ -1200,8 +1215,8 @@ impl<'modules> Typechecker<'modules> {
             self.common_kinds,
             &self.source,
             &self.module_context,
-            &self.type_context,
-            &self.bound_tyvars,
+            self.type_context,
+            self.bound_tyvars,
             &mut self.kind_solutions,
             &mut self.type_solutions,
             &self.context,
@@ -1217,19 +1232,15 @@ impl<'modules> Typechecker<'modules> {
 
 fn infer_kind(
     common_kinds: &CommonKinds,
-    type_context: &HashMap<Rc<str>, Kind>,
-    bound_tyvars: &BoundVars<Kind>,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
     kind_solutions: &mut kind_inference::Solutions,
     source: &Source,
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), TypeError> {
-    let mut ctx = kind_inference::InferenceContext::new(
-        common_kinds,
-        type_context,
-        bound_tyvars,
-        kind_solutions,
-    );
+    let mut ctx =
+        kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions);
     kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos,
@@ -1239,20 +1250,16 @@ fn infer_kind(
 
 fn check_kind(
     common_kinds: &CommonKinds,
-    type_context: &HashMap<Rc<str>, Kind>,
-    bound_tyvars: &BoundVars<Kind>,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
     kind_solutions: &mut kind_inference::Solutions,
     source: &Source,
     pos: Option<usize>,
     ty: &syntax::Type<Rc<str>>,
     kind: &Kind,
 ) -> Result<core::Type, TypeError> {
-    let mut ctx = kind_inference::InferenceContext::new(
-        common_kinds,
-        type_context,
-        bound_tyvars,
-        kind_solutions,
-    );
+    let mut ctx =
+        kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions);
     kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos: pos.unwrap_or(0),

@@ -3,8 +3,8 @@ mod test;
 
 use super::Constraint;
 use crate::{
-    eq_zonked_constraint, metavariables, Implication, SolveConstraintContext, TypeError,
-    Typechecker,
+    eq_zonked_constraint, metavariables, type_inference::unify, Implication,
+    SolveConstraintContext, TypeError, Typechecker,
 };
 use ipso_core::{self as core, Binop, Expr, Placeholder};
 use ipso_syntax::kind::Kind;
@@ -55,10 +55,17 @@ pub fn solve_constraint(
 
                 let implication = implication.instantiate_many(&metas);
 
-                match tc
-                    .type_inference_context()
-                    .unify(None, constraint, &implication.consequent)
-                {
+                match unify(
+                    tc.common_kinds,
+                    tc.type_context,
+                    tc.bound_tyvars,
+                    &mut tc.kind_solutions,
+                    &mut tc.type_solutions,
+                    &tc.source,
+                    None,
+                    constraint,
+                    &implication.consequent,
+                ) {
                     Err(_) => {
                         continue;
                     }
@@ -68,11 +75,11 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.type_solutions.zonk(&tc.kind_solutions, x))
+                                .map(|x| tc.type_solutions.zonk(tc.kind_solutions, x))
                                 .collect(),
                             consequent: tc
                                 .type_solutions
-                                .zonk(&tc.kind_solutions, implication.consequent),
+                                .zonk(tc.kind_solutions, implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -190,7 +197,13 @@ pub fn solve_constraint(
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
-                                    tc.type_inference_context().unify(
+                                    unify(
+                                        tc.common_kinds,
+                                        tc.type_context,
+                                        tc.bound_tyvars,
+                                        &mut tc.kind_solutions,
+                                        &mut tc.type_solutions,
+                                        &tc.source,
                                         None,
                                         &core::Type::RowNil,
                                         rest,
@@ -254,7 +267,7 @@ pub fn solve_placeholder(
                 &Some(SolveConstraintContext {
                     constraint: tc.fill_ty_names(
                         tc.type_solutions
-                            .zonk(&tc.kind_solutions, item.constraint.to_type())
+                            .zonk(tc.kind_solutions, item.constraint.to_type())
                             .to_syntax(),
                     ),
                 }),
