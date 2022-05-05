@@ -1,5 +1,9 @@
 use super::{InferenceContext, InferenceError, InferredPattern, Solutions};
-use crate::{evidence, kind_inference, BoundVars};
+use crate::{
+    evidence, kind_inference,
+    type_inference::{fresh_type_meta, zonk_type},
+    BoundVars,
+};
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
@@ -44,8 +48,8 @@ fn with_empty_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(f: F) -> A {
 #[test]
 fn occurs_1() {
     with_empty_ctx(|ctx| {
-        let v1 = ctx.fresh_type_meta(&Kind::Type);
-        let v2 = ctx.fresh_type_meta(&Kind::Type);
+        let v1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+        let v2 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
         let expected = Err(InferenceError::occurs(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
@@ -248,7 +252,9 @@ fn infer_lam_1() {
                 Type::Meta(Kind::Type, 0),
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -282,7 +288,9 @@ fn infer_lam_2() {
                 },
             ),
         };
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -343,7 +351,9 @@ fn infer_lam_3() {
                 },
             ),
         };
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -434,7 +444,9 @@ fn infer_lam_4() {
                 Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -494,7 +506,9 @@ fn infer_lam_5() {
                 ),
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -524,7 +538,9 @@ fn infer_array_1() {
             Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
             Type::app(Type::mk_array(ctx.common_kinds), Type::Int),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -580,11 +596,13 @@ fn unify_1() {
             ),
             Type::Int,
         );
-        let m_0 = ctx.fresh_type_meta(&Kind::Type);
-        let m_1 = ctx.fresh_type_meta(&Kind::Type);
+        let m_0 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+        let m_1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
         let holey = Type::arrow(ctx.common_kinds, m_1, m_0);
         let expected = Ok(real.clone());
-        let actual = ctx.unify(None, &real, &holey).map(|_| ctx.zonk_type(holey));
+        let actual = ctx
+            .unify(None, &real, &holey)
+            .map(|_| zonk_type(ctx.kind_solutions, ctx.type_solutions, holey));
         assert_eq!(expected, actual)
     })
 }
@@ -696,10 +714,10 @@ fn unify_rows_4() {
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
-            ctx.zonk_type(ty1.clone())
+            zonk_type(ctx.kind_solutions, ctx.type_solutions, ty1.clone())
                 .to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
-            ctx.zonk_type(ty2.clone())
+            zonk_type(ctx.kind_solutions, ctx.type_solutions, ty2.clone())
                 .to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
         ));
@@ -715,7 +733,7 @@ fn infer_record_1() {
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
             ctx.infer(&syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, ctx.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty))),
             Ok((
                 Expr::mk_record(Vec::new(), None),
                 Type::mk_record(ctx.common_kinds, Vec::new(), None)
@@ -749,7 +767,7 @@ fn infer_record_2() {
         );
         assert_eq!(
             ctx.infer(&syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, ctx.zonk_type(ty))),
+                .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty))),
             Ok((
                 Expr::mk_record(
                     vec![
@@ -826,7 +844,7 @@ fn infer_record_3() {
         ));
         let actual = ctx
             .infer(&syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -867,7 +885,7 @@ fn infer_record_4() {
         .with_position(22));
         let actual = ctx
             .infer(&syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -937,7 +955,9 @@ fn infer_case_1() {
                 &Type::Meta(Kind::Type, 2),
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1035,7 +1055,9 @@ fn infer_case_2() {
                 &Type::Meta(Kind::Type, 4),
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1148,7 +1170,9 @@ fn infer_case_3() {
                 &Type::Int,
             ),
         ));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1231,7 +1255,9 @@ fn infer_case_4() {
             label: String::from(SOURCE_LABEL),
         })
         .with_position(32));
-        let actual = ctx.infer(&term).map(|(expr, ty)| (expr, ctx.zonk_type(ty)));
+        let actual = ctx
+            .infer(&term)
+            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
         assert_eq!(expected, actual)
     })
 }

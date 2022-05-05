@@ -1124,26 +1124,6 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    /// Generate a fresh kind metavariable.
-    pub fn fresh_kind_meta(&mut self) -> Kind {
-        Kind::Meta(self.kind_solutions.fresh_meta())
-    }
-
-    /// Generate a fresh type metavariable.
-    pub fn fresh_type_meta(&mut self, kind: &Kind) -> Type {
-        Type::Meta(kind.clone(), self.type_solutions.fresh_meta())
-    }
-
-    /// Substitute all solved type and kind metavariables in a type.
-    pub fn zonk_type(&self, ty: Type) -> Type {
-        self.type_solutions.zonk(self.kind_solutions, ty)
-    }
-
-    /// A mutable version of [`InferenceContext::zonk_type`].
-    pub fn zonk_type_mut(&self, ty: &mut Type) {
-        self.type_solutions.zonk_mut(self.kind_solutions, ty);
-    }
-
     /// Unify two types.
     pub fn unify(
         &mut self,
@@ -1176,12 +1156,18 @@ impl<'a> InferenceContext<'a> {
                 */
                 match error {
                     UnificationError::Mismatch { .. } => UnificationError::Mismatch {
-                        expected: self.zonk_type(expected.clone()).to_syntax().map(&mut |ix| {
-                            self.type_variables.lookup_index(*ix).unwrap().0.clone()
-                        }),
-                        actual: self.zonk_type(actual.clone()).to_syntax().map(&mut |ix| {
-                            self.type_variables.lookup_index(*ix).unwrap().0.clone()
-                        }),
+                        expected: zonk_type(
+                            self.kind_solutions,
+                            self.type_solutions,
+                            expected.clone(),
+                        )
+                        .to_syntax()
+                        .map(&mut |ix| self.type_variables.lookup_index(*ix).unwrap().0.clone()),
+                        actual: zonk_type(self.kind_solutions, self.type_solutions, actual.clone())
+                            .to_syntax()
+                            .map(&mut |ix| {
+                                self.type_variables.lookup_index(*ix).unwrap().0.clone()
+                            }),
                     },
                     _ => error,
                 },
@@ -1209,8 +1195,8 @@ impl<'a> InferenceContext<'a> {
             .ty_vars
             .iter()
             .map(|_| {
-                let kind = self.fresh_kind_meta();
-                self.fresh_type_meta(&kind)
+                let kind = fresh_kind_meta(self.kind_solutions);
+                fresh_type_meta(self.type_solutions, &kind)
             })
             .collect();
 
@@ -1249,7 +1235,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn infer_name_pattern(&mut self, name: &Spanned<Rc<str>>) -> InferredPattern {
-        let name_ty = self.fresh_type_meta(&Kind::Type);
+        let name_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
         InferredPattern::Any {
             pattern: Pattern::Name,
             names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
@@ -1294,10 +1280,13 @@ impl<'a> InferenceContext<'a> {
                 .map(|name| {
                     let name_item_ref = name.item.as_ref();
                     names_to_positions.insert(name_item_ref, name.pos);
-                    (Rc::from(name_item_ref), self.fresh_type_meta(&Kind::Type))
+                    (
+                        Rc::from(name_item_ref),
+                        fresh_type_meta(self.type_solutions, &Kind::Type),
+                    )
                 })
                 .collect();
-            let rest = rest.map(|_| self.fresh_type_meta(&Kind::Row));
+            let rest = rest.map(|_| fresh_type_meta(self.type_solutions, &Kind::Row));
             Type::mk_rows(fields, rest)
         };
 
@@ -1344,8 +1333,8 @@ impl<'a> InferenceContext<'a> {
         arg: &Spanned<Rc<str>>,
     ) -> InferredPattern {
         let ctor: Rc<str> = Rc::from(ctor);
-        let arg_ty = self.fresh_type_meta(&Kind::Type);
-        let rest_row = self.fresh_type_meta(&Kind::Row);
+        let arg_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
+        let rest_row = fresh_type_meta(self.type_solutions, &Kind::Row);
         let tag = Expr::Placeholder(self.evidence.placeholder(
             pos,
             evidence::Constraint::HasField {
@@ -1366,7 +1355,7 @@ impl<'a> InferenceContext<'a> {
         InferredPattern::Any {
             pattern: Pattern::Wildcard,
             names: Vec::new(),
-            ty: self.fresh_type_meta(&Kind::Type),
+            ty: fresh_type_meta(self.type_solutions, &Kind::Type),
         }
     }
 
@@ -1545,7 +1534,7 @@ impl<'a> InferenceContext<'a> {
                 Ok((Expr::String(string_parts), Type::String))
             }
             syntax::Expr::Array(items) => {
-                let item_ty = self.fresh_type_meta(&Kind::Type);
+                let item_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                 let items: Vec<Expr> = items
                     .iter()
                     .map(|item| self.check(item, &item_ty))
@@ -1578,7 +1567,7 @@ impl<'a> InferenceContext<'a> {
                     Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
                 }
                 syntax::Binop::Append => {
-                    let item_ty = self.fresh_type_meta(&Kind::Type);
+                    let item_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                     let array_ty = Type::app(Type::mk_array(self.common_kinds), item_ty);
                     let left = self.check(left, &array_ty)?;
                     let right = self.check(right, &array_ty)?;
@@ -1595,16 +1584,16 @@ impl<'a> InferenceContext<'a> {
                     Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
                 }
                 syntax::Binop::LApply => {
-                    let in_ty = self.fresh_type_meta(&Kind::Type);
-                    let out_ty = self.fresh_type_meta(&Kind::Type);
+                    let in_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
+                    let out_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                     let left =
                         self.check(left, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
                     let right = self.check(right, &in_ty)?;
                     Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
                 }
                 syntax::Binop::RApply => {
-                    let in_ty = self.fresh_type_meta(&Kind::Type);
-                    let out_ty = self.fresh_type_meta(&Kind::Type);
+                    let in_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
+                    let out_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                     let left = self.check(left, &in_ty)?;
                     let right =
                         self.check(right, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
@@ -1619,8 +1608,8 @@ impl<'a> InferenceContext<'a> {
             },
 
             syntax::Expr::App(fun, arg) => {
-                let in_ty = self.fresh_type_meta(&Kind::Type);
-                let out_ty = self.fresh_type_meta(&Kind::Type);
+                let in_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
+                let out_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                 let fun = self.check(fun, &Type::mk_arrow(self.common_kinds, &in_ty, &out_ty))?;
                 let arg = self.check(arg, &in_ty)?;
                 Ok((Expr::mk_app(fun, arg), out_ty))
@@ -1700,7 +1689,9 @@ impl<'a> InferenceContext<'a> {
                             })
                         })
                         .collect::<Result<_, _>>()?;
-                    let rest = rest.as_ref().map(|_| self.fresh_type_meta(&Kind::Row));
+                    let rest = rest
+                        .as_ref()
+                        .map(|_| fresh_type_meta(self.type_solutions, &Kind::Row));
                     Ok(Type::mk_rows(fields, rest))
                 }?;
 
@@ -1744,9 +1735,9 @@ impl<'a> InferenceContext<'a> {
             }
             syntax::Expr::Project(expr, field) => {
                 let field_name: Rc<str> = Rc::from(field.item.as_str());
-                let field_ty = self.fresh_type_meta(&Kind::Type);
+                let field_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
 
-                let rest_row = self.fresh_type_meta(&Kind::Row);
+                let rest_row = fresh_type_meta(self.type_solutions, &Kind::Row);
 
                 let pos = expr.pos;
                 let expr = self.check(
@@ -1772,7 +1763,7 @@ impl<'a> InferenceContext<'a> {
                 let pos = constructor.pos;
                 let constructor: Rc<str> = Rc::from(constructor.item.as_str());
 
-                let rest_row = self.fresh_type_meta(&Kind::Row);
+                let rest_row = fresh_type_meta(self.type_solutions, &Kind::Row);
                 let placeholder = Expr::Placeholder(self.evidence.placeholder(
                     pos,
                     evidence::Constraint::HasField {
@@ -1781,7 +1772,7 @@ impl<'a> InferenceContext<'a> {
                     },
                 ));
 
-                let arg_ty = self.fresh_type_meta(&Kind::Type);
+                let arg_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                 Ok((
                     Expr::mk_variant(placeholder),
                     Type::arrow(
@@ -1796,7 +1787,7 @@ impl<'a> InferenceContext<'a> {
                 ))
             }
             syntax::Expr::Embed(constructor, expr) => {
-                let rest_row = self.fresh_type_meta(&Kind::Row);
+                let rest_row = fresh_type_meta(self.type_solutions, &Kind::Row);
                 let expr = self.check(
                     expr,
                     &Type::app(Type::mk_variant_ctor(self.common_kinds), rest_row.clone()),
@@ -1804,7 +1795,7 @@ impl<'a> InferenceContext<'a> {
 
                 let constructor_pos = constructor.pos;
                 let constructor: Rc<str> = Rc::from(constructor.item.as_str());
-                let arg_ty = self.fresh_type_meta(&Kind::Type);
+                let arg_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
                 let placeholder = Expr::Placeholder(self.evidence.placeholder(
                     constructor_pos,
                     evidence::Constraint::HasField {
@@ -1878,7 +1869,7 @@ impl<'a> InferenceContext<'a> {
         ```
         */
 
-        let out_ty = self.fresh_type_meta(&Kind::Type);
+        let out_ty = fresh_type_meta(self.type_solutions, &Kind::Type);
         let mut seen_ctors = FnvHashSet::default();
         let mut saw_catchall = false;
         let branches: Vec<Branch> = branches
@@ -1912,7 +1903,7 @@ impl<'a> InferenceContext<'a> {
                 Ok(Branch { pattern, body })
             })
             .collect::<Result<_, _>>()?;
-        self.zonk_type_mut(&mut expr_ty);
+        zonk_type_mut(self.kind_solutions, self.type_solutions, &mut expr_ty);
         match expr_ty.unwrap_variant() {
             Some(RowParts {
                 rest: Some(rest), ..
@@ -1933,6 +1924,34 @@ impl<'a> InferenceContext<'a> {
         self.unify(Some(position), expected, &expr_ty)?;
         Ok(expr)
     }
+}
+
+/// Generate a fresh kind metavariable.
+pub fn fresh_kind_meta(kind_solutions: &mut kind_inference::Solutions) -> Kind {
+    Kind::Meta(kind_solutions.fresh_meta())
+}
+
+/// Generate a fresh type metavariable.
+pub fn fresh_type_meta(type_solutions: &mut Solutions, kind: &Kind) -> Type {
+    Type::Meta(kind.clone(), type_solutions.fresh_meta())
+}
+
+/// Substitute all solved type and kind metavariables in a type.
+pub fn zonk_type(
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut Solutions,
+    ty: Type,
+) -> Type {
+    type_solutions.zonk(kind_solutions, ty)
+}
+
+/// A mutable version of [`zonk_type`].
+pub fn zonk_type_mut(
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut Solutions,
+    ty: &mut Type,
+) {
+    type_solutions.zonk_mut(kind_solutions, ty);
 }
 
 /// Infer an expression's type.
