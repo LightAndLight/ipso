@@ -1,4 +1,4 @@
-use super::{InferenceContext, InferenceError, InferredPattern, Solutions};
+use super::{unification, InferenceContext, InferenceError, InferredPattern};
 use crate::{
     evidence, kind_inference,
     type_inference::{fresh_type_meta, zonk_type},
@@ -22,7 +22,7 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
     let modules = HashMap::new();
     let types = HashMap::new();
     let mut kind_solutions = kind_inference::Solutions::new();
-    let mut type_solutions = Solutions::new();
+    let mut type_solutions = unification::Solutions::new();
     let type_signatures = HashMap::new();
     let mut variables = BoundVars::new();
     let mut evidence = evidence::Evidence::new();

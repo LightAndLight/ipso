@@ -148,7 +148,7 @@ pub struct Typechecker<'modules> {
     common_kinds: &'modules CommonKinds,
     source: Source,
     kind_solutions: kind_inference::Solutions,
-    type_solutions: &'modules mut type_inference::Solutions,
+    type_solutions: &'modules mut type_inference::unification::Solutions,
     implications: Vec<Implication>,
     evidence: Evidence,
     type_context: HashMap<Rc<str>, Kind>,
@@ -243,18 +243,18 @@ impl TypeError {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
                 type_inference::InferenceErrorInfo::UnificationError { error } => match error {
-                    type_inference::UnificationError::Mismatch { expected, actual } => format!(
+                    type_inference::unification::Error::Mismatch { expected, actual } => format!(
                         "expected type \"{}\", got type \"{}\"",
                         expected.render(),
                         actual.render()
                     ),
-                    type_inference::UnificationError::Occurs { meta, ty } => format!(
+                    type_inference::unification::Error::Occurs { meta, ty } => format!(
                         "infinite type from equating ?{} with \"{}\"",
                         meta,
                         ty.render()
                     ),
 
-                    type_inference::UnificationError::KindError { error } => {
+                    type_inference::unification::Error::KindError { error } => {
                         render_kind_inference_error(error)
                     }
                 },
@@ -386,7 +386,7 @@ macro_rules! with_tc {
             ModuleKey::from("builtins"),
             builtins::builtins(&common_kinds),
         );
-        let mut type_solutions = type_inference::Solutions::new();
+        let mut type_solutions = type_inference::unification::Solutions::new();
         let mut tc = Typechecker::new($location, &common_kinds, &modules, &mut type_solutions);
         tc.register_from_import(builtins_module_id, &syntax::Names::All);
         $f(tc)
@@ -430,7 +430,7 @@ impl<'modules> Typechecker<'modules> {
         source: Source,
         common_kinds: &'modules CommonKinds,
         modules: &'modules Modules<core::Module>,
-        type_solutions: &'modules mut type_inference::Solutions,
+        type_solutions: &'modules mut type_inference::unification::Solutions,
     ) -> Self {
         Typechecker {
             common_kinds,
@@ -1377,12 +1377,12 @@ pub fn register_type_alias(name: &str, args: &[Kind], body: &core::Type) {
 }
 
 fn eq_zonked_type(
-    type_solutions: &type_inference::Solutions,
+    type_solutions: &type_inference::unification::Solutions,
     t1: &core::Type,
     t2: &core::Type,
 ) -> bool {
     fn zonk_just_enough<'a>(
-        type_solutions: &'a type_inference::Solutions,
+        type_solutions: &'a type_inference::unification::Solutions,
         t: &'a core::Type,
     ) -> &'a core::Type {
         match t {
@@ -1456,7 +1456,7 @@ fn eq_zonked_type(
 }
 
 pub fn eq_zonked_constraint(
-    type_solutions: &type_inference::Solutions,
+    type_solutions: &type_inference::unification::Solutions,
     c1: &evidence::Constraint,
     c2: &evidence::Constraint,
 ) -> bool {
