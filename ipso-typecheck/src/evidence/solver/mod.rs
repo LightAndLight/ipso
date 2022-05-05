@@ -3,7 +3,7 @@ mod test;
 
 use super::Constraint;
 use crate::{
-    eq_zonked_constraint, metavariables, type_inference::unify, Implication,
+    eq_zonked_constraint, fill_ty_names, metavariables, type_inference::unify, Implication,
     SolveConstraintContext, TypeError, Typechecker,
 };
 use ipso_core::{self as core, Binop, Expr, Placeholder};
@@ -265,7 +265,8 @@ pub fn solve_placeholder(
             let expr = solve_constraint(
                 item.pos,
                 &Some(SolveConstraintContext {
-                    constraint: tc.fill_ty_names(
+                    constraint: fill_ty_names(
+                        tc.bound_tyvars,
                         tc.type_solutions
                             .zonk(tc.kind_solutions, item.constraint.to_type())
                             .to_syntax(),

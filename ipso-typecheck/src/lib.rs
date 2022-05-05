@@ -1021,7 +1021,7 @@ impl<'modules> Typechecker<'modules> {
                 match evidence::solver::solve_constraint(
                     name.pos,
                     &Some(SolveConstraintContext {
-                        constraint: self.fill_ty_names(superclass.to_syntax()),
+                        constraint: fill_ty_names(self.bound_tyvars, superclass.to_syntax()),
                     }),
                     self,
                     &evidence::Constraint::from_type(&superclass),
@@ -1241,10 +1241,13 @@ impl<'modules> Typechecker<'modules> {
             }
         }
     }
+}
 
-    pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {
-        ty.map(&mut |&ix| self.bound_tyvars.lookup_index(ix).unwrap().0.clone())
-    }
+pub fn fill_ty_names(
+    bound_tyvars: &BoundVars<Kind>,
+    ty: syntax::Type<usize>,
+) -> syntax::Type<Rc<str>> {
+    ty.map(&mut |&ix| bound_tyvars.lookup_index(ix).unwrap().0.clone())
 }
 
 fn infer_kind(

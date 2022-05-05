@@ -204,8 +204,22 @@ fn infer_record_1() {
                 None,
             ),
         };
-        let actual_result = type_inference::infer(&mut tc.type_inference_context(), &expr)
-            .map(|(expr, ty)| (expr, tc.type_solutions.zonk(tc.kind_solutions, ty)));
+        let actual_result = type_inference::infer(
+            &mut type_inference::InferenceContext {
+                common_kinds: tc.common_kinds,
+                modules: &tc.module_context,
+                types: tc.type_context,
+                type_variables: tc.bound_tyvars,
+                kind_solutions: &mut tc.kind_solutions,
+                type_solutions: &mut tc.type_solutions,
+                type_signatures: &tc.context,
+                variables: &mut tc.bound_vars,
+                evidence: &mut tc.evidence,
+                source: &tc.source,
+            },
+            &expr,
+        )
+        .map(|(expr, ty)| (expr, tc.type_solutions.zonk(tc.kind_solutions, ty)));
         assert_eq!(expected_result, actual_result, "checking results");
 
         let (mut actual_expr, _actual_ty) = actual_result.unwrap();
