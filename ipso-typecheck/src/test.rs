@@ -1,5 +1,8 @@
 use crate::{
-    evidence::{solver::solve_placeholder, Constraint},
+    evidence::{
+        solver::{self, solve_placeholder},
+        Constraint,
+    },
     zonk_constraint, BoundVars, Declarations, Typechecker,
 };
 use ipso_core::{self as core, ClassMember, Placeholder, Signature, TypeSig};
@@ -250,7 +253,20 @@ fn infer_record_1() {
                     )
                 }
             )),
-            solve_placeholder(&mut tc, *p0).map(|(expr, constraint)| (
+            solve_placeholder(
+                &mut solver::Context {
+                    common_kinds: tc.common_kinds,
+                    types: tc.type_context,
+                    kind_solutions: tc.kind_solutions,
+                    type_solutions: tc.type_solutions,
+                    implications: &tc.implications,
+                    type_variables: tc.bound_tyvars,
+                    evidence: &mut tc.evidence,
+                    source: &tc.source,
+                },
+                *p0
+            )
+            .map(|(expr, constraint)| (
                 expr,
                 zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
             ))
@@ -264,7 +280,20 @@ fn infer_record_1() {
                     rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
                 }
             )),
-            solve_placeholder(&mut tc, *p1).map(|(expr, constraint)| (
+            solve_placeholder(
+                &mut solver::Context {
+                    common_kinds: tc.common_kinds,
+                    types: tc.type_context,
+                    kind_solutions: tc.kind_solutions,
+                    type_solutions: tc.type_solutions,
+                    implications: &tc.implications,
+                    type_variables: tc.bound_tyvars,
+                    evidence: &mut tc.evidence,
+                    source: &tc.source,
+                },
+                *p1
+            )
+            .map(|(expr, constraint)| (
                 expr,
                 zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
             ))
@@ -278,7 +307,20 @@ fn infer_record_1() {
                     rest: core::Type::RowNil
                 }
             )),
-            solve_placeholder(&mut tc, *p2).map(|(expr, constraint)| (
+            solve_placeholder(
+                &mut solver::Context {
+                    common_kinds: tc.common_kinds,
+                    types: tc.type_context,
+                    kind_solutions: tc.kind_solutions,
+                    type_solutions: tc.type_solutions,
+                    implications: &tc.implications,
+                    type_variables: tc.bound_tyvars,
+                    evidence: &mut tc.evidence,
+                    source: &tc.source,
+                },
+                *p2
+            )
+            .map(|(expr, constraint)| (
                 expr,
                 zonk_constraint(tc.kind_solutions, tc.type_solutions, &constraint)
             ))

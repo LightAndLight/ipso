@@ -1,5 +1,8 @@
 use crate::{
-    evidence::{solver::solve_constraint, Constraint, Evidence},
+    evidence::{
+        solver::{self, solve_constraint},
+        Constraint, Evidence,
+    },
     register_class, register_instance, Typechecker,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
@@ -20,7 +23,21 @@ fn solve_constraint_1() {
             ),
         };
         let expected = Ok(Rc::new(Expr::Int(0)));
-        let actual = solve_constraint(0, &None, &mut tc, &constraint);
+        let actual = solve_constraint(
+            &mut solver::Context {
+                common_kinds: tc.common_kinds,
+                types: tc.type_context,
+                kind_solutions: tc.kind_solutions,
+                type_solutions: tc.type_solutions,
+                implications: &tc.implications,
+                type_variables: tc.bound_tyvars,
+                evidence: &mut tc.evidence,
+                source: &tc.source,
+            },
+            0,
+            &None,
+            &constraint,
+        );
         assert_eq!(expected, actual)
     })
 }
@@ -43,7 +60,21 @@ fn solve_constraint_2() {
             Expr::Int(1),
             Expr::Int(0),
         )));
-        let actual = solve_constraint(0, &None, &mut tc, &constraint);
+        let actual = solve_constraint(
+            &mut solver::Context {
+                common_kinds: tc.common_kinds,
+                types: tc.type_context,
+                kind_solutions: tc.kind_solutions,
+                type_solutions: tc.type_solutions,
+                implications: &tc.implications,
+                type_variables: tc.bound_tyvars,
+                evidence: &mut tc.evidence,
+                source: &tc.source,
+            },
+            0,
+            &None,
+            &constraint,
+        );
         assert_eq!(expected, actual)
     })
 }
@@ -72,7 +103,21 @@ fn solve_constraint_3() {
         };
 
         let expected_result = Ok(Rc::new(Expr::Int(2)));
-        let actual_result = solve_constraint(0, &None, &mut tc, &constraint);
+        let actual_result = solve_constraint(
+            &mut solver::Context {
+                common_kinds: tc.common_kinds,
+                types: tc.type_context,
+                kind_solutions: tc.kind_solutions,
+                type_solutions: tc.type_solutions,
+                implications: &tc.implications,
+                type_variables: tc.bound_tyvars,
+                evidence: &mut tc.evidence,
+                source: &tc.source,
+            },
+            0,
+            &None,
+            &constraint,
+        );
         assert_eq!(expected_result, actual_result);
 
         let expected_evidence = Evidence {
@@ -181,7 +226,21 @@ fn solve_constraint_4() {
             eq_ty,
             core::Type::app(core::Type::mk_array(tc.common_kinds), core::Type::Int),
         ));
-        let actual = solve_constraint(0, &None, &mut tc, constraint);
+        let actual = solve_constraint(
+            &mut solver::Context {
+                common_kinds: tc.common_kinds,
+                types: tc.type_context,
+                kind_solutions: tc.kind_solutions,
+                type_solutions: tc.type_solutions,
+                implications: &tc.implications,
+                type_variables: tc.bound_tyvars,
+                evidence: &mut tc.evidence,
+                source: &tc.source,
+            },
+            0,
+            &None,
+            constraint,
+        );
 
         assert_eq!(expected, actual)
     })

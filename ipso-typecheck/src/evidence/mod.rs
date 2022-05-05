@@ -1,6 +1,6 @@
 pub mod solver;
 
-use crate::{eq_zonked_constraint, Typechecker};
+use crate::{eq_zonked_constraint, type_inference};
 use ipso_core::{self as core, EVar, Expr, Placeholder};
 use std::rc::Rc;
 
@@ -73,9 +73,13 @@ impl Evidence {
         ev
     }
 
-    pub fn find(&self, tc: &Typechecker, constraint: &Constraint) -> Option<Rc<Expr>> {
+    pub fn find(
+        &self,
+        type_solutions: &type_inference::unification::Solutions,
+        constraint: &Constraint,
+    ) -> Option<Rc<Expr>> {
         self.environment.iter().find_map(|c| {
-            if eq_zonked_constraint(tc.type_solutions, &c.constraint, constraint) {
+            if eq_zonked_constraint(type_solutions, &c.constraint, constraint) {
                 c.expr.clone()
             } else {
                 None

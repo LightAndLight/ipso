@@ -7,7 +7,10 @@ pub mod metavariables;
 pub mod type_inference;
 
 use diagnostic::{Location, Message};
-use evidence::{solver::solve_placeholder, Constraint, Evidence};
+use evidence::{
+    solver::{self, solve_placeholder},
+    Constraint, Evidence,
+};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind, ModuleRef, Spanned};
@@ -599,69 +602,6 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn abstract_evidence(
-        &mut self,
-        mut expr: core::Expr,
-    ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
-        expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
-            let (expr, _solved_constraint) = solve_placeholder(self, *p)?;
-            Ok(expr.as_ref().clone())
-        })?;
-
-        let mut unsolved_constraints: Vec<(core::EVar, core::Type)> = Vec::new();
-        let mut seen_evars: HashSet<core::EVar> = HashSet::new();
-        for ev in expr.iter_evars() {
-            if !seen_evars.contains(ev) {
-                seen_evars.insert(*ev);
-                let constraint = self.evidence.lookup_evar(ev).unwrap();
-                unsolved_constraints.push((
-                    *ev,
-                    self.type_solutions
-                        .zonk(self.kind_solutions, constraint.to_type()),
-                ));
-            }
-        }
-
-        let mut expr = expr;
-        let mut new_unsolved_constraints = Vec::new();
-        for (ev, constraint) in unsolved_constraints.into_iter().rev() {
-            expr = expr.abstract_evar(ev);
-            match constraint.iter_metas().next() {
-                None => {}
-                Some(_) => {
-                    todo!("handle ambiguous constraints")
-                }
-            }
-            new_unsolved_constraints.push(constraint);
-        }
-        new_unsolved_constraints.reverse();
-
-        Ok((expr, new_unsolved_constraints))
-    }
-
-    fn generalise(
-        &mut self,
-        expr: core::Expr,
-        ty: core::Type,
-    ) -> Result<(core::Expr, core::TypeSig), TypeError> {
-        let (expr, unsolved_constraints) = self.abstract_evidence(expr)?;
-
-        let mut ty = self.type_solutions.zonk(self.kind_solutions, ty);
-        for constraint in unsolved_constraints.into_iter().rev() {
-            ty = core::Type::mk_fatarrow(self.common_kinds, constraint, ty);
-        }
-
-        let ty_vars: Vec<(Rc<str>, Kind)> = self
-            .bound_tyvars
-            .info
-            .iter()
-            .map(|(name, kind)| (name.clone(), self.kind_solutions.zonk(true, kind.clone())))
-            .collect();
-        let sig = core::TypeSig::new(ty_vars, ty);
-
-        Ok((expr, sig))
-    }
-
     fn check_definition(
         &mut self,
         name: &str,
@@ -781,7 +721,18 @@ impl<'modules> Typechecker<'modules> {
             }
         });
 
-        let (body, sig) = self.generalise(body, ty.clone())?;
+        let (body, sig) = generalise(
+            self.common_kinds,
+            self.type_context,
+            self.kind_solutions,
+            self.type_solutions,
+            &self.implications,
+            self.bound_tyvars,
+            &mut self.evidence,
+            &self.source,
+            body,
+            ty.clone(),
+        )?;
         self.evidence = Evidence::new();
 
         self.bound_tyvars.delete(ty_var_kinds.len());
@@ -1019,15 +970,35 @@ impl<'modules> Typechecker<'modules> {
                 let superclass = superclass.instantiate_many(&args);
 
                 match evidence::solver::solve_constraint(
+                    &mut solver::Context {
+                        common_kinds: self.common_kinds,
+                        types: self.type_context,
+                        kind_solutions: self.kind_solutions,
+                        type_solutions: self.type_solutions,
+                        implications: &self.implications,
+                        type_variables: self.bound_tyvars,
+                        evidence: &mut self.evidence,
+                        source: &self.source,
+                    },
                     name.pos,
                     &Some(SolveConstraintContext {
                         constraint: fill_ty_names(self.bound_tyvars, superclass.to_syntax()),
                     }),
-                    self,
                     &evidence::Constraint::from_type(&superclass),
                 )
-                .and_then(|evidence| self.abstract_evidence(evidence.as_ref().clone()))
-                {
+                .and_then(|evidence| {
+                    abstract_evidence(
+                        self.common_kinds,
+                        self.type_context,
+                        self.kind_solutions,
+                        self.type_solutions,
+                        &self.implications,
+                        self.bound_tyvars,
+                        &mut self.evidence,
+                        &self.source,
+                        evidence.as_ref().clone(),
+                    )
+                }) {
                     Err(err) => {
                         return Err(err);
                     }
@@ -1099,7 +1070,18 @@ impl<'modules> Typechecker<'modules> {
                             },
                             &member_type.sig.body,
                         )?;
-                        self.generalise(member_body, member_type.sig.body.clone())
+                        generalise(
+                            self.common_kinds,
+                            self.type_context,
+                            self.kind_solutions,
+                            self.type_solutions,
+                            &self.implications,
+                            self.bound_tyvars,
+                            &mut self.evidence,
+                            &self.source,
+                            member_body,
+                            member_type.sig.body.clone(),
+                        )
                     } {
                         Err(err) => return Err(err),
                         Ok((member_body, _)) => {
@@ -1229,6 +1211,103 @@ impl<'modules> Typechecker<'modules> {
                 .map(|(a, b)| Declarations::Two(a, b)),
         }
     }
+}
+
+fn abstract_evidence(
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &[Implication],
+    type_variables: &BoundVars<Kind>,
+    evidence: &mut Evidence,
+    source: &Source,
+    mut expr: core::Expr,
+) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
+    expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
+        let (expr, _solved_constraint) = solve_placeholder(
+            &mut solver::Context {
+                common_kinds,
+                types,
+                kind_solutions,
+                type_solutions,
+                implications,
+                type_variables,
+                evidence,
+                source,
+            },
+            *p,
+        )?;
+        Ok(expr.as_ref().clone())
+    })?;
+
+    let mut unsolved_constraints: Vec<(core::EVar, core::Type)> = Vec::new();
+    let mut seen_evars: HashSet<core::EVar> = HashSet::new();
+    for ev in expr.iter_evars() {
+        if !seen_evars.contains(ev) {
+            seen_evars.insert(*ev);
+            let constraint = evidence.lookup_evar(ev).unwrap();
+            unsolved_constraints.push((
+                *ev,
+                type_solutions.zonk(kind_solutions, constraint.to_type()),
+            ));
+        }
+    }
+
+    let mut expr = expr;
+    let mut new_unsolved_constraints = Vec::new();
+    for (ev, constraint) in unsolved_constraints.into_iter().rev() {
+        expr = expr.abstract_evar(ev);
+        match constraint.iter_metas().next() {
+            None => {}
+            Some(_) => {
+                todo!("handle ambiguous constraints")
+            }
+        }
+        new_unsolved_constraints.push(constraint);
+    }
+    new_unsolved_constraints.reverse();
+
+    Ok((expr, new_unsolved_constraints))
+}
+
+fn generalise(
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut type_inference::unification::Solutions,
+    implications: &[Implication],
+    type_variables: &BoundVars<Kind>,
+    evidence: &mut Evidence,
+    source: &Source,
+    expr: core::Expr,
+    ty: core::Type,
+) -> Result<(core::Expr, core::TypeSig), TypeError> {
+    let (expr, unsolved_constraints) = abstract_evidence(
+        common_kinds,
+        types,
+        kind_solutions,
+        type_solutions,
+        implications,
+        type_variables,
+        evidence,
+        source,
+        expr,
+    )?;
+
+    let mut ty = type_solutions.zonk(kind_solutions, ty);
+    for constraint in unsolved_constraints.into_iter().rev() {
+        ty = core::Type::mk_fatarrow(common_kinds, constraint, ty);
+    }
+
+    let ty_vars: Vec<(Rc<str>, Kind)> = type_variables
+        .info
+        .iter()
+        .map(|(name, kind)| (name.clone(), kind_solutions.zonk(true, kind.clone())))
+        .collect();
+    let sig = core::TypeSig::new(ty_vars, ty);
+
+    Ok((expr, sig))
 }
 
 pub fn zonk_constraint(

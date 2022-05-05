@@ -1,23 +1,29 @@
 #[cfg(test)]
 mod test;
 
-use super::Constraint;
+use super::{Constraint, Evidence};
 use crate::{
-    eq_zonked_constraint, fill_ty_names, metavariables, type_inference::unify, Implication,
-    SolveConstraintContext, TypeError, Typechecker,
+    eq_zonked_constraint, fill_ty_names, kind_inference, metavariables,
+    type_inference::{self, unify},
+    BoundVars, Implication, SolveConstraintContext, TypeError,
 };
-use ipso_core::{self as core, Binop, Expr, Placeholder};
+use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
+use ipso_diagnostic::Source;
 use ipso_syntax::kind::Kind;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
-pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<core::Expr>> {
-    tc.evidence.environment.iter().find_map(
+pub fn lookup_evidence(
+    type_solutions: &type_inference::unification::Solutions,
+    evidence: &Evidence,
+    constraint: &Constraint,
+) -> Option<Rc<core::Expr>> {
+    evidence.environment.iter().find_map(
         |super::Item {
              constraint: other_constraint,
              expr: other_evidence,
              ..
          }| {
-            if eq_zonked_constraint(tc.type_solutions, constraint, other_constraint) {
+            if eq_zonked_constraint(type_solutions, constraint, other_constraint) {
                 other_evidence.as_ref().cloned()
             } else {
                 None
@@ -26,42 +32,60 @@ pub fn lookup_evidence(tc: &Typechecker, constraint: &Constraint) -> Option<Rc<c
     )
 }
 
+/**
+Constraint olver context.
+
+[`solve_placeholder`] and [`solve_constraint`] take many unchanging arguments, so we bundle the
+arguments into a struct for convenience.
+*/
+pub struct Context<'a> {
+    pub common_kinds: &'a CommonKinds,
+    pub types: &'a HashMap<Rc<str>, Kind>,
+    pub kind_solutions: &'a mut kind_inference::Solutions,
+    pub type_solutions: &'a mut type_inference::unification::Solutions,
+    pub implications: &'a [Implication],
+    pub type_variables: &'a BoundVars<Kind>,
+    pub evidence: &'a mut Evidence,
+    pub source: &'a Source,
+}
+
 pub fn solve_constraint(
+    ctx: &mut Context,
     pos: usize,
     context: &Option<SolveConstraintContext>,
-    tc: &mut Typechecker,
     constraint: &Constraint,
 ) -> Result<Rc<core::Expr>, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            debug_assert!(tc.kind_solutions.zonk(false, constraint.kind()) == Kind::Constraint);
+            debug_assert!(ctx.kind_solutions.zonk(false, constraint.kind()) == Kind::Constraint);
 
-            match tc.evidence.find(tc, &Constraint::from_type(constraint)) {
+            match ctx
+                .evidence
+                .find(ctx.type_solutions, &Constraint::from_type(constraint))
+            {
                 None => {}
                 Some(expr) => {
                     return Ok(expr);
                 }
             }
 
-            let implications = tc.implications.clone();
-
             let mut result = None;
-            for implication in implications.into_iter() {
+            for implication in ctx.implications.iter() {
                 let metas: Vec<core::Type> = implication
                     .ty_vars
                     .iter()
-                    .map(|kind| core::Type::Meta(kind.clone(), tc.type_solutions.fresh_meta()))
+                    .map(|kind| core::Type::Meta(kind.clone(), ctx.type_solutions.fresh_meta()))
                     .collect();
 
                 let implication = implication.instantiate_many(&metas);
 
                 match unify(
-                    tc.common_kinds,
-                    tc.type_context,
-                    tc.bound_tyvars,
-                    &mut tc.kind_solutions,
-                    &mut tc.type_solutions,
-                    &tc.source,
+                    ctx.common_kinds,
+                    ctx.types,
+                    ctx.type_variables,
+                    ctx.kind_solutions,
+                    ctx.type_solutions,
+                    ctx.source,
                     None,
                     constraint,
                     &implication.consequent,
@@ -75,35 +99,35 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| tc.type_solutions.zonk(tc.kind_solutions, x))
+                                .map(|x| ctx.type_solutions.zonk(ctx.kind_solutions, x))
                                 .collect(),
-                            consequent: tc
+                            consequent: ctx
                                 .type_solutions
-                                .zonk(tc.kind_solutions, implication.consequent),
+                                .zonk(ctx.kind_solutions, implication.consequent),
                             evidence: implication.evidence,
                         };
 
-                        let mut evidence = Ok(implication.evidence);
+                        let mut evidence_result = Ok(implication.evidence);
 
                         for antecedent in &implication.antecedents {
                             match solve_constraint(
+                                ctx,
                                 pos,
                                 context,
-                                tc,
                                 &Constraint::from_type(antecedent),
                             ) {
                                 Err(err) => {
-                                    evidence = Err(err);
+                                    evidence_result = Err(err);
                                     break;
                                 }
                                 Ok(arg) => {
-                                    evidence =
-                                        evidence.map(|evidence| Rc::new(Expr::app(evidence, arg)));
+                                    evidence_result = evidence_result
+                                        .map(|evidence| Rc::new(Expr::app(evidence, arg)));
                                 }
                             }
                         }
 
-                        match evidence {
+                        match evidence_result {
                             Err(_err) => {
                                 continue;
                             }
@@ -119,23 +143,23 @@ pub fn solve_constraint(
             match result {
                 None => Err(TypeError::CannotDeduce {
                     pos,
-                    source: tc.source.clone(),
+                    source: ctx.source.clone(),
                     context: context.clone(),
                 }),
                 Some(evidence) => Ok(evidence),
             }
         }
         Constraint::HasField { field, rest } => {
-            debug_assert!(tc.kind_solutions.zonk(false, rest.kind()) == Kind::Row);
+            debug_assert!(ctx.kind_solutions.zonk(false, rest.kind()) == Kind::Row);
 
             let new_evidence: Rc<core::Expr> = match rest {
                 core::Type::RowNil => Ok(Rc::new(core::Expr::Int(0))),
                 core::Type::RowCons(other_field, _, other_rest) => {
                     if field <= other_field {
                         solve_constraint(
+                            ctx,
                             pos,
                             context,
-                            tc,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: other_rest.as_ref().clone(),
@@ -143,9 +167,9 @@ pub fn solve_constraint(
                         )
                     } else {
                         let ev = solve_constraint(
+                            ctx,
                             pos,
                             context,
-                            tc,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: other_rest.as_ref().clone(),
@@ -163,21 +187,23 @@ pub fn solve_constraint(
                 core::Type::Name(_, n) => todo!("deduce HasField for Name({})", n),
 
                 core::Type::Var(_, _) => {
-                    let evidence = lookup_evidence(tc, constraint);
-                    match evidence {
+                    let evidence_result =
+                        lookup_evidence(ctx.type_solutions, ctx.evidence, constraint);
+                    match evidence_result {
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
-                            let ev = tc.evidence.assume(0, constraint.clone());
-                            debug_assert!(tc.evidence.lookup_evar(&ev) != None);
+                            let ev = ctx.evidence.assume(0, constraint.clone());
+                            debug_assert!(ctx.evidence.lookup_evar(&ev) != None);
                             Ok(Rc::new(core::Expr::EVar(ev)))
                         }
                         Some(evidence) => Ok(evidence),
                     }
                 }
                 core::Type::App(_, _, _) => {
-                    let evidence = lookup_evidence(tc, constraint);
-                    match evidence {
+                    let evidence_result =
+                        lookup_evidence(ctx.type_solutions, ctx.evidence, constraint);
+                    match evidence_result {
                         None => {
                             panic!(
                                 "impossible: cannot deduce HasField({:?}, {:?})",
@@ -188,33 +214,37 @@ pub fn solve_constraint(
                     }
                 }
                 core::Type::Meta(kind, n) => {
-                    let sol = tc.type_solutions.get(*n);
+                    let sol = ctx.type_solutions.get(*n);
                     // we assume solving is done after unification, so any unsolved variables
                     // will never recieve solutions
                     match sol.clone() {
                         metavariables::Solution::Unsolved => {
-                            match tc.kind_solutions.zonk(false, kind.clone()) {
+                            match ctx.kind_solutions.zonk(false, kind.clone()) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
                                     unify(
-                                        tc.common_kinds,
-                                        tc.type_context,
-                                        tc.bound_tyvars,
-                                        &mut tc.kind_solutions,
-                                        &mut tc.type_solutions,
-                                        &tc.source,
+                                        ctx.common_kinds,
+                                        ctx.types,
+                                        ctx.type_variables,
+                                        ctx.kind_solutions,
+                                        ctx.type_solutions,
+                                        ctx.source,
                                         None,
                                         &core::Type::RowNil,
                                         rest,
                                     )?;
-                                    solve_constraint(pos, context, tc, constraint)
+                                    solve_constraint(ctx, pos, context, constraint)
                                 }
-                                _ => match lookup_evidence(tc, constraint) {
+                                _ => match lookup_evidence(
+                                    ctx.type_solutions,
+                                    ctx.evidence,
+                                    constraint,
+                                ) {
                                     None => {
                                         panic!(
                                         "impossible: cannot deduce HasField({:?}, {:?}) given {:?}",
-                                        field, rest, tc.evidence
+                                        field, rest, ctx.evidence
                                     )
                                     }
                                     Some(evidence) => Ok(evidence),
@@ -222,9 +252,9 @@ pub fn solve_constraint(
                             }
                         }
                         metavariables::Solution::Solved(sol) => solve_constraint(
+                            ctx,
                             pos,
                             context,
-                            tc,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: sol,
@@ -256,26 +286,26 @@ pub fn solve_constraint(
 }
 
 pub fn solve_placeholder(
-    tc: &mut Typechecker,
+    ctx: &mut Context,
     p: Placeholder,
 ) -> Result<(Rc<core::Expr>, Constraint), TypeError> {
-    let item = tc.evidence.environment[p.0].clone();
+    let item = ctx.evidence.environment[p.0].clone();
     match item.expr {
         None => {
             let expr = solve_constraint(
+                ctx,
                 item.pos,
                 &Some(SolveConstraintContext {
                     constraint: fill_ty_names(
-                        tc.bound_tyvars,
-                        tc.type_solutions
-                            .zonk(tc.kind_solutions, item.constraint.to_type())
+                        ctx.type_variables,
+                        ctx.type_solutions
+                            .zonk(ctx.kind_solutions, item.constraint.to_type())
                             .to_syntax(),
                     ),
                 }),
-                tc,
                 &item.constraint,
             )?;
-            tc.evidence.environment[p.0].expr = Some(expr.clone());
+            ctx.evidence.environment[p.0].expr = Some(expr.clone());
             Ok((expr, item.constraint.clone()))
         }
         Some(evidence) => Ok((evidence, item.constraint.clone())),
