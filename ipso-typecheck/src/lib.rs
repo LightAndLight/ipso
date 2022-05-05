@@ -168,18 +168,6 @@ pub struct Typechecker<'modules> {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyTypeContext {
-    pub expected: syntax::Type<Rc<str>>,
-    pub actual: syntax::Type<Rc<str>>,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct UnifyTypeContextRefs<'a> {
-    pub expected: &'a core::Type,
-    pub actual: &'a core::Type,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct SolveConstraintContext {
     pub constraint: syntax::Type<Rc<str>>,
 }
