@@ -726,10 +726,24 @@ impl<'modules> Typechecker<'modules> {
             .collect();
         let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
 
-        self.unify_type(
+        let common_kinds = &self.common_kinds;
+        type_inference::InferenceContext::new(
+            self.common_kinds,
+            &self.source,
+            &self.module_context,
+            &self.type_context,
+            &self.bound_tyvars,
+            &mut self.kind_solutions,
+            &mut self.type_solutions,
+            &self.context,
+            &mut self.bound_vars,
+            &mut self.evidence,
+        )
+        .unify(
+            None,
             ty,
             &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
-                core::Type::mk_arrow(self.common_kinds, &el.ty(self.common_kinds), &acc)
+                core::Type::mk_arrow(common_kinds, &el.ty(common_kinds), &acc)
             }),
         )?;
 
@@ -1207,7 +1221,7 @@ impl<'modules> Typechecker<'modules> {
         }
     }
 
-    fn type_inference_context(&mut self) -> type_inference::InferenceContext {
+    pub fn type_inference_context(&mut self) -> type_inference::InferenceContext {
         type_inference::InferenceContext::new(
             self.common_kinds,
             &self.source,
@@ -1220,17 +1234,6 @@ impl<'modules> Typechecker<'modules> {
             &mut self.bound_vars,
             &mut self.evidence,
         )
-    }
-
-    pub fn unify_type(
-        &mut self,
-        expected: &core::Type,
-        actual: &core::Type,
-    ) -> Result<(), TypeError> {
-        self.type_inference_context()
-            .unify(None, expected, actual)?;
-
-        Ok(())
     }
 
     pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {

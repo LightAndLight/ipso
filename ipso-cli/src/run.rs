@@ -43,6 +43,12 @@ impl From<typecheck::TypeError> for InterpreterError {
     }
 }
 
+impl From<type_inference::InferenceError> for InterpreterError {
+    fn from(err: type_inference::InferenceError) -> Self {
+        InterpreterError::TypeError(typecheck::TypeError::from(err))
+    }
+}
+
 impl From<import::ModuleError> for InterpreterError {
     fn from(err: import::ModuleError) -> Self {
         InterpreterError::ModuleError(err)
@@ -105,7 +111,9 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         let actual = target_sig.body;
 
         let mut tc = Typechecker::new(source, &common_kinds, &modules, &mut type_solutions);
-        let _ = tc.unify_type(&expected, &actual)?;
+        let _ = tc
+            .type_inference_context()
+            .unify(None, &expected, &actual)?;
     }
 
     let bytes = Arena::new();

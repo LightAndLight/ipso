@@ -55,7 +55,10 @@ pub fn solve_constraint(
 
                 let implication = implication.instantiate_many(&metas);
 
-                match tc.unify_type(constraint, &implication.consequent) {
+                match tc
+                    .type_inference_context()
+                    .unify(None, constraint, &implication.consequent)
+                {
                     Err(_) => {
                         continue;
                     }
@@ -187,7 +190,11 @@ pub fn solve_constraint(
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
-                                    tc.unify_type(&core::Type::RowNil, rest)?;
+                                    tc.type_inference_context().unify(
+                                        None,
+                                        &core::Type::RowNil,
+                                        rest,
+                                    )?;
                                     solve_constraint(pos, context, tc, constraint)
                                 }
                                 _ => match lookup_evidence(tc, constraint) {
