@@ -1219,18 +1219,18 @@ impl<'modules> Typechecker<'modules> {
     }
 
     pub fn type_inference_context(&mut self) -> type_inference::InferenceContext {
-        type_inference::InferenceContext::new(
-            self.common_kinds,
-            &self.source,
-            &self.module_context,
-            self.type_context,
-            self.bound_tyvars,
-            &mut self.kind_solutions,
-            &mut self.type_solutions,
-            &self.context,
-            &mut self.bound_vars,
-            &mut self.evidence,
-        )
+        type_inference::InferenceContext {
+            common_kinds: self.common_kinds,
+            modules: &self.module_context,
+            types: self.type_context,
+            type_variables: self.bound_tyvars,
+            kind_solutions: &mut self.kind_solutions,
+            type_solutions: &mut self.type_solutions,
+            type_signatures: &self.context,
+            variables: &mut self.bound_vars,
+            evidence: &mut self.evidence,
+            source: &self.source,
+        }
     }
 
     pub fn fill_ty_names(&self, ty: syntax::Type<usize>) -> syntax::Type<Rc<str>> {

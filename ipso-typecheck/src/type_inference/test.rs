@@ -26,18 +26,18 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
     let type_signatures = HashMap::new();
     let mut variables = BoundVars::new();
     let mut evidence = evidence::Evidence::new();
-    let mut ctx = InferenceContext::new(
-        &common_kinds,
-        &source,
-        &modules,
-        &types,
-        &type_variables,
-        &mut kind_solutions,
-        &mut type_solutions,
-        &type_signatures,
-        &mut variables,
-        &mut evidence,
-    );
+    let mut ctx = InferenceContext {
+        common_kinds: &common_kinds,
+        modules: &modules,
+        types: &types,
+        type_variables: &type_variables,
+        kind_solutions: &mut kind_solutions,
+        type_solutions: &mut type_solutions,
+        type_signatures: &type_signatures,
+        variables: &mut variables,
+        evidence: &mut evidence,
+        source: &source,
+    };
     f(&mut ctx)
 }
 

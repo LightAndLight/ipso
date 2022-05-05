@@ -217,18 +217,23 @@ impl CheckedPattern {
     }
 }
 
-/// Type inference context.
+/**
+Type inference context.
+
+[`infer`], [`check`], and [`check_case`] are mutually recursive and take many arguments. This
+struct bundles all those arguments for convenience.
+*/
 pub struct InferenceContext<'a> {
-    common_kinds: &'a CommonKinds,
-    source: &'a Source,
-    modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
-    types: &'a HashMap<Rc<str>, Kind>,
-    type_variables: &'a BoundVars<Kind>,
-    kind_solutions: &'a mut kind_inference::Solutions,
-    type_solutions: &'a mut unification::Solutions,
-    type_signatures: &'a HashMap<String, Signature>,
-    variables: &'a mut BoundVars<Type>,
-    evidence: &'a mut Evidence,
+    pub common_kinds: &'a CommonKinds,
+    pub modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
+    pub types: &'a HashMap<Rc<str>, Kind>,
+    pub type_variables: &'a BoundVars<Kind>,
+    pub kind_solutions: &'a mut kind_inference::Solutions,
+    pub type_solutions: &'a mut unification::Solutions,
+    pub type_signatures: &'a HashMap<String, Signature>,
+    pub variables: &'a mut BoundVars<Type>,
+    pub evidence: &'a mut Evidence,
+    pub source: &'a Source,
 }
 
 fn pattern_is_redundant(
@@ -241,35 +246,6 @@ fn pattern_is_redundant(
             syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_ref()),
             _ => false,
         }
-}
-
-impl<'a> InferenceContext<'a> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        common_kinds: &'a CommonKinds,
-        source: &'a Source,
-        modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
-        types: &'a HashMap<Rc<str>, Kind>,
-        type_variables: &'a BoundVars<Kind>,
-        kind_solutions: &'a mut kind_inference::Solutions,
-        type_solutions: &'a mut unification::Solutions,
-        type_signatures: &'a HashMap<String, Signature>,
-        variables: &'a mut BoundVars<Type>,
-        evidence: &'a mut Evidence,
-    ) -> Self {
-        InferenceContext {
-            common_kinds,
-            source,
-            modules,
-            types,
-            type_variables,
-            kind_solutions,
-            type_solutions,
-            type_signatures,
-            variables,
-            evidence,
-        }
-    }
 }
 
 /**
@@ -549,7 +525,7 @@ fn check_case(
       c -> ...
     ```
 
-    A consequence of ctx is that the tags associated with each variant pattern
+    A consequence of this is that the tags associated with each variant pattern
     aren't unique. The above example gives:
 
     ```
@@ -563,7 +539,7 @@ fn check_case(
 
       c -> ...
 
-    The interpreter needs to account for ctx when checking pattern matches.
+    The interpreter needs to account for this when checking pattern matches.
     ```
     */
 
@@ -714,8 +690,8 @@ pub fn infer(
                 syntax::ModuleRef::Id(id) => match ctx.modules.get(id) {
                     None => {
                         /*
-                        A module accessor will only be desugared if the module was in scope, so ctx case
-                        is impossible as long as `ctx.modules` is valid w.r.t ctx expression.
+                        A module accessor will only be desugared if the module was in scope, so this case
+                        is impossible as long as the set of modules valid w.r.t this expression.
                         */
                         panic!(
                             "module not in scope. id: {:?}, path: {:?}, item: {:?}",
