@@ -270,41 +270,42 @@ impl<'a> InferenceContext<'a> {
             evidence,
         }
     }
+}
 
-    /**
-    Instantiate a type signature.
+/**
+Instantiate a type signature.
 
-    Replaces `type_signature`'s type variables with metavariables, and applies `expr`
-    to a placeholder for each constraint in `type_signature`.
-    */
-    pub fn instantiate(
-        &mut self,
-        pos: usize,
-        expr: Expr,
-        type_signature: &TypeSig,
-    ) -> (Expr, Type) {
-        let metas: Vec<Type> = type_signature
-            .ty_vars
-            .iter()
-            .map(|_| {
-                let kind = fresh_kind_meta(self.kind_solutions);
-                fresh_type_meta(self.type_solutions, &kind)
-            })
-            .collect();
+Replaces `type_signature`'s type variables with metavariables, and applies `expr`
+to a placeholder for each constraint in `type_signature`.
+*/
+pub fn instantiate(
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut unification::Solutions,
+    evidence: &mut Evidence,
+    pos: usize,
+    expr: Expr,
+    type_signature: &TypeSig,
+) -> (Expr, Type) {
+    let metas: Vec<Type> = type_signature
+        .ty_vars
+        .iter()
+        .map(|_| {
+            let kind = fresh_kind_meta(kind_solutions);
+            fresh_type_meta(type_solutions, &kind)
+        })
+        .collect();
 
-        let ty = type_signature.body.instantiate_many(&metas);
-        let (constraints, ty) = ty.unwrap_constraints();
+    let ty = type_signature.body.instantiate_many(&metas);
+    let (constraints, ty) = ty.unwrap_constraints();
 
-        let expr = constraints.iter().fold(expr, |expr, constraint| {
-            let placeholder = Expr::Placeholder(
-                self.evidence
-                    .placeholder(pos, evidence::Constraint::from_type(constraint)),
-            );
-            Expr::mk_app(expr, placeholder)
-        });
+    let expr = constraints.iter().fold(expr, |expr, constraint| {
+        let placeholder = Expr::Placeholder(
+            evidence.placeholder(pos, evidence::Constraint::from_type(constraint)),
+        );
+        Expr::mk_app(expr, placeholder)
+    });
 
-        (expr, ty.clone())
-    }
+    (expr, ty.clone())
 }
 
 fn check_duplicate_args(
@@ -669,7 +670,10 @@ pub fn infer(
             Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
             None => match ctx.type_signatures.get(name) {
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(ctx.instantiate(
+                    Signature::TypeSig(type_signature) => Ok(instantiate(
+                        ctx.kind_solutions,
+                        ctx.type_solutions,
+                        ctx.evidence,
                         expr.pos,
                         Expr::Name(Name::definition(name.clone())),
                         type_signature,
@@ -730,7 +734,10 @@ pub fn infer(
                         .with_position(item.pos))
                 }
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(ctx.instantiate(
+                    Signature::TypeSig(type_signature) => Ok(instantiate(
+                        ctx.kind_solutions,
+                        ctx.type_solutions,
+                        ctx.evidence,
                         expr.pos,
                         Expr::Module {
                             id: *id,
