@@ -718,7 +718,14 @@ impl<'modules> Typechecker<'modules> {
 
         let arg_tys: Vec<type_inference::InferredPattern> = args
             .iter()
-            .map(|arg| infer_pattern(&mut self.type_inference_context(), arg))
+            .map(|arg| {
+                infer_pattern(
+                    self.common_kinds,
+                    self.type_solutions,
+                    &mut self.evidence,
+                    arg,
+                )
+            })
             .collect();
         let out_ty = core::Type::Meta(Kind::Type, self.type_solutions.fresh_meta());
 

@@ -308,7 +308,7 @@ impl<'a> InferenceContext<'a> {
 }
 
 fn check_duplicate_args(
-    ctx: &InferenceContext,
+    source: &Source,
     args: &[Spanned<syntax::Pattern>],
 ) -> Result<(), InferenceError> {
     let mut seen: HashSet<&str> = HashSet::new();
@@ -316,10 +316,8 @@ fn check_duplicate_args(
         .flat_map(|arg| arg.item.get_arg_names().into_iter())
         .try_for_each(|arg| {
             if seen.contains(&arg.item.as_ref()) {
-                Err(
-                    InferenceError::duplicate_argument(ctx.source, arg.item.clone())
-                        .with_position(arg.pos),
-                )
+                Err(InferenceError::duplicate_argument(source, arg.item.clone())
+                    .with_position(arg.pos))
             } else {
                 seen.insert(&arg.item);
                 Ok(())
@@ -327,8 +325,11 @@ fn check_duplicate_args(
         })
 }
 
-fn infer_name_pattern(ctx: &mut InferenceContext, name: &Spanned<Rc<str>>) -> InferredPattern {
-    let name_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+fn infer_name_pattern(
+    type_solutions: &mut unification::Solutions,
+    name: &Spanned<Rc<str>>,
+) -> InferredPattern {
+    let name_ty = fresh_type_meta(type_solutions, &Kind::Type);
     InferredPattern::Any {
         pattern: Pattern::Name,
         names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
@@ -361,7 +362,9 @@ fn infer_char_pattern(c: &Spanned<char>) -> InferredPattern {
 }
 
 fn infer_record_pattern(
-    ctx: &mut InferenceContext,
+    common_kinds: &CommonKinds,
+    type_solutions: &mut unification::Solutions,
+    evidence: &mut Evidence,
     names: &[Spanned<Rc<str>>],
     rest: Option<&Spanned<Rc<str>>>,
 ) -> InferredPattern {
@@ -375,11 +378,11 @@ fn infer_record_pattern(
                 names_to_positions.insert(name_item_ref, name.pos);
                 (
                     Rc::from(name_item_ref),
-                    fresh_type_meta(ctx.type_solutions, &Kind::Type),
+                    fresh_type_meta(type_solutions, &Kind::Type),
                 )
             })
             .collect();
-        let rest = rest.map(|_| fresh_type_meta(ctx.type_solutions, &Kind::Row));
+        let rest = rest.map(|_| fresh_type_meta(type_solutions, &Kind::Row));
         Type::mk_rows(fields, rest)
     };
 
@@ -389,7 +392,7 @@ fn infer_record_pattern(
 
         let mut row: &Type = &entire_row;
         while let Type::RowCons(field, ty, rest) = row {
-            names.push(Expr::Placeholder(ctx.evidence.placeholder(
+            names.push(Expr::Placeholder(evidence.placeholder(
                 names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
                 evidence::Constraint::HasField {
                     field: field.clone(),
@@ -402,7 +405,7 @@ fn infer_record_pattern(
         if let Some(rest) = rest {
             names_tys.push((
                 Rc::from(rest.item.as_ref()),
-                Type::app(Type::mk_record_ctor(ctx.common_kinds), row.clone()),
+                Type::app(Type::mk_record_ctor(common_kinds), row.clone()),
             ));
         }
 
@@ -415,20 +418,21 @@ fn infer_record_pattern(
             rest: rest.is_some(),
         },
         names: names_tys,
-        ty: Type::app(Type::mk_record_ctor(ctx.common_kinds), entire_row),
+        ty: Type::app(Type::mk_record_ctor(common_kinds), entire_row),
     }
 }
 
 fn infer_variant_pattern(
-    ctx: &mut InferenceContext,
+    type_solutions: &mut unification::Solutions,
+    evidence: &mut Evidence,
     pos: usize,
     ctor: &str,
     arg: &Spanned<Rc<str>>,
 ) -> InferredPattern {
     let ctor: Rc<str> = Rc::from(ctor);
-    let arg_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-    let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
-    let tag = Expr::Placeholder(ctx.evidence.placeholder(
+    let arg_ty = fresh_type_meta(type_solutions, &Kind::Type);
+    let rest_row = fresh_type_meta(type_solutions, &Kind::Row);
+    let tag = Expr::Placeholder(evidence.placeholder(
         pos,
         evidence::Constraint::HasField {
             field: ctor.clone(),
@@ -444,47 +448,57 @@ fn infer_variant_pattern(
     }
 }
 
-fn infer_wildcard_pattern(ctx: &mut InferenceContext) -> InferredPattern {
+fn infer_wildcard_pattern(type_solutions: &mut unification::Solutions) -> InferredPattern {
     InferredPattern::Any {
         pattern: Pattern::Wildcard,
         names: Vec::new(),
-        ty: fresh_type_meta(ctx.type_solutions, &Kind::Type),
+        ty: fresh_type_meta(type_solutions, &Kind::Type),
     }
 }
 
 pub fn infer_pattern(
-    ctx: &mut InferenceContext,
+    common_kinds: &CommonKinds,
+    type_solutions: &mut unification::Solutions,
+    evidence: &mut Evidence,
     pattern: &Spanned<syntax::Pattern>,
 ) -> InferredPattern {
     match &pattern.item {
-        syntax::Pattern::Name(name) => infer_name_pattern(ctx, name),
-        syntax::Pattern::Record { names, rest } => infer_record_pattern(ctx, names, rest.as_ref()),
+        syntax::Pattern::Name(name) => infer_name_pattern(type_solutions, name),
+        syntax::Pattern::Record { names, rest } => {
+            infer_record_pattern(common_kinds, type_solutions, evidence, names, rest.as_ref())
+        }
         syntax::Pattern::Variant { name, arg } => {
-            infer_variant_pattern(ctx, pattern.pos, name, arg)
+            infer_variant_pattern(type_solutions, evidence, pattern.pos, name, arg)
         }
         syntax::Pattern::Char(c) => infer_char_pattern(c),
         syntax::Pattern::Int(n) => infer_int_pattern(n),
         syntax::Pattern::String(s) => infer_string_pattern(s),
-        syntax::Pattern::Wildcard => infer_wildcard_pattern(ctx),
+        syntax::Pattern::Wildcard => infer_wildcard_pattern(type_solutions),
     }
 }
 
 fn check_pattern(
-    ctx: &mut InferenceContext,
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
+    kind_solutions: &mut kind_inference::Solutions,
+    type_solutions: &mut unification::Solutions,
+    evidence: &mut Evidence,
+    source: &Source,
     pattern: &Spanned<syntax::Pattern>,
     expected: &Type,
 ) -> Result<CheckedPattern, InferenceError> {
-    let result = infer_pattern(ctx, pattern);
+    let result = infer_pattern(common_kinds, type_solutions, evidence, pattern);
     unify(
-        ctx.common_kinds,
-        ctx.types,
-        ctx.type_variables,
-        ctx.kind_solutions,
-        ctx.type_solutions,
-        ctx.source,
+        common_kinds,
+        types,
+        type_variables,
+        kind_solutions,
+        type_solutions,
+        source,
         Some(pattern.pos),
         expected,
-        &result.ty(ctx.common_kinds),
+        &result.ty(common_kinds),
     )?;
     Ok(match result {
         InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
@@ -568,7 +582,17 @@ fn check_case(
                 seen_ctors.insert(name.as_ref());
             }
 
-            let result = check_pattern(ctx, &branch.pattern, &expr_ty)?;
+            let result = check_pattern(
+                ctx.common_kinds,
+                ctx.types,
+                ctx.type_variables,
+                ctx.kind_solutions,
+                ctx.type_solutions,
+                ctx.evidence,
+                ctx.source,
+                &branch.pattern,
+                &expr_ty,
+            )?;
 
             if let CheckedPattern::Variant { rest, .. } = &result {
                 expr_ty = Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest.clone())
@@ -856,13 +880,14 @@ pub fn infer(
             Ok((Expr::mk_app(fun, arg), out_ty))
         }
         syntax::Expr::Lam { args, body } => {
-            check_duplicate_args(ctx, args)?;
+            check_duplicate_args(ctx.source, args)?;
 
             let mut inferred_args: Vec<(Pattern, Type)> = Vec::with_capacity(args.len());
             let bound_variables: Vec<(Rc<str>, Type)> = args
                 .iter()
                 .flat_map(|arg| {
-                    let result = infer_pattern(ctx, arg);
+                    let result =
+                        infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, arg);
                     inferred_args.push((result.pattern(), result.ty(ctx.common_kinds)));
                     result.names().into_iter()
                 })

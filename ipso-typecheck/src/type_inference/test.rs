@@ -88,7 +88,7 @@ fn infer_pattern_1() {
             }),
         };
         assert_eq!(
-            infer_pattern(ctx, &pattern),
+            infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, &pattern),
             InferredPattern::Any {
                 pattern: Pattern::Name,
                 names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
@@ -145,7 +145,7 @@ fn infer_pattern_2() {
                 (Rc::from("z"), Type::Meta(Kind::Type, 2)),
             ],
         };
-        let actual = infer_pattern(ctx, &pat);
+        let actual = infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
         assert_eq!(expected, actual)
     })
 }
@@ -204,7 +204,7 @@ fn infer_pattern_3() {
                 ),
             ],
         };
-        let actual = infer_pattern(ctx, &pat);
+        let actual = infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
         assert_eq!(expected, actual)
     })
 }
@@ -229,7 +229,7 @@ fn infer_pattern_4() {
             arg_ty: Type::Meta(Kind::Type, 0),
             rest: Type::Meta(Kind::Row, 1),
         };
-        let actual = infer_pattern(ctx, &pat);
+        let actual = infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
         assert_eq!(expected, actual)
     })
 }
