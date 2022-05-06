@@ -335,7 +335,7 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
         kind_inference::InferenceErrorInfo::UnificationError {
             error: unification_error,
         } => match unification_error {
-            kind_inference::UnificationError::Mismatch { expected, actual } => {
+            kind_inference::unification::Error::Mismatch { expected, actual } => {
                 let mut message = String::from("expected kind ");
                 message.push('"');
                 message.push_str(expected.render().as_str());
@@ -346,7 +346,7 @@ fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String
                 message.push('"');
                 message
             }
-            kind_inference::UnificationError::Occurs { meta, kind } => {
+            kind_inference::unification::Error::Occurs { meta, kind } => {
                 format!(
                     "infinite kind from equating ?{} with \"{}\"",
                     meta,
@@ -423,7 +423,7 @@ pub fn register_declaration(
 
 pub fn check_module_with(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     evidence: &mut Evidence,
@@ -609,7 +609,7 @@ pub fn register_from_import(
 
 fn check_definition(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
@@ -755,7 +755,7 @@ fn check_definition(
 
 fn check_class_member(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     type_context: &mut HashMap<Rc<str>, Kind>,
     bound_tyvars: &mut BoundVars<Kind>,
@@ -808,7 +808,7 @@ fn check_class_member(
 
 fn check_class(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     type_context: &mut HashMap<Rc<str>, Kind>,
     bound_tyvars: &mut BoundVars<Kind>,
@@ -885,7 +885,7 @@ fn check_class(
 
 fn check_instance(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
@@ -1175,7 +1175,7 @@ fn check_instance(
 
 fn check_declaration(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     evidence: &mut Evidence,
@@ -1297,7 +1297,7 @@ fn check_declaration(
 fn abstract_evidence(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
@@ -1355,7 +1355,7 @@ fn abstract_evidence(
 fn generalise(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
@@ -1392,7 +1392,7 @@ fn generalise(
 }
 
 pub fn zonk_constraint(
-    kind_solutions: &kind_inference::Solutions,
+    kind_solutions: &kind_inference::unification::Solutions,
     type_solutions: &type_inference::unification::Solutions,
     constraint: &Constraint,
 ) -> Constraint {
@@ -1416,7 +1416,7 @@ fn infer_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     source: &Source,
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
@@ -1433,7 +1433,7 @@ fn check_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     source: &Source,
     pos: Option<usize>,
     ty: &syntax::Type<Rc<str>>,

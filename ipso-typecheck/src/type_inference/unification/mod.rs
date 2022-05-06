@@ -97,7 +97,11 @@ impl Solutions {
       { ty.iter_metas().all(|meta| self.contains(meta) && self.get(meta).is_unsolved()) }
       ```
     */
-    pub fn zonk(&self, kind_solutions: &kind_inference::Solutions, mut ty: Type) -> Type {
+    pub fn zonk(
+        &self,
+        kind_solutions: &kind_inference::unification::Solutions,
+        mut ty: Type,
+    ) -> Type {
         self.zonk_mut(kind_solutions, &mut ty);
         ty
     }
@@ -105,7 +109,7 @@ impl Solutions {
     /**
     A mutable version of [`Solutions::zonk`].
     */
-    pub fn zonk_mut(&self, kind_solutions: &kind_inference::Solutions, ty: &mut Type) {
+    pub fn zonk_mut(&self, kind_solutions: &kind_inference::unification::Solutions, ty: &mut Type) {
         match ty {
             Type::Bool
             | Type::Int
@@ -176,7 +180,7 @@ impl Error {
     Uses `type_variables` to replace de Bruijn indices with names.
     */
     pub fn mismatch(
-        kind_solutions: &kind_inference::Solutions,
+        kind_solutions: &kind_inference::unification::Solutions,
         type_solutions: &Solutions,
         type_variables: &BoundVars<Kind>,
         expected: Type,
@@ -214,13 +218,13 @@ pub fn unify(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::Solutions,
+    kind_solutions: &mut kind_inference::unification::Solutions,
     type_solutions: &mut Solutions,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), Error> {
     fn solve_left(
-        kind_solutions: &kind_inference::Solutions,
+        kind_solutions: &kind_inference::unification::Solutions,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         meta: Meta,
@@ -256,7 +260,7 @@ pub fn unify(
     }
 
     fn solve_right(
-        kind_solutions: &kind_inference::Solutions,
+        kind_solutions: &kind_inference::unification::Solutions,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         expected: &Type,
@@ -296,7 +300,7 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_solutions: &mut kind_inference::Solutions,
+        kind_solutions: &mut kind_inference::unification::Solutions,
         type_solutions: &mut Solutions,
         meta: &usize,
         actual: &Type,
@@ -328,7 +332,7 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_solutions: &mut kind_inference::Solutions,
+        kind_solutions: &mut kind_inference::unification::Solutions,
         type_solutions: &mut Solutions,
         expected: &Type,
         meta: &usize,

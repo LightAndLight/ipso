@@ -41,7 +41,7 @@ arguments into a struct for convenience.
 pub struct Context<'a> {
     pub common_kinds: &'a CommonKinds,
     pub types: &'a HashMap<Rc<str>, Kind>,
-    pub kind_solutions: &'a mut kind_inference::Solutions,
+    pub kind_solutions: &'a mut kind_inference::unification::Solutions,
     pub type_solutions: &'a mut type_inference::unification::Solutions,
     pub implications: &'a [Implication],
     pub type_variables: &'a BoundVars<Kind>,

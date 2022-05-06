@@ -1,4 +1,4 @@
-use super::{infer, Context, InferenceError, InferenceErrorHint, Solutions};
+use super::{infer, unification, Context, InferenceError, InferenceErrorHint};
 use crate::BoundVars;
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{self as syntax, kind::Kind};
@@ -9,7 +9,7 @@ fn with_empty_ctx<A>(f: &dyn Fn(&mut Context) -> A) -> A {
     let common_kinds = CommonKinds::default();
     let types = HashMap::new();
     let type_variables = BoundVars::new();
-    let mut kind_solutions = Solutions::new();
+    let mut kind_solutions = unification::Solutions::new();
     let mut ctx = Context {
         common_kinds: &common_kinds,
         types: &types,
