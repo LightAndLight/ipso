@@ -1,4 +1,4 @@
-use super::{infer, unification, Context, InferenceError, InferenceErrorHint};
+use super::{infer, unification, Context, Error, ErrorHint};
 use crate::BoundVars;
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{self as syntax, kind::Kind};
@@ -42,8 +42,8 @@ fn infer_3() {
     with_empty_ctx(&|ctx| {
         let ty =
             syntax::Type::mk_rowcons(Rc::from("x"), syntax::Type::RowNil, syntax::Type::RowNil);
-        let expected = Err(InferenceError::mismatch(&Kind::Type, &Kind::Row)
-            .with_hint(InferenceErrorHint::WhileInferring { ty: ty.clone() }));
+        let expected = Err(Error::mismatch(&Kind::Type, &Kind::Row)
+            .with_hint(ErrorHint::WhileInferring { ty: ty.clone() }));
         let actual = infer(ctx, &ty);
         assert_eq!(expected, actual)
     })
@@ -77,11 +77,11 @@ fn occurs_1() {
         let v1 = ctx.fresh_meta();
         let v2 = ctx.fresh_meta();
         let kind = Kind::mk_arrow(&v1, &v2);
-        let hint = InferenceErrorHint::WhileChecking {
+        let hint = ErrorHint::WhileChecking {
             ty: syntax::Type::Unit,
             has_kind: Kind::Type,
         };
-        let expected = Err(InferenceError::occurs(
+        let expected = Err(Error::occurs(
             match v1 {
                 Kind::Meta(m) => m,
                 _ => unreachable!(),

@@ -181,7 +181,7 @@ pub enum TypeError {
     KindError {
         source: Source,
         pos: usize,
-        error: kind_inference::InferenceError,
+        error: kind_inference::Error,
     },
     NoSuchClass {
         source: Source,
@@ -284,17 +284,17 @@ impl TypeError {
                 type_inference::ErrorInfo::NotAModule => None,
             },
             TypeError::KindError { error, .. } => match error.info {
-                kind_inference::InferenceErrorInfo::NotInScope { .. } => None,
-                kind_inference::InferenceErrorInfo::UnificationError { .. } => {
+                kind_inference::ErrorInfo::NotInScope { .. } => None,
+                kind_inference::ErrorInfo::UnificationError { .. } => {
                     error.hint.as_ref().map(|hint| match hint {
-                        kind_inference::InferenceErrorHint::WhileChecking { ty, has_kind } => {
+                        kind_inference::ErrorHint::WhileChecking { ty, has_kind } => {
                             format!(
                                 "While checking that \"{}\" has kind \"{}\"",
                                 ty.render(),
                                 has_kind.render()
                             )
                         }
-                        kind_inference::InferenceErrorHint::WhileInferring { ty } => {
+                        kind_inference::ErrorHint::WhileInferring { ty } => {
                             format!("While inferring the kind of \"{}\"", ty.render())
                         }
                     })
@@ -329,10 +329,10 @@ impl From<type_inference::Error> for TypeError {
     }
 }
 
-fn render_kind_inference_error(error: &kind_inference::InferenceError) -> String {
+fn render_kind_inference_error(error: &kind_inference::Error) -> String {
     match &error.info {
-        kind_inference::InferenceErrorInfo::NotInScope { .. } => String::from("type not in scope"),
-        kind_inference::InferenceErrorInfo::UnificationError {
+        kind_inference::ErrorInfo::NotInScope { .. } => String::from("type not in scope"),
+        kind_inference::ErrorInfo::UnificationError {
             error: unification_error,
         } => match unification_error {
             kind_inference::unification::Error::Mismatch { expected, actual } => {

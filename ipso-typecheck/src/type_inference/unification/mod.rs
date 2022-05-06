@@ -169,7 +169,7 @@ pub enum Error {
         ty: syntax::Type<Rc<str>>,
     },
     KindError {
-        error: kind_inference::InferenceError,
+        error: kind_inference::Error,
     },
 }
 
@@ -360,8 +360,8 @@ pub fn unify(
         }
     }
 
-    let hint: &dyn Fn() -> kind_inference::InferenceErrorHint =
-        &|| kind_inference::InferenceErrorHint::WhileChecking {
+    let hint: &dyn Fn() -> kind_inference::ErrorHint =
+        &|| kind_inference::ErrorHint::WhileChecking {
             ty: actual
                 .to_syntax()
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
