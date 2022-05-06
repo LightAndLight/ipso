@@ -98,7 +98,7 @@ pub struct Context<'a> {
     common_kinds: &'a CommonKinds,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
-    kind_solutions: &'a mut unification::Solutions,
+    kind_solutions: unification::Solutions,
 }
 
 impl<'a> Context<'a> {
@@ -106,14 +106,21 @@ impl<'a> Context<'a> {
         common_kinds: &'a CommonKinds,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
-        kind_solutions: &'a mut unification::Solutions,
     ) -> Self {
         Context {
             common_kinds,
             types,
             type_variables,
-            kind_solutions,
+            kind_solutions: unification::Solutions::new(),
         }
+    }
+
+    pub fn kind_solutions(&self) -> &unification::Solutions {
+        &self.kind_solutions
+    }
+
+    pub fn kind_solutions_mut(&self) -> &mut unification::Solutions {
+        &mut self.kind_solutions
     }
 
     /// Generate a fresh kind metavariable.
@@ -128,7 +135,7 @@ impl<'a> Context<'a> {
         expected: &Kind,
         actual: &Kind,
     ) -> Result<(), Error> {
-        unification::unify(self.kind_solutions, expected, actual)
+        unification::unify(&mut self.kind_solutions, expected, actual)
             .map_err(|err| Error::from(err).with_hint(hint()))
     }
 

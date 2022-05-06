@@ -10,12 +10,7 @@ fn with_empty_ctx<A>(f: &dyn Fn(&mut Context) -> A) -> A {
     let types = HashMap::new();
     let type_variables = BoundVars::new();
     let mut kind_solutions = unification::Solutions::new();
-    let mut ctx = Context {
-        common_kinds: &common_kinds,
-        types: &types,
-        type_variables: &type_variables,
-        kind_solutions: &mut kind_solutions,
-    };
+    let mut ctx = Context::new(&common_kinds, &types, &type_variables);
     f(&mut ctx)
 }
 

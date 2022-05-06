@@ -21,7 +21,8 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
     };
     let modules = HashMap::new();
     let types = HashMap::new();
-    let mut kind_solutions = kind_inference::unification::Solutions::new();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = unification::Solutions::new();
     let type_signatures = HashMap::new();
     let mut variables = BoundVars::new();
@@ -31,7 +32,7 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
         modules: &modules,
         types: &types,
         type_variables: &type_variables,
-        kind_solutions: &mut kind_solutions,
+        kind_inference_ctx: &mut kind_inference_ctx,
         type_solutions: &mut type_solutions,
         type_signatures: &type_signatures,
         variables: &mut variables,
@@ -66,7 +67,7 @@ fn occurs_1() {
             ctx.common_kinds,
             ctx.types,
             ctx.type_variables,
-            ctx.kind_solutions,
+            ctx.kind_inference_ctx,
             ctx.type_solutions,
             ctx.source,
             None,
@@ -262,8 +263,12 @@ fn infer_lam_1() {
                 Type::Meta(Kind::Type, 0),
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -297,8 +302,12 @@ fn infer_lam_2() {
                 },
             ),
         };
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -359,8 +368,12 @@ fn infer_lam_3() {
                 },
             ),
         };
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -451,8 +464,12 @@ fn infer_lam_4() {
                 Type::mk_record(ctx.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -512,8 +529,12 @@ fn infer_lam_5() {
                 ),
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -543,8 +564,12 @@ fn infer_array_1() {
             Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
             Type::app(Type::mk_array(ctx.common_kinds), Type::Int),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -608,14 +633,14 @@ fn unify_1() {
             ctx.common_kinds,
             ctx.types,
             ctx.type_variables,
-            ctx.kind_solutions,
+            ctx.kind_inference_ctx,
             ctx.type_solutions,
             ctx.source,
             None,
             &real,
             &holey,
         )
-        .map(|_| zonk_type(ctx.kind_solutions, ctx.type_solutions, holey));
+        .map(|_| zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, holey));
         assert_eq!(expected, actual)
     })
 }
@@ -628,7 +653,7 @@ fn unify_rows_1() {
                 ctx.common_kinds,
                 ctx.types,
                 ctx.type_variables,
-                ctx.kind_solutions,
+                ctx.kind_inference_ctx,
                 ctx.type_solutions,
                 ctx.source,
                 None,
@@ -656,7 +681,7 @@ fn unify_rows_2() {
                 ctx.common_kinds,
                 ctx.types,
                 ctx.type_variables,
-                ctx.kind_solutions,
+                ctx.kind_inference_ctx,
                 ctx.type_solutions,
                 ctx.source,
                 None,
@@ -692,7 +717,7 @@ fn unify_rows_3() {
                 ctx.common_kinds,
                 ctx.types,
                 ctx.type_variables,
-                ctx.kind_solutions,
+                ctx.kind_inference_ctx,
                 ctx.type_solutions,
                 ctx.source,
                 None,
@@ -745,10 +770,10 @@ fn unify_rows_4() {
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
-            zonk_type(ctx.kind_solutions, ctx.type_solutions, ty1.clone())
+            zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty1.clone())
                 .to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
-            zonk_type(ctx.kind_solutions, ctx.type_solutions, ty2.clone())
+            zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty2.clone())
                 .to_syntax()
                 .map(&mut |ix| ctx.type_variables.lookup_index(*ix).unwrap().0.clone()),
         ));
@@ -756,7 +781,7 @@ fn unify_rows_4() {
             ctx.common_kinds,
             ctx.types,
             ctx.type_variables,
-            ctx.kind_solutions,
+            ctx.kind_inference_ctx,
             ctx.type_solutions,
             ctx.source,
             None,
@@ -773,8 +798,10 @@ fn infer_record_1() {
         // {}
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
-            infer(ctx, &syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty))),
+            infer(ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty)
+            )),
             Ok((
                 Expr::mk_record(Vec::new(), None),
                 Type::mk_record(ctx.common_kinds, Vec::new(), None)
@@ -807,8 +834,10 @@ fn infer_record_2() {
             None,
         );
         assert_eq!(
-            infer(ctx, &syntax::Spanned { pos: 0, item: term })
-                .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty))),
+            infer(ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty)
+            )),
             Ok((
                 Expr::mk_record(
                     vec![
@@ -883,8 +912,12 @@ fn infer_record_3() {
                 None,
             ),
         ));
-        let actual = infer(ctx, &syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -923,8 +956,12 @@ fn infer_record_4() {
             syntax::Type::Int,
         )
         .with_position(22));
-        let actual = infer(ctx, &syntax::Spanned { pos: 0, item: term })
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -994,8 +1031,12 @@ fn infer_case_1() {
                 &Type::Meta(Kind::Type, 2),
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -1093,8 +1134,12 @@ fn infer_case_2() {
                 &Type::Meta(Kind::Type, 4),
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -1207,8 +1252,12 @@ fn infer_case_3() {
                 &Type::Int,
             ),
         ));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -1291,8 +1340,12 @@ fn infer_case_4() {
             label: String::from(SOURCE_LABEL),
         })
         .with_position(32));
-        let actual = infer(ctx, &term)
-            .map(|(expr, ty)| (expr, zonk_type(ctx.kind_solutions, ctx.type_solutions, ty)));
+        let actual = infer(ctx, &term).map(|(expr, ty)| {
+            (
+                expr,
+                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+            )
+        });
         assert_eq!(expected, actual)
     })
 }
@@ -1337,7 +1390,7 @@ fn unify_variant_1() {
             ctx.common_kinds,
             ctx.types,
             ctx.type_variables,
-            ctx.kind_solutions,
+            ctx.kind_inference_ctx,
             ctx.type_solutions,
             ctx.source,
             None,

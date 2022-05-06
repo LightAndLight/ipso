@@ -41,7 +41,7 @@ arguments into a struct for convenience.
 pub struct Context<'a> {
     pub common_kinds: &'a CommonKinds,
     pub types: &'a HashMap<Rc<str>, Kind>,
-    pub kind_solutions: &'a mut kind_inference::unification::Solutions,
+    pub kind_inference_ctx: &'a mut kind_inference::Context<'a>,
     pub type_solutions: &'a mut type_inference::unification::Solutions,
     pub implications: &'a [Implication],
     pub type_variables: &'a BoundVars<Kind>,
@@ -57,7 +57,12 @@ pub fn solve_constraint(
 ) -> Result<Rc<core::Expr>, TypeError> {
     match constraint {
         Constraint::Type(constraint) => {
-            debug_assert!(ctx.kind_solutions.zonk(false, constraint.kind()) == Kind::Constraint);
+            debug_assert!(
+                ctx.kind_inference_ctx
+                    .kind_solutions_mut()
+                    .zonk(false, constraint.kind())
+                    == Kind::Constraint
+            );
 
             match ctx
                 .evidence
@@ -83,7 +88,7 @@ pub fn solve_constraint(
                     ctx.common_kinds,
                     ctx.types,
                     ctx.type_variables,
-                    ctx.kind_solutions,
+                    ctx.kind_inference_ctx,
                     ctx.type_solutions,
                     ctx.source,
                     None,
@@ -99,11 +104,15 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| ctx.type_solutions.zonk(ctx.kind_solutions, x))
+                                .map(|x| {
+                                    ctx.type_solutions
+                                        .zonk(ctx.kind_inference_ctx.kind_solutions(), x)
+                                })
                                 .collect(),
-                            consequent: ctx
-                                .type_solutions
-                                .zonk(ctx.kind_solutions, implication.consequent),
+                            consequent: ctx.type_solutions.zonk(
+                                ctx.kind_inference_ctx.kind_solutions(),
+                                implication.consequent,
+                            ),
                             evidence: implication.evidence,
                         };
 
@@ -150,7 +159,12 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            debug_assert!(ctx.kind_solutions.zonk(false, rest.kind()) == Kind::Row);
+            debug_assert!(
+                ctx.kind_inference_ctx
+                    .kind_solutions()
+                    .zonk(false, rest.kind())
+                    == Kind::Row
+            );
 
             let new_evidence: Rc<core::Expr> = match rest {
                 core::Type::RowNil => Ok(Rc::new(core::Expr::Int(0))),
@@ -219,7 +233,11 @@ pub fn solve_constraint(
                     // will never recieve solutions
                     match sol.clone() {
                         metavariables::Solution::Unsolved => {
-                            match ctx.kind_solutions.zonk(false, kind.clone()) {
+                            match ctx
+                                .kind_inference_ctx
+                                .kind_solutions()
+                                .zonk(false, kind.clone())
+                            {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
@@ -227,7 +245,7 @@ pub fn solve_constraint(
                                         ctx.common_kinds,
                                         ctx.types,
                                         ctx.type_variables,
-                                        ctx.kind_solutions,
+                                        ctx.kind_inference_ctx,
                                         ctx.type_solutions,
                                         ctx.source,
                                         None,
@@ -299,7 +317,10 @@ pub fn solve_placeholder(
                     constraint: fill_ty_names(
                         ctx.type_variables,
                         ctx.type_solutions
-                            .zonk(ctx.kind_solutions, item.constraint.to_type())
+                            .zonk(
+                                ctx.kind_inference_ctx.kind_solutions(),
+                                item.constraint.to_type(),
+                            )
                             .to_syntax(),
                     ),
                 }),

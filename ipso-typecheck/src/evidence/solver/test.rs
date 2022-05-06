@@ -1,6 +1,7 @@
 use crate::{
     evidence::{solver, Constraint, Evidence},
-    register_class, register_instance, type_inference, SolveConstraintContext, TypeError,
+    kind_inference, register_class, register_instance, type_inference, SolveConstraintContext,
+    TypeError,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_diagnostic::Source;
@@ -14,10 +15,11 @@ fn solve_constraint(
 ) -> std::result::Result<std::rc::Rc<ipso_core::Expr>, TypeError> {
     let common_kinds = Default::default();
     let types = Default::default();
-    let mut kind_solutions = Default::default();
+    let type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let implications = Default::default();
-    let type_variables = Default::default();
     let mut evidence = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -26,7 +28,7 @@ fn solve_constraint(
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_solutions: &mut kind_solutions,
+            kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions: &mut type_solutions,
             implications,
             type_variables: &type_variables,
@@ -81,10 +83,11 @@ fn solve_constraint_2() {
 fn solve_constraint_3() {
     let common_kinds = Default::default();
     let types = Default::default();
-    let mut kind_solutions = Default::default();
+    let type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = type_inference::unification::Solutions::default();
     let implications = Default::default();
-    let type_variables = Default::default();
     let mut evidence = Evidence::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -115,7 +118,7 @@ fn solve_constraint_3() {
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_solutions: &mut kind_solutions,
+            kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions: &mut type_solutions,
             implications,
             type_variables: &type_variables,
@@ -150,10 +153,11 @@ fn solve_constraint_3() {
 fn solve_constraint_4() {
     let common_kinds = Default::default();
     let mut types = Default::default();
-    let mut kind_solutions = Default::default();
+    let type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
-    let type_variables = Default::default();
     let mut evidence = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -235,7 +239,7 @@ fn solve_constraint_4() {
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_solutions: &mut kind_solutions,
+            kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions: &mut type_solutions,
             implications: &implications,
             type_variables: &type_variables,

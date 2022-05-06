@@ -248,7 +248,7 @@ pub struct InferenceContext<'a> {
     pub modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
     pub types: &'a HashMap<Rc<str>, Kind>,
     pub type_variables: &'a BoundVars<Kind>,
-    pub kind_solutions: &'a mut kind_inference::unification::Solutions,
+    pub kind_inference_ctx: &'a mut kind_inference::Context<'a>,
     pub type_solutions: &'a mut unification::Solutions,
     pub type_signatures: &'a HashMap<String, Signature>,
     pub variables: &'a mut BoundVars<Type>,
@@ -275,7 +275,7 @@ Replaces `type_signature`'s type variables with metavariables, and applies `expr
 to a placeholder for each constraint in `type_signature`.
 */
 pub fn instantiate(
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut unification::Solutions,
     evidence: &mut Evidence,
     pos: usize,
@@ -286,7 +286,7 @@ pub fn instantiate(
         .ty_vars
         .iter()
         .map(|_| {
-            let kind = fresh_kind_meta(kind_solutions);
+            let kind = fresh_kind_meta(kind_inference_ctx);
             fresh_type_meta(type_solutions, &kind)
         })
         .collect();
@@ -475,7 +475,7 @@ fn check_pattern(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut unification::Solutions,
     evidence: &mut Evidence,
     source: &Source,
@@ -487,7 +487,7 @@ fn check_pattern(
         common_kinds,
         types,
         type_variables,
-        kind_solutions,
+        kind_inference_ctx,
         type_solutions,
         source,
         Some(pattern.pos),
@@ -512,8 +512,8 @@ fn check_pattern(
 }
 
 /// Generate a fresh kind metavariable.
-pub fn fresh_kind_meta(kind_solutions: &mut kind_inference::unification::Solutions) -> Kind {
-    Kind::Meta(kind_solutions.fresh_meta())
+pub fn fresh_kind_meta(kind_inference_ctx: &mut kind_inference::Context) -> Kind {
+    Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta())
 }
 
 /// Generate a fresh type metavariable.
@@ -523,20 +523,20 @@ pub fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: &Kind)
 
 /// Substitute all solved type and kind metavariables in a type.
 pub fn zonk_type(
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut unification::Solutions,
     ty: Type,
 ) -> Type {
-    type_solutions.zonk(kind_solutions, ty)
+    type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty)
 }
 
 /// A mutable version of [`zonk_type`].
 pub fn zonk_type_mut(
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut unification::Solutions,
     ty: &mut Type,
 ) {
-    type_solutions.zonk_mut(kind_solutions, ty);
+    type_solutions.zonk_mut(kind_inference_ctx.kind_solutions(), ty);
 }
 
 /// Infer an expression's type.
@@ -550,7 +550,7 @@ pub fn infer(
             None => match ctx.type_signatures.get(name) {
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
-                        ctx.kind_solutions,
+                        ctx.kind_inference_ctx,
                         ctx.type_solutions,
                         ctx.evidence,
                         expr.pos,
@@ -613,7 +613,7 @@ pub fn infer(
                 None => Err(Error::not_in_scope(ctx.source, &item.item).with_position(item.pos)),
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
-                        ctx.kind_solutions,
+                        ctx.kind_inference_ctx,
                         ctx.type_solutions,
                         ctx.evidence,
                         expr.pos,
@@ -878,7 +878,7 @@ pub fn infer(
                         ctx.common_kinds,
                         ctx.types,
                         ctx.type_variables,
-                        ctx.kind_solutions,
+                        ctx.kind_inference_ctx,
                         ctx.type_solutions,
                         ctx.source,
                         None,
@@ -1050,7 +1050,7 @@ fn infer_case(
                 ctx.common_kinds,
                 ctx.types,
                 ctx.type_variables,
-                ctx.kind_solutions,
+                ctx.kind_inference_ctx,
                 ctx.type_solutions,
                 ctx.evidence,
                 ctx.source,
@@ -1075,7 +1075,7 @@ fn infer_case(
             Ok(Branch { pattern, body })
         })
         .collect::<Result<_, _>>()?;
-    zonk_type_mut(ctx.kind_solutions, ctx.type_solutions, &mut expr_ty);
+    zonk_type_mut(ctx.kind_inference_ctx, ctx.type_solutions, &mut expr_ty);
     match expr_ty.unwrap_variant() {
         Some(RowParts {
             rest: Some(rest), ..
@@ -1083,7 +1083,7 @@ fn infer_case(
             ctx.common_kinds,
             ctx.types,
             ctx.type_variables,
-            ctx.kind_solutions,
+            ctx.kind_inference_ctx,
             ctx.type_solutions,
             ctx.source,
             None,
@@ -1107,7 +1107,7 @@ pub fn check(
         ctx.common_kinds,
         ctx.types,
         ctx.type_variables,
-        ctx.kind_solutions,
+        ctx.kind_inference_ctx,
         ctx.type_solutions,
         ctx.source,
         Some(position),
@@ -1122,7 +1122,7 @@ pub fn unify(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut unification::Solutions,
     source: &Source,
     position: Option<usize>,
@@ -1133,7 +1133,7 @@ pub fn unify(
         common_kinds,
         types,
         type_variables,
-        kind_solutions,
+        kind_inference_ctx,
         type_solutions,
         expected,
         actual,
@@ -1152,10 +1152,10 @@ pub fn unify(
             */
             match error {
                 unification::Error::Mismatch { .. } => unification::Error::Mismatch {
-                    expected: zonk_type(kind_solutions, type_solutions, expected.clone())
+                    expected: zonk_type(kind_inference_ctx, type_solutions, expected.clone())
                         .to_syntax()
                         .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
-                    actual: zonk_type(kind_solutions, type_solutions, actual.clone())
+                    actual: zonk_type(kind_inference_ctx, type_solutions, actual.clone())
                         .to_syntax()
                         .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
                 },

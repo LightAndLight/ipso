@@ -3,7 +3,7 @@ use crate::{
         solver::{self, solve_placeholder},
         Constraint,
     },
-    register_declaration, type_inference, zonk_constraint, BoundVars, Declarations,
+    kind_inference, register_declaration, type_inference, zonk_constraint, BoundVars, Declarations,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
@@ -160,7 +160,8 @@ fn infer_record_1() {
     let modules = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_solutions = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let implications = Default::default();
     let type_signatures = Default::default();
@@ -227,7 +228,7 @@ fn infer_record_1() {
             modules: &modules,
             types: &types,
             type_variables: &type_variables,
-            kind_solutions: &mut kind_solutions,
+            kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions: &mut type_solutions,
             type_signatures: &type_signatures,
             variables: &mut variables,
@@ -236,7 +237,12 @@ fn infer_record_1() {
         },
         &expr,
     )
-    .map(|(expr, ty)| (expr, type_solutions.zonk(&kind_solutions, ty)));
+    .map(|(expr, ty)| {
+        (
+            expr,
+            type_solutions.zonk(&kind_inference_ctx.kind_solutions(), ty),
+        )
+    });
     assert_eq!(expected_result, actual_result, "checking results");
 
     let (mut actual_expr, _actual_ty) = actual_result.unwrap();
@@ -271,7 +277,7 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_solutions: &mut kind_solutions,
+                kind_inference_ctx: &mut kind_inference_ctx,
                 type_solutions: &mut type_solutions,
                 implications,
                 type_variables: &type_variables,
@@ -282,7 +288,11 @@ fn infer_record_1() {
         )
         .map(|(expr, constraint)| (
             expr,
-            zonk_constraint(&kind_solutions, &type_solutions, &constraint)
+            zonk_constraint(
+                &kind_inference_ctx.kind_solutions(),
+                &type_solutions,
+                &constraint
+            )
         ))
     );
 
@@ -298,7 +308,7 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_solutions: &mut kind_solutions,
+                kind_inference_ctx: &mut kind_inference_ctx,
                 type_solutions: &mut type_solutions,
                 implications,
                 type_variables: &type_variables,
@@ -309,7 +319,11 @@ fn infer_record_1() {
         )
         .map(|(expr, constraint)| (
             expr,
-            zonk_constraint(&kind_solutions, &type_solutions, &constraint)
+            zonk_constraint(
+                &kind_inference_ctx.kind_solutions(),
+                &type_solutions,
+                &constraint
+            )
         ))
     );
 
@@ -325,7 +339,7 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_solutions: &mut kind_solutions,
+                kind_inference_ctx: &mut kind_inference_ctx,
                 type_solutions: &mut type_solutions,
                 implications,
                 type_variables: &type_variables,
@@ -336,7 +350,11 @@ fn infer_record_1() {
         )
         .map(|(expr, constraint)| (
             expr,
-            zonk_constraint(&kind_solutions, &type_solutions, &constraint)
+            zonk_constraint(
+                &kind_inference_ctx.kind_solutions(),
+                &type_solutions,
+                &constraint
+            )
         ))
     );
 }
@@ -345,15 +363,16 @@ fn check_declaration(
     decl: &Spanned<syntax::Declaration>,
 ) -> std::result::Result<Declarations, crate::TypeError> {
     let common_kinds = Default::default();
-    let mut kind_solutions = Default::default();
+    let mut types = Default::default();
+    let mut type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
-    let mut type_context = Default::default();
     let mut context = Default::default();
     let class_context = Default::default();
     let mut bound_vars = Default::default();
-    let mut bound_tyvars = Default::default();
     let modules = Default::default();
     let mut module_context = Default::default();
     let source = Source::Interactive {
@@ -361,15 +380,15 @@ fn check_declaration(
     };
     crate::check_declaration(
         &common_kinds,
-        &mut kind_solutions,
+        &mut kind_inference_ctx,
         &mut type_solutions,
         &mut implications,
         &mut evidence,
-        &mut type_context,
+        &mut types,
         &mut context,
         &class_context,
         &mut bound_vars,
-        &mut bound_tyvars,
+        &mut type_variables,
         &modules,
         &mut module_context,
         &source,
@@ -924,15 +943,16 @@ fn check_class_2() {
 #[test]
 fn check_instance_1() {
     let common_kinds = CommonKinds::default();
-    let mut kind_solutions = Default::default();
+    let mut types = Default::default();
+    let mut type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
-    let mut type_context = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
     let mut bound_vars = Default::default();
-    let mut bound_tyvars = Default::default();
     let modules = Default::default();
     let mut module_context = Default::default();
     let source = Source::Interactive {
@@ -971,7 +991,7 @@ fn check_instance_1() {
         register_declaration(
             &common_kinds,
             &mut implications,
-            &mut type_context,
+            &mut types,
             &mut context,
             &mut class_context,
             None,
@@ -999,15 +1019,15 @@ fn check_instance_1() {
     */
     let actual = crate::check_declaration(
         &common_kinds,
-        &mut kind_solutions,
+        &mut kind_inference_ctx,
         &mut type_solutions,
         &mut implications,
         &mut evidence,
-        &mut type_context,
+        &mut types,
         &mut context,
         &class_context,
         &mut bound_vars,
-        &mut bound_tyvars,
+        &mut type_variables,
         &modules,
         &mut module_context,
         &source,

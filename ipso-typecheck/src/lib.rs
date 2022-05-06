@@ -423,7 +423,7 @@ pub fn register_declaration(
 
 pub fn check_module_with(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     evidence: &mut Evidence,
@@ -441,7 +441,7 @@ pub fn check_module_with(
         acc.and_then(|mut decls| {
             check_declaration(
                 common_kinds,
-                kind_solutions,
+                kind_inference_ctx,
                 type_solutions,
                 implications,
                 evidence,
@@ -505,19 +505,20 @@ pub fn check_module(
     source: &Source,
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
-    let mut kind_solutions = Default::default();
+    let mut types = Default::default();
+    let mut type_variables = Default::default();
+    let mut kind_inference_ctx =
+        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
-    let mut types = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
     let mut variables = Default::default();
-    let mut type_variables = Default::default();
     let mut module_context = Default::default();
     check_module_with(
         common_kinds,
-        &mut kind_solutions,
+        &mut kind_inference_ctx,
         &mut type_solutions,
         &mut implications,
         &mut evidence,
@@ -609,7 +610,7 @@ pub fn register_from_import(
 
 fn check_definition(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
@@ -630,7 +631,10 @@ fn check_definition(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                    Some((
+                        name.clone(),
+                        Kind::Meta(kind_inference_ctx.kind_solutions().fresh_meta()),
+                    ))
                 } else {
                     None
                 }
@@ -644,7 +648,7 @@ fn check_definition(
         common_kinds,
         type_context,
         bound_tyvars,
-        kind_solutions,
+        kind_inference_ctx,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
         None,
@@ -679,7 +683,7 @@ fn check_definition(
         common_kinds,
         type_context,
         bound_tyvars,
-        kind_solutions,
+        kind_inference_ctx,
         type_solutions,
         source,
         None,
@@ -700,7 +704,7 @@ fn check_definition(
             modules: module_context,
             types: type_context,
             type_variables: bound_tyvars,
-            kind_solutions,
+            kind_inference_ctx,
             type_solutions,
             type_signatures: context,
             variables: bound_vars,
@@ -731,7 +735,7 @@ fn check_definition(
     let (body, sig) = generalise(
         common_kinds,
         type_context,
-        kind_solutions,
+        kind_inference_ctx,
         type_solutions,
         implications,
         bound_tyvars,
@@ -755,7 +759,7 @@ fn check_definition(
 
 fn check_class_member(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     type_context: &mut HashMap<Rc<str>, Kind>,
     bound_tyvars: &mut BoundVars<Kind>,
@@ -773,7 +777,10 @@ fn check_class_member(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                    Some((
+                        name.clone(),
+                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
+                    ))
                 } else {
                     None
                 }
@@ -786,7 +793,7 @@ fn check_class_member(
         common_kinds,
         type_context,
         bound_tyvars,
-        kind_solutions,
+        kind_inference_ctx,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
         None,
@@ -797,9 +804,12 @@ fn check_class_member(
 
     let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
         .into_iter()
-        .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+        .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
         .collect();
-    let sig = core::TypeSig::new(ty_vars, type_solutions.zonk(kind_solutions, ty));
+    let sig = core::TypeSig::new(
+        ty_vars,
+        type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty),
+    );
     Ok(core::ClassMember {
         name: name.to_string(),
         sig,
@@ -808,7 +818,7 @@ fn check_class_member(
 
 fn check_class(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     type_context: &mut HashMap<Rc<str>, Kind>,
     bound_tyvars: &mut BoundVars<Kind>,
@@ -824,7 +834,10 @@ fn check_class(
             .map(|arg| {
                 if !seen_names.contains(arg.item.as_ref()) {
                     seen_names.insert(arg.item.as_ref());
-                    Ok((arg.item.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                    Ok((
+                        arg.item.clone(),
+                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
+                    ))
                 } else {
                     Err(TypeError::DuplicateClassArgument {
                         source: source.clone(),
@@ -844,7 +857,7 @@ fn check_class(
                 common_kinds,
                 type_context,
                 bound_tyvars,
-                kind_solutions,
+                kind_inference_ctx,
                 source,
                 Some(superclass.pos),
                 &superclass.item,
@@ -858,7 +871,7 @@ fn check_class(
         .map(|(member_name, member_type)| {
             check_class_member(
                 common_kinds,
-                kind_solutions,
+                kind_inference_ctx,
                 type_solutions,
                 type_context,
                 bound_tyvars,
@@ -877,7 +890,7 @@ fn check_class(
         name: name.clone(),
         args: args_kinds
             .into_iter()
-            .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+            .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
             .collect::<Vec<(Rc<str>, Kind)>>(),
         members,
     }))
@@ -885,7 +898,7 @@ fn check_class(
 
 fn check_instance(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
@@ -950,7 +963,10 @@ fn check_instance(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((name.clone(), Kind::Meta(kind_solutions.fresh_meta())))
+                    Some((
+                        name.clone(),
+                        Kind::Meta(kind_inference_ctx.kind_solutions().fresh_meta()),
+                    ))
                 } else {
                     None
                 }
@@ -967,7 +983,7 @@ fn check_instance(
                 common_kinds,
                 type_context,
                 bound_tyvars,
-                kind_solutions,
+                kind_inference_ctx,
                 source,
                 arg.pos,
                 &arg.item,
@@ -983,7 +999,7 @@ fn check_instance(
                 common_kinds,
                 type_context,
                 bound_tyvars,
-                kind_solutions,
+                kind_inference_ctx,
                 source,
                 Some(assume.pos),
                 &assume.item,
@@ -1005,7 +1021,7 @@ fn check_instance(
                 &mut solver::Context {
                     common_kinds,
                     types: type_context,
-                    kind_solutions,
+                    kind_inference_ctx,
                     type_solutions,
                     implications,
                     type_variables: bound_tyvars,
@@ -1022,7 +1038,7 @@ fn check_instance(
                 abstract_evidence(
                     common_kinds,
                     type_context,
-                    kind_solutions,
+                    kind_inference_ctx,
                     type_solutions,
                     implications,
                     bound_tyvars,
@@ -1055,7 +1071,7 @@ fn check_instance(
         common_kinds,
         type_context,
         bound_tyvars,
-        kind_solutions,
+        kind_inference_ctx,
         source,
         Some(name.pos),
         &head,
@@ -1086,7 +1102,7 @@ fn check_instance(
                             modules: module_context,
                             types: type_context,
                             type_variables: bound_tyvars,
-                            kind_solutions,
+                            kind_inference_ctx,
                             type_solutions,
                             type_signatures: context,
                             variables: bound_vars,
@@ -1102,7 +1118,7 @@ fn check_instance(
                     generalise(
                         common_kinds,
                         type_context,
-                        kind_solutions,
+                        kind_inference_ctx,
                         type_solutions,
                         implications,
                         bound_tyvars,
@@ -1127,7 +1143,7 @@ fn check_instance(
 
     let ty_vars = ty_var_kinds
         .into_iter()
-        .map(|(name, kind)| (name, kind_solutions.zonk(true, kind)))
+        .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
         .collect();
 
     let evidence = {
@@ -1164,9 +1180,9 @@ fn check_instance(
         ty_vars,
         assumes: assumes
             .into_iter()
-            .map(|assume| type_solutions.zonk(kind_solutions, assume))
+            .map(|assume| type_solutions.zonk(kind_inference_ctx.kind_solutions(), assume))
             .collect(),
-        head: type_solutions.zonk(kind_solutions, head),
+        head: type_solutions.zonk(kind_inference_ctx.kind_solutions(), head),
         evidence: evidence_name,
     };
 
@@ -1175,7 +1191,7 @@ fn check_instance(
 
 fn check_declaration(
     common_kinds: &CommonKinds,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     evidence: &mut Evidence,
@@ -1197,7 +1213,7 @@ fn check_declaration(
             body,
         } => check_definition(
             common_kinds,
-            kind_solutions,
+            kind_inference_ctx,
             type_solutions,
             implications,
             evidence,
@@ -1256,7 +1272,7 @@ fn check_declaration(
             members,
         } => check_class(
             common_kinds,
-            kind_solutions,
+            kind_inference_ctx,
             type_solutions,
             type_context,
             bound_tyvars,
@@ -1274,7 +1290,7 @@ fn check_declaration(
             members,
         } => check_instance(
             common_kinds,
-            kind_solutions,
+            kind_inference_ctx,
             type_solutions,
             implications,
             evidence,
@@ -1297,7 +1313,7 @@ fn check_declaration(
 fn abstract_evidence(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
@@ -1310,7 +1326,7 @@ fn abstract_evidence(
             &mut solver::Context {
                 common_kinds,
                 types,
-                kind_solutions,
+                kind_inference_ctx,
                 type_solutions,
                 implications,
                 type_variables,
@@ -1330,7 +1346,7 @@ fn abstract_evidence(
             let constraint = evidence.lookup_evar(ev).unwrap();
             unsolved_constraints.push((
                 *ev,
-                type_solutions.zonk(kind_solutions, constraint.to_type()),
+                type_solutions.zonk(kind_inference_ctx.kind_solutions(), constraint.to_type()),
             ));
         }
     }
@@ -1355,7 +1371,7 @@ fn abstract_evidence(
 fn generalise(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
@@ -1367,7 +1383,7 @@ fn generalise(
     let (expr, unsolved_constraints) = abstract_evidence(
         common_kinds,
         types,
-        kind_solutions,
+        kind_inference_ctx,
         type_solutions,
         implications,
         type_variables,
@@ -1376,7 +1392,7 @@ fn generalise(
         expr,
     )?;
 
-    let mut ty = type_solutions.zonk(kind_solutions, ty);
+    let mut ty = type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty);
     for constraint in unsolved_constraints.into_iter().rev() {
         ty = core::Type::mk_fatarrow(common_kinds, constraint, ty);
     }
@@ -1384,7 +1400,12 @@ fn generalise(
     let ty_vars: Vec<(Rc<str>, Kind)> = type_variables
         .info
         .iter()
-        .map(|(name, kind)| (name.clone(), kind_solutions.zonk(true, kind.clone())))
+        .map(|(name, kind)| {
+            (
+                name.clone(),
+                kind_inference_ctx.kind_solutions().zonk(true, kind.clone()),
+            )
+        })
         .collect();
     let sig = core::TypeSig::new(ty_vars, ty);
 
@@ -1416,13 +1437,12 @@ fn infer_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     source: &Source,
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), TypeError> {
-    let mut ctx = kind_inference::Context::new(common_kinds, types, type_variables, kind_solutions);
-    kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
+    kind_inference::infer(kind_inference_ctx, ty).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos,
         error,
@@ -1433,14 +1453,13 @@ fn check_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_solutions: &mut kind_inference::unification::Solutions,
+    kind_inference_ctx: &mut kind_inference::Context,
     source: &Source,
     pos: Option<usize>,
     ty: &syntax::Type<Rc<str>>,
     kind: &Kind,
 ) -> Result<core::Type, TypeError> {
-    let mut ctx = kind_inference::Context::new(common_kinds, types, type_variables, kind_solutions);
-    kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
+    kind_inference::check(kind_inference_ctx, ty, kind).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos: pos.unwrap_or(0),
         error,
