@@ -1421,8 +1421,7 @@ fn infer_kind(
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), TypeError> {
-    let mut ctx =
-        kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions);
+    let mut ctx = kind_inference::Context::new(common_kinds, types, type_variables, kind_solutions);
     kind_inference::infer(&mut ctx, ty).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos,
@@ -1440,8 +1439,7 @@ fn check_kind(
     ty: &syntax::Type<Rc<str>>,
     kind: &Kind,
 ) -> Result<core::Type, TypeError> {
-    let mut ctx =
-        kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions);
+    let mut ctx = kind_inference::Context::new(common_kinds, types, type_variables, kind_solutions);
     kind_inference::check(&mut ctx, ty, kind).map_err(|error| TypeError::KindError {
         source: source.clone(),
         pos: pos.unwrap_or(0),

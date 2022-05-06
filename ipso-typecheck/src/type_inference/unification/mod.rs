@@ -363,7 +363,7 @@ pub fn unify(
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
             has_kind: expected.kind(),
         };
-    kind_inference::InferenceContext::new(common_kinds, types, type_variables, kind_solutions)
+    kind_inference::Context::new(common_kinds, types, type_variables, kind_solutions)
         .unify(hint, &expected.kind(), &actual.kind())
         .map_err(|error| Error::KindError { error })?;
 

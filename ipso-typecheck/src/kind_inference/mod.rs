@@ -388,21 +388,21 @@ impl<T: Into<InferenceErrorInfo>> From<T> for InferenceError {
 }
 
 /// Kind inference context.
-pub struct InferenceContext<'a> {
+pub struct Context<'a> {
     common_kinds: &'a CommonKinds,
     types: &'a HashMap<Rc<str>, Kind>,
     type_variables: &'a BoundVars<Kind>,
     kind_solutions: &'a mut Solutions,
 }
 
-impl<'a> InferenceContext<'a> {
+impl<'a> Context<'a> {
     pub fn new(
         common_kinds: &'a CommonKinds,
         types: &'a HashMap<Rc<str>, Kind>,
         type_variables: &'a BoundVars<Kind>,
         kind_solutions: &'a mut Solutions,
     ) -> Self {
-        InferenceContext {
+        Context {
             common_kinds,
             types,
             type_variables,
@@ -522,7 +522,7 @@ impl<'a> InferenceContext<'a> {
 
 /// Infer a type's kind.
 pub fn infer(
-    ctx: &mut InferenceContext,
+    ctx: &mut Context,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), InferenceError> {
     ctx.infer(
@@ -533,7 +533,7 @@ pub fn infer(
 
 /// Check a type's kind.
 pub fn check(
-    ctx: &mut InferenceContext,
+    ctx: &mut Context,
     ty: &syntax::Type<Rc<str>>,
     expected_kind: &Kind,
 ) -> Result<core::Type, InferenceError> {

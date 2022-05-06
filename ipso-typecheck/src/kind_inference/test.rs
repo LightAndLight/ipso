@@ -1,16 +1,16 @@
-use super::{infer, InferenceContext, InferenceError, InferenceErrorHint, Solutions};
+use super::{infer, Context, InferenceError, InferenceErrorHint, Solutions};
 use crate::BoundVars;
 use ipso_core::{self as core, CommonKinds};
 use ipso_syntax::{self as syntax, kind::Kind};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-fn with_empty_ctx<A>(f: &dyn Fn(&mut InferenceContext) -> A) -> A {
+fn with_empty_ctx<A>(f: &dyn Fn(&mut Context) -> A) -> A {
     let common_kinds = CommonKinds::default();
     let types = HashMap::new();
     let type_variables = BoundVars::new();
     let mut kind_solutions = Solutions::new();
-    let mut ctx = InferenceContext {
+    let mut ctx = Context {
         common_kinds: &common_kinds,
         types: &types,
         type_variables: &type_variables,
