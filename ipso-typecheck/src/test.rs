@@ -222,17 +222,19 @@ fn infer_record_1() {
         ),
     };
     let actual_result = type_inference::infer(
-        &mut type_inference::InferenceContext {
+        type_inference::Env {
             common_kinds: &common_kinds,
             modules: &modules,
             types: &types,
             type_variables: &type_variables,
+            type_signatures: &type_signatures,
+            source: &source,
+        },
+        &mut type_inference::State {
             kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions: &mut type_solutions,
-            type_signatures: &type_signatures,
             variables: &mut variables,
             evidence: &mut evidence,
-            source: &source,
         },
         &expr,
     )

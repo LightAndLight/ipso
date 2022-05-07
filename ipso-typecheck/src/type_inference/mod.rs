@@ -238,22 +238,29 @@ impl CheckedPattern {
 }
 
 /**
-Type inference context.
+Type inference environment.
 
 [`infer`] and [`check`] are mutually recursive and take many arguments. This
 struct bundles all those arguments for convenience.
 */
-pub struct InferenceContext<'a> {
+#[derive(Clone, Copy)]
+pub struct Env<'a> {
     pub common_kinds: &'a CommonKinds,
     pub modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
     pub types: &'a HashMap<Rc<str>, Kind>,
     pub type_variables: &'a BoundVars<Kind>,
+    pub type_signatures: &'a HashMap<String, Signature>,
+    pub source: &'a Source,
+}
+
+/**
+Type inference state.
+*/
+pub struct State<'a> {
     pub kind_inference_ctx: &'a mut kind_inference::State,
     pub type_solutions: &'a mut unification::Solutions,
-    pub type_signatures: &'a HashMap<String, Signature>,
     pub variables: &'a mut BoundVars<Type>,
     pub evidence: &'a mut Evidence,
-    pub source: &'a Source,
 }
 
 fn pattern_is_redundant(
@@ -541,13 +548,14 @@ pub fn zonk_type_mut(
 
 /// Infer an expression's type.
 pub fn infer(
-    ctx: &mut InferenceContext,
+    env: Env,
+    ctx: &mut State,
     expr: &Spanned<syntax::Expr>,
 ) -> Result<(Expr, Type), Error> {
     match &expr.item {
         syntax::Expr::Var(name) => match ctx.variables.lookup_name(name) {
             Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
-            None => match ctx.type_signatures.get(name) {
+            None => match env.type_signatures.get(name) {
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
                         ctx.kind_inference_ctx,
@@ -558,10 +566,10 @@ pub fn infer(
                         type_signature,
                     )),
                     Signature::Module(_) => {
-                        Err(Error::not_a_value(ctx.source, name).with_position(expr.pos))
+                        Err(Error::not_a_value(env.source, name).with_position(expr.pos))
                     }
                 },
-                None => Err(Error::not_in_scope(ctx.source, name).with_position(expr.pos)),
+                None => Err(Error::not_in_scope(env.source, name).with_position(expr.pos)),
             },
         },
         syntax::Expr::Module { id, path, item } => {
@@ -591,8 +599,8 @@ pub fn infer(
             }
 
             let definitions = match id {
-                syntax::ModuleRef::This => ctx.type_signatures,
-                syntax::ModuleRef::Id(id) => match ctx.modules.get(id) {
+                syntax::ModuleRef::This => env.type_signatures,
+                syntax::ModuleRef::Id(id) => match env.modules.get(id) {
                     None => {
                         /*
                         A module accessor will only be desugared if the module was in scope, so this case
@@ -607,10 +615,10 @@ pub fn infer(
                 },
             };
 
-            let definitions = lookup_path(ctx.source, definitions, path)?;
+            let definitions = lookup_path(env.source, definitions, path)?;
 
             match definitions.get(&item.item) {
-                None => Err(Error::not_in_scope(ctx.source, &item.item).with_position(item.pos)),
+                None => Err(Error::not_in_scope(env.source, &item.item).with_position(item.pos)),
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
                         ctx.kind_inference_ctx,
@@ -625,7 +633,7 @@ pub fn infer(
                         type_signature,
                     )),
                     Signature::Module(_) => {
-                        Err(Error::not_a_value(ctx.source, &item.item).with_position(item.pos))
+                        Err(Error::not_a_value(env.source, &item.item).with_position(item.pos))
                     }
                 },
             }
@@ -634,9 +642,9 @@ pub fn infer(
         syntax::Expr::True => Ok((Expr::True, Type::Bool)),
         syntax::Expr::False => Ok((Expr::False, Type::Bool)),
         syntax::Expr::IfThenElse(condition, then_expr, else_expr) => {
-            let condition = check(ctx, condition, &Type::Bool)?;
-            let (then_expr, then_ty) = infer(ctx, then_expr)?;
-            let else_expr = check(ctx, else_expr, &then_ty)?;
+            let condition = check(env, ctx, condition, &Type::Bool)?;
+            let (then_expr, then_ty) = infer(env, ctx, then_expr)?;
+            let else_expr = check(env, ctx, else_expr, &then_ty)?;
             Ok((
                 Expr::mk_ifthenelse(condition, then_expr, else_expr),
                 then_ty,
@@ -652,10 +660,11 @@ pub fn infer(
                 .map(|cmd_part| match cmd_part {
                     syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
                     syntax::CmdPart::Expr(expr) => check(
+                        env,
                         ctx,
                         expr,
                         &Type::app(
-                            Type::Array(ctx.common_kinds.type_to_type.clone()),
+                            Type::Array(env.common_kinds.type_to_type.clone()),
                             Type::String,
                         ),
                     )
@@ -670,7 +679,7 @@ pub fn infer(
                 .map(|string_part| match string_part {
                     syntax::StringPart::String(string) => Ok(StringPart::String(string.clone())),
                     syntax::StringPart::Expr(expr) => {
-                        check(ctx, expr, &Type::String).map(StringPart::Expr)
+                        check(env, ctx, expr, &Type::String).map(StringPart::Expr)
                     }
                 })
                 .collect::<Result<_, _>>()?;
@@ -680,71 +689,73 @@ pub fn infer(
             let item_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
             let items: Vec<Expr> = items
                 .iter()
-                .map(|item| check(ctx, item, &item_ty))
+                .map(|item| check(env, ctx, item, &item_ty))
                 .collect::<Result<_, _>>()?;
             Ok((
                 Expr::Array(items),
-                Type::app(Type::mk_array(ctx.common_kinds), item_ty),
+                Type::app(Type::mk_array(env.common_kinds), item_ty),
             ))
         }
 
         syntax::Expr::Binop(op, left, right) => match op.item {
             syntax::Binop::Add => {
-                let left = check(ctx, left, &Type::Int)?;
-                let right = check(ctx, right, &Type::Int)?;
+                let left = check(env, ctx, left, &Type::Int)?;
+                let right = check(env, ctx, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
             }
             syntax::Binop::Multiply => {
-                let left = check(ctx, left, &Type::Int)?;
-                let right = check(ctx, right, &Type::Int)?;
+                let left = check(env, ctx, left, &Type::Int)?;
+                let right = check(env, ctx, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
             }
             syntax::Binop::Subtract => {
-                let left = check(ctx, left, &Type::Int)?;
-                let right = check(ctx, right, &Type::Int)?;
+                let left = check(env, ctx, left, &Type::Int)?;
+                let right = check(env, ctx, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
             }
             syntax::Binop::Divide => {
-                let left = check(ctx, left, &Type::Int)?;
-                let right = check(ctx, right, &Type::Int)?;
+                let left = check(env, ctx, left, &Type::Int)?;
+                let right = check(env, ctx, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
             }
             syntax::Binop::Append => {
                 let item_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-                let array_ty = Type::app(Type::mk_array(ctx.common_kinds), item_ty);
-                let left = check(ctx, left, &array_ty)?;
-                let right = check(ctx, right, &array_ty)?;
+                let array_ty = Type::app(Type::mk_array(env.common_kinds), item_ty);
+                let left = check(env, ctx, left, &array_ty)?;
+                let right = check(env, ctx, right, &array_ty)?;
                 Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
             }
             syntax::Binop::Or => {
-                let left = check(ctx, left, &Type::Bool)?;
-                let right = check(ctx, right, &Type::Bool)?;
+                let left = check(env, ctx, left, &Type::Bool)?;
+                let right = check(env, ctx, right, &Type::Bool)?;
                 Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
             }
             syntax::Binop::And => {
-                let left = check(ctx, left, &Type::Bool)?;
-                let right = check(ctx, right, &Type::Bool)?;
+                let left = check(env, ctx, left, &Type::Bool)?;
+                let right = check(env, ctx, right, &Type::Bool)?;
                 Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
             }
             syntax::Binop::LApply => {
                 let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
                 let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
                 let left = check(
+                    env,
                     ctx,
                     left,
-                    &Type::mk_arrow(ctx.common_kinds, &in_ty, &out_ty),
+                    &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
                 )?;
-                let right = check(ctx, right, &in_ty)?;
+                let right = check(env, ctx, right, &in_ty)?;
                 Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
             }
             syntax::Binop::RApply => {
                 let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
                 let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-                let left = check(ctx, left, &in_ty)?;
+                let left = check(env, ctx, left, &in_ty)?;
                 let right = check(
+                    env,
                     ctx,
                     right,
-                    &Type::mk_arrow(ctx.common_kinds, &in_ty, &out_ty),
+                    &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
                 )?;
                 Ok((Expr::mk_binop(Binop::RApply, left, right), out_ty))
             }
@@ -759,26 +770,31 @@ pub fn infer(
         syntax::Expr::App(fun, arg) => {
             let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
             let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-            let fun = check(ctx, fun, &Type::mk_arrow(ctx.common_kinds, &in_ty, &out_ty))?;
-            let arg = check(ctx, arg, &in_ty)?;
+            let fun = check(
+                env,
+                ctx,
+                fun,
+                &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
+            )?;
+            let arg = check(env, ctx, arg, &in_ty)?;
             Ok((Expr::mk_app(fun, arg), out_ty))
         }
         syntax::Expr::Lam { args, body } => {
-            check_duplicate_args(ctx.source, args)?;
+            check_duplicate_args(env.source, args)?;
 
             let mut inferred_args: Vec<(Pattern, Type)> = Vec::with_capacity(args.len());
             let bound_variables: Vec<(Rc<str>, Type)> = args
                 .iter()
                 .flat_map(|arg| {
                     let result =
-                        infer_pattern(ctx.common_kinds, ctx.type_solutions, ctx.evidence, arg);
-                    inferred_args.push((result.pattern(), result.ty(ctx.common_kinds)));
+                        infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, arg);
+                    inferred_args.push((result.pattern(), result.ty(env.common_kinds)));
                     result.names().into_iter()
                 })
                 .collect();
 
             ctx.variables.insert(&bound_variables);
-            let (body, body_ty) = infer(ctx, body)?;
+            let (body, body_ty) = infer(env, ctx, body)?;
             ctx.variables.delete(bound_variables.len());
 
             let (expr, ty) = inferred_args.into_iter().rev().fold(
@@ -802,7 +818,7 @@ pub fn infer(
                         ),
                         Pattern::Wildcard => Expr::mk_lam(false, body),
                     };
-                    let body_ty = Type::arrow(ctx.common_kinds, arg_ty, body_ty);
+                    let body_ty = Type::arrow(env.common_kinds, arg_ty, body_ty);
 
                     (body, body_ty)
                 },
@@ -811,10 +827,10 @@ pub fn infer(
             Ok((expr, ty))
         }
         syntax::Expr::Let { name, value, rest } => {
-            let (value, value_ty) = infer(ctx, value)?;
+            let (value, value_ty) = infer(env, ctx, value)?;
 
             ctx.variables.insert(&[(name.clone(), value_ty)]);
-            let (rest, rest_ty) = infer(ctx, rest)?;
+            let (rest, rest_ty) = infer(env, ctx, rest)?;
             ctx.variables.delete(1);
 
             Ok((Expr::mk_let(value, rest), rest_ty))
@@ -831,7 +847,7 @@ pub fn infer(
                     .iter()
                     .map(|(field_name, field_expr)| {
                         let field_pos = field_expr.pos;
-                        infer(ctx, field_expr).map(|(field_expr, field_ty)| {
+                        infer(env, ctx, field_expr).map(|(field_expr, field_ty)| {
                             let field_name_str = field_name.as_str();
                             field_to_expr.insert(field_name_str, field_expr);
                             field_to_pos.insert(field_name_str, field_pos);
@@ -867,20 +883,21 @@ pub fn infer(
             let (expr_rest, ty_rest) = match rest {
                 Some(rest) => {
                     let rest = check(
+                        env,
                         ctx,
                         rest,
-                        &Type::mk_app(&Type::mk_record_ctor(ctx.common_kinds), row),
+                        &Type::mk_app(&Type::mk_record_ctor(env.common_kinds), row),
                     )?;
                     Ok((Some(rest), Some(row.clone())))
                 }
                 None => {
                     unify(
-                        ctx.common_kinds,
-                        ctx.types,
-                        ctx.type_variables,
+                        env.common_kinds,
+                        env.types,
+                        env.type_variables,
                         ctx.kind_inference_ctx,
                         ctx.type_solutions,
-                        ctx.source,
+                        env.source,
                         None,
                         &Type::RowNil,
                         row,
@@ -891,7 +908,7 @@ pub fn infer(
 
             Ok((
                 Expr::mk_record(expr_fields, expr_rest),
-                Type::mk_record(ctx.common_kinds, ty_fields, ty_rest),
+                Type::mk_record(env.common_kinds, ty_fields, ty_rest),
             ))
         }
         syntax::Expr::Project(expr, field) => {
@@ -902,10 +919,11 @@ pub fn infer(
 
             let pos = expr.pos;
             let expr = check(
+                env,
                 ctx,
                 expr,
                 &Type::mk_record(
-                    ctx.common_kinds,
+                    env.common_kinds,
                     vec![(field_name.clone(), field_ty.clone())],
                     Some(rest_row.clone()),
                 ),
@@ -938,10 +956,10 @@ pub fn infer(
             Ok((
                 Expr::mk_variant(placeholder),
                 Type::arrow(
-                    ctx.common_kinds,
+                    env.common_kinds,
                     arg_ty.clone(),
                     Type::mk_variant(
-                        ctx.common_kinds,
+                        env.common_kinds,
                         vec![(constructor, arg_ty)],
                         Some(rest_row),
                     ),
@@ -951,9 +969,10 @@ pub fn infer(
         syntax::Expr::Embed(constructor, expr) => {
             let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
             let expr = check(
+                env,
                 ctx,
                 expr,
-                &Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest_row.clone()),
+                &Type::app(Type::mk_variant_ctor(env.common_kinds), rest_row.clone()),
             )?;
 
             let constructor_pos = constructor.pos;
@@ -969,13 +988,13 @@ pub fn infer(
             Ok((
                 Expr::mk_embed(placeholder, expr),
                 Type::mk_variant(
-                    ctx.common_kinds,
+                    env.common_kinds,
                     vec![(constructor, arg_ty)],
                     Some(rest_row),
                 ),
             ))
         }
-        syntax::Expr::Case(expr, branches) => infer_case(ctx, expr, branches),
+        syntax::Expr::Case(expr, branches) => infer_case(env, ctx, expr, branches),
 
         syntax::Expr::Comp(_) => {
             panic!("computation expression was not desugared")
@@ -984,11 +1003,12 @@ pub fn infer(
 }
 
 fn infer_case(
-    ctx: &mut InferenceContext,
+    env: Env,
+    ctx: &mut State,
     expr: &Spanned<syntax::Expr>,
     branches: &[syntax::Branch],
 ) -> Result<(Expr, Type), Error> {
-    let (expr, mut expr_ty) = infer(ctx, expr)?;
+    let (expr, mut expr_ty) = infer(env, ctx, expr)?;
 
     /*
     [note: peeling constructors when matching on variants]
@@ -1039,7 +1059,7 @@ fn infer_case(
         .iter()
         .map(|branch| {
             if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                return Err(Error::redundant_pattern(ctx.source).with_position(branch.pattern.pos));
+                return Err(Error::redundant_pattern(env.source).with_position(branch.pattern.pos));
             }
 
             if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
@@ -1047,24 +1067,24 @@ fn infer_case(
             }
 
             let result = check_pattern(
-                ctx.common_kinds,
-                ctx.types,
-                ctx.type_variables,
+                env.common_kinds,
+                env.types,
+                env.type_variables,
                 ctx.kind_inference_ctx,
                 ctx.type_solutions,
                 ctx.evidence,
-                ctx.source,
+                env.source,
                 &branch.pattern,
                 &expr_ty,
             )?;
 
             if let CheckedPattern::Variant { rest, .. } = &result {
-                expr_ty = Type::app(Type::mk_variant_ctor(ctx.common_kinds), rest.clone())
+                expr_ty = Type::app(Type::mk_variant_ctor(env.common_kinds), rest.clone())
             }
 
             let names = result.names();
             ctx.variables.insert(&names);
-            let body = check(ctx, &branch.body, &out_ty)?;
+            let body = check(env, ctx, &branch.body, &out_ty)?;
             ctx.variables.delete(names.len());
 
             let pattern = result.pattern();
@@ -1080,12 +1100,12 @@ fn infer_case(
         Some(RowParts {
             rest: Some(rest), ..
         }) if !saw_catchall => unify(
-            ctx.common_kinds,
-            ctx.types,
-            ctx.type_variables,
+            env.common_kinds,
+            env.types,
+            env.type_variables,
             ctx.kind_inference_ctx,
             ctx.type_solutions,
-            ctx.source,
+            env.source,
             None,
             &Type::RowNil,
             rest,
@@ -1097,19 +1117,20 @@ fn infer_case(
 
 /// Check an expression's type.
 pub fn check(
-    ctx: &mut InferenceContext,
+    env: Env,
+    ctx: &mut State,
     expr: &Spanned<syntax::Expr>,
     expected: &Type,
 ) -> Result<Expr, Error> {
     let position = expr.pos;
-    let (expr, expr_ty) = infer(ctx, expr)?;
+    let (expr, expr_ty) = infer(env, ctx, expr)?;
     unify(
-        ctx.common_kinds,
-        ctx.types,
-        ctx.type_variables,
+        env.common_kinds,
+        env.types,
+        env.type_variables,
         ctx.kind_inference_ctx,
         ctx.type_solutions,
-        ctx.source,
+        env.source,
         Some(position),
         expected,
         &expr_ty,

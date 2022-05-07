@@ -695,17 +695,19 @@ fn check_definition(
         .collect::<Vec<_>>();
     bound_vars.insert(&arg_bound_vars);
     let body = type_inference::check(
-        &mut type_inference::InferenceContext {
+        type_inference::Env {
             common_kinds,
             modules: module_context,
             types,
             type_variables,
+            type_signatures: context,
+            source,
+        },
+        &mut type_inference::State {
             kind_inference_ctx: &mut kind_inference_ctx,
             type_solutions,
-            type_signatures: context,
             variables: bound_vars,
             evidence,
-            source,
         },
         body,
         &out_ty,
@@ -1095,17 +1097,19 @@ fn check_instance(
 
                 match {
                     let member_body = type_inference::check(
-                        &mut type_inference::InferenceContext {
+                        type_inference::Env {
                             common_kinds,
                             modules: module_context,
                             types,
                             type_variables,
+                            type_signatures: context,
+                            source,
+                        },
+                        &mut type_inference::State {
                             kind_inference_ctx: &mut kind_inference_ctx,
                             type_solutions,
-                            type_signatures: context,
                             variables: bound_vars,
                             evidence,
-                            source,
                         },
                         &Spanned {
                             pos: member.name.pos,
