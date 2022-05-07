@@ -1,6 +1,5 @@
 //! Module checking.
 
-use crate::declaration::Declarations;
 use crate::{declaration, Implication, TypeError};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
@@ -14,6 +13,7 @@ pub struct State {
     pub type_context: HashMap<Rc<str>, Kind>,
     pub context: HashMap<String, core::Signature>,
     pub class_context: HashMap<Rc<str>, core::ClassDeclaration>,
+    pub module_context: HashMap<ModuleId, HashMap<String, core::Signature>>,
 }
 
 impl State {
@@ -23,27 +23,108 @@ impl State {
             type_context: HashMap::new(),
             context: HashMap::new(),
             class_context: HashMap::new(),
+            module_context: HashMap::new(),
         }
     }
 
-    pub fn register_declaration(
+    pub fn add_declaration(
         &mut self,
         common_kinds: &CommonKinds,
-        module_id: Option<ModuleId>,
+        decls: &mut Vec<core::Declaration>,
+        decl: declaration::Checked,
+    ) {
+        match decl {
+            declaration::Checked::Definition { name, sig, body } => {
+                register_definition(&mut self.context, &name, &sig);
+                decls.push(core::Declaration::Definition { name, sig, body })
+            }
+
+            declaration::Checked::ResolvedImport { module_id, module } => {
+                self.module_context
+                    .insert(module_id, module.get_signatures(common_kinds));
+                module.decls.iter().for_each(|decl| {
+                    if let core::Declaration::Instance {
+                        ty_vars,
+                        assumes,
+                        head,
+                        evidence,
+                        ..
+                    } = decl
+                    {
+                        self.import_instance(module_id, ty_vars, assumes, head, evidence.clone())
+                    }
+                });
+            }
+
+            declaration::Checked::Class(class_decl) => {
+                register_class(
+                    common_kinds,
+                    &mut self.type_context,
+                    &mut self.implications,
+                    &mut self.context,
+                    &mut self.class_context,
+                    &class_decl,
+                );
+                decls.push(core::Declaration::Class(class_decl))
+            }
+
+            declaration::Checked::Instance {
+                evidence_name,
+                evidence_body,
+                instance_ty_vars,
+                instance_assumes,
+                instance_head,
+                instance_evidence,
+            } => {
+                register_instance(
+                    &mut self.implications,
+                    None,
+                    &instance_ty_vars,
+                    &instance_assumes,
+                    &instance_head,
+                    instance_evidence.clone(),
+                );
+
+                decls.push(core::Declaration::Evidence {
+                    name: evidence_name,
+                    body: evidence_body,
+                });
+                decls.push(core::Declaration::Instance {
+                    ty_vars: instance_ty_vars,
+                    assumes: instance_assumes,
+                    head: instance_head,
+                    evidence: instance_evidence,
+                });
+            }
+        }
+    }
+
+    /**
+    Import a declaration from another module.
+
+    ## Arguments
+
+    * `module_id` - Module that contains the declaration.
+
+    */
+    pub fn import_declaration(
+        &mut self,
+        common_kinds: &CommonKinds,
+        module_id: ModuleId,
         decl: &core::Declaration,
     ) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                self.register_builtin_type(name, kind);
+                self.import_builtin_type(name, kind);
             }
-            core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
+            core::Declaration::Definition { name, sig, .. } => self.import_definition(name, sig),
             core::Declaration::Module { name, decls, .. } => {
-                self.register_module(common_kinds, name, decls)
+                self.import_module(common_kinds, name, decls)
             }
             core::Declaration::TypeAlias { name, args, body } => {
-                self.register_type_alias(name, args, body)
+                self.import_type_alias(name, args, body)
             }
-            core::Declaration::Class(decl) => self.register_class(common_kinds, decl),
+            core::Declaration::Class(decl) => self.import_class(common_kinds, decl),
             core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
@@ -51,30 +132,11 @@ impl State {
                 head,
                 evidence,
                 ..
-            } => self.register_instance(module_id, ty_vars, assumes, head, evidence.clone()),
+            } => self.import_instance(module_id, ty_vars, assumes, head, evidence.clone()),
         }
     }
 
-    pub fn register_from_import(
-        &mut self,
-        common_kinds: &CommonKinds,
-        modules: &Modules<core::Module>,
-        module_id: ModuleId,
-        names: &syntax::Names,
-    ) {
-        register_from_import(
-            common_kinds,
-            &mut self.implications,
-            &mut self.type_context,
-            &mut self.context,
-            &mut self.class_context,
-            modules,
-            module_id,
-            names,
-        )
-    }
-
-    pub fn register_class(&mut self, common_kinds: &CommonKinds, decl: &core::ClassDeclaration) {
+    pub fn import_class(&mut self, common_kinds: &CommonKinds, decl: &core::ClassDeclaration) {
         register_class(
             common_kinds,
             &mut self.type_context,
@@ -85,9 +147,9 @@ impl State {
         )
     }
 
-    pub fn register_instance(
+    pub fn import_instance(
         &mut self,
-        module_id: Option<ModuleId>,
+        module_id: ModuleId,
         ty_vars: &[(Rc<str>, Kind)],
         assumes: &[core::Type],
         head: &core::Type,
@@ -95,7 +157,7 @@ impl State {
     ) {
         register_instance(
             &mut self.implications,
-            module_id,
+            Some(module_id),
             ty_vars,
             assumes,
             head,
@@ -103,15 +165,15 @@ impl State {
         )
     }
 
-    pub fn register_builtin_type(&mut self, name: &str, kind: &Kind) {
+    pub fn import_builtin_type(&mut self, name: &str, kind: &Kind) {
         register_builtin_type(&mut self.type_context, name, kind)
     }
 
-    pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
+    pub fn import_definition(&mut self, name: &str, sig: &core::TypeSig) {
         register_definition(&mut self.context, name, sig)
     }
 
-    pub fn register_module(
+    pub fn import_module(
         &mut self,
         common_kinds: &CommonKinds,
         name: &str,
@@ -120,8 +182,8 @@ impl State {
         register_module(common_kinds, &mut self.context, name, decls)
     }
 
-    pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
-        todo!("register TypeAlias {:?}", (name, args, body))
+    pub fn import_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
+        todo!("import TypeAlias {:?}", (name, args, body))
     }
 }
 
@@ -137,39 +199,30 @@ pub fn check(
     source: &Source,
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
-    let mut module_context = HashMap::new();
     let mut state = State::new();
 
-    let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
-        acc.and_then(|mut decls| {
-            declaration::check(
-                common_kinds,
-                &mut state.implications,
-                &mut state.type_context,
-                &mut state.context,
-                &state.class_context,
-                modules,
-                &mut module_context,
-                source,
-                decl,
-            )
-            .map(|checked_decls| match checked_decls {
-                Declarations::Zero => decls,
-                Declarations::One(decl) => {
-                    state.register_declaration(common_kinds, None, &decl);
-                    decls.push(decl);
-                    decls
-                }
-                Declarations::Two(decl1, decl2) => {
-                    state.register_declaration(common_kinds, None, &decl1);
-                    decls.push(decl1);
-                    state.register_declaration(common_kinds, None, &decl2);
-                    decls.push(decl2);
-                    decls
-                }
+    let decls = module.decls.iter().fold(
+        Ok(vec![]),
+        |acc: Result<Vec<core::Declaration>, TypeError>, decl| {
+            acc.and_then(|mut decls| {
+                declaration::check(
+                    common_kinds,
+                    &state.implications,
+                    &state.type_context,
+                    &state.context,
+                    &state.class_context,
+                    modules,
+                    &state.module_context,
+                    source,
+                    decl,
+                )
+                .map(|checked| state.add_declaration(common_kinds, &mut decls, checked))?;
+
+                Ok(decls)
             })
-        })
-    })?;
+        },
+    )?;
+
     Ok(core::Module { decls })
 }
 

@@ -3,11 +3,11 @@
 use crate::{
     abstract_evidence, check_kind,
     constraint_solving::{self, solve_constraint},
-    evidence, fill_ty_names, generalise, infer_kind, kind_inference, module,
+    evidence, fill_ty_names, generalise, infer_kind, kind_inference,
     type_inference::{self, infer_pattern},
     BoundVars, Implication, TypeError,
 };
-use ipso_core::{self as core, CommonKinds};
+use ipso_core::{self as core, CommonKinds, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, ModuleId, Modules, Spanned};
 use std::{
@@ -17,23 +17,38 @@ use std::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Declarations {
-    Zero,
-    One(core::Declaration),
-    Two(core::Declaration, core::Declaration),
+pub enum Checked {
+    Definition {
+        name: String,
+        sig: TypeSig,
+        body: Rc<core::Expr>,
+    },
+    ResolvedImport {
+        module_id: ModuleId,
+        module: core::Module,
+    },
+    Class(core::ClassDeclaration),
+    Instance {
+        evidence_name: Rc<str>,
+        evidence_body: Rc<core::Expr>,
+        instance_ty_vars: Vec<(Rc<str>, Kind)>,
+        instance_assumes: Vec<core::Type>,
+        instance_head: core::Type,
+        instance_evidence: Rc<str>,
+    },
 }
 
 pub fn check(
     common_kinds: &CommonKinds,
-    implications: &mut Vec<Implication>,
-    type_context: &mut HashMap<Rc<str>, Kind>,
-    context: &mut HashMap<String, core::Signature>,
+    implications: &[Implication],
+    type_context: &HashMap<Rc<str>, Kind>,
+    context: &HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
     modules: &Modules<core::Module>,
-    module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
+    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
     decl: &syntax::Spanned<syntax::Declaration>,
-) -> Result<Declarations, TypeError> {
+) -> Result<Checked, TypeError> {
     match &decl.item {
         syntax::Declaration::Definition {
             name,
@@ -51,8 +66,7 @@ pub fn check(
             ty,
             args,
             body,
-        )
-        .map(Declarations::One),
+        ),
         syntax::Declaration::TypeAlias { name, args, body } => {
             todo!("check type alias {:?}", (name, args, body))
         }
@@ -62,31 +76,11 @@ pub fn check(
             let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
 
             let module = modules.lookup(module_id);
-            {
-                let signatures = module.get_signatures(common_kinds);
-                module_context.insert(module_id, signatures);
-            }
-            module.decls.iter().for_each(|decl| {
-                if let core::Declaration::Instance {
-                    ty_vars,
-                    assumes,
-                    head,
-                    evidence,
-                    ..
-                } = decl
-                {
-                    module::register_instance(
-                        implications,
-                        Some(module_id),
-                        ty_vars,
-                        assumes,
-                        head,
-                        evidence.clone(),
-                    )
-                }
-            });
 
-            Ok(Declarations::Zero)
+            Ok(Checked::ResolvedImport {
+                module_id,
+                module: module.clone(),
+            })
         }
 
         syntax::Declaration::Class {
@@ -102,8 +96,7 @@ pub fn check(
             name,
             args,
             members,
-        )
-        .map(Declarations::One),
+        ),
         syntax::Declaration::Instance {
             assumes,
             name,
@@ -121,23 +114,23 @@ pub fn check(
             name,
             args,
             members,
-        )
-        .map(|(a, b)| Declarations::Two(a, b)),
+        ),
     }
 }
 
 pub fn check_definition(
     common_kinds: &CommonKinds,
     implications: &[Implication],
-    types: &mut HashMap<Rc<str>, Kind>,
-    type_signatures: &mut HashMap<String, core::Signature>,
+    types: &HashMap<Rc<str>, Kind>,
+    type_signatures: &HashMap<String, core::Signature>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
     name: &str,
     ty: &syntax::Type<Rc<str>>,
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
-) -> Result<core::Declaration, TypeError> {
+) -> Result<Checked, TypeError> {
+    let mut type_signatures = type_signatures.clone();
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
@@ -198,7 +191,7 @@ pub fn check_definition(
                     modules: module_context,
                     types,
                     type_variables: &type_variables,
-                    type_signatures,
+                    type_signatures: &type_signatures,
                     source,
                 },
                 &mut type_inference_state,
@@ -234,7 +227,7 @@ pub fn check_definition(
                 modules: module_context,
                 types,
                 type_variables: &type_variables,
-                type_signatures,
+                type_signatures: &type_signatures,
                 source,
             },
             type_inference_state,
@@ -272,9 +265,7 @@ pub fn check_definition(
 
     type_variables.delete(ty_var_kinds.len());
 
-    type_signatures.remove(name);
-
-    Ok(core::Declaration::Definition {
+    Ok(Checked::Definition {
         name: name.to_string(),
         sig,
         body: Rc::new(body),
@@ -285,8 +276,8 @@ pub fn check_class_member(
     common_kinds: &CommonKinds,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut type_inference::unification::Solutions,
-    type_context: &mut HashMap<Rc<str>, Kind>,
-    bound_tyvars: &mut BoundVars<Kind>,
+    type_context: &HashMap<Rc<str>, Kind>,
+    bound_tyvars: &BoundVars<Kind>,
     source: &Source,
     class_args_kinds: &[(Rc<str>, Kind)],
     name: &str,
@@ -309,11 +300,12 @@ pub fn check_class_member(
             .collect()
     };
 
+    let mut bound_tyvars = bound_tyvars.clone();
     bound_tyvars.insert(&ty_var_kinds);
     let ty = check_kind(
         common_kinds,
         type_context,
-        bound_tyvars,
+        &bound_tyvars,
         kind_inference_state,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
@@ -339,13 +331,13 @@ pub fn check_class_member(
 
 pub fn check_class(
     common_kinds: &CommonKinds,
-    types: &mut HashMap<Rc<str>, Kind>,
+    types: &HashMap<Rc<str>, Kind>,
     source: &Source,
     supers: &[Spanned<syntax::Type<Rc<str>>>],
     name: &Rc<str>,
     args: &[Spanned<Rc<str>>],
     members: &[(String, syntax::Type<Rc<str>>)],
-) -> Result<core::Declaration, TypeError> {
+) -> Result<Checked, TypeError> {
     let mut type_variables = BoundVars::new();
     let mut type_solutions = type_inference::unification::Solutions::new();
     let mut kind_inference_state = kind_inference::State::new();
@@ -404,7 +396,7 @@ pub fn check_class(
 
     type_variables.delete(args_kinds.len());
 
-    Ok(core::Declaration::Class(core::ClassDeclaration {
+    Ok(Checked::Class(core::ClassDeclaration {
         supers,
         name: name.clone(),
         args: args_kinds
@@ -418,7 +410,7 @@ pub fn check_class(
 pub fn check_instance(
     common_kinds: &CommonKinds,
     implications: &[Implication],
-    types: &mut HashMap<Rc<str>, Kind>,
+    types: &HashMap<Rc<str>, Kind>,
     context: &HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
@@ -427,7 +419,7 @@ pub fn check_instance(
     name: &Spanned<Rc<str>>,
     args: &[Spanned<syntax::Type<Rc<str>>>],
     members: &[syntax::InstanceMember],
-) -> Result<(core::Declaration, core::Declaration), TypeError> {
+) -> Result<Checked, TypeError> {
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
@@ -690,19 +682,15 @@ pub fn check_instance(
         Rc::new(evidence)
     };
 
-    let evidence_decl = core::Declaration::Evidence {
-        name: evidence_name.clone(),
-        body: evidence,
-    };
-    let instance_decl = core::Declaration::Instance {
-        ty_vars,
-        assumes: assumes
+    Ok(Checked::Instance {
+        evidence_name: evidence_name.clone(),
+        evidence_body: evidence,
+        instance_ty_vars: ty_vars,
+        instance_assumes: assumes
             .into_iter()
             .map(|assume| type_inference_state.zonk_type(assume))
             .collect(),
-        head: type_inference_state.zonk_type(head),
-        evidence: evidence_name,
-    };
-
-    Ok((evidence_decl, instance_decl))
+        instance_head: type_inference_state.zonk_type(head),
+        instance_evidence: evidence_name,
+    })
 }

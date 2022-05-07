@@ -1600,7 +1600,7 @@ pub struct ClassMember {
     pub sig: TypeSig,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     BuiltinType {
         name: String,
@@ -1782,7 +1782,7 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub decls: Vec<Declaration>,
 }

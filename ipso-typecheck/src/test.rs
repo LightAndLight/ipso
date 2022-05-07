@@ -1,11 +1,11 @@
 use crate::constraint_solving::{self, solve_placeholder};
+use crate::declaration;
 use crate::{
-    declaration::Declarations, evidence::Constraint, kind_inference, module, type_inference,
-    zonk_constraint, BoundVars,
+    evidence::Constraint, kind_inference, module, type_inference, zonk_constraint, BoundVars,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
-use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
+use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, Spanned};
 use ipso_util::void::Void;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -343,25 +343,25 @@ fn infer_record_1() {
 
 fn check_declaration(
     decl: &Spanned<syntax::Declaration>,
-) -> std::result::Result<Declarations, crate::TypeError> {
+) -> std::result::Result<declaration::Checked, crate::TypeError> {
     let common_kinds = Default::default();
-    let mut types = Default::default();
-    let mut implications = Default::default();
-    let mut context = Default::default();
+    let types = Default::default();
+    let implications = Default::default();
+    let context = Default::default();
     let class_context = Default::default();
     let modules = Default::default();
-    let mut module_context = Default::default();
+    let module_context = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
     };
     crate::declaration::check(
         &common_kinds,
-        &mut implications,
-        &mut types,
-        &mut context,
+        implications,
+        &types,
+        &context,
         &class_context,
         &modules,
-        &mut module_context,
+        &module_context,
         &source,
         decl,
     )
@@ -395,14 +395,14 @@ fn check_definition_1() {
     };
 
     let a = core::Type::unsafe_mk_var(0, Kind::Type);
-    let expected = Ok(Declarations::One(core::Declaration::Definition {
+    let expected = Ok(declaration::Checked::Definition {
         name: String::from("id"),
         sig: core::TypeSig {
             ty_vars: vec![(Rc::from("a"), a.kind())],
             body: core::Type::arrow(&common_kinds, a.clone(), a),
         },
         body: Rc::new(core::Expr::mk_lam(true, core::Expr::Var(0))),
-    }));
+    });
     let actual = check_declaration(&decl);
     assert_eq!(expected, actual,)
 }
@@ -453,7 +453,7 @@ fn check_definition_2() {
     };
 
     let r = core::Type::unsafe_mk_var(0, Kind::Row);
-    let expected = Ok(Declarations::One(core::Declaration::Definition {
+    let expected = Ok(declaration::Checked::Definition {
         name: String::from("thing"),
         sig: core::TypeSig {
             ty_vars: vec![(Rc::from("r"), r.kind())],
@@ -478,7 +478,7 @@ fn check_definition_2() {
                 core::Expr::mk_extend(core::Expr::Var(1), core::Expr::Int(0), core::Expr::Var(0)),
             ),
         )),
-    }));
+    });
     let actual = check_declaration(&decl);
     assert_eq!(expected, actual)
 }
@@ -535,7 +535,7 @@ fn check_definition_3() {
             },
         },
     };
-    let expected = Ok(Declarations::One(core::Declaration::Definition {
+    let expected = Ok(declaration::Checked::Definition {
         name: String::from("thing"),
         sig: core::TypeSig {
             ty_vars: Vec::new(),
@@ -557,7 +557,7 @@ fn check_definition_3() {
             ],
             None,
         )),
-    }));
+    });
     let actual = check_declaration(&decl);
     assert_eq!(expected, actual)
 }
@@ -600,7 +600,7 @@ fn check_definition_4() {
             },
         },
     };
-    let expected = Ok(Declarations::One(core::Declaration::Definition {
+    let expected = Ok(declaration::Checked::Definition {
         name: String::from("getx"),
         sig: {
             let r = core::Type::unsafe_mk_var(0, Kind::Row);
@@ -637,52 +637,35 @@ fn check_definition_4() {
                 ),
             ),
         )),
-    }));
+    });
     let actual = check_declaration(&decl);
     assert_eq!(expected, actual)
-}
-
-fn register_declarations(
-    common_kinds: &CommonKinds,
-    state: &mut module::State,
-    module_id: Option<ModuleId>,
-    decls: &Declarations,
-) {
-    match decls {
-        Declarations::Zero => {}
-        Declarations::One(a) => state.register_declaration(common_kinds, module_id, a),
-        Declarations::Two(a, b) => {
-            state.register_declaration(common_kinds, module_id, a);
-            state.register_declaration(common_kinds, module_id, b);
-        }
-    }
 }
 
 #[test]
 fn check_class_1() {
     let common_kinds = CommonKinds::default();
     let mut state = module::State::new();
+    let mut decls = Vec::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
-        Ok(Declarations::One(core::Declaration::Class(
-            core::ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("MyEq"),
-                args: vec![(Rc::from("a"), a.kind())],
-                members: vec![ClassMember {
-                    name: String::from("myeq"),
-                    sig: TypeSig {
-                        ty_vars: vec![],
-                        body: core::Type::arrow(
-                            &common_kinds,
-                            a.clone(),
-                            core::Type::arrow(&common_kinds, a, core::Type::Bool),
-                        ),
-                    },
-                }],
-            },
-        )))
+        Ok(declaration::Checked::Class(core::ClassDeclaration {
+            supers: Vec::new(),
+            name: Rc::from("MyEq"),
+            args: vec![(Rc::from("a"), a.kind())],
+            members: vec![ClassMember {
+                name: String::from("myeq"),
+                sig: TypeSig {
+                    ty_vars: vec![],
+                    body: core::Type::arrow(
+                        &common_kinds,
+                        a.clone(),
+                        core::Type::arrow(&common_kinds, a, core::Type::Bool),
+                    ),
+                },
+            }],
+        }))
     };
     /*
     class MyEq a where
@@ -708,8 +691,8 @@ fn check_class_1() {
     });
     assert_eq!(expected, actual);
 
-    let decls = actual.unwrap();
-    register_declarations(&common_kinds, &mut state, None, &decls);
+    let checked = actual.unwrap();
+    state.add_declaration(&common_kinds, &mut decls, checked);
 
     let expected_class: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -762,28 +745,27 @@ fn check_class_1() {
 fn check_class_2() {
     let common_kinds = CommonKinds::default();
     let mut state = module::State::new();
+    let mut decls = Vec::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
         let b = core::Type::unsafe_mk_var(0, Kind::Type);
-        Ok(Declarations::One(core::Declaration::Class(
-            core::ClassDeclaration {
-                supers: Vec::new(),
-                name: Rc::from("Wut"),
-                args: vec![(Rc::from("a"), a.kind())],
-                members: vec![ClassMember {
-                    name: String::from("wut"),
-                    sig: TypeSig {
-                        ty_vars: vec![(Rc::from("b"), b.kind())],
-                        body: core::Type::arrow(
-                            &common_kinds,
-                            a,
-                            core::Type::arrow(&common_kinds, b, core::Type::Bool),
-                        ),
-                    },
-                }],
-            },
-        )))
+        Ok(declaration::Checked::Class(core::ClassDeclaration {
+            supers: Vec::new(),
+            name: Rc::from("Wut"),
+            args: vec![(Rc::from("a"), a.kind())],
+            members: vec![ClassMember {
+                name: String::from("wut"),
+                sig: TypeSig {
+                    ty_vars: vec![(Rc::from("b"), b.kind())],
+                    body: core::Type::arrow(
+                        &common_kinds,
+                        a,
+                        core::Type::arrow(&common_kinds, b, core::Type::Bool),
+                    ),
+                },
+            }],
+        }))
     };
     /*
     class Wut a where
@@ -809,8 +791,8 @@ fn check_class_2() {
     });
     assert_eq!(expected, actual);
 
-    let decls = actual.unwrap();
-    register_declarations(&common_kinds, &mut state, None, &decls);
+    let checked = actual.unwrap();
+    state.add_declaration(&common_kinds, &mut decls, checked);
 
     let expected_class_decl: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -869,8 +851,9 @@ fn check_class_2() {
 fn check_instance_1() {
     let common_kinds = CommonKinds::default();
     let modules = Default::default();
-    let mut module_context = Default::default();
+    let module_context = Default::default();
     let mut state = module::State::new();
+    let mut decls = Vec::new();
     let source = Source::Interactive {
         label: String::from("test"),
     };
@@ -881,33 +864,29 @@ fn check_instance_1() {
             Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
         );
         let evidence_name: Rc<str> = Rc::from("Eq ()");
-        Ok(Declarations::Two(
-            core::Declaration::Evidence {
-                name: evidence_name.clone(),
-                body: Rc::new(core::Expr::mk_record(
-                    vec![(
-                        // eq
-                        core::Expr::Int(0),
-                        // \a b -> True
-                        core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
-                    )],
-                    None,
-                )),
-            },
-            core::Declaration::Instance {
-                ty_vars: Vec::new(),
-                assumes: Vec::new(),
-                head: core::Type::app(eq_ty, core::Type::Unit),
-                evidence: evidence_name,
-            },
-        ))
+        Ok(declaration::Checked::Instance {
+            evidence_name: evidence_name.clone(),
+            evidence_body: Rc::new(core::Expr::mk_record(
+                vec![(
+                    // eq
+                    core::Expr::Int(0),
+                    // \a b -> True
+                    core::Expr::mk_lam(true, core::Expr::mk_lam(true, core::Expr::True)),
+                )],
+                None,
+            )),
+            instance_ty_vars: Vec::new(),
+            instance_assumes: Vec::new(),
+            instance_head: core::Type::app(eq_ty, core::Type::Unit),
+            instance_evidence: evidence_name,
+        })
     };
     {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
-        state.register_declaration(
+        state.add_declaration(
             &common_kinds,
-            None,
-            &core::Declaration::Class(core::ClassDeclaration {
+            &mut decls,
+            declaration::Checked::Class(core::ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),
                 args: vec![(Rc::from("a"), Kind::Type)],
@@ -931,12 +910,12 @@ fn check_instance_1() {
     */
     let actual = crate::declaration::check(
         &common_kinds,
-        &mut state.implications,
-        &mut state.type_context,
-        &mut state.context,
+        &state.implications,
+        &state.type_context,
+        &state.context,
         &state.class_context,
         &modules,
-        &mut module_context,
+        &module_context,
         &source,
         &Spanned {
             pos: 0,
