@@ -1,24 +1,4 @@
-/*!
-Type checking and inference.
-
-## Checking and inference
-
-* [`check`]
-* [`infer`]
-
-## Unification
-
-* [`unify`]
-* [`unification`]
-
-## Metavariable generation & zonking
-
-* [`fresh_kind_meta`]
-* [`fresh_type_meta`]
-* [`zonk_type`]
-* [`zonk_type_mut`]
-
-*/
+//! Type checking and inference.
 
 #[cfg(test)]
 mod test;
@@ -257,9 +237,16 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn zonk_type(&self, ty: Type) -> Type {
+    /// Substitute all solved type and kind metavariables in a type.
+    pub fn zonk_type(&self, mut ty: Type) -> Type {
+        self.zonk_type_mut(&mut ty);
+        ty
+    }
+
+    /// A mutable version of [`State::zonk_type`].
+    fn zonk_type_mut(&self, ty: &mut Type) {
         self.type_solutions
-            .zonk(self.kind_inference_state.kind_solutions(), ty)
+            .zonk_mut(self.kind_inference_state.kind_solutions(), ty);
     }
 
     pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {
@@ -539,24 +526,6 @@ pub fn check_pattern(
             rest,
         },
     })
-}
-
-/// Substitute all solved type and kind metavariables in a type.
-pub fn zonk_type(
-    kind_inference_state: &kind_inference::State,
-    type_solutions: &unification::Solutions,
-    ty: Type,
-) -> Type {
-    type_solutions.zonk(kind_inference_state.kind_solutions(), ty)
-}
-
-/// A mutable version of [`zonk_type`].
-pub fn zonk_type_mut(
-    kind_inference_state: &mut kind_inference::State,
-    type_solutions: &mut unification::Solutions,
-    ty: &mut Type,
-) {
-    type_solutions.zonk_mut(kind_inference_state.kind_solutions(), ty);
 }
 
 /// Infer an expression's type.
@@ -1102,11 +1071,7 @@ fn infer_case(
             Ok(Branch { pattern, body })
         })
         .collect::<Result<_, _>>()?;
-    zonk_type_mut(
-        &mut state.kind_inference_state,
-        &mut state.type_solutions,
-        &mut expr_ty,
-    );
+    state.zonk_type_mut(&mut expr_ty);
     match expr_ty.unwrap_variant() {
         Some(RowParts {
             rest: Some(rest), ..

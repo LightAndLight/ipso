@@ -1,7 +1,7 @@
 use super::{Env, Error, InferredPattern, State};
 use crate::{
     evidence,
-    type_inference::{infer, infer_pattern, unification, zonk_type},
+    type_inference::{infer, infer_pattern, unification},
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
@@ -262,12 +262,7 @@ fn infer_lam_1() {
                 Type::Meta(Kind::Type, 0),
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -301,12 +296,7 @@ fn infer_lam_2() {
                 },
             ),
         };
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -367,12 +357,7 @@ fn infer_lam_3() {
                 },
             ),
         };
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -463,12 +448,7 @@ fn infer_lam_4() {
                 Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -528,12 +508,7 @@ fn infer_lam_5() {
                 ),
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -563,12 +538,7 @@ fn infer_array_1() {
             Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
             Type::app(Type::mk_array(env.common_kinds), Type::Int),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -643,7 +613,7 @@ fn unify_1() {
             &real,
             &holey,
         )
-        .map(|_| zonk_type(&state.kind_inference_state, &state.type_solutions, holey));
+        .map(|_| state.zonk_type(holey));
         assert_eq!(expected, actual)
     })
 }
@@ -804,10 +774,8 @@ fn infer_record_1() {
         // {}
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
-            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty)
-            )),
+            infer(env, state, &syntax::Spanned { pos: 0, item: term })
+                .map(|(expr, ty)| (expr, state.zonk_type(ty))),
             Ok((
                 Expr::mk_record(Vec::new(), None),
                 Type::mk_record(env.common_kinds, Vec::new(), None)
@@ -840,10 +808,8 @@ fn infer_record_2() {
             None,
         );
         assert_eq!(
-            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty)
-            )),
+            infer(env, state, &syntax::Spanned { pos: 0, item: term })
+                .map(|(expr, ty)| (expr, state.zonk_type(ty))),
             Ok((
                 Expr::mk_record(
                     vec![
@@ -918,13 +884,8 @@ fn infer_record_3() {
                 None,
             ),
         ));
-        let actual =
-            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
-                (
-                    expr,
-                    zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-                )
-            });
+        let actual = infer(env, state, &syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -969,13 +930,8 @@ fn infer_record_4() {
             }),
         )
         .with_position(22));
-        let actual =
-            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
-                (
-                    expr,
-                    zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-                )
-            });
+        let actual = infer(env, state, &syntax::Spanned { pos: 0, item: term })
+            .map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1045,12 +1001,7 @@ fn infer_case_1() {
                 &Type::Meta(Kind::Type, 2),
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1148,12 +1099,7 @@ fn infer_case_2() {
                 &Type::Meta(Kind::Type, 4),
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1266,12 +1212,7 @@ fn infer_case_3() {
                 &Type::Int,
             ),
         ));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
@@ -1354,12 +1295,7 @@ fn infer_case_4() {
             label: String::from(SOURCE_LABEL),
         })
         .with_position(32));
-        let actual = infer(env, state, &term).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
-            )
-        });
+        let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
 }
