@@ -572,12 +572,12 @@ pub fn import(
     match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
             if path.exists() {
-                let input_location = Source::File {
+                let target_source = Source::File {
                     path: PathBuf::from(path),
                 };
 
                 let module = parse::parse_file(path)?;
-                let mut module = desugar::desugar_module(&input_location, module)?;
+                let mut module = desugar::desugar_module(&target_source, module)?;
 
                 let working_dir = path.parent().unwrap();
 
@@ -590,7 +590,8 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let module = typecheck::check_module(common_kinds, modules, source, &module)?;
+                let module =
+                    typecheck::check_module(common_kinds, modules, &target_source, &module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)
