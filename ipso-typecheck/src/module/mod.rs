@@ -32,25 +32,16 @@ impl State {
     ) {
         match decl {
             core::Declaration::BuiltinType { name, kind } => {
-                register_builtin_type(&mut self.type_context, name, kind);
+                self.register_builtin_type(name, kind);
             }
-            core::Declaration::Definition { name, sig, .. } => {
-                register_definition(&mut self.context, name, sig)
-            }
+            core::Declaration::Definition { name, sig, .. } => self.register_definition(name, sig),
             core::Declaration::Module { name, decls, .. } => {
-                register_module(common_kinds, &mut self.context, name, decls)
+                self.register_module(common_kinds, name, decls)
             }
             core::Declaration::TypeAlias { name, args, body } => {
-                register_type_alias(name, args, body)
+                self.register_type_alias(name, args, body)
             }
-            core::Declaration::Class(decl) => register_class(
-                common_kinds,
-                &mut self.type_context,
-                &mut self.implications,
-                &mut self.context,
-                &mut self.class_context,
-                decl,
-            ),
+            core::Declaration::Class(decl) => self.register_class(common_kinds, decl),
             core::Declaration::Evidence { .. } => {}
             core::Declaration::Instance {
                 ty_vars,
@@ -58,15 +49,77 @@ impl State {
                 head,
                 evidence,
                 ..
-            } => register_instance(
-                &mut self.implications,
-                module_id,
-                ty_vars,
-                assumes,
-                head,
-                evidence.clone(),
-            ),
+            } => self.register_instance(module_id, ty_vars, assumes, head, evidence.clone()),
         }
+    }
+
+    pub fn register_from_import(
+        &mut self,
+        common_kinds: &CommonKinds,
+        modules: &Modules<core::Module>,
+        module_id: ModuleId,
+        names: &syntax::Names,
+    ) {
+        register_from_import(
+            common_kinds,
+            &mut self.implications,
+            &mut self.type_context,
+            &mut self.context,
+            &mut self.class_context,
+            modules,
+            module_id,
+            names,
+        )
+    }
+
+    pub fn register_class(&mut self, common_kinds: &CommonKinds, decl: &core::ClassDeclaration) {
+        register_class(
+            common_kinds,
+            &mut self.type_context,
+            &mut self.implications,
+            &mut self.context,
+            &mut self.class_context,
+            decl,
+        )
+    }
+
+    pub fn register_instance(
+        &mut self,
+        module_id: Option<ModuleId>,
+        ty_vars: &[(Rc<str>, Kind)],
+        assumes: &[core::Type],
+        head: &core::Type,
+        evidence_name: Rc<str>,
+    ) {
+        register_instance(
+            &mut self.implications,
+            module_id,
+            ty_vars,
+            assumes,
+            head,
+            evidence_name,
+        )
+    }
+
+    pub fn register_builtin_type(&mut self, name: &str, kind: &Kind) {
+        register_builtin_type(&mut self.type_context, name, kind)
+    }
+
+    pub fn register_definition(&mut self, name: &str, sig: &core::TypeSig) {
+        register_definition(&mut self.context, name, sig)
+    }
+
+    pub fn register_module(
+        &mut self,
+        common_kinds: &CommonKinds,
+        name: &str,
+        decls: &[Rc<core::Declaration>],
+    ) {
+        register_module(common_kinds, &mut self.context, name, decls)
+    }
+
+    pub fn register_type_alias(&mut self, name: &str, args: &[Kind], body: &core::Type) {
+        todo!("register TypeAlias {:?}", (name, args, body))
     }
 }
 
@@ -118,6 +171,7 @@ pub fn check(
     Ok(core::Module { decls })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn register_from_import(
     common_kinds: &CommonKinds,
     implications: &mut Vec<Implication>,
