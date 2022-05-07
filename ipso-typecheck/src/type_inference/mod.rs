@@ -254,13 +254,48 @@ impl<'a> State<'a> {
     }
 
     /// Generate a fresh kind metavariable.
-    pub fn fresh_kind_meta(kind_inference_state: &mut kind_inference::State) -> Kind {
-        kind_inference_state.fresh_meta()
+    pub fn fresh_kind_meta(&mut self) -> Kind {
+        self.kind_inference_state.fresh_meta()
     }
 
     /// Generate a fresh type metavariable.
     pub fn fresh_type_meta(&mut self, kind: Kind) -> Type {
         fresh_type_meta(&mut self.type_solutions, kind)
+    }
+
+    /**
+    Instantiate a type signature.
+
+    Replaces `type_signature`'s type variables with metavariables, and applies `expr`
+    to a placeholder for each constraint in `type_signature`.
+    */
+    pub fn instantiate(
+        &mut self,
+        pos: usize,
+        expr: Expr,
+        type_signature: &TypeSig,
+    ) -> (Expr, Type) {
+        let metas: Vec<Type> = type_signature
+            .ty_vars
+            .iter()
+            .map(|_| {
+                let kind = self.fresh_kind_meta();
+                self.fresh_type_meta(kind)
+            })
+            .collect();
+
+        let ty = type_signature.body.instantiate_many(&metas);
+        let (constraints, ty) = ty.unwrap_constraints();
+
+        let expr = constraints.iter().fold(expr, |expr, constraint| {
+            let placeholder = Expr::Placeholder(
+                self.evidence
+                    .placeholder(pos, evidence::Constraint::from_type(constraint)),
+            );
+            Expr::mk_app(expr, placeholder)
+        });
+
+        (expr, ty.clone())
     }
 }
 
@@ -278,42 +313,6 @@ fn pattern_is_redundant(
 
 fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: Kind) -> Type {
     Type::Meta(kind, type_solutions.fresh_meta())
-}
-
-/**
-Instantiate a type signature.
-
-Replaces `type_signature`'s type variables with metavariables, and applies `expr`
-to a placeholder for each constraint in `type_signature`.
-*/
-pub fn instantiate(
-    kind_inference_state: &mut kind_inference::State,
-    type_solutions: &mut unification::Solutions,
-    evidence: &mut Evidence,
-    pos: usize,
-    expr: Expr,
-    type_signature: &TypeSig,
-) -> (Expr, Type) {
-    let metas: Vec<Type> = type_signature
-        .ty_vars
-        .iter()
-        .map(|_| {
-            let kind = kind_inference_state.fresh_meta();
-            fresh_type_meta(type_solutions, kind)
-        })
-        .collect();
-
-    let ty = type_signature.body.instantiate_many(&metas);
-    let (constraints, ty) = ty.unwrap_constraints();
-
-    let expr = constraints.iter().fold(expr, |expr, constraint| {
-        let placeholder = Expr::Placeholder(
-            evidence.placeholder(pos, evidence::Constraint::from_type(constraint)),
-        );
-        Expr::mk_app(expr, placeholder)
-    });
-
-    (expr, ty.clone())
 }
 
 fn check_duplicate_args(source: &Source, args: &[Spanned<syntax::Pattern>]) -> Result<(), Error> {
@@ -539,10 +538,7 @@ pub fn infer(
             Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
             None => match env.type_signatures.get(name) {
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(instantiate(
-                        &mut state.kind_inference_state,
-                        &mut state.type_solutions,
-                        state.evidence,
+                    Signature::TypeSig(type_signature) => Ok(state.instantiate(
                         expr.pos,
                         Expr::Name(Name::definition(name.clone())),
                         type_signature,
@@ -602,10 +598,7 @@ pub fn infer(
             match definitions.get(&item.item) {
                 None => Err(Error::not_in_scope(env.source, &item.item).with_position(item.pos)),
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(instantiate(
-                        &mut state.kind_inference_state,
-                        &mut state.type_solutions,
-                        state.evidence,
+                    Signature::TypeSig(type_signature) => Ok(state.instantiate(
                         expr.pos,
                         Expr::Module {
                             id: *id,
