@@ -421,7 +421,6 @@ pub fn check_module_with(
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: &mut BoundVars<core::Type>,
     bound_tyvars: &mut BoundVars<Kind>,
     modules: &Modules<core::Module>,
     module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
@@ -438,7 +437,6 @@ pub fn check_module_with(
                 type_context,
                 context,
                 class_context,
-                bound_vars,
                 bound_tyvars,
                 modules,
                 module_context,
@@ -502,7 +500,6 @@ pub fn check_module(
     let mut evidence = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
-    let mut variables = Default::default();
     let mut module_context = Default::default();
     check_module_with(
         common_kinds,
@@ -512,7 +509,6 @@ pub fn check_module(
         &mut types,
         &mut context,
         &mut class_context,
-        &mut variables,
         &mut type_variables,
         modules,
         &mut module_context,
@@ -601,7 +597,6 @@ fn check_definition(
     evidence: &mut Evidence,
     types: &mut HashMap<Rc<str>, Kind>,
     type_signatures: &mut HashMap<String, core::Signature>,
-    bound_vars: &mut BoundVars<core::Type>,
     type_variables: &mut BoundVars<Kind>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
@@ -660,7 +655,7 @@ fn check_definition(
     let mut type_inference_state = type_inference::State {
         kind_inference_state,
         type_solutions: Default::default(),
-        variables: bound_vars,
+        variables: Default::default(),
         evidence,
     };
 
@@ -898,7 +893,6 @@ fn check_instance(
     types: &mut HashMap<Rc<str>, Kind>,
     context: &HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: &mut BoundVars<core::Type>,
     type_variables: &mut BoundVars<Kind>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
@@ -1005,7 +999,7 @@ fn check_instance(
     let mut type_inference_state = type_inference::State {
         kind_inference_state,
         type_solutions: Default::default(),
-        variables: bound_vars,
+        variables: Default::default(),
         evidence,
     };
 
@@ -1192,7 +1186,6 @@ fn check_declaration(
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_vars: &mut BoundVars<core::Type>,
     bound_tyvars: &mut BoundVars<Kind>,
     modules: &Modules<core::Module>,
     module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
@@ -1211,7 +1204,6 @@ fn check_declaration(
             evidence,
             type_context,
             context,
-            bound_vars,
             bound_tyvars,
             module_context,
             source,
@@ -1286,7 +1278,6 @@ fn check_declaration(
             type_context,
             context,
             class_context,
-            bound_vars,
             bound_tyvars,
             module_context,
             source,

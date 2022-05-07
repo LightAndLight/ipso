@@ -16,8 +16,7 @@ fn solve_constraint(
     let types = Default::default();
     let type_variables = Default::default();
     let mut evidence = Default::default();
-    let mut variables = Default::default();
-    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let mut type_inference_state = type_inference::State::new(&mut evidence);
     let implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -80,9 +79,8 @@ fn solve_constraint_3() {
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut variables = Default::default();
     let mut evidence = Evidence::default();
-    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let mut type_inference_state = type_inference::State::new(&mut evidence);
     let implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -148,8 +146,7 @@ fn solve_constraint_4() {
     let mut types = Default::default();
     let type_variables = Default::default();
     let mut evidence = Default::default();
-    let mut variables = Default::default();
-    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let mut type_inference_state = type_inference::State::new(&mut evidence);
     let mut implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),

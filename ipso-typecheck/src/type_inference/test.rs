@@ -22,7 +22,6 @@ fn with_type_variables_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(
     let modules = HashMap::new();
     let types = HashMap::new();
     let type_signatures = HashMap::new();
-    let mut variables = BoundVars::new();
     let mut evidence = evidence::Evidence::new();
     let env = Env {
         common_kinds: &common_kinds,
@@ -32,7 +31,7 @@ fn with_type_variables_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(
         type_signatures: &type_signatures,
         source: &source,
     };
-    let mut state = State::new(&mut variables, &mut evidence);
+    let mut state = State::new(&mut evidence);
     f(env, &mut state)
 }
 

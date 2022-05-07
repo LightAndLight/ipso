@@ -164,7 +164,6 @@ fn infer_record_1() {
     let type_solutions = Default::default();
     let implications = Default::default();
     let type_signatures = Default::default();
-    let mut variables = Default::default();
     let mut evidence = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
@@ -221,7 +220,7 @@ fn infer_record_1() {
             None,
         ),
     };
-    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let mut type_inference_state = type_inference::State::new(&mut evidence);
     let actual_result = type_inference::infer(
         type_inference::Env {
             common_kinds: &common_kinds,
@@ -356,7 +355,6 @@ fn check_declaration(
     let mut evidence = Default::default();
     let mut context = Default::default();
     let class_context = Default::default();
-    let mut bound_vars = Default::default();
     let modules = Default::default();
     let mut module_context = Default::default();
     let source = Source::Interactive {
@@ -370,7 +368,6 @@ fn check_declaration(
         &mut types,
         &mut context,
         &class_context,
-        &mut bound_vars,
         &mut type_variables,
         &modules,
         &mut module_context,
@@ -933,7 +930,6 @@ fn check_instance_1() {
     let mut evidence = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
-    let mut bound_vars = Default::default();
     let modules = Default::default();
     let mut module_context = Default::default();
     let source = Source::Interactive {
@@ -1006,7 +1002,6 @@ fn check_instance_1() {
         &mut types,
         &mut context,
         &class_context,
-        &mut bound_vars,
         &mut type_variables,
         &modules,
         &mut module_context,

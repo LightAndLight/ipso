@@ -223,16 +223,16 @@ Type inference state.
 pub struct State<'a> {
     pub kind_inference_state: kind_inference::State,
     pub type_solutions: unification::Solutions,
-    pub variables: &'a mut BoundVars<Type>,
+    pub variables: BoundVars<Type>,
     pub evidence: &'a mut Evidence,
 }
 
 impl<'a> State<'a> {
-    pub fn new(variables: &'a mut BoundVars<Type>, evidence: &'a mut Evidence) -> Self {
+    pub fn new(evidence: &'a mut Evidence) -> Self {
         State {
             kind_inference_state: kind_inference::State::new(),
             type_solutions: unification::Solutions::new(),
-            variables,
+            variables: BoundVars::new(),
             evidence,
         }
     }
