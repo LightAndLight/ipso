@@ -101,7 +101,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut kind_inference_ctx = kind_inference::State::new();
+        let mut kind_inference_state = kind_inference::State::new();
         let mut type_solutions = type_inference::unification::Solutions::new();
 
         let expected = core::Type::app(
@@ -110,17 +110,18 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         );
         let actual = target_sig.body;
 
-        let _ = type_inference::unify(
-            &common_kinds,
-            &HashMap::new(),
-            &BoundVars::new(),
-            &mut kind_inference_ctx,
+        let _ = type_inference::unification::unify(
+            type_inference::unification::Env {
+                common_kinds: &common_kinds,
+                types: &HashMap::new(),
+                type_variables: &BoundVars::new(),
+            },
+            &mut kind_inference_state,
             &mut type_solutions,
-            &source,
-            None,
             &expected,
             &actual,
-        )?;
+        )
+        .map_err(|error| type_inference::Error::unification_error(&source, error))?;
     }
 
     let bytes = Arena::new();
