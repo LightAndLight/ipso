@@ -1,4 +1,21 @@
-//! Kind checking and inference.
+/*!
+Kind checking and inference.
+
+## Checking & inference
+
+* [`check`]
+* [`infer`]
+
+### With hints
+
+* [`check_with_hint`]
+* [`infer_with_hint`]
+
+## Unification
+
+* [`unification`]
+* [`unify_with_hint`]
+*/
 
 #[cfg(test)]
 mod test;
