@@ -648,7 +648,6 @@ fn check_definition_4() {
 fn check_class_1() {
     let common_kinds = CommonKinds::default();
     let mut state = module::State::new();
-    let mut decls = Vec::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -694,7 +693,7 @@ fn check_class_1() {
     assert_eq!(expected, actual);
 
     let checked = actual.unwrap();
-    state.add_declaration(&common_kinds, &mut decls, checked);
+    state.add_declaration(&common_kinds, checked);
 
     let expected_class: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -747,7 +746,6 @@ fn check_class_1() {
 fn check_class_2() {
     let common_kinds = CommonKinds::default();
     let mut state = module::State::new();
-    let mut decls = Vec::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -794,7 +792,7 @@ fn check_class_2() {
     assert_eq!(expected, actual);
 
     let checked = actual.unwrap();
-    state.add_declaration(&common_kinds, &mut decls, checked);
+    state.add_declaration(&common_kinds, checked);
 
     let expected_class_decl: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -855,7 +853,6 @@ fn check_instance_1() {
     let modules = Default::default();
     let module_context = Default::default();
     let mut state = module::State::new();
-    let mut decls = Vec::new();
     let source = Source::Interactive {
         label: String::from("test"),
     };
@@ -887,7 +884,6 @@ fn check_instance_1() {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
         state.add_declaration(
             &common_kinds,
-            &mut decls,
             declaration::Checked::Class(core::ClassDeclaration {
                 supers: Vec::new(),
                 name: Rc::from("Eq"),

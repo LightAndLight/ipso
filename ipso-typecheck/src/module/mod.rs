@@ -14,6 +14,7 @@ pub struct State {
     pub context: HashMap<String, core::Signature>,
     pub class_context: HashMap<Rc<str>, core::ClassDeclaration>,
     pub module_context: HashMap<ModuleId, HashMap<String, core::Signature>>,
+    pub decls: Vec<core::Declaration>,
 }
 
 impl State {
@@ -24,19 +25,21 @@ impl State {
             context: HashMap::new(),
             class_context: HashMap::new(),
             module_context: HashMap::new(),
+            decls: Vec::new(),
         }
     }
 
-    pub fn add_declaration(
-        &mut self,
-        common_kinds: &CommonKinds,
-        decls: &mut Vec<core::Declaration>,
-        decl: declaration::Checked,
-    ) {
+    /// Finish a module checking session, returning all the checked declarations.
+    pub fn finish(self) -> Vec<core::Declaration> {
+        self.decls
+    }
+
+    pub fn add_declaration(&mut self, common_kinds: &CommonKinds, decl: declaration::Checked) {
         match decl {
             declaration::Checked::Definition { name, sig, body } => {
                 register_definition(&mut self.context, &name, &sig);
-                decls.push(core::Declaration::Definition { name, sig, body })
+                self.decls
+                    .push(core::Declaration::Definition { name, sig, body })
             }
 
             declaration::Checked::ResolvedImport { module_id, module } => {
@@ -65,7 +68,7 @@ impl State {
                     &mut self.class_context,
                     &class_decl,
                 );
-                decls.push(core::Declaration::Class(class_decl))
+                self.decls.push(core::Declaration::Class(class_decl))
             }
 
             declaration::Checked::Instance {
@@ -85,11 +88,11 @@ impl State {
                     instance_evidence.clone(),
                 );
 
-                decls.push(core::Declaration::Evidence {
+                self.decls.push(core::Declaration::Evidence {
                     name: evidence_name,
                     body: evidence_body,
                 });
-                decls.push(core::Declaration::Instance {
+                self.decls.push(core::Declaration::Instance {
                     ty_vars: instance_ty_vars,
                     assumes: instance_assumes,
                     head: instance_head,
@@ -201,29 +204,24 @@ pub fn check(
 ) -> Result<core::Module, TypeError> {
     let mut state = State::new();
 
-    let decls = module.decls.iter().fold(
-        Ok(vec![]),
-        |acc: Result<Vec<core::Declaration>, TypeError>, decl| {
-            acc.and_then(|mut decls| {
-                declaration::check(
-                    declaration::Env {
-                        common_kinds,
-                        modules,
-                        module_context: &state.module_context,
-                        type_context: &state.type_context,
-                        class_context: &state.class_context,
-                        context: &state.context,
-                        implications: &state.implications,
-                        source,
-                    },
-                    decl,
-                )
-                .map(|checked| state.add_declaration(common_kinds, &mut decls, checked))?;
+    module.decls.iter().try_for_each(|decl| {
+        declaration::check(
+            declaration::Env {
+                common_kinds,
+                modules,
+                module_context: &state.module_context,
+                type_context: &state.type_context,
+                class_context: &state.class_context,
+                context: &state.context,
+                implications: &state.implications,
+                source,
+            },
+            decl,
+        )
+        .map(|checked| state.add_declaration(common_kinds, checked))
+    })?;
 
-                Ok(decls)
-            })
-        },
-    )?;
+    let decls = state.finish();
 
     Ok(core::Module { decls })
 }
