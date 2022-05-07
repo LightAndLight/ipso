@@ -420,7 +420,6 @@ pub fn check_module_with(
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_tyvars: &mut BoundVars<Kind>,
     modules: &Modules<core::Module>,
     module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
@@ -435,7 +434,6 @@ pub fn check_module_with(
                 type_context,
                 context,
                 class_context,
-                bound_tyvars,
                 modules,
                 module_context,
                 source,
@@ -492,12 +490,12 @@ pub fn check_module(
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
     let mut types = Default::default();
-    let mut type_variables = Default::default();
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
     let mut module_context = Default::default();
+
     check_module_with(
         common_kinds,
         &mut type_solutions,
@@ -505,7 +503,6 @@ pub fn check_module(
         &mut types,
         &mut context,
         &mut class_context,
-        &mut type_variables,
         modules,
         &mut module_context,
         source,
@@ -592,7 +589,6 @@ fn check_definition(
     implications: &[Implication],
     types: &mut HashMap<Rc<str>, Kind>,
     type_signatures: &mut HashMap<String, core::Signature>,
-    type_variables: &mut BoundVars<Kind>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
     name: &str,
@@ -600,6 +596,7 @@ fn check_definition(
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<core::Declaration, TypeError> {
+    let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
@@ -624,7 +621,7 @@ fn check_definition(
     let ty = check_kind(
         common_kinds,
         types,
-        type_variables,
+        &type_variables,
         &mut type_inference_state.kind_inference_state,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
@@ -658,7 +655,7 @@ fn check_definition(
                     common_kinds,
                     modules: module_context,
                     types,
-                    type_variables,
+                    type_variables: &type_variables,
                     type_signatures,
                     source,
                 },
@@ -673,7 +670,7 @@ fn check_definition(
         type_inference::unification::Env {
             common_kinds,
             types,
-            type_variables,
+            type_variables: &type_variables,
         },
         &mut type_inference_state.kind_inference_state,
         &mut type_inference_state.type_solutions,
@@ -694,7 +691,7 @@ fn check_definition(
                 common_kinds,
                 modules: module_context,
                 types,
-                type_variables,
+                type_variables: &type_variables,
                 type_signatures,
                 source,
             },
@@ -725,7 +722,7 @@ fn check_definition(
         types,
         &mut type_inference_state,
         implications,
-        type_variables,
+        &type_variables,
         source,
         body,
         ty.clone(),
@@ -802,13 +799,13 @@ fn check_class(
     common_kinds: &CommonKinds,
     type_solutions: &mut type_inference::unification::Solutions,
     types: &mut HashMap<Rc<str>, Kind>,
-    type_variables: &mut BoundVars<Kind>,
     source: &Source,
     supers: &[Spanned<syntax::Type<Rc<str>>>],
     name: &Rc<str>,
     args: &[Spanned<Rc<str>>],
     members: &[(String, syntax::Type<Rc<str>>)],
 ) -> Result<core::Declaration, TypeError> {
+    let mut type_variables = BoundVars::new();
     let mut kind_inference_state = kind_inference::State::new();
 
     let args_kinds: Vec<(Rc<str>, Kind)> = {
@@ -836,7 +833,7 @@ fn check_class(
             check_kind(
                 common_kinds,
                 types,
-                type_variables,
+                &type_variables,
                 &mut kind_inference_state,
                 source,
                 Some(superclass.pos),
@@ -854,7 +851,7 @@ fn check_class(
                 &mut kind_inference_state,
                 type_solutions,
                 types,
-                type_variables,
+                &mut type_variables,
                 source,
                 &args_kinds,
                 member_name,
@@ -882,7 +879,6 @@ fn check_instance(
     types: &mut HashMap<Rc<str>, Kind>,
     context: &HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    type_variables: &mut BoundVars<Kind>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
     assumes: &[Spanned<syntax::Type<Rc<str>>>],
@@ -890,6 +886,7 @@ fn check_instance(
     args: &[Spanned<syntax::Type<Rc<str>>>],
     members: &[syntax::InstanceMember],
 ) -> Result<(core::Declaration, core::Declaration), TypeError> {
+    let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
     let evidence_name: Rc<str> = {
@@ -960,7 +957,7 @@ fn check_instance(
             let res = infer_kind(
                 common_kinds,
                 types,
-                type_variables,
+                &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 source,
                 arg.pos,
@@ -976,7 +973,7 @@ fn check_instance(
             let constraint = check_kind(
                 common_kinds,
                 types,
-                type_variables,
+                &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 source,
                 Some(assume.pos),
@@ -1003,12 +1000,12 @@ fn check_instance(
                     types,
                     type_inference_state: &mut type_inference_state,
                     implications,
-                    type_variables,
+                    type_variables: &type_variables,
                     source,
                 },
                 name.pos,
                 &Some(SolveConstraintContext {
-                    constraint: fill_ty_names(type_variables, superclass.to_syntax()),
+                    constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
                 }),
                 &evidence::Constraint::from_type(&superclass),
             )
@@ -1018,7 +1015,7 @@ fn check_instance(
                     types,
                     &mut type_inference_state,
                     implications,
-                    type_variables,
+                    &type_variables,
                     source,
                     evidence_expr.as_ref().clone(),
                 )
@@ -1046,7 +1043,7 @@ fn check_instance(
     let head = check_kind(
         common_kinds,
         types,
-        type_variables,
+        &type_variables,
         &mut type_inference_state.kind_inference_state,
         source,
         Some(name.pos),
@@ -1077,7 +1074,7 @@ fn check_instance(
                             common_kinds,
                             modules: module_context,
                             types,
-                            type_variables,
+                            type_variables: &type_variables,
                             type_signatures: context,
                             source,
                         },
@@ -1093,7 +1090,7 @@ fn check_instance(
                         types,
                         &mut type_inference_state,
                         implications,
-                        type_variables,
+                        &type_variables,
                         source,
                         member_body,
                         member_type.sig.body.clone(),
@@ -1171,7 +1168,6 @@ fn check_declaration(
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    bound_tyvars: &mut BoundVars<Kind>,
     modules: &Modules<core::Module>,
     module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
@@ -1188,7 +1184,6 @@ fn check_declaration(
             implications,
             type_context,
             context,
-            bound_tyvars,
             module_context,
             source,
             name,
@@ -1242,7 +1237,6 @@ fn check_declaration(
             common_kinds,
             type_solutions,
             type_context,
-            bound_tyvars,
             source,
             supers,
             name,
@@ -1261,7 +1255,6 @@ fn check_declaration(
             type_context,
             context,
             class_context,
-            bound_tyvars,
             module_context,
             source,
             assumes,

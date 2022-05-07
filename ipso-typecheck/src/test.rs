@@ -348,7 +348,6 @@ fn check_declaration(
 ) -> std::result::Result<Declarations, crate::TypeError> {
     let common_kinds = Default::default();
     let mut types = Default::default();
-    let mut type_variables = Default::default();
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut context = Default::default();
@@ -365,7 +364,6 @@ fn check_declaration(
         &mut types,
         &mut context,
         &class_context,
-        &mut type_variables,
         &modules,
         &mut module_context,
         &source,
@@ -921,7 +919,6 @@ fn check_class_2() {
 fn check_instance_1() {
     let common_kinds = CommonKinds::default();
     let mut types = Default::default();
-    let mut type_variables = Default::default();
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut context = Default::default();
@@ -997,7 +994,6 @@ fn check_instance_1() {
         &mut types,
         &mut context,
         &class_context,
-        &mut type_variables,
         &modules,
         &mut module_context,
         &source,
