@@ -1,6 +1,6 @@
 use crate::{
     evidence::{solver, Constraint, Evidence},
-    register_class, register_instance, type_inference, SolveConstraintContext, TypeError,
+    module, type_inference, SolveConstraintContext, TypeError,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_diagnostic::Source;
@@ -154,7 +154,7 @@ fn solve_constraint_4() {
 
     {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
-        register_class(
+        module::register_class(
             &common_kinds,
             &mut types,
             &mut implications,
@@ -185,7 +185,7 @@ fn solve_constraint_4() {
         Rc::from("MyEq"),
         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
     );
-    register_instance(
+    module::register_instance(
         &mut implications,
         None,
         &Vec::new(),
@@ -201,7 +201,7 @@ fn solve_constraint_4() {
     );
 
     let a = core::Type::unsafe_mk_var(0, Kind::Type);
-    register_instance(
+    module::register_instance(
         &mut implications,
         None,
         &[(Rc::from("a"), a.kind())],

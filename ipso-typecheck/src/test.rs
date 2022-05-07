@@ -3,7 +3,9 @@ use crate::{
         solver::{self, solve_placeholder},
         Constraint,
     },
-    kind_inference, register_declaration, type_inference, zonk_constraint, BoundVars, Declarations,
+    kind_inference,
+    module::register_declaration,
+    type_inference, zonk_constraint, BoundVars, Declarations,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
