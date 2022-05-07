@@ -241,11 +241,11 @@ pub fn check_definition(
 
 pub fn check_class_member(
     common_kinds: &CommonKinds,
-    kind_inference_state: &mut kind_inference::State,
-    type_solutions: &mut type_inference::unification::Solutions,
     type_context: &HashMap<Rc<str>, Kind>,
     bound_tyvars: &BoundVars<Kind>,
     source: &Source,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut type_inference::unification::Solutions,
     class_args_kinds: &[(Rc<str>, Kind)],
     name: &str,
     ty: &syntax::Type<Rc<str>>,
@@ -347,11 +347,11 @@ pub fn check_class(
         .map(|(member_name, member_type)| {
             check_class_member(
                 env.common_kinds,
-                &mut kind_inference_state,
-                &mut type_solutions,
                 env.type_context,
                 &type_variables,
                 env.source,
+                &mut kind_inference_state,
+                &mut type_solutions,
                 &args_kinds,
                 member_name,
                 member_type,
