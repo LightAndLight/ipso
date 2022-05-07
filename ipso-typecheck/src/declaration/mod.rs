@@ -16,6 +16,7 @@ use std::{
     todo,
 };
 
+/// Checked declarations.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Checked {
     Definition {
@@ -38,35 +39,26 @@ pub enum Checked {
     },
 }
 
-pub fn check(
-    common_kinds: &CommonKinds,
-    implications: &[Implication],
-    type_context: &HashMap<Rc<str>, Kind>,
-    context: &HashMap<String, core::Signature>,
-    class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    modules: &Modules<core::Module>,
-    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
-    source: &Source,
-    decl: &syntax::Spanned<syntax::Declaration>,
-) -> Result<Checked, TypeError> {
+#[derive(Clone, Copy)]
+pub struct Env<'a> {
+    pub common_kinds: &'a CommonKinds,
+    pub modules: &'a Modules<core::Module>,
+    pub module_context: &'a HashMap<ModuleId, HashMap<String, core::Signature>>,
+    pub type_context: &'a HashMap<Rc<str>, Kind>,
+    pub class_context: &'a HashMap<Rc<str>, core::ClassDeclaration>,
+    pub context: &'a HashMap<String, core::Signature>,
+    pub implications: &'a [Implication],
+    pub source: &'a Source,
+}
+
+pub fn check(env: Env, decl: &syntax::Spanned<syntax::Declaration>) -> Result<Checked, TypeError> {
     match &decl.item {
         syntax::Declaration::Definition {
             name,
             ty,
             args,
             body,
-        } => check_definition(
-            common_kinds,
-            implications,
-            type_context,
-            context,
-            module_context,
-            source,
-            name,
-            ty,
-            args,
-            body,
-        ),
+        } => check_definition(env, name, ty, args, body),
         syntax::Declaration::TypeAlias { name, args, body } => {
             todo!("check type alias {:?}", (name, args, body))
         }
@@ -75,7 +67,7 @@ pub fn check(
         | syntax::Declaration::FromImport { resolved, .. } => {
             let module_id = resolved.unwrap_or_else(|| panic!("unresolved import"));
 
-            let module = modules.lookup(module_id);
+            let module = env.modules.lookup(module_id);
 
             Ok(Checked::ResolvedImport {
                 module_id,
@@ -88,49 +80,24 @@ pub fn check(
             name,
             args,
             members,
-        } => check_class(
-            common_kinds,
-            type_context,
-            source,
-            supers,
-            name,
-            args,
-            members,
-        ),
+        } => check_class(env, supers, name, args, members),
         syntax::Declaration::Instance {
             assumes,
             name,
             args,
             members,
-        } => check_instance(
-            common_kinds,
-            implications,
-            type_context,
-            context,
-            class_context,
-            module_context,
-            source,
-            assumes,
-            name,
-            args,
-            members,
-        ),
+        } => check_instance(env, assumes, name, args, members),
     }
 }
 
 pub fn check_definition(
-    common_kinds: &CommonKinds,
-    implications: &[Implication],
-    types: &HashMap<Rc<str>, Kind>,
-    type_signatures: &HashMap<String, core::Signature>,
-    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
-    source: &Source,
+    env: Env,
     name: &str,
     ty: &syntax::Type<Rc<str>>,
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<Checked, TypeError> {
-    let mut type_signatures = type_signatures.clone();
+    let mut type_signatures = env.context.clone();
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
@@ -154,11 +121,11 @@ pub fn check_definition(
     type_variables.insert(&ty_var_kinds);
 
     let ty = check_kind(
-        common_kinds,
-        types,
+        env.common_kinds,
+        env.type_context,
         &type_variables,
         &mut type_inference_state.kind_inference_state,
-        source,
+        env.source,
         // TODO: make `ty` `Spanned` and use its position here.
         None,
         ty,
@@ -187,12 +154,12 @@ pub fn check_definition(
         .map(|arg| {
             infer_pattern(
                 type_inference::Env {
-                    common_kinds,
-                    modules: module_context,
-                    types,
+                    common_kinds: env.common_kinds,
+                    modules: env.module_context,
+                    types: env.type_context,
                     type_variables: &type_variables,
                     type_signatures: &type_signatures,
-                    source,
+                    source: env.source,
                 },
                 &mut type_inference_state,
                 arg,
@@ -203,18 +170,18 @@ pub fn check_definition(
 
     type_inference::unification::unify(
         type_inference::unification::Env {
-            common_kinds,
-            types,
+            common_kinds: env.common_kinds,
+            types: env.type_context,
             type_variables: &type_variables,
         },
         &mut type_inference_state.kind_inference_state,
         &mut type_inference_state.type_solutions,
         ty,
         &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
-            core::Type::mk_arrow(common_kinds, &el.ty(common_kinds), &acc)
+            core::Type::mk_arrow(env.common_kinds, &el.ty(env.common_kinds), &acc)
         }),
     )
-    .map_err(|error| type_inference::Error::unification_error(source, error))?;
+    .map_err(|error| type_inference::Error::unification_error(env.source, error))?;
 
     let arg_bound_vars = arg_tys
         .iter()
@@ -223,12 +190,12 @@ pub fn check_definition(
     let body = type_inference_state.with_bound_vars(&arg_bound_vars, |type_inference_state| {
         type_inference::check(
             type_inference::Env {
-                common_kinds,
-                modules: module_context,
-                types,
+                common_kinds: env.common_kinds,
+                modules: env.module_context,
+                types: env.type_context,
                 type_variables: &type_variables,
                 type_signatures: &type_signatures,
-                source,
+                source: env.source,
             },
             type_inference_state,
             body,
@@ -253,12 +220,12 @@ pub fn check_definition(
     });
 
     let (body, sig) = generalise(
-        common_kinds,
-        implications,
-        types,
+        env.common_kinds,
+        env.implications,
+        env.type_context,
         &type_variables,
         &mut type_inference_state,
-        source,
+        env.source,
         body,
         ty.clone(),
     )?;
@@ -330,9 +297,7 @@ pub fn check_class_member(
 }
 
 pub fn check_class(
-    common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    source: &Source,
+    env: Env,
     supers: &[Spanned<syntax::Type<Rc<str>>>],
     name: &Rc<str>,
     args: &[Spanned<Rc<str>>],
@@ -351,7 +316,7 @@ pub fn check_class(
                     Ok((arg.item.clone(), kind_inference_state.fresh_meta()))
                 } else {
                     Err(TypeError::DuplicateClassArgument {
-                        source: source.clone(),
+                        source: env.source.clone(),
                         pos: arg.pos,
                     })
                 }
@@ -365,11 +330,11 @@ pub fn check_class(
         .iter()
         .map(|superclass| {
             check_kind(
-                common_kinds,
-                types,
+                env.common_kinds,
+                env.type_context,
                 &type_variables,
                 &mut kind_inference_state,
-                source,
+                env.source,
                 Some(superclass.pos),
                 &superclass.item,
                 &Kind::Constraint,
@@ -381,12 +346,12 @@ pub fn check_class(
         .iter()
         .map(|(member_name, member_type)| {
             check_class_member(
-                common_kinds,
+                env.common_kinds,
                 &mut kind_inference_state,
                 &mut type_solutions,
-                types,
-                &mut type_variables,
-                source,
+                env.type_context,
+                &type_variables,
+                env.source,
                 &args_kinds,
                 member_name,
                 member_type,
@@ -408,13 +373,7 @@ pub fn check_class(
 }
 
 pub fn check_instance(
-    common_kinds: &CommonKinds,
-    implications: &[Implication],
-    types: &HashMap<Rc<str>, Kind>,
-    context: &HashMap<String, core::Signature>,
-    class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
-    module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
-    source: &Source,
+    env: Env,
     assumes: &[Spanned<syntax::Type<Rc<str>>>],
     name: &Spanned<Rc<str>>,
     args: &[Spanned<syntax::Type<Rc<str>>>],
@@ -451,9 +410,9 @@ pub fn check_instance(
         Rc::from(buffer)
     };
 
-    let class_decl: core::ClassDeclaration = match class_context.get(&name.item) {
+    let class_decl: core::ClassDeclaration = match env.class_context.get(&name.item) {
         None => Err(TypeError::NoSuchClass {
-            source: source.clone(),
+            source: env.source.clone(),
             pos: name.pos,
         }),
         Some(class_decl) => Ok(class_decl.clone()),
@@ -489,11 +448,11 @@ pub fn check_instance(
         .iter()
         .map(|arg| {
             let res = infer_kind(
-                common_kinds,
-                types,
+                env.common_kinds,
+                env.type_context,
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
-                source,
+                env.source,
                 arg.pos,
                 &arg.item,
             )?;
@@ -505,11 +464,11 @@ pub fn check_instance(
         .iter()
         .map(|assume| {
             let constraint = check_kind(
-                common_kinds,
-                types,
+                env.common_kinds,
+                env.type_context,
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
-                source,
+                env.source,
                 Some(assume.pos),
                 &assume.item,
                 &Kind::Constraint,
@@ -530,11 +489,11 @@ pub fn check_instance(
 
             match solve_constraint(
                 constraint_solving::Env {
-                    common_kinds,
-                    types,
-                    implications,
+                    common_kinds: env.common_kinds,
+                    types: env.type_context,
+                    implications: env.implications,
                     type_variables: &type_variables,
-                    source,
+                    source: env.source,
                 },
                 &mut type_inference_state,
                 name.pos,
@@ -549,12 +508,12 @@ pub fn check_instance(
             })
             .and_then(|evidence_expr| {
                 abstract_evidence(
-                    common_kinds,
-                    implications,
-                    types,
+                    env.common_kinds,
+                    env.implications,
+                    env.type_context,
                     &type_variables,
                     &mut type_inference_state,
-                    source,
+                    env.source,
                     evidence_expr.as_ref().clone(),
                 )
             }) {
@@ -579,11 +538,11 @@ pub fn check_instance(
         .collect();
 
     let head = check_kind(
-        common_kinds,
-        types,
+        env.common_kinds,
+        env.type_context,
         &type_variables,
         &mut type_inference_state.kind_inference_state,
-        source,
+        env.source,
         Some(name.pos),
         &head,
         &Kind::Constraint,
@@ -598,7 +557,7 @@ pub fn check_instance(
         {
             None => {
                 return Err(TypeError::NotAMember {
-                    source: source.clone(),
+                    source: env.source.clone(),
                     pos: member.name.pos,
                     cls: name.item.clone(),
                 })
@@ -609,12 +568,12 @@ pub fn check_instance(
                 match {
                     let member_body = type_inference::check(
                         type_inference::Env {
-                            common_kinds,
-                            modules: module_context,
-                            types,
+                            common_kinds: env.common_kinds,
+                            modules: env.module_context,
+                            types: env.type_context,
                             type_variables: &type_variables,
-                            type_signatures: context,
-                            source,
+                            type_signatures: env.context,
+                            source: env.source,
                         },
                         &mut type_inference_state,
                         &Spanned {
@@ -624,12 +583,12 @@ pub fn check_instance(
                         &member_type.sig.body,
                     )?;
                     generalise(
-                        common_kinds,
-                        implications,
-                        types,
+                        env.common_kinds,
+                        env.implications,
+                        env.type_context,
                         &type_variables,
                         &mut type_inference_state,
-                        source,
+                        env.source,
                         member_body,
                         member_type.sig.body.clone(),
                     )

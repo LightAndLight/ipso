@@ -355,14 +355,16 @@ fn check_declaration(
         label: String::from("test"),
     };
     crate::declaration::check(
-        &common_kinds,
-        implications,
-        &types,
-        &context,
-        &class_context,
-        &modules,
-        &module_context,
-        &source,
+        crate::declaration::Env {
+            common_kinds: &common_kinds,
+            modules: &modules,
+            module_context: &module_context,
+            type_context: &types,
+            class_context: &class_context,
+            context: &context,
+            implications,
+            source: &source,
+        },
         decl,
     )
 }
@@ -909,14 +911,16 @@ fn check_instance_1() {
       eq x y = True
     */
     let actual = crate::declaration::check(
-        &common_kinds,
-        &state.implications,
-        &state.type_context,
-        &state.context,
-        &state.class_context,
-        &modules,
-        &module_context,
-        &source,
+        crate::declaration::Env {
+            common_kinds: &common_kinds,
+            modules: &modules,
+            module_context: &module_context,
+            type_context: &state.type_context,
+            class_context: &state.class_context,
+            context: &state.context,
+            implications: &state.implications,
+            source: &source,
+        },
         &Spanned {
             pos: 0,
             item: syntax::Declaration::Instance {

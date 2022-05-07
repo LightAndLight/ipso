@@ -206,14 +206,16 @@ pub fn check(
         |acc: Result<Vec<core::Declaration>, TypeError>, decl| {
             acc.and_then(|mut decls| {
                 declaration::check(
-                    common_kinds,
-                    &state.implications,
-                    &state.type_context,
-                    &state.context,
-                    &state.class_context,
-                    modules,
-                    &state.module_context,
-                    source,
+                    declaration::Env {
+                        common_kinds,
+                        modules,
+                        module_context: &state.module_context,
+                        type_context: &state.type_context,
+                        class_context: &state.class_context,
+                        context: &state.context,
+                        implications: &state.implications,
+                        source,
+                    },
                     decl,
                 )
                 .map(|checked| state.add_declaration(common_kinds, &mut decls, checked))?;
