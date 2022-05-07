@@ -6,6 +6,76 @@ use ipso_syntax::{self as syntax, kind::Kind, ModuleId, ModuleRef, Modules};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Module checking state.
+pub struct State {
+    pub implications: Vec<Implication>,
+    pub type_context: HashMap<Rc<str>, Kind>,
+    pub context: HashMap<String, core::Signature>,
+    pub class_context: HashMap<Rc<str>, core::ClassDeclaration>,
+}
+
+impl State {
+    pub fn new() -> Self {
+        State {
+            implications: Vec::new(),
+            type_context: HashMap::new(),
+            context: HashMap::new(),
+            class_context: HashMap::new(),
+        }
+    }
+
+    pub fn register_declaration(
+        &mut self,
+        common_kinds: &CommonKinds,
+        module_id: Option<ModuleId>,
+        decl: &core::Declaration,
+    ) {
+        match decl {
+            core::Declaration::BuiltinType { name, kind } => {
+                register_builtin_type(&mut self.type_context, name, kind);
+            }
+            core::Declaration::Definition { name, sig, .. } => {
+                register_definition(&mut self.context, name, sig)
+            }
+            core::Declaration::Module { name, decls, .. } => {
+                register_module(common_kinds, &mut self.context, name, decls)
+            }
+            core::Declaration::TypeAlias { name, args, body } => {
+                register_type_alias(name, args, body)
+            }
+            core::Declaration::Class(decl) => register_class(
+                common_kinds,
+                &mut self.type_context,
+                &mut self.implications,
+                &mut self.context,
+                &mut self.class_context,
+                decl,
+            ),
+            core::Declaration::Evidence { .. } => {}
+            core::Declaration::Instance {
+                ty_vars,
+                assumes,
+                head,
+                evidence,
+                ..
+            } => register_instance(
+                &mut self.implications,
+                module_id,
+                ty_vars,
+                assumes,
+                head,
+                evidence.clone(),
+            ),
+        }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn check(
     common_kinds: &CommonKinds,
     modules: &Modules<core::Module>,
@@ -13,19 +83,16 @@ pub fn check(
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
     let mut module_context = HashMap::new();
-    let mut class_context = HashMap::new();
-    let mut type_context = HashMap::new();
-    let mut context = HashMap::new();
-    let mut implications = Vec::new();
+    let mut state = State::new();
 
     let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
         acc.and_then(|mut decls| {
             check_declaration(
                 common_kinds,
-                &mut implications,
-                &mut type_context,
-                &mut context,
-                &class_context,
+                &mut state.implications,
+                &mut state.type_context,
+                &mut state.context,
+                &state.class_context,
                 modules,
                 &mut module_context,
                 source,
@@ -34,38 +101,14 @@ pub fn check(
             .map(|checked_decls| match checked_decls {
                 Declarations::Zero => decls,
                 Declarations::One(decl) => {
-                    register_declaration(
-                        common_kinds,
-                        &mut implications,
-                        &mut type_context,
-                        &mut context,
-                        &mut class_context,
-                        None,
-                        &decl,
-                    );
+                    state.register_declaration(common_kinds, None, &decl);
                     decls.push(decl);
                     decls
                 }
                 Declarations::Two(decl1, decl2) => {
-                    register_declaration(
-                        common_kinds,
-                        &mut implications,
-                        &mut type_context,
-                        &mut context,
-                        &mut class_context,
-                        None,
-                        &decl1,
-                    );
+                    state.register_declaration(common_kinds, None, &decl1);
                     decls.push(decl1);
-                    register_declaration(
-                        common_kinds,
-                        &mut implications,
-                        &mut type_context,
-                        &mut context,
-                        &mut class_context,
-                        None,
-                        &decl2,
-                    );
+                    state.register_declaration(common_kinds, None, &decl2);
                     decls.push(decl2);
                     decls
                 }
@@ -73,50 +116,6 @@ pub fn check(
         })
     })?;
     Ok(core::Module { decls })
-}
-
-pub fn register_declaration(
-    common_kinds: &CommonKinds,
-    implications: &mut Vec<Implication>,
-    type_context: &mut HashMap<Rc<str>, Kind>,
-    context: &mut HashMap<String, core::Signature>,
-    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
-    module_id: Option<ModuleId>,
-    decl: &core::Declaration,
-) {
-    match decl {
-        core::Declaration::BuiltinType { name, kind } => {
-            register_builtin_type(type_context, name, kind);
-        }
-        core::Declaration::Definition { name, sig, .. } => register_definition(context, name, sig),
-        core::Declaration::Module { name, decls, .. } => {
-            register_module(common_kinds, context, name, decls)
-        }
-        core::Declaration::TypeAlias { name, args, body } => register_type_alias(name, args, body),
-        core::Declaration::Class(decl) => register_class(
-            common_kinds,
-            type_context,
-            implications,
-            context,
-            class_context,
-            decl,
-        ),
-        core::Declaration::Evidence { .. } => {}
-        core::Declaration::Instance {
-            ty_vars,
-            assumes,
-            head,
-            evidence,
-            ..
-        } => register_instance(
-            implications,
-            module_id,
-            ty_vars,
-            assumes,
-            head,
-            evidence.clone(),
-        ),
-    }
 }
 
 pub fn register_from_import(

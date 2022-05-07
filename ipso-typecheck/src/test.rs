@@ -3,15 +3,13 @@ use crate::{
         solver::{self, solve_placeholder},
         Constraint,
     },
-    kind_inference,
-    module::register_declaration,
-    type_inference, zonk_constraint, BoundVars, Declarations,
+    kind_inference, module, type_inference, zonk_constraint, BoundVars, Declarations,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, ModuleId, Spanned};
 use ipso_util::void::Void;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 #[test]
@@ -648,43 +646,16 @@ fn check_definition_4() {
 
 fn register_declarations(
     common_kinds: &CommonKinds,
-    implications: &mut Vec<crate::Implication>,
-    type_context: &mut HashMap<Rc<str>, Kind>,
-    context: &mut HashMap<String, core::Signature>,
-    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
+    state: &mut module::State,
     module_id: Option<ModuleId>,
     decls: &Declarations,
 ) {
     match decls {
         Declarations::Zero => {}
-        Declarations::One(a) => register_declaration(
-            common_kinds,
-            implications,
-            type_context,
-            context,
-            class_context,
-            module_id,
-            a,
-        ),
+        Declarations::One(a) => state.register_declaration(common_kinds, module_id, a),
         Declarations::Two(a, b) => {
-            register_declaration(
-                common_kinds,
-                implications,
-                type_context,
-                context,
-                class_context,
-                module_id,
-                a,
-            );
-            register_declaration(
-                common_kinds,
-                implications,
-                type_context,
-                context,
-                class_context,
-                module_id,
-                b,
-            );
+            state.register_declaration(common_kinds, module_id, a);
+            state.register_declaration(common_kinds, module_id, b);
         }
     }
 }
@@ -692,10 +663,7 @@ fn register_declarations(
 #[test]
 fn check_class_1() {
     let common_kinds = CommonKinds::default();
-    let mut implications = Default::default();
-    let mut type_context = Default::default();
-    let mut context = Default::default();
-    let mut class_context = Default::default();
+    let mut state = module::State::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -743,15 +711,7 @@ fn check_class_1() {
     assert_eq!(expected, actual);
 
     let decls = actual.unwrap();
-    register_declarations(
-        &common_kinds,
-        &mut implications,
-        &mut type_context,
-        &mut context,
-        &mut class_context,
-        None,
-        &decls,
-    );
+    register_declarations(&common_kinds, &mut state, None, &decls);
 
     let expected_class: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -773,7 +733,7 @@ fn check_class_1() {
         }
     };
 
-    assert_eq!(&expected_class, class_context.get("MyEq").unwrap());
+    assert_eq!(&expected_class, state.class_context.get("MyEq").unwrap());
 
     let expected_member = {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -796,17 +756,14 @@ fn check_class_1() {
     };
     assert_eq!(
         Some(&Signature::TypeSig(expected_member)),
-        context.get(&String::from("myeq"))
+        state.context.get(&String::from("myeq"))
     );
 }
 
 #[test]
 fn check_class_2() {
     let common_kinds = CommonKinds::default();
-    let mut implications = Default::default();
-    let mut type_context = Default::default();
-    let mut context = Default::default();
-    let mut class_context = Default::default();
+    let mut state = module::State::new();
 
     let expected = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -855,15 +812,7 @@ fn check_class_2() {
     assert_eq!(expected, actual);
 
     let decls = actual.unwrap();
-    register_declarations(
-        &common_kinds,
-        &mut implications,
-        &mut type_context,
-        &mut context,
-        &mut class_context,
-        None,
-        &decls,
-    );
+    register_declarations(&common_kinds, &mut state, None, &decls);
 
     let expected_class_decl: core::ClassDeclaration = {
         let a = core::Type::unsafe_mk_var(1, Kind::Type);
@@ -886,7 +835,10 @@ fn check_class_2() {
         }
     };
 
-    assert_eq!(&expected_class_decl, class_context.get("Wut").unwrap());
+    assert_eq!(
+        &expected_class_decl,
+        state.class_context.get("Wut").unwrap()
+    );
 
     let expected_member = {
         let wut_ty = core::Type::unsafe_mk_name(
@@ -910,7 +862,7 @@ fn check_class_2() {
     };
     assert_eq!(
         Some(&Signature::TypeSig(expected_member)),
-        context.get(&String::from("wut")),
+        state.context.get(&String::from("wut")),
         "expected member"
     );
 }
@@ -918,12 +870,9 @@ fn check_class_2() {
 #[test]
 fn check_instance_1() {
     let common_kinds = CommonKinds::default();
-    let mut types = Default::default();
-    let mut implications = Default::default();
-    let mut context = Default::default();
-    let mut class_context = Default::default();
     let modules = Default::default();
     let mut module_context = Default::default();
+    let mut state = module::State::new();
     let source = Source::Interactive {
         label: String::from("test"),
     };
@@ -957,12 +906,8 @@ fn check_instance_1() {
     };
     {
         let a = core::Type::unsafe_mk_var(0, Kind::Type);
-        register_declaration(
+        state.register_declaration(
             &common_kinds,
-            &mut implications,
-            &mut types,
-            &mut context,
-            &mut class_context,
             None,
             &core::Declaration::Class(core::ClassDeclaration {
                 supers: Vec::new(),
@@ -988,10 +933,10 @@ fn check_instance_1() {
     */
     let actual = crate::check_declaration(
         &common_kinds,
-        &mut implications,
-        &mut types,
-        &mut context,
-        &class_context,
+        &mut state.implications,
+        &mut state.type_context,
+        &mut state.context,
+        &state.class_context,
         &modules,
         &mut module_context,
         &source,
