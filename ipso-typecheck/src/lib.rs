@@ -413,27 +413,28 @@ pub fn register_declaration(
     }
 }
 
-pub fn check_module_with(
+pub fn check_module(
     common_kinds: &CommonKinds,
-    implications: &mut Vec<Implication>,
-    type_context: &mut HashMap<Rc<str>, Kind>,
-    context: &mut HashMap<String, core::Signature>,
-    class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
     modules: &Modules<core::Module>,
-    module_context: &mut HashMap<ModuleId, HashMap<String, core::Signature>>,
     source: &Source,
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
+    let mut module_context = HashMap::new();
+    let mut class_context = HashMap::new();
+    let mut type_context = HashMap::new();
+    let mut context = HashMap::new();
+    let mut implications = Vec::new();
+
     let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
         acc.and_then(|mut decls| {
             check_declaration(
                 common_kinds,
-                implications,
-                type_context,
-                context,
-                class_context,
+                &mut implications,
+                &mut type_context,
+                &mut context,
+                &class_context,
                 modules,
-                module_context,
+                &mut module_context,
                 source,
                 decl,
             )
@@ -442,10 +443,10 @@ pub fn check_module_with(
                 Declarations::One(decl) => {
                     register_declaration(
                         common_kinds,
-                        implications,
-                        type_context,
-                        context,
-                        class_context,
+                        &mut implications,
+                        &mut type_context,
+                        &mut context,
+                        &mut class_context,
                         None,
                         &decl,
                     );
@@ -455,20 +456,20 @@ pub fn check_module_with(
                 Declarations::Two(decl1, decl2) => {
                     register_declaration(
                         common_kinds,
-                        implications,
-                        type_context,
-                        context,
-                        class_context,
+                        &mut implications,
+                        &mut type_context,
+                        &mut context,
+                        &mut class_context,
                         None,
                         &decl1,
                     );
                     decls.push(decl1);
                     register_declaration(
                         common_kinds,
-                        implications,
-                        type_context,
-                        context,
-                        class_context,
+                        &mut implications,
+                        &mut type_context,
+                        &mut context,
+                        &mut class_context,
                         None,
                         &decl2,
                     );
@@ -479,31 +480,6 @@ pub fn check_module_with(
         })
     })?;
     Ok(core::Module { decls })
-}
-
-pub fn check_module(
-    common_kinds: &CommonKinds,
-    modules: &Modules<core::Module>,
-    source: &Source,
-    module: &syntax::Module,
-) -> Result<core::Module, TypeError> {
-    let mut types = Default::default();
-    let mut implications = Default::default();
-    let mut context = Default::default();
-    let mut class_context = Default::default();
-    let mut module_context = Default::default();
-
-    check_module_with(
-        common_kinds,
-        &mut implications,
-        &mut types,
-        &mut context,
-        &mut class_context,
-        modules,
-        &mut module_context,
-        source,
-        module,
-    )
 }
 
 pub fn register_from_import(
