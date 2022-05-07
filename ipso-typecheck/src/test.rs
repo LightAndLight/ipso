@@ -262,14 +262,14 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut constraint_solving::Context {
+            constraint_solving::Env {
                 common_kinds: &common_kinds,
                 types: &types,
-                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
                 source: &source,
             },
+            &mut type_inference_state,
             *p0
         )
         .map(|(expr, constraint)| (
@@ -291,14 +291,14 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut constraint_solving::Context {
+            constraint_solving::Env {
                 common_kinds: &common_kinds,
                 types: &types,
-                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
                 source: &source,
             },
+            &mut type_inference_state,
             *p1
         )
         .map(|(expr, constraint)| (
@@ -320,14 +320,14 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut constraint_solving::Context {
+            constraint_solving::Env {
                 common_kinds: &common_kinds,
                 types: &types,
-                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
                 source: &source,
             },
+            &mut type_inference_state,
             *p2
         )
         .map(|(expr, constraint)| (

@@ -313,14 +313,14 @@ fn abstract_evidence(
 ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
     expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
         let (expr, _solved_constraint) = solve_placeholder(
-            &mut constraint_solving::Context {
+            constraint_solving::Env {
                 common_kinds,
                 types,
-                type_inference_state,
                 implications,
                 type_variables,
                 source,
             },
+            type_inference_state,
             *p,
         )?;
         Ok(expr.as_ref().clone())

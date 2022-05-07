@@ -537,14 +537,14 @@ pub fn check_instance(
             let superclass = superclass.instantiate_many(&args);
 
             match solve_constraint(
-                &mut constraint_solving::Context {
+                constraint_solving::Env {
                     common_kinds,
                     types,
-                    type_inference_state: &mut type_inference_state,
                     implications,
                     type_variables: &type_variables,
                     source,
                 },
+                &mut type_inference_state,
                 name.pos,
                 &evidence::Constraint::from_type(&superclass),
             )

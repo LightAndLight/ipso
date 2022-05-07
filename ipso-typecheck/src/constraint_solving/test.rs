@@ -21,14 +21,14 @@ fn solve_constraint(
         label: String::from("test"),
     };
     super::solve_constraint(
-        &mut super::Context {
+        super::Env {
             common_kinds: &common_kinds,
             types: &types,
-            type_inference_state: &mut type_inference_state,
             implications,
             type_variables: &type_variables,
             source: &source,
         },
+        &mut type_inference_state,
         pos,
         constraint,
     )
@@ -105,14 +105,14 @@ fn solve_constraint_3() {
 
     let expected_result = Ok(Rc::new(Expr::Int(2)));
     let actual_result = super::solve_constraint(
-        &mut super::Context {
+        super::Env {
             common_kinds: &common_kinds,
             types: &types,
-            type_inference_state: &mut type_inference_state,
             implications,
             type_variables: &type_variables,
             source: &source,
         },
+        &mut type_inference_state,
         0,
         &constraint,
     );
@@ -220,14 +220,14 @@ fn solve_constraint_4() {
         core::Type::app(core::Type::mk_array(&common_kinds), core::Type::Int),
     ));
     let actual = constraint_solving::solve_constraint(
-        &mut constraint_solving::Context {
+        constraint_solving::Env {
             common_kinds: &common_kinds,
             types: &types,
-            type_inference_state: &mut type_inference_state,
             implications: &implications,
             type_variables: &type_variables,
             source: &source,
         },
+        &mut type_inference_state,
         0,
         constraint,
     );
