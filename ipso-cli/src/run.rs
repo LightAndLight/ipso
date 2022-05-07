@@ -24,7 +24,7 @@ pub struct Config {
 #[derive(Debug)]
 pub enum InterpreterError {
     ParseError(parse::ParseError),
-    TypeError(typecheck::TypeError),
+    TypeError(Box<typecheck::TypeError>),
     ModuleError(import::ModuleError),
     MissingEntrypoint(String),
     FileDoesNotExist(PathBuf),
@@ -38,13 +38,13 @@ impl From<parse::ParseError> for InterpreterError {
 
 impl From<typecheck::TypeError> for InterpreterError {
     fn from(err: typecheck::TypeError) -> Self {
-        InterpreterError::TypeError(err)
+        InterpreterError::TypeError(Box::new(err))
     }
 }
 
 impl From<type_inference::Error> for InterpreterError {
     fn from(err: type_inference::Error) -> Self {
-        InterpreterError::TypeError(typecheck::TypeError::from(err))
+        Self::from(typecheck::TypeError::from(err))
     }
 }
 

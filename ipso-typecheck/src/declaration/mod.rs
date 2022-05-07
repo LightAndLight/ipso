@@ -2,7 +2,7 @@
 
 use crate::{
     abstract_evidence, check_kind,
-    constraint_solving::{self, solve_constraint, SolveConstraintContext},
+    constraint_solving::{self, solve_constraint},
     evidence, fill_ty_names, generalise, infer_kind, kind_inference, module,
     type_inference::{self, infer_pattern},
     BoundVars, Implication, TypeError,
@@ -546,11 +546,15 @@ pub fn check_instance(
                     source,
                 },
                 name.pos,
-                &Some(SolveConstraintContext {
-                    constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
-                }),
                 &evidence::Constraint::from_type(&superclass),
             )
+            .map_err(|error| {
+                TypeError::from(
+                    error.with_hint(constraint_solving::ErrorHint::WhileSolving {
+                        constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
+                    }),
+                )
+            })
             .and_then(|evidence_expr| {
                 abstract_evidence(
                     common_kinds,

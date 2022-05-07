@@ -9,7 +9,7 @@ pub mod metavariables;
 pub mod module;
 pub mod type_inference;
 
-use constraint_solving::{solve_placeholder, SolveConstraintContext};
+use constraint_solving::solve_placeholder;
 use diagnostic::{Location, Message};
 use evidence::Constraint;
 use ipso_core::{self as core, CommonKinds};
@@ -151,6 +151,9 @@ pub enum TypeError {
     TypeError {
         error: type_inference::Error,
     },
+    ConstraintError {
+        error: constraint_solving::Error,
+    },
     DuplicateClassArgument {
         source: Source,
         pos: usize,
@@ -179,71 +182,39 @@ pub enum TypeError {
         pos: usize,
         cls: Rc<str>,
     },
-    CannotDeduce {
-        source: Source,
-        pos: usize,
-        context: Option<SolveConstraintContext>,
-    },
 }
 
 impl TypeError {
     pub fn source(&self) -> Source {
         match self {
             TypeError::TypeError { error } => error.source.clone(),
+            TypeError::ConstraintError { error } => error.source.clone(),
             TypeError::KindError { source, .. } => source.clone(),
             TypeError::NotInScope { source, .. } => source.clone(),
             TypeError::NotInModule { source, .. } => source.clone(),
             TypeError::DuplicateClassArgument { source, .. } => source.clone(),
             TypeError::NoSuchClass { source, .. } => source.clone(),
             TypeError::NotAMember { source, .. } => source.clone(),
-            TypeError::CannotDeduce { source, .. } => source.clone(),
         }
     }
 
     pub fn position(&self) -> usize {
         match self {
             TypeError::TypeError { error } => error.position.unwrap_or(0),
+            TypeError::ConstraintError { error } => error.position.unwrap_or(0),
             TypeError::KindError { pos, .. } => *pos,
             TypeError::NotInScope { pos, .. } => *pos,
             TypeError::NotInModule { pos, .. } => *pos,
             TypeError::DuplicateClassArgument { pos, .. } => *pos,
             TypeError::NoSuchClass { pos, .. } => *pos,
             TypeError::NotAMember { pos, .. } => *pos,
-            TypeError::CannotDeduce { pos, .. } => *pos,
         }
     }
 
     pub fn message(&self) -> String {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
-                type_inference::ErrorInfo::UnificationError { error } => match &error.info {
-                    type_inference::unification::ErrorInfo::Mismatch { expected, actual } => {
-                        let (expected, actual) = match &error.hint {
-                            Some(hint) => match hint {
-                                type_inference::unification::ErrorHint::WhileUnifying {
-                                    expected,
-                                    actual,
-                                } => (expected, actual),
-                            },
-                            None => (expected, actual),
-                        };
-
-                        format!(
-                            "expected type \"{}\", got type \"{}\"",
-                            expected.render(),
-                            actual.render()
-                        )
-                    }
-                    type_inference::unification::ErrorInfo::Occurs { meta, ty } => format!(
-                        "infinite type from equating ?{} with \"{}\"",
-                        meta,
-                        ty.render()
-                    ),
-
-                    type_inference::unification::ErrorInfo::KindError { error } => {
-                        render_kind_inference_error(error)
-                    }
-                },
+                type_inference::ErrorInfo::UnificationError { error } => error.message(),
 
                 type_inference::ErrorInfo::NotInScope { .. } => {
                     String::from("variable not in scope")
@@ -255,7 +226,7 @@ impl TypeError {
                 type_inference::ErrorInfo::NotAValue { .. } => String::from("not a value"),
                 type_inference::ErrorInfo::NotAModule => String::from("not a module"),
             },
-            TypeError::KindError { error, .. } => render_kind_inference_error(error),
+            TypeError::KindError { error, .. } => error.message(),
             TypeError::NotInScope { .. } => String::from("not in scope"),
             TypeError::NotInModule { .. } => String::from("not in scope"),
             TypeError::DuplicateClassArgument { .. } => {
@@ -265,10 +236,7 @@ impl TypeError {
             TypeError::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
-            TypeError::CannotDeduce { context, .. } => match context {
-                None => String::from("cannot deduce"),
-                Some(context) => format!("cannot deduce \"{:}\"", context.constraint.render()),
-            },
+            TypeError::ConstraintError { error } => error.message(),
         }
     }
 
@@ -282,6 +250,7 @@ impl TypeError {
                 type_inference::ErrorInfo::NotAValue { .. } => None,
                 type_inference::ErrorInfo::NotAModule => None,
             },
+            TypeError::ConstraintError { .. } => None,
             TypeError::KindError { error, .. } => match error.info {
                 kind_inference::ErrorInfo::NotInScope { .. } => None,
                 kind_inference::ErrorInfo::UnificationError { .. } => {
@@ -304,7 +273,6 @@ impl TypeError {
             TypeError::NotInModule { .. } => None,
             TypeError::NoSuchClass { .. } => None,
             TypeError::NotAMember { .. } => None,
-            TypeError::CannotDeduce { .. } => None,
         }
     }
 
@@ -328,31 +296,9 @@ impl From<type_inference::Error> for TypeError {
     }
 }
 
-fn render_kind_inference_error(error: &kind_inference::Error) -> String {
-    match &error.info {
-        kind_inference::ErrorInfo::NotInScope { .. } => String::from("type not in scope"),
-        kind_inference::ErrorInfo::UnificationError {
-            error: unification_error,
-        } => match unification_error {
-            kind_inference::unification::Error::Mismatch { expected, actual } => {
-                let mut message = String::from("expected kind ");
-                message.push('"');
-                message.push_str(expected.render().as_str());
-                message.push('"');
-                message.push_str(", got kind ");
-                message.push('"');
-                message.push_str(actual.render().as_str());
-                message.push('"');
-                message
-            }
-            kind_inference::unification::Error::Occurs { meta, kind } => {
-                format!(
-                    "infinite kind from equating ?{} with \"{}\"",
-                    meta,
-                    kind.render()
-                )
-            }
-        },
+impl From<constraint_solving::Error> for TypeError {
+    fn from(error: constraint_solving::Error) -> Self {
+        TypeError::ConstraintError { error }
     }
 }
 

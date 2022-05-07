@@ -1,8 +1,7 @@
-use super::SolveConstraintContext;
 use crate::{
     constraint_solving,
     evidence::{Constraint, Evidence},
-    module, type_inference, TypeError,
+    module, type_inference,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_diagnostic::Source;
@@ -11,9 +10,8 @@ use std::rc::Rc;
 
 fn solve_constraint(
     pos: usize,
-    context: &Option<SolveConstraintContext>,
     constraint: &Constraint,
-) -> std::result::Result<std::rc::Rc<ipso_core::Expr>, TypeError> {
+) -> std::result::Result<std::rc::Rc<ipso_core::Expr>, constraint_solving::Error> {
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
@@ -32,7 +30,6 @@ fn solve_constraint(
             source: &source,
         },
         pos,
-        context,
         constraint,
     )
 }
@@ -50,7 +47,7 @@ fn solve_constraint_1() {
         ),
     };
     let expected = Ok(Rc::new(Expr::Int(0)));
-    let actual = solve_constraint(0, &None, &constraint);
+    let actual = solve_constraint(0, &constraint);
     assert_eq!(expected, actual)
 }
 
@@ -71,7 +68,7 @@ fn solve_constraint_2() {
         Expr::Int(1),
         Expr::Int(0),
     )));
-    let actual = solve_constraint(0, &None, &constraint);
+    let actual = solve_constraint(0, &constraint);
     assert_eq!(expected, actual)
 }
 
@@ -117,7 +114,6 @@ fn solve_constraint_3() {
             source: &source,
         },
         0,
-        &None,
         &constraint,
     );
     assert_eq!(expected_result, actual_result);
@@ -233,7 +229,6 @@ fn solve_constraint_4() {
             source: &source,
         },
         0,
-        &None,
         constraint,
     );
 

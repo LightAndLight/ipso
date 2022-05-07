@@ -188,6 +188,32 @@ impl Error {
     pub fn mismatch(expected: syntax::Type<Rc<str>>, actual: syntax::Type<Rc<str>>) -> Self {
         Self::from(ErrorInfo::Mismatch { expected, actual })
     }
+
+    pub fn message(&self) -> String {
+        match &self.info {
+            ErrorInfo::Mismatch { expected, actual } => {
+                let (expected, actual) = match &self.hint {
+                    Some(hint) => match hint {
+                        ErrorHint::WhileUnifying { expected, actual } => (expected, actual),
+                    },
+                    None => (expected, actual),
+                };
+
+                format!(
+                    "expected type \"{}\", got type \"{}\"",
+                    expected.render(),
+                    actual.render()
+                )
+            }
+            ErrorInfo::Occurs { meta, ty } => format!(
+                "infinite type from equating ?{} with \"{}\"",
+                meta,
+                ty.render()
+            ),
+
+            ErrorInfo::KindError { error } => error.message(),
+        }
+    }
 }
 
 impl From<ErrorInfo> for Error {

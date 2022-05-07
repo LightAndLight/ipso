@@ -4,9 +4,7 @@ mod test;
 use crate::{
     eq_zonked_constraint,
     evidence::{Constraint, Evidence, Item},
-    fill_ty_names, metavariables,
-    type_inference::{self},
-    BoundVars, Implication, TypeError,
+    fill_ty_names, metavariables, type_inference, BoundVars, Implication,
 };
 use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
 use ipso_diagnostic::Source;
@@ -33,9 +31,72 @@ pub fn lookup_evidence(
     )
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct SolveConstraintContext {
-    pub constraint: syntax::Type<Rc<str>>,
+#[derive(PartialEq, Eq, Debug)]
+pub enum ErrorInfo {
+    CannotDeduce {
+        constraint: syntax::Type<Rc<str>>,
+    },
+    UnificationError {
+        error: type_inference::unification::Error,
+    },
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum ErrorHint {
+    WhileSolving { constraint: syntax::Type<Rc<str>> },
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct Error {
+    pub source: Source,
+    pub position: Option<usize>,
+    pub info: ErrorInfo,
+    pub hint: Option<ErrorHint>,
+}
+
+impl Error {
+    pub fn cannot_deduce(source: Source, constraint: syntax::Type<Rc<str>>) -> Self {
+        Error {
+            source,
+            position: None,
+            info: ErrorInfo::CannotDeduce { constraint },
+            hint: None,
+        }
+    }
+
+    pub fn unification_error(source: Source, error: type_inference::unification::Error) -> Self {
+        Error {
+            source,
+            position: None,
+            info: ErrorInfo::UnificationError { error },
+            hint: None,
+        }
+    }
+
+    pub fn with_position(mut self, position: usize) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    pub fn with_hint(mut self, hint: ErrorHint) -> Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    pub fn message(&self) -> String {
+        match &self.info {
+            ErrorInfo::CannotDeduce { constraint } => {
+                let constraint = match &self.hint {
+                    Some(hint) => match hint {
+                        ErrorHint::WhileSolving { constraint } => constraint,
+                    },
+                    None => constraint,
+                };
+                format!("cannot deduce \"{:}\"", constraint.render())
+            }
+            ErrorInfo::UnificationError { error } => error.message(),
+        }
+    }
 }
 
 /**
@@ -56,9 +117,8 @@ pub struct Context<'a> {
 pub fn solve_constraint(
     ctx: &mut Context,
     pos: usize,
-    context: &Option<SolveConstraintContext>,
     constraint: &Constraint,
-) -> Result<Rc<core::Expr>, TypeError> {
+) -> Result<Rc<core::Expr>, Error> {
     match constraint {
         Constraint::Type(constraint) => {
             debug_assert!(
@@ -114,12 +174,7 @@ pub fn solve_constraint(
                         let mut evidence_result = Ok(implication.evidence);
 
                         for antecedent in &implication.antecedents {
-                            match solve_constraint(
-                                ctx,
-                                pos,
-                                context,
-                                &Constraint::from_type(antecedent),
-                            ) {
+                            match solve_constraint(ctx, pos, &Constraint::from_type(antecedent)) {
                                 Err(err) => {
                                     evidence_result = Err(err);
                                     break;
@@ -145,11 +200,16 @@ pub fn solve_constraint(
             }
 
             match result {
-                None => Err(TypeError::CannotDeduce {
-                    pos,
-                    source: ctx.source.clone(),
-                    context: context.clone(),
-                }),
+                None => Err(Error::cannot_deduce(
+                    ctx.source.clone(),
+                    fill_ty_names(
+                        ctx.type_variables,
+                        ctx.type_inference_state
+                            .zonk_type(constraint.clone())
+                            .to_syntax(),
+                    ),
+                )
+                .with_position(pos)),
                 Some(evidence) => Ok(evidence),
             }
         }
@@ -163,7 +223,6 @@ pub fn solve_constraint(
                         solve_constraint(
                             ctx,
                             pos,
-                            context,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: other_rest.as_ref().clone(),
@@ -173,7 +232,6 @@ pub fn solve_constraint(
                         let ev = solve_constraint(
                             ctx,
                             pos,
-                            context,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: other_rest.as_ref().clone(),
@@ -250,9 +308,9 @@ pub fn solve_constraint(
                                         rest,
                                     )
                                     .map_err(|error| {
-                                        type_inference::Error::unification_error(ctx.source, error)
+                                        Error::unification_error(ctx.source.clone(), error)
                                     })?;
-                                    solve_constraint(ctx, pos, context, constraint)
+                                    solve_constraint(ctx, pos, constraint)
                                 }
                                 _ => match lookup_evidence(
                                     &ctx.type_inference_state.type_solutions,
@@ -272,7 +330,6 @@ pub fn solve_constraint(
                         metavariables::Solution::Solved(sol) => solve_constraint(
                             ctx,
                             pos,
-                            context,
                             &Constraint::HasField {
                                 field: field.clone(),
                                 rest: sol,
@@ -306,23 +363,20 @@ pub fn solve_constraint(
 pub fn solve_placeholder(
     ctx: &mut Context,
     p: Placeholder,
-) -> Result<(Rc<core::Expr>, Constraint), TypeError> {
+) -> Result<(Rc<core::Expr>, Constraint), Error> {
     let item = ctx.type_inference_state.evidence.environment[p.0].clone();
     match item.expr {
         None => {
-            let expr = solve_constraint(
-                ctx,
-                item.pos,
-                &Some(SolveConstraintContext {
+            let expr = solve_constraint(ctx, item.pos, &item.constraint).map_err(|error| {
+                error.with_hint(ErrorHint::WhileSolving {
                     constraint: fill_ty_names(
                         ctx.type_variables,
                         ctx.type_inference_state
                             .zonk_type(item.constraint.to_type())
                             .to_syntax(),
                     ),
-                }),
-                &item.constraint,
-            )?;
+                })
+            })?;
             ctx.type_inference_state.evidence.environment[p.0].expr = Some(expr.clone());
             Ok((expr, item.constraint.clone()))
         }

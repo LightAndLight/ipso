@@ -26,7 +26,7 @@ pub enum ModuleError {
     IO(io::Error),
     Parse(parse::ParseError),
     Desugar(desugar::Error),
-    Check(typecheck::TypeError),
+    Check(Box<typecheck::TypeError>),
 }
 
 impl ModuleError {
@@ -84,7 +84,7 @@ impl From<desugar::Error> for ModuleError {
 
 impl From<typecheck::TypeError> for ModuleError {
     fn from(err: typecheck::TypeError) -> Self {
-        ModuleError::Check(err)
+        ModuleError::Check(Box::new(err))
     }
 }
 

@@ -82,6 +82,34 @@ impl Error {
         self.hint = Some(hint);
         self
     }
+
+    pub fn message(&self) -> String {
+        match &self.info {
+            ErrorInfo::NotInScope { .. } => String::from("type not in scope"),
+            ErrorInfo::UnificationError {
+                error: unification_error,
+            } => match unification_error {
+                unification::Error::Mismatch { expected, actual } => {
+                    let mut message = String::from("expected kind ");
+                    message.push('"');
+                    message.push_str(expected.render().as_str());
+                    message.push('"');
+                    message.push_str(", got kind ");
+                    message.push('"');
+                    message.push_str(actual.render().as_str());
+                    message.push('"');
+                    message
+                }
+                unification::Error::Occurs { meta, kind } => {
+                    format!(
+                        "infinite kind from equating ?{} with \"{}\"",
+                        meta,
+                        kind.render()
+                    )
+                }
+            },
+        }
+    }
 }
 
 impl<T: Into<ErrorInfo>> From<T> for Error {
