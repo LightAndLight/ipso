@@ -101,7 +101,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut kind_solutions = kind_inference::unification::Solutions::new();
+        let mut kind_inference_ctx = kind_inference::State::new();
         let mut type_solutions = type_inference::unification::Solutions::new();
 
         let expected = core::Type::app(
@@ -114,7 +114,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &common_kinds,
             &HashMap::new(),
             &BoundVars::new(),
-            &mut kind_solutions,
+            &mut kind_inference_ctx,
             &mut type_solutions,
             &source,
             None,
