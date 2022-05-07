@@ -1,16 +1,4 @@
-/*!
-Kind checking and inference.
-
-## Checking & inference
-
-* [`check`]
-* [`infer`]
-
-### With hints
-
-* [`check_with_hint`]
-* [`infer_with_hint`]
-*/
+//! Kind checking and inference.
 
 #[cfg(test)]
 mod test;
