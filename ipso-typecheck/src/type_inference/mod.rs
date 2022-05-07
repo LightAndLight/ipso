@@ -257,10 +257,26 @@ pub struct Env<'a> {
 Type inference state.
 */
 pub struct State<'a> {
-    pub kind_inference_ctx: &'a mut kind_inference::State,
-    pub type_solutions: &'a mut unification::Solutions,
-    pub variables: &'a mut BoundVars<Type>,
-    pub evidence: &'a mut Evidence,
+    kind_inference_ctx: &'a mut kind_inference::State,
+    type_solutions: &'a mut unification::Solutions,
+    variables: &'a mut BoundVars<Type>,
+    evidence: &'a mut Evidence,
+}
+
+impl<'a> State<'a> {
+    pub fn new(
+        kind_inference_ctx: &'a mut kind_inference::State,
+        type_solutions: &'a mut unification::Solutions,
+        variables: &'a mut BoundVars<Type>,
+        evidence: &'a mut Evidence,
+    ) -> Self {
+        State {
+            kind_inference_ctx,
+            type_solutions,
+            variables,
+            evidence,
+        }
+    }
 }
 
 fn pattern_is_redundant(

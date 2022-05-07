@@ -703,12 +703,12 @@ fn check_definition(
             type_signatures: context,
             source,
         },
-        &mut type_inference::State {
-            kind_inference_ctx: &mut kind_inference_ctx,
+        &mut type_inference::State::new(
+            &mut kind_inference_ctx,
             type_solutions,
-            variables: bound_vars,
+            bound_vars,
             evidence,
-        },
+        ),
         body,
         &out_ty,
     )?;
@@ -1105,12 +1105,12 @@ fn check_instance(
                             type_signatures: context,
                             source,
                         },
-                        &mut type_inference::State {
-                            kind_inference_ctx: &mut kind_inference_ctx,
+                        &mut type_inference::State::new(
+                            &mut kind_inference_ctx,
                             type_solutions,
-                            variables: bound_vars,
+                            bound_vars,
                             evidence,
-                        },
+                        ),
                         &Spanned {
                             pos: member.name.pos,
                             item: syntax::Expr::mk_lam(member.args.clone(), member.body.clone()),

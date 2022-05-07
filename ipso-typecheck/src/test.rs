@@ -230,12 +230,12 @@ fn infer_record_1() {
             type_signatures: &type_signatures,
             source: &source,
         },
-        &mut type_inference::State {
-            kind_inference_ctx: &mut kind_inference_ctx,
-            type_solutions: &mut type_solutions,
-            variables: &mut variables,
-            evidence: &mut evidence,
-        },
+        &mut type_inference::State::new(
+            &mut kind_inference_ctx,
+            &mut type_solutions,
+            &mut variables,
+            &mut evidence,
+        ),
         &expr,
     )
     .map(|(expr, ty)| {
