@@ -415,7 +415,6 @@ pub fn register_declaration(
 
 pub fn check_module_with(
     common_kinds: &CommonKinds,
-    type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
@@ -429,7 +428,6 @@ pub fn check_module_with(
         acc.and_then(|mut decls| {
             check_declaration(
                 common_kinds,
-                type_solutions,
                 implications,
                 type_context,
                 context,
@@ -490,7 +488,6 @@ pub fn check_module(
     module: &syntax::Module,
 ) -> Result<core::Module, TypeError> {
     let mut types = Default::default();
-    let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
@@ -498,7 +495,6 @@ pub fn check_module(
 
     check_module_with(
         common_kinds,
-        &mut type_solutions,
         &mut implications,
         &mut types,
         &mut context,
@@ -797,7 +793,6 @@ fn check_class_member(
 
 fn check_class(
     common_kinds: &CommonKinds,
-    type_solutions: &mut type_inference::unification::Solutions,
     types: &mut HashMap<Rc<str>, Kind>,
     source: &Source,
     supers: &[Spanned<syntax::Type<Rc<str>>>],
@@ -806,6 +801,7 @@ fn check_class(
     members: &[(String, syntax::Type<Rc<str>>)],
 ) -> Result<core::Declaration, TypeError> {
     let mut type_variables = BoundVars::new();
+    let mut type_solutions = type_inference::unification::Solutions::new();
     let mut kind_inference_state = kind_inference::State::new();
 
     let args_kinds: Vec<(Rc<str>, Kind)> = {
@@ -849,7 +845,7 @@ fn check_class(
             check_class_member(
                 common_kinds,
                 &mut kind_inference_state,
-                type_solutions,
+                &mut type_solutions,
                 types,
                 &mut type_variables,
                 source,
@@ -1163,7 +1159,6 @@ fn check_instance(
 
 fn check_declaration(
     common_kinds: &CommonKinds,
-    type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
@@ -1235,7 +1230,6 @@ fn check_declaration(
             members,
         } => check_class(
             common_kinds,
-            type_solutions,
             type_context,
             source,
             supers,
