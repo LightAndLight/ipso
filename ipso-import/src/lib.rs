@@ -591,7 +591,7 @@ pub fn import(
                 )?;
 
                 let module =
-                    typecheck::check_module(common_kinds, modules, &target_source, &module)?;
+                    typecheck::module::check(common_kinds, modules, &target_source, &module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)
