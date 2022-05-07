@@ -1,10 +1,7 @@
+use crate::constraint_solving::{self, solve_placeholder};
 use crate::{
-    declaration::Declarations,
-    evidence::{
-        solver::{self, solve_placeholder},
-        Constraint,
-    },
-    kind_inference, module, type_inference, zonk_constraint, BoundVars,
+    declaration::Declarations, evidence::Constraint, kind_inference, module, type_inference,
+    zonk_constraint, BoundVars,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
@@ -265,7 +262,7 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut solver::Context {
+            &mut constraint_solving::Context {
                 common_kinds: &common_kinds,
                 types: &types,
                 type_inference_state: &mut type_inference_state,
@@ -294,7 +291,7 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut solver::Context {
+            &mut constraint_solving::Context {
                 common_kinds: &common_kinds,
                 types: &types,
                 type_inference_state: &mut type_inference_state,
@@ -323,7 +320,7 @@ fn infer_record_1() {
             }
         )),
         solve_placeholder(
-            &mut solver::Context {
+            &mut constraint_solving::Context {
                 common_kinds: &common_kinds,
                 types: &types,
                 type_inference_state: &mut type_inference_state,

@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+pub mod constraint_solving;
 pub mod declaration;
 pub mod evidence;
 pub mod kind_inference;
@@ -8,11 +9,9 @@ pub mod metavariables;
 pub mod module;
 pub mod type_inference;
 
+use constraint_solving::{solve_placeholder, SolveConstraintContext};
 use diagnostic::{Location, Message};
-use evidence::{
-    solver::{self, solve_placeholder},
-    Constraint,
-};
+use evidence::Constraint;
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind};
@@ -145,11 +144,6 @@ impl Implication {
             evidence: self.evidence.clone(),
         }
     }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct SolveConstraintContext {
-    pub constraint: syntax::Type<Rc<str>>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -373,7 +367,7 @@ fn abstract_evidence(
 ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
     expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
         let (expr, _solved_constraint) = solve_placeholder(
-            &mut solver::Context {
+            &mut constraint_solving::Context {
                 common_kinds,
                 types,
                 type_inference_state,

@@ -1,6 +1,8 @@
+use super::SolveConstraintContext;
 use crate::{
-    evidence::{solver, Constraint, Evidence},
-    module, type_inference, SolveConstraintContext, TypeError,
+    constraint_solving,
+    evidence::{Constraint, Evidence},
+    module, type_inference, TypeError,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_diagnostic::Source;
@@ -20,8 +22,8 @@ fn solve_constraint(
     let source = Source::Interactive {
         label: String::from("test"),
     };
-    solver::solve_constraint(
-        &mut solver::Context {
+    super::solve_constraint(
+        &mut super::Context {
             common_kinds: &common_kinds,
             types: &types,
             type_inference_state: &mut type_inference_state,
@@ -105,8 +107,8 @@ fn solve_constraint_3() {
     };
 
     let expected_result = Ok(Rc::new(Expr::Int(2)));
-    let actual_result = solver::solve_constraint(
-        &mut solver::Context {
+    let actual_result = super::solve_constraint(
+        &mut super::Context {
             common_kinds: &common_kinds,
             types: &types,
             type_inference_state: &mut type_inference_state,
@@ -221,8 +223,8 @@ fn solve_constraint_4() {
         eq_ty,
         core::Type::app(core::Type::mk_array(&common_kinds), core::Type::Int),
     ));
-    let actual = solver::solve_constraint(
-        &mut solver::Context {
+    let actual = constraint_solving::solve_constraint(
+        &mut constraint_solving::Context {
             common_kinds: &common_kinds,
             types: &types,
             type_inference_state: &mut type_inference_state,

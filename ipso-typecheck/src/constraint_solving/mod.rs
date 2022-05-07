@@ -1,15 +1,16 @@
 #[cfg(test)]
 mod test;
 
-use super::{Constraint, Evidence};
 use crate::{
-    eq_zonked_constraint, fill_ty_names, metavariables,
+    eq_zonked_constraint,
+    evidence::{Constraint, Evidence, Item},
+    fill_ty_names, metavariables,
     type_inference::{self},
-    BoundVars, Implication, SolveConstraintContext, TypeError,
+    BoundVars, Implication, TypeError,
 };
 use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
 use ipso_diagnostic::Source;
-use ipso_syntax::kind::Kind;
+use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
 
 pub fn lookup_evidence(
@@ -18,7 +19,7 @@ pub fn lookup_evidence(
     constraint: &Constraint,
 ) -> Option<Rc<core::Expr>> {
     evidence.environment.iter().find_map(
-        |super::Item {
+        |Item {
              constraint: other_constraint,
              expr: other_evidence,
              ..
@@ -32,8 +33,13 @@ pub fn lookup_evidence(
     )
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct SolveConstraintContext {
+    pub constraint: syntax::Type<Rc<str>>,
+}
+
 /**
-Constraint olver context.
+Constraint solver context.
 
 [`solve_placeholder`] and [`solve_constraint`] take many unchanging arguments, so we bundle the
 arguments into a struct for convenience.

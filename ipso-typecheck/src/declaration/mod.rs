@@ -1,9 +1,11 @@
 //! Declaration checking.
 
-use crate::type_inference::{self, infer_pattern};
 use crate::{
-    abstract_evidence, check_kind, evidence, evidence::solver, fill_ty_names, generalise,
-    infer_kind, kind_inference, module, BoundVars, Implication, SolveConstraintContext, TypeError,
+    abstract_evidence, check_kind,
+    constraint_solving::{self, solve_constraint, SolveConstraintContext},
+    evidence, fill_ty_names, generalise, infer_kind, kind_inference, module,
+    type_inference::{self, infer_pattern},
+    BoundVars, Implication, TypeError,
 };
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
@@ -534,8 +536,8 @@ pub fn check_instance(
         for superclass in &class_decl.supers {
             let superclass = superclass.instantiate_many(&args);
 
-            match evidence::solver::solve_constraint(
-                &mut solver::Context {
+            match solve_constraint(
+                &mut constraint_solving::Context {
                     common_kinds,
                     types,
                     type_inference_state: &mut type_inference_state,
