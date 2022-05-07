@@ -1,3 +1,5 @@
+//! Module checking.
+
 use crate::{check_declaration, Declarations};
 use crate::{Implication, TypeError};
 use ipso_core::{self as core, CommonKinds};
