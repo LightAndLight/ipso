@@ -1,9 +1,10 @@
 use crate::{
+    declaration::Declarations,
     evidence::{
         solver::{self, solve_placeholder},
         Constraint,
     },
-    kind_inference, module, type_inference, zonk_constraint, BoundVars, Declarations,
+    kind_inference, module, type_inference, zonk_constraint, BoundVars,
 };
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
@@ -356,7 +357,7 @@ fn check_declaration(
     let source = Source::Interactive {
         label: String::from("test"),
     };
-    crate::check_declaration(
+    crate::declaration::check(
         &common_kinds,
         &mut implications,
         &mut types,
@@ -931,7 +932,7 @@ fn check_instance_1() {
     instance Eq () where
       eq x y = True
     */
-    let actual = crate::check_declaration(
+    let actual = crate::declaration::check(
         &common_kinds,
         &mut state.implications,
         &mut state.type_context,

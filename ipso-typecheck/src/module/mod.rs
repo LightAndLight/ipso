@@ -1,7 +1,7 @@
 //! Module checking.
 
-use crate::{check_declaration, Declarations};
-use crate::{Implication, TypeError};
+use crate::declaration::Declarations;
+use crate::{declaration, Implication, TypeError};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, ModuleId, ModuleRef, Modules};
@@ -142,7 +142,7 @@ pub fn check(
 
     let decls = module.decls.iter().fold(Ok(vec![]), |acc, decl| {
         acc.and_then(|mut decls| {
-            check_declaration(
+            declaration::check(
                 common_kinds,
                 &mut state.implications,
                 &mut state.type_context,
