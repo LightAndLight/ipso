@@ -1,7 +1,6 @@
 use crate::{
     evidence::{solver, Constraint, Evidence},
-    kind_inference, register_class, register_instance, type_inference, SolveConstraintContext,
-    TypeError,
+    register_class, register_instance, type_inference, SolveConstraintContext, TypeError,
 };
 use ipso_core::{self as core, Binop, ClassDeclaration, ClassMember, EVar, Expr, Name, TypeSig};
 use ipso_diagnostic::Source;
@@ -16,10 +15,10 @@ fn solve_constraint(
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx = kind_inference::State::new();
-    let mut type_solutions = Default::default();
-    let implications = Default::default();
     let mut evidence = Default::default();
+    let mut variables = Default::default();
+    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
     };
@@ -27,11 +26,9 @@ fn solve_constraint(
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_inference_ctx: &mut kind_inference_ctx,
-            type_solutions: &mut type_solutions,
+            type_inference_state: &mut type_inference_state,
             implications,
             type_variables: &type_variables,
-            evidence: &mut evidence,
             source: &source,
         },
         pos,
@@ -83,16 +80,16 @@ fn solve_constraint_3() {
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx = kind_inference::State::new();
-    let mut type_solutions = type_inference::unification::Solutions::default();
-    let implications = Default::default();
+    let mut variables = Default::default();
     let mut evidence = Evidence::default();
+    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
     };
 
-    let var = core::Type::Meta(Kind::Row, type_solutions.fresh_meta());
-    evidence.assume(
+    let var = type_inference_state.fresh_type_meta(Kind::Row);
+    type_inference_state.evidence.assume(
         0,
         Constraint::HasField {
             field: Rc::from("z"),
@@ -116,11 +113,9 @@ fn solve_constraint_3() {
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_inference_ctx: &mut kind_inference_ctx,
-            type_solutions: &mut type_solutions,
+            type_inference_state: &mut type_inference_state,
             implications,
             type_variables: &type_variables,
-            evidence: &mut evidence,
             source: &source,
         },
         0,
@@ -152,10 +147,10 @@ fn solve_constraint_4() {
     let common_kinds = Default::default();
     let mut types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx = kind_inference::State::new();
-    let mut type_solutions = Default::default();
-    let mut implications = Default::default();
     let mut evidence = Default::default();
+    let mut variables = Default::default();
+    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
+    let mut implications = Default::default();
     let source = Source::Interactive {
         label: String::from("test"),
     };
@@ -236,11 +231,9 @@ fn solve_constraint_4() {
         &mut solver::Context {
             common_kinds: &common_kinds,
             types: &types,
-            kind_inference_ctx: &mut kind_inference_ctx,
-            type_solutions: &mut type_solutions,
+            type_inference_state: &mut type_inference_state,
             implications: &implications,
             type_variables: &type_variables,
-            evidence: &mut evidence,
             source: &source,
         },
         0,

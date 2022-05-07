@@ -157,9 +157,44 @@ impl Solutions {
     }
 }
 
-/// A type unification error.
 #[derive(PartialEq, Eq, Debug)]
-pub enum Error {
+pub enum ErrorHint {
+    WhileUnifying {
+        expected: syntax::Type<Rc<str>>,
+        actual: syntax::Type<Rc<str>>,
+    },
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct Error {
+    pub info: ErrorInfo,
+    pub hint: Option<ErrorHint>,
+}
+
+impl Error {
+    pub fn with_hint(mut self, hint: ErrorHint) -> Self {
+        self.hint = Some(hint);
+        self
+    }
+
+    pub fn occurs(meta: Meta, ty: syntax::Type<Rc<str>>) -> Self {
+        Self::from(ErrorInfo::Occurs { meta, ty })
+    }
+
+    pub fn mismatch(expected: syntax::Type<Rc<str>>, actual: syntax::Type<Rc<str>>) -> Self {
+        Self::from(ErrorInfo::Mismatch { expected, actual })
+    }
+}
+
+impl From<ErrorInfo> for Error {
+    fn from(info: ErrorInfo) -> Self {
+        Error { info, hint: None }
+    }
+}
+
+/// Type unification error info.
+#[derive(PartialEq, Eq, Debug)]
+pub enum ErrorInfo {
     Mismatch {
         expected: syntax::Type<Rc<str>>,
         actual: syntax::Type<Rc<str>>,
@@ -173,7 +208,7 @@ pub enum Error {
     },
 }
 
-impl Error {
+impl ErrorInfo {
     /**
     Construct a [`Error::Mismatch`].
 
@@ -186,7 +221,7 @@ impl Error {
         expected: Type,
         actual: Type,
     ) -> Self {
-        Error::Mismatch {
+        ErrorInfo::Mismatch {
             expected: type_solutions
                 .zonk(kind_solutions, expected)
                 .to_syntax()
@@ -204,7 +239,7 @@ impl Error {
     Uses `type_variables` to replace de Bruijn indices with names.
     */
     pub fn occurs(type_variables: &BoundVars<Kind>, meta: Meta, ty: &Type) -> Self {
-        Error::Occurs {
+        ErrorInfo::Occurs {
             meta,
             ty: ty
                 .to_syntax()
@@ -213,23 +248,85 @@ impl Error {
     }
 }
 
+/// Type unification environment.
+#[derive(Clone, Copy)]
+pub struct Env<'a> {
+    pub common_kinds: &'a CommonKinds,
+    pub types: &'a HashMap<Rc<str>, Kind>,
+    pub type_variables: &'a BoundVars<Kind>,
+}
+
+/// Unify two types, with error hint.
+pub fn unify_with_hint(
+    env: Env,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut Solutions,
+    hint: &dyn Fn() -> ErrorHint,
+    expected: &Type,
+    actual: &Type,
+) -> Result<(), Error> {
+    unify_inner(
+        env.common_kinds,
+        env.types,
+        env.type_variables,
+        kind_inference_state,
+        type_solutions,
+        expected,
+        actual,
+    )
+    .map_err(|error| Error::from(error).with_hint(hint()))
+}
+
 /// Unify two types.
 pub fn unify(
-    common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
+    env: Env,
+    kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), Error> {
+    unify_inner(
+        env.common_kinds,
+        env.types,
+        env.type_variables,
+        kind_inference_state,
+        type_solutions,
+        expected,
+        actual,
+    )
+    .map_err(|error| {
+        Error::from(error).with_hint({
+            ErrorHint::WhileUnifying {
+                expected: type_solutions
+                    .zonk(kind_inference_state.kind_solutions(), expected.clone())
+                    .to_syntax()
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+
+                actual: type_solutions
+                    .zonk(kind_inference_state.kind_solutions(), actual.clone())
+                    .to_syntax()
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            }
+        })
+    })
+}
+
+fn unify_inner(
+    common_kinds: &CommonKinds,
+    types: &HashMap<Rc<str>, Kind>,
+    type_variables: &BoundVars<Kind>,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut Solutions,
+    expected: &Type,
+    actual: &Type,
+) -> Result<(), ErrorInfo> {
     fn solve_left(
-        kind_inference_ctx: &mut kind_inference::State,
+        kind_inference_state: &mut kind_inference::State,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         meta: Meta,
         actual: &Type,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ErrorInfo> {
         /*
         [note: avoiding solved metas as solutions]
 
@@ -248,10 +345,10 @@ pub fn unify(
         });
 
         if type_solutions.occurs(meta, actual) {
-            Err(Error::occurs(
+            Err(ErrorInfo::occurs(
                 type_variables,
                 meta,
-                &type_solutions.zonk(kind_inference_ctx.kind_solutions(), actual.clone()),
+                &type_solutions.zonk(kind_inference_state.kind_solutions(), actual.clone()),
             ))
         } else {
             type_solutions.set(meta, actual);
@@ -260,12 +357,12 @@ pub fn unify(
     }
 
     fn solve_right(
-        kind_inference_ctx: &mut kind_inference::State,
+        kind_inference_state: &mut kind_inference::State,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         expected: &Type,
         meta: Meta,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ErrorInfo> {
         // See [note: avoiding solved metas as solutions]
         debug_assert!(match expected {
             Type::Meta(_, expected_meta) => {
@@ -275,10 +372,10 @@ pub fn unify(
         });
 
         if type_solutions.occurs(meta, expected) {
-            Err(Error::occurs(
+            Err(ErrorInfo::occurs(
                 type_variables,
                 meta,
-                &type_solutions.zonk(kind_inference_ctx.kind_solutions(), expected.clone()),
+                &type_solutions.zonk(kind_inference_state.kind_solutions(), expected.clone()),
             ))
         } else {
             type_solutions.set(meta, expected);
@@ -300,26 +397,26 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_inference_ctx: &mut kind_inference::State,
+        kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         meta: &usize,
         actual: &Type,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ErrorInfo> {
         match walk(type_solutions, actual) {
             Type::Meta(_, actual_meta) if *meta == actual_meta => Ok(()),
             actual => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_left(
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_variables,
                     type_solutions,
                     *meta,
                     &actual,
                 ),
-                Solution::Solved(expected) => unify(
+                Solution::Solved(expected) => unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     &expected,
                     &actual,
@@ -332,26 +429,26 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_inference_ctx: &mut kind_inference::State,
+        kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         expected: &Type,
         meta: &usize,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ErrorInfo> {
         match walk(type_solutions, expected) {
             Type::Meta(_, expected_meta) if *meta == expected_meta => Ok(()),
             expected => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_right(
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_variables,
                     type_solutions,
                     &expected,
                     *meta,
                 ),
-                Solution::Solved(actual) => unify(
+                Solution::Solved(actual) => unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     &expected,
                     &actual,
@@ -367,15 +464,15 @@ pub fn unify(
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
             has_kind: expected.kind(),
         };
-    kind_inference::unify_with_hint(kind_inference_ctx, hint, &expected.kind(), &actual.kind())
-        .map_err(|error| Error::KindError { error })?;
+    kind_inference::unify_with_hint(kind_inference_state, hint, &expected.kind(), &actual.kind())
+        .map_err(|error| ErrorInfo::KindError { error })?;
 
     match expected {
         Type::Meta(_, meta) => unify_meta_left(
             common_kinds,
             types,
             type_variables,
-            kind_inference_ctx,
+            kind_inference_state,
             type_solutions,
             meta,
             actual,
@@ -386,13 +483,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -405,13 +502,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -424,13 +521,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -443,13 +540,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -462,13 +559,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -481,13 +578,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -500,13 +597,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -519,13 +616,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -538,13 +635,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -557,13 +654,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -576,13 +673,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -595,13 +692,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -614,13 +711,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -633,13 +730,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -652,13 +749,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -671,13 +768,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -686,20 +783,20 @@ pub fn unify(
         },
         Type::App(_, expected_a, expected_b) => match actual {
             Type::App(_, actual_a, actual_b) => {
-                unify(
+                unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     expected_a,
                     actual_a,
                 )?;
-                unify(
+                unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     expected_b,
                     actual_b,
@@ -709,13 +806,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -723,26 +820,28 @@ pub fn unify(
             )),
         },
         Type::HasField(expected_field, expected_row) => match actual {
-            Type::HasField(actual_field, actual_row) if expected_field == actual_field => unify(
-                common_kinds,
-                types,
-                type_variables,
-                kind_inference_ctx,
-                type_solutions,
-                expected_row,
-                actual_row,
-            ),
+            Type::HasField(actual_field, actual_row) if expected_field == actual_field => {
+                unify_inner(
+                    common_kinds,
+                    types,
+                    type_variables,
+                    kind_inference_state,
+                    type_solutions,
+                    expected_row,
+                    actual_row,
+                )
+            }
             Type::Meta(_, meta) => unify_meta_right(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -757,11 +856,11 @@ pub fn unify(
                     .iter()
                     .zip(actual_constraints.iter())
                     .try_for_each(|(expected_constraint, actual_constraint)| {
-                        unify(
+                        unify_inner(
                             common_kinds,
                             types,
                             type_variables,
-                            kind_inference_ctx,
+                            kind_inference_state,
                             type_solutions,
                             expected_constraint,
                             actual_constraint,
@@ -772,13 +871,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -795,11 +894,11 @@ pub fn unify(
                 metavariable or the empty row. This ending is called the 'tail'.
                 */
                 let expected =
-                    type_solutions.zonk(kind_inference_ctx.kind_solutions(), expected.clone());
+                    type_solutions.zonk(kind_inference_state.kind_solutions(), expected.clone());
                 let expected_row_parts = expected.unwrap_rows();
 
                 let actual =
-                    type_solutions.zonk(kind_inference_ctx.kind_solutions(), actual.clone());
+                    type_solutions.zonk(kind_inference_state.kind_solutions(), actual.clone());
                 let actual_row_parts = actual.unwrap_rows();
 
                 // The fields common to both known prefixes will be unified.
@@ -851,11 +950,11 @@ pub fn unify(
                     .collect();
 
                 common_fields.into_iter().try_for_each(|common_field| {
-                    unify(
+                    unify_inner(
                         common_kinds,
                         types,
                         type_variables,
-                        kind_inference_ctx,
+                        kind_inference_state,
                         type_solutions,
                         common_field.expected,
                         common_field.actual,
@@ -873,21 +972,21 @@ pub fn unify(
                 let expected_tail = expected_row_parts.rest.unwrap_or(&Type::RowNil);
                 let actual_tail = actual_row_parts.rest.unwrap_or(&Type::RowNil);
 
-                unify(
+                unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     &Type::mk_rows(remaining_expected_fields, Some(common_tail.clone())),
                     actual_tail,
                 )?;
 
-                unify(
+                unify_inner(
                     common_kinds,
                     types,
                     type_variables,
-                    kind_inference_ctx,
+                    kind_inference_state,
                     type_solutions,
                     expected_tail,
                     &Type::mk_rows(remaining_actual_fields, Some(common_tail)),
@@ -897,13 +996,13 @@ pub fn unify(
                 common_kinds,
                 types,
                 type_variables,
-                kind_inference_ctx,
+                kind_inference_state,
                 type_solutions,
                 expected,
                 meta,
             ),
-            _ => Err(Error::mismatch(
-                kind_inference_ctx.kind_solutions(),
+            _ => Err(ErrorInfo::mismatch(
+                kind_inference_state.kind_solutions(),
                 type_solutions,
                 type_variables,
                 expected.clone(),

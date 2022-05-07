@@ -1,7 +1,7 @@
-use super::{unification, Env, Error, InferredPattern, State};
+use super::{Env, Error, InferredPattern, State};
 use crate::{
-    evidence, kind_inference,
-    type_inference::{fresh_type_meta, infer, infer_pattern, unify, zonk_type},
+    evidence,
+    type_inference::{infer, infer_pattern, unification, zonk_type},
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
@@ -11,7 +11,7 @@ use std::{collections::HashMap, rc::Rc};
 
 const SOURCE_LABEL: &str = "test";
 
-fn with_type_variables_env_and_ctx<A, F: FnOnce(Env, &mut State) -> A>(
+fn with_type_variables_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(
     type_variables: BoundVars<Kind>,
     f: F,
 ) -> A {
@@ -21,8 +21,6 @@ fn with_type_variables_env_and_ctx<A, F: FnOnce(Env, &mut State) -> A>(
     };
     let modules = HashMap::new();
     let types = HashMap::new();
-    let mut kind_inference_ctx = kind_inference::State::new();
-    let mut type_solutions = unification::Solutions::new();
     let type_signatures = HashMap::new();
     let mut variables = BoundVars::new();
     let mut evidence = evidence::Evidence::new();
@@ -34,28 +32,20 @@ fn with_type_variables_env_and_ctx<A, F: FnOnce(Env, &mut State) -> A>(
         type_signatures: &type_signatures,
         source: &source,
     };
-    let mut ctx = State {
-        kind_inference_ctx: &mut kind_inference_ctx,
-        type_solutions: &mut type_solutions,
-        variables: &mut variables,
-        evidence: &mut evidence,
-    };
-    f(env, &mut ctx)
+    let mut state = State::new(&mut variables, &mut evidence);
+    f(env, &mut state)
 }
 
-fn with_empty_env_and_ctx<A, F: FnOnce(Env, &mut State) -> A>(f: F) -> A {
-    with_type_variables_env_and_ctx(BoundVars::new(), f)
+fn with_empty_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(f: F) -> A {
+    with_type_variables_env_and_state(BoundVars::new(), f)
 }
 
 #[test]
 fn occurs_1() {
-    with_empty_env_and_ctx(|env, ctx| {
-        let v1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-        let v2 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-        let expected = Err(Error::occurs(
-            &Source::Interactive {
-                label: String::from(SOURCE_LABEL),
-            },
+    with_empty_env_and_state(|env, state| {
+        let v1 = state.fresh_type_meta(Kind::Type);
+        let v2 = state.fresh_type_meta(Kind::Type);
+        let expected = Err(unification::Error::occurs(
             0,
             syntax::Type::mk_arrow(
                 v1.to_syntax()
@@ -63,15 +53,23 @@ fn occurs_1() {
                 v2.to_syntax()
                     .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
             ),
-        ));
-        let actual = unify(
-            env.common_kinds,
-            env.types,
-            env.type_variables,
-            ctx.kind_inference_ctx,
-            ctx.type_solutions,
-            env.source,
-            None,
+        )
+        .with_hint(unification::ErrorHint::WhileUnifying {
+            expected: v1
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            actual: Type::mk_arrow(env.common_kinds, &v1, &v2)
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+        }));
+        let actual = unification::unify(
+            unification::Env {
+                common_kinds: env.common_kinds,
+                types: env.types,
+                type_variables: env.type_variables,
+            },
+            &mut state.kind_inference_state,
+            &mut state.type_solutions,
             &v1,
             &Type::mk_arrow(env.common_kinds, &v1, &v2),
         );
@@ -81,7 +79,7 @@ fn occurs_1() {
 
 #[test]
 fn infer_pattern_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         let pattern = syntax::Spanned {
             pos: 0,
             item: syntax::Pattern::Name(Spanned {
@@ -90,7 +88,7 @@ fn infer_pattern_1() {
             }),
         };
         assert_eq!(
-            infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, &pattern),
+            infer_pattern(env, state, &pattern),
             InferredPattern::Any {
                 pattern: Pattern::Name,
                 names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
@@ -102,7 +100,7 @@ fn infer_pattern_1() {
 
 #[test]
 fn infer_pattern_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         let pat = syntax::Spanned {
             pos: 0,
             item: syntax::Pattern::Record {
@@ -147,14 +145,14 @@ fn infer_pattern_2() {
                 (Rc::from("z"), Type::Meta(Kind::Type, 2)),
             ],
         };
-        let actual = infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
+        let actual = infer_pattern(env, state, &pat);
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_pattern_3() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         let pat = syntax::Spanned {
             pos: 0,
             item: syntax::Pattern::Record {
@@ -206,14 +204,14 @@ fn infer_pattern_3() {
                 ),
             ],
         };
-        let actual = infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
+        let actual = infer_pattern(env, state, &pat);
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_pattern_4() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         let pat = syntax::Spanned {
             pos: 0,
             item: syntax::Pattern::Variant {
@@ -231,14 +229,14 @@ fn infer_pattern_4() {
             arg_ty: Type::Meta(Kind::Type, 0),
             rest: Type::Meta(Kind::Row, 1),
         };
-        let actual = infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, &pat);
+        let actual = infer_pattern(env, state, &pat);
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_lam_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // \x -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -264,10 +262,10 @@ fn infer_lam_1() {
                 Type::Meta(Kind::Type, 0),
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -276,7 +274,7 @@ fn infer_lam_1() {
 
 #[test]
 fn infer_lam_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // \{x, y} -> x
         let term = syntax::Spanned {
             pos: 0,
@@ -303,10 +301,10 @@ fn infer_lam_2() {
                 },
             ),
         };
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         let expected = Ok((
@@ -342,7 +340,7 @@ fn infer_lam_2() {
 
 #[test]
 fn infer_lam_3() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // \{x, y} -> y
         let term = syntax::Spanned {
             pos: 0,
@@ -369,10 +367,10 @@ fn infer_lam_3() {
                 },
             ),
         };
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         let expected = Ok((
@@ -408,7 +406,7 @@ fn infer_lam_3() {
 
 #[test]
 fn infer_lam_4() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // \{x, y, ...z} -> z
         let term = syntax::Spanned {
             pos: 0,
@@ -465,10 +463,10 @@ fn infer_lam_4() {
                 Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -477,7 +475,7 @@ fn infer_lam_4() {
 
 #[test]
 fn infer_lam_5() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // \f x -> f x
         let term = syntax::Spanned {
             pos: 0,
@@ -530,10 +528,10 @@ fn infer_lam_5() {
                 ),
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -542,7 +540,7 @@ fn infer_lam_5() {
 
 #[test]
 fn infer_array_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // [1, 2, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -565,10 +563,10 @@ fn infer_array_1() {
             Expr::Array(vec![Expr::Int(1), Expr::Int(2), Expr::Int(3)]),
             Type::app(Type::mk_array(env.common_kinds), Type::Int),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -577,7 +575,7 @@ fn infer_array_1() {
 
 #[test]
 fn infer_array_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // [1, true, 3]
         let term = syntax::Spanned {
             pos: 0,
@@ -597,13 +595,17 @@ fn infer_array_2() {
             ]),
         };
         assert_eq!(
-            infer(env, ctx, &term),
-            Err(Error::mismatch(
+            infer(env, state, &term),
+            Err(Error::unification_error(
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL)
                 },
-                syntax::Type::Int,
-                syntax::Type::Bool
+                unification::Error::mismatch(syntax::Type::Int, syntax::Type::Bool,).with_hint(
+                    unification::ErrorHint::WhileUnifying {
+                        expected: syntax::Type::Int,
+                        actual: syntax::Type::Bool,
+                    }
+                )
             )
             .with_position(4))
         )
@@ -617,7 +619,7 @@ fn unify_1() {
         type_variables.insert(&[(Rc::from("r"), Kind::Row)]);
         type_variables
     };
-    with_type_variables_env_and_ctx(type_variables, |env, ctx| {
+    with_type_variables_env_and_state(type_variables, |env, state| {
         let real = Type::arrow(
             env.common_kinds,
             Type::app(
@@ -626,38 +628,38 @@ fn unify_1() {
             ),
             Type::Int,
         );
-        let m_0 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-        let m_1 = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+        let m_0 = state.fresh_type_meta(Kind::Type);
+        let m_1 = state.fresh_type_meta(Kind::Type);
         let holey = Type::arrow(env.common_kinds, m_1, m_0);
         let expected = Ok(real.clone());
-        let actual = unify(
-            env.common_kinds,
-            env.types,
-            env.type_variables,
-            ctx.kind_inference_ctx,
-            ctx.type_solutions,
-            env.source,
-            None,
+        let actual = unification::unify(
+            unification::Env {
+                common_kinds: env.common_kinds,
+                types: env.types,
+                type_variables: env.type_variables,
+            },
+            &mut state.kind_inference_state,
+            &mut state.type_solutions,
             &real,
             &holey,
         )
-        .map(|_| zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, holey));
+        .map(|_| zonk_type(&state.kind_inference_state, &state.type_solutions, holey));
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn unify_rows_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         assert_eq!(
-            unify(
-                env.common_kinds,
-                env.types,
-                env.type_variables,
-                ctx.kind_inference_ctx,
-                ctx.type_solutions,
-                env.source,
-                None,
+            unification::unify(
+                unification::Env {
+                    common_kinds: env.common_kinds,
+                    types: env.types,
+                    type_variables: env.type_variables,
+                },
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
@@ -676,16 +678,16 @@ fn unify_rows_1() {
 
 #[test]
 fn unify_rows_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         assert_eq!(
-            unify(
-                env.common_kinds,
-                env.types,
-                env.type_variables,
-                ctx.kind_inference_ctx,
-                ctx.type_solutions,
-                env.source,
-                None,
+            unification::unify(
+                unification::Env {
+                    common_kinds: env.common_kinds,
+                    types: env.types,
+                    type_variables: env.type_variables,
+                },
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![
@@ -712,16 +714,16 @@ fn unify_rows_2() {
 
 #[test]
 fn unify_rows_3() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         assert_eq!(
-            unify(
-                env.common_kinds,
-                env.types,
-                env.type_variables,
-                ctx.kind_inference_ctx,
-                ctx.type_solutions,
-                env.source,
-                None,
+            unification::unify(
+                unification::Env {
+                    common_kinds: env.common_kinds,
+                    types: env.types,
+                    type_variables: env.type_variables,
+                },
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![
@@ -748,7 +750,7 @@ fn unify_rows_3() {
 
 #[test]
 fn unify_rows_4() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         let ty1 = Type::mk_record(
             env.common_kinds,
             vec![
@@ -767,25 +769,28 @@ fn unify_rows_4() {
             ],
             None,
         );
-        let expected = Err(Error::mismatch(
-            &Source::Interactive {
-                label: String::from(SOURCE_LABEL),
+        let expected = Err(
+            unification::Error::mismatch(syntax::Type::Bool, syntax::Type::Int).with_hint(
+                unification::ErrorHint::WhileUnifying {
+                    expected: state
+                        .zonk_type(ty1.clone())
+                        .to_syntax()
+                        .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+                    actual: state
+                        .zonk_type(ty2.clone())
+                        .to_syntax()
+                        .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+                },
+            ),
+        );
+        let actual = unification::unify(
+            unification::Env {
+                common_kinds: env.common_kinds,
+                types: env.types,
+                type_variables: env.type_variables,
             },
-            zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty1.clone())
-                .to_syntax()
-                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
-            zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty2.clone())
-                .to_syntax()
-                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
-        ));
-        let actual = unify(
-            env.common_kinds,
-            env.types,
-            env.type_variables,
-            ctx.kind_inference_ctx,
-            ctx.type_solutions,
-            env.source,
-            None,
+            &mut state.kind_inference_state,
+            &mut state.type_solutions,
             &ty1,
             &ty2,
         );
@@ -795,13 +800,13 @@ fn unify_rows_4() {
 
 #[test]
 fn infer_record_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // {}
         let term = syntax::Expr::mk_record(Vec::new(), None);
         assert_eq!(
-            infer(env, ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
+            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty)
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty)
             )),
             Ok((
                 Expr::mk_record(Vec::new(), None),
@@ -813,7 +818,7 @@ fn infer_record_1() {
 
 #[test]
 fn infer_record_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // { x = 1, y = true }
         let term = syntax::Expr::mk_record(
             vec![
@@ -835,9 +840,9 @@ fn infer_record_2() {
             None,
         );
         assert_eq!(
-            infer(env, ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
+            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty)
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty)
             )),
             Ok((
                 Expr::mk_record(
@@ -859,7 +864,7 @@ fn infer_record_2() {
 
 #[test]
 fn infer_record_3() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // { x = 1, y = true, ...{ z = 'c' } }
         let term = syntax::Expr::mk_record(
             vec![
@@ -913,19 +918,20 @@ fn infer_record_3() {
                 None,
             ),
         ));
-        let actual = infer(env, ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
-            )
-        });
+        let actual =
+            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
+                (
+                    expr,
+                    zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
+                )
+            });
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_record_4() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         // { x = 1, y = true, ..1 }
         let term = syntax::Expr::mk_record(
             vec![
@@ -949,27 +955,34 @@ fn infer_record_4() {
                 item: syntax::Expr::Int(1),
             }),
         );
-        let expected = Err(Error::mismatch(
+        let expected = Err(Error::unification_error(
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
-            syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
-            syntax::Type::Int,
+            unification::Error::mismatch(
+                syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                syntax::Type::Int,
+            )
+            .with_hint(unification::ErrorHint::WhileUnifying {
+                expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                actual: syntax::Type::Int,
+            }),
         )
         .with_position(22));
-        let actual = infer(env, ctx, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
-            (
-                expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
-            )
-        });
+        let actual =
+            infer(env, state, &syntax::Spanned { pos: 0, item: term }).map(|(expr, ty)| {
+                (
+                    expr,
+                    zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
+                )
+            });
         assert_eq!(expected, actual)
     })
 }
 
 #[test]
 fn infer_case_1() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         /*
         \x -> case x of
           X a -> a
@@ -1032,10 +1045,10 @@ fn infer_case_1() {
                 &Type::Meta(Kind::Type, 2),
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -1044,7 +1057,7 @@ fn infer_case_1() {
 
 #[test]
 fn infer_case_2() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         /*
         \x -> case x of
           Left a -> a
@@ -1135,10 +1148,10 @@ fn infer_case_2() {
                 &Type::Meta(Kind::Type, 4),
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -1147,7 +1160,7 @@ fn infer_case_2() {
 
 #[test]
 fn infer_case_3() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         /*
         \x -> case x of
           Left a -> a
@@ -1253,10 +1266,10 @@ fn infer_case_3() {
                 &Type::Int,
             ),
         ));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -1265,7 +1278,7 @@ fn infer_case_3() {
 
 #[test]
 fn infer_case_4() {
-    with_empty_env_and_ctx(|env, ctx| {
+    with_empty_env_and_state(|env, state| {
         /*
         \x -> case x of
           Left a -> a
@@ -1341,10 +1354,10 @@ fn infer_case_4() {
             label: String::from(SOURCE_LABEL),
         })
         .with_position(32));
-        let actual = infer(env, ctx, &term).map(|(expr, ty)| {
+        let actual = infer(env, state, &term).map(|(expr, ty)| {
             (
                 expr,
-                zonk_type(ctx.kind_inference_ctx, ctx.type_solutions, ty),
+                zonk_type(&state.kind_inference_state, &state.type_solutions, ty),
             )
         });
         assert_eq!(expected, actual)
@@ -1359,7 +1372,7 @@ fn unify_variant_1() {
         type_variables
     };
 
-    with_type_variables_env_and_ctx(type_variables, |env, ctx| {
+    with_type_variables_env_and_state(type_variables, |env, state| {
         let x = Type::Var(Kind::Type, 1);
         let r = Type::Var(Kind::Row, 0);
         let b: Rc<str> = Rc::from("B");
@@ -1374,27 +1387,34 @@ fn unify_variant_1() {
         // (| B : x, A : x, r |)
         let ty2 = Type::mk_variant(
             env.common_kinds,
-            vec![(b, x.clone()), (Rc::from("A"), x)],
-            Some(r),
+            vec![(b, x.clone()), (Rc::from("A"), x.clone())],
+            Some(r.clone()),
         );
 
-        let expected = Err(Error::mismatch(
-            &Source::Interactive {
-                label: String::from(SOURCE_LABEL),
+        let expected = Err(unification::Error::mismatch(
+            r.clone()
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            (Type::mk_rows(vec![(Rc::from("A"), x)], Some(r)))
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+        )
+        .with_hint(unification::ErrorHint::WhileUnifying {
+            expected: ty1
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            actual: ty2
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+        }));
+        let actual = unification::unify(
+            unification::Env {
+                common_kinds: env.common_kinds,
+                types: env.types,
+                type_variables: env.type_variables,
             },
-            ty1.to_syntax()
-                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
-            ty2.to_syntax()
-                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
-        ));
-        let actual = unify(
-            env.common_kinds,
-            env.types,
-            env.type_variables,
-            ctx.kind_inference_ctx,
-            ctx.type_solutions,
-            env.source,
-            None,
+            &mut state.kind_inference_state,
+            &mut state.type_solutions,
             &ty1,
             &ty2,
         );

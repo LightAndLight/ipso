@@ -3,8 +3,8 @@ mod test;
 
 use super::{Constraint, Evidence};
 use crate::{
-    eq_zonked_constraint, fill_ty_names, kind_inference, metavariables,
-    type_inference::{self, unify},
+    eq_zonked_constraint, fill_ty_names, metavariables,
+    type_inference::{self},
     BoundVars, Implication, SolveConstraintContext, TypeError,
 };
 use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
@@ -38,14 +38,12 @@ Constraint olver context.
 [`solve_placeholder`] and [`solve_constraint`] take many unchanging arguments, so we bundle the
 arguments into a struct for convenience.
 */
-pub struct Context<'a> {
+pub struct Context<'a, 'b> {
     pub common_kinds: &'a CommonKinds,
     pub types: &'a HashMap<Rc<str>, Kind>,
-    pub kind_inference_ctx: &'a mut kind_inference::State,
-    pub type_solutions: &'a mut type_inference::unification::Solutions,
+    pub type_inference_state: &'a mut type_inference::State<'b>,
     pub implications: &'a [Implication],
     pub type_variables: &'a BoundVars<Kind>,
-    pub evidence: &'a mut Evidence,
     pub source: &'a Source,
 }
 
@@ -58,16 +56,13 @@ pub fn solve_constraint(
     match constraint {
         Constraint::Type(constraint) => {
             debug_assert!(
-                ctx.kind_inference_ctx
-                    .kind_solutions()
-                    .zonk(false, constraint.kind())
-                    == Kind::Constraint
+                ctx.type_inference_state.zonk_kind(false, constraint.kind()) == Kind::Constraint
             );
 
-            match ctx
-                .evidence
-                .find(ctx.type_solutions, &Constraint::from_type(constraint))
-            {
+            match ctx.type_inference_state.evidence.find(
+                &ctx.type_inference_state.type_solutions,
+                &Constraint::from_type(constraint),
+            ) {
                 None => {}
                 Some(expr) => {
                     return Ok(expr);
@@ -79,19 +74,19 @@ pub fn solve_constraint(
                 let metas: Vec<core::Type> = implication
                     .ty_vars
                     .iter()
-                    .map(|kind| core::Type::Meta(kind.clone(), ctx.type_solutions.fresh_meta()))
+                    .map(|kind| ctx.type_inference_state.fresh_type_meta(kind.clone()))
                     .collect();
 
                 let implication = implication.instantiate_many(&metas);
 
-                match unify(
-                    ctx.common_kinds,
-                    ctx.types,
-                    ctx.type_variables,
-                    ctx.kind_inference_ctx,
-                    ctx.type_solutions,
-                    ctx.source,
-                    None,
+                match type_inference::unification::unify(
+                    type_inference::unification::Env {
+                        common_kinds: ctx.common_kinds,
+                        types: ctx.types,
+                        type_variables: ctx.type_variables,
+                    },
+                    &mut ctx.type_inference_state.kind_inference_state,
+                    &mut ctx.type_inference_state.type_solutions,
                     constraint,
                     &implication.consequent,
                 ) {
@@ -104,15 +99,9 @@ pub fn solve_constraint(
                             antecedents: implication
                                 .antecedents
                                 .into_iter()
-                                .map(|x| {
-                                    ctx.type_solutions
-                                        .zonk(ctx.kind_inference_ctx.kind_solutions(), x)
-                                })
+                                .map(|x| ctx.type_inference_state.zonk_type(x))
                                 .collect(),
-                            consequent: ctx.type_solutions.zonk(
-                                ctx.kind_inference_ctx.kind_solutions(),
-                                implication.consequent,
-                            ),
+                            consequent: ctx.type_inference_state.zonk_type(implication.consequent),
                             evidence: implication.evidence,
                         };
 
@@ -159,12 +148,7 @@ pub fn solve_constraint(
             }
         }
         Constraint::HasField { field, rest } => {
-            debug_assert!(
-                ctx.kind_inference_ctx
-                    .kind_solutions()
-                    .zonk(false, rest.kind())
-                    == Kind::Row
-            );
+            debug_assert!(ctx.type_inference_state.zonk_kind(false, rest.kind()) == Kind::Row);
 
             let new_evidence: Rc<core::Expr> = match rest {
                 core::Type::RowNil => Ok(Rc::new(core::Expr::Int(0))),
@@ -201,22 +185,33 @@ pub fn solve_constraint(
                 core::Type::Name(_, n) => todo!("deduce HasField for Name({})", n),
 
                 core::Type::Var(_, _) => {
-                    let evidence_result =
-                        lookup_evidence(ctx.type_solutions, ctx.evidence, constraint);
+                    let evidence_result = lookup_evidence(
+                        &ctx.type_inference_state.type_solutions,
+                        ctx.type_inference_state.evidence,
+                        constraint,
+                    );
                     match evidence_result {
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
                             // so the user doesn't have to write them
-                            let ev = ctx.evidence.assume(0, constraint.clone());
-                            debug_assert!(ctx.evidence.lookup_evar(&ev) != None);
+                            let ev = ctx
+                                .type_inference_state
+                                .evidence
+                                .assume(0, constraint.clone());
+                            debug_assert!(
+                                ctx.type_inference_state.evidence.lookup_evar(&ev) != None
+                            );
                             Ok(Rc::new(core::Expr::EVar(ev)))
                         }
                         Some(evidence) => Ok(evidence),
                     }
                 }
                 core::Type::App(_, _, _) => {
-                    let evidence_result =
-                        lookup_evidence(ctx.type_solutions, ctx.evidence, constraint);
+                    let evidence_result = lookup_evidence(
+                        &ctx.type_inference_state.type_solutions,
+                        ctx.type_inference_state.evidence,
+                        constraint,
+                    );
                     match evidence_result {
                         None => {
                             panic!(
@@ -228,41 +223,40 @@ pub fn solve_constraint(
                     }
                 }
                 core::Type::Meta(kind, n) => {
-                    let sol = ctx.type_solutions.get(*n);
+                    let sol = ctx.type_inference_state.type_solutions.get(*n);
                     // we assume solving is done after unification, so any unsolved variables
                     // will never recieve solutions
                     match sol.clone() {
                         metavariables::Solution::Unsolved => {
-                            match ctx
-                                .kind_inference_ctx
-                                .kind_solutions()
-                                .zonk(false, kind.clone())
-                            {
+                            match ctx.type_inference_state.zonk_kind(false, kind.clone()) {
                                 // row metavariables can be safely defaulted to the empty row in the
                                 // presence of ambiguity
                                 Kind::Row => {
-                                    unify(
-                                        ctx.common_kinds,
-                                        ctx.types,
-                                        ctx.type_variables,
-                                        ctx.kind_inference_ctx,
-                                        ctx.type_solutions,
-                                        ctx.source,
-                                        None,
+                                    type_inference::unification::unify(
+                                        type_inference::unification::Env {
+                                            common_kinds: ctx.common_kinds,
+                                            types: ctx.types,
+                                            type_variables: ctx.type_variables,
+                                        },
+                                        &mut ctx.type_inference_state.kind_inference_state,
+                                        &mut ctx.type_inference_state.type_solutions,
                                         &core::Type::RowNil,
                                         rest,
-                                    )?;
+                                    )
+                                    .map_err(|error| {
+                                        type_inference::Error::unification_error(ctx.source, error)
+                                    })?;
                                     solve_constraint(ctx, pos, context, constraint)
                                 }
                                 _ => match lookup_evidence(
-                                    ctx.type_solutions,
-                                    ctx.evidence,
+                                    &ctx.type_inference_state.type_solutions,
+                                    ctx.type_inference_state.evidence,
                                     constraint,
                                 ) {
                                     None => {
                                         panic!(
                                         "impossible: cannot deduce HasField({:?}, {:?}) given {:?}",
-                                        field, rest, ctx.evidence
+                                        field, rest, ctx.type_inference_state.evidence
                                     )
                                     }
                                     Some(evidence) => Ok(evidence),
@@ -307,7 +301,7 @@ pub fn solve_placeholder(
     ctx: &mut Context,
     p: Placeholder,
 ) -> Result<(Rc<core::Expr>, Constraint), TypeError> {
-    let item = ctx.evidence.environment[p.0].clone();
+    let item = ctx.type_inference_state.evidence.environment[p.0].clone();
     match item.expr {
         None => {
             let expr = solve_constraint(
@@ -316,17 +310,14 @@ pub fn solve_placeholder(
                 &Some(SolveConstraintContext {
                     constraint: fill_ty_names(
                         ctx.type_variables,
-                        ctx.type_solutions
-                            .zonk(
-                                ctx.kind_inference_ctx.kind_solutions(),
-                                item.constraint.to_type(),
-                            )
+                        ctx.type_inference_state
+                            .zonk_type(item.constraint.to_type())
                             .to_syntax(),
                     ),
                 }),
                 &item.constraint,
             )?;
-            ctx.evidence.environment[p.0].expr = Some(expr.clone());
+            ctx.type_inference_state.evidence.environment[p.0].expr = Some(expr.clone());
             Ok((expr, item.constraint.clone()))
         }
         Some(evidence) => Ok((evidence, item.constraint.clone())),

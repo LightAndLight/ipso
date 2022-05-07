@@ -134,8 +134,8 @@ impl State {
         &self.kind_solutions
     }
 
-    pub fn kind_solutions_mut(&mut self) -> &mut unification::Solutions {
-        &mut self.kind_solutions
+    pub fn zonk(&self, close_unsolved: bool, kind: Kind) -> Kind {
+        self.kind_solutions.zonk(close_unsolved, kind)
     }
 
     /// Generate a fresh kind metavariable.

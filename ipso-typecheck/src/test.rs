@@ -160,8 +160,8 @@ fn infer_record_1() {
     let modules = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx = kind_inference::State::new();
-    let mut type_solutions = Default::default();
+    let kind_inference_state = kind_inference::State::new();
+    let type_solutions = Default::default();
     let implications = Default::default();
     let type_signatures = Default::default();
     let mut variables = Default::default();
@@ -221,6 +221,7 @@ fn infer_record_1() {
             None,
         ),
     };
+    let mut type_inference_state = type_inference::State::new(&mut variables, &mut evidence);
     let actual_result = type_inference::infer(
         type_inference::Env {
             common_kinds: &common_kinds,
@@ -230,20 +231,10 @@ fn infer_record_1() {
             type_signatures: &type_signatures,
             source: &source,
         },
-        &mut type_inference::State::new(
-            &mut kind_inference_ctx,
-            &mut type_solutions,
-            &mut variables,
-            &mut evidence,
-        ),
+        &mut type_inference_state,
         &expr,
     )
-    .map(|(expr, ty)| {
-        (
-            expr,
-            type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty),
-        )
-    });
+    .map(|(expr, ty)| (expr, type_inference_state.zonk_type(ty)));
     assert_eq!(expected_result, actual_result, "checking results");
 
     let (mut actual_expr, _actual_ty) = actual_result.unwrap();
@@ -278,11 +269,9 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_inference_ctx: &mut kind_inference_ctx,
-                type_solutions: &mut type_solutions,
+                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
-                evidence: &mut evidence,
                 source: &source,
             },
             *p0
@@ -290,7 +279,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_ctx.kind_solutions(),
+                kind_inference_state.kind_solutions(),
                 &type_solutions,
                 &constraint
             )
@@ -309,11 +298,9 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_inference_ctx: &mut kind_inference_ctx,
-                type_solutions: &mut type_solutions,
+                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
-                evidence: &mut evidence,
                 source: &source,
             },
             *p1
@@ -321,7 +308,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_ctx.kind_solutions(),
+                kind_inference_state.kind_solutions(),
                 &type_solutions,
                 &constraint
             )
@@ -340,11 +327,9 @@ fn infer_record_1() {
             &mut solver::Context {
                 common_kinds: &common_kinds,
                 types: &types,
-                kind_inference_ctx: &mut kind_inference_ctx,
-                type_solutions: &mut type_solutions,
+                type_inference_state: &mut type_inference_state,
                 implications,
                 type_variables: &type_variables,
-                evidence: &mut evidence,
                 source: &source,
             },
             *p2
@@ -352,7 +337,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_ctx.kind_solutions(),
+                kind_inference_state.kind_solutions(),
                 &type_solutions,
                 &constraint
             )

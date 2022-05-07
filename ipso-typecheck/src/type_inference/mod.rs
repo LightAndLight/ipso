@@ -27,9 +27,7 @@ pub mod unification;
 
 use crate::{
     evidence::{self, Evidence},
-    kind_inference,
-    metavariables::Meta,
-    BoundVars,
+    kind_inference, BoundVars,
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use ipso_core::{
@@ -119,20 +117,6 @@ impl Error {
         }
     }
 
-    /// Construct a [`unification::Error::Occurs`].
-    pub fn occurs(source: &Source, meta: Meta, ty: syntax::Type<Rc<str>>) -> Self {
-        Error::unification_error(source, unification::Error::Occurs { meta, ty })
-    }
-
-    /// Construct a [`unification::Error::Mismatch`].
-    pub fn mismatch(
-        source: &Source,
-        expected: syntax::Type<Rc<str>>,
-        actual: syntax::Type<Rc<str>>,
-    ) -> Self {
-        Error::unification_error(source, unification::Error::Mismatch { expected, actual })
-    }
-
     /// Lift a [`unification::Error`].
     pub fn unification_error(source: &Source, error: unification::Error) -> Self {
         Error {
@@ -199,7 +183,7 @@ impl InferredPattern {
     }
 }
 
-enum CheckedPattern {
+pub enum CheckedPattern {
     Any {
         pattern: Pattern,
         names: Vec<(Rc<str>, Type)>,
@@ -257,25 +241,39 @@ pub struct Env<'a> {
 Type inference state.
 */
 pub struct State<'a> {
-    kind_inference_ctx: &'a mut kind_inference::State,
-    type_solutions: &'a mut unification::Solutions,
-    variables: &'a mut BoundVars<Type>,
-    evidence: &'a mut Evidence,
+    pub kind_inference_state: kind_inference::State,
+    pub type_solutions: unification::Solutions,
+    pub variables: &'a mut BoundVars<Type>,
+    pub evidence: &'a mut Evidence,
 }
 
 impl<'a> State<'a> {
-    pub fn new(
-        kind_inference_ctx: &'a mut kind_inference::State,
-        type_solutions: &'a mut unification::Solutions,
-        variables: &'a mut BoundVars<Type>,
-        evidence: &'a mut Evidence,
-    ) -> Self {
+    pub fn new(variables: &'a mut BoundVars<Type>, evidence: &'a mut Evidence) -> Self {
         State {
-            kind_inference_ctx,
-            type_solutions,
+            kind_inference_state: kind_inference::State::new(),
+            type_solutions: unification::Solutions::new(),
             variables,
             evidence,
         }
+    }
+
+    pub fn zonk_type(&self, ty: Type) -> Type {
+        self.type_solutions
+            .zonk(self.kind_inference_state.kind_solutions(), ty)
+    }
+
+    pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {
+        self.kind_inference_state.zonk(close_unsolved, kind)
+    }
+
+    /// Generate a fresh kind metavariable.
+    pub fn fresh_kind_meta(kind_inference_state: &mut kind_inference::State) -> Kind {
+        kind_inference_state.fresh_meta()
+    }
+
+    /// Generate a fresh type metavariable.
+    pub fn fresh_type_meta(&mut self, kind: Kind) -> Type {
+        fresh_type_meta(&mut self.type_solutions, kind)
     }
 }
 
@@ -291,6 +289,10 @@ fn pattern_is_redundant(
         }
 }
 
+fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: Kind) -> Type {
+    Type::Meta(kind, type_solutions.fresh_meta())
+}
+
 /**
 Instantiate a type signature.
 
@@ -298,7 +300,7 @@ Replaces `type_signature`'s type variables with metavariables, and applies `expr
 to a placeholder for each constraint in `type_signature`.
 */
 pub fn instantiate(
-    kind_inference_ctx: &mut kind_inference::State,
+    kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     evidence: &mut Evidence,
     pos: usize,
@@ -309,8 +311,8 @@ pub fn instantiate(
         .ty_vars
         .iter()
         .map(|_| {
-            let kind = fresh_kind_meta(kind_inference_ctx);
-            fresh_type_meta(type_solutions, &kind)
+            let kind = kind_inference_state.fresh_meta();
+            fresh_type_meta(type_solutions, kind)
         })
         .collect();
 
@@ -345,7 +347,7 @@ fn infer_name_pattern(
     type_solutions: &mut unification::Solutions,
     name: &Spanned<Rc<str>>,
 ) -> InferredPattern {
-    let name_ty = fresh_type_meta(type_solutions, &Kind::Type);
+    let name_ty = fresh_type_meta(type_solutions, Kind::Type);
     InferredPattern::Any {
         pattern: Pattern::Name,
         names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
@@ -394,11 +396,11 @@ fn infer_record_pattern(
                 names_to_positions.insert(name_item_ref, name.pos);
                 (
                     Rc::from(name_item_ref),
-                    fresh_type_meta(type_solutions, &Kind::Type),
+                    fresh_type_meta(type_solutions, Kind::Type),
                 )
             })
             .collect();
-        let rest = rest.map(|_| fresh_type_meta(type_solutions, &Kind::Row));
+        let rest = rest.map(|_| fresh_type_meta(type_solutions, Kind::Row));
         Type::mk_rows(fields, rest)
     };
 
@@ -446,8 +448,8 @@ fn infer_variant_pattern(
     arg: &Spanned<Rc<str>>,
 ) -> InferredPattern {
     let ctor: Rc<str> = Rc::from(ctor);
-    let arg_ty = fresh_type_meta(type_solutions, &Kind::Type);
-    let rest_row = fresh_type_meta(type_solutions, &Kind::Row);
+    let arg_ty = fresh_type_meta(type_solutions, Kind::Type);
+    let rest_row = fresh_type_meta(type_solutions, Kind::Row);
     let tag = Expr::Placeholder(evidence.placeholder(
         pos,
         evidence::Constraint::HasField {
@@ -468,55 +470,60 @@ fn infer_wildcard_pattern(type_solutions: &mut unification::Solutions) -> Inferr
     InferredPattern::Any {
         pattern: Pattern::Wildcard,
         names: Vec::new(),
-        ty: fresh_type_meta(type_solutions, &Kind::Type),
+        ty: fresh_type_meta(type_solutions, Kind::Type),
     }
 }
 
 /// Infer a pattern's type.
 pub fn infer_pattern(
-    common_kinds: &CommonKinds,
-    type_solutions: &mut unification::Solutions,
-    evidence: &mut Evidence,
+    env: Env,
+    state: &mut State,
     pattern: &Spanned<syntax::Pattern>,
 ) -> InferredPattern {
     match &pattern.item {
-        syntax::Pattern::Name(name) => infer_name_pattern(type_solutions, name),
-        syntax::Pattern::Record { names, rest } => {
-            infer_record_pattern(common_kinds, type_solutions, evidence, names, rest.as_ref())
-        }
-        syntax::Pattern::Variant { name, arg } => {
-            infer_variant_pattern(type_solutions, evidence, pattern.pos, name, arg)
-        }
+        syntax::Pattern::Name(name) => infer_name_pattern(&mut state.type_solutions, name),
+        syntax::Pattern::Record { names, rest } => infer_record_pattern(
+            env.common_kinds,
+            &mut state.type_solutions,
+            state.evidence,
+            names,
+            rest.as_ref(),
+        ),
+        syntax::Pattern::Variant { name, arg } => infer_variant_pattern(
+            &mut state.type_solutions,
+            state.evidence,
+            pattern.pos,
+            name,
+            arg,
+        ),
         syntax::Pattern::Char(c) => infer_char_pattern(c),
         syntax::Pattern::Int(n) => infer_int_pattern(n),
         syntax::Pattern::String(s) => infer_string_pattern(s),
-        syntax::Pattern::Wildcard => infer_wildcard_pattern(type_solutions),
+        syntax::Pattern::Wildcard => infer_wildcard_pattern(&mut state.type_solutions),
     }
 }
 
-fn check_pattern(
-    common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
-    type_solutions: &mut unification::Solutions,
-    evidence: &mut Evidence,
-    source: &Source,
+pub fn check_pattern(
+    env: Env,
+    state: &mut State,
     pattern: &Spanned<syntax::Pattern>,
     expected: &Type,
 ) -> Result<CheckedPattern, Error> {
-    let result = infer_pattern(common_kinds, type_solutions, evidence, pattern);
-    unify(
-        common_kinds,
-        types,
-        type_variables,
-        kind_inference_ctx,
-        type_solutions,
-        source,
-        Some(pattern.pos),
+    let result = infer_pattern(env, state, pattern);
+
+    let actual = result.ty(env.common_kinds);
+    unification::unify(
+        unification::Env {
+            common_kinds: env.common_kinds,
+            types: env.types,
+            type_variables: env.type_variables,
+        },
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
         expected,
-        &result.ty(common_kinds),
-    )?;
+        &actual,
+    )
+    .map_err(|error| Error::unification_error(env.source, error).with_position(pattern.pos))?;
     Ok(match result {
         InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
         InferredPattern::Variant {
@@ -534,49 +541,39 @@ fn check_pattern(
     })
 }
 
-/// Generate a fresh kind metavariable.
-pub fn fresh_kind_meta(kind_inference_ctx: &mut kind_inference::State) -> Kind {
-    Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta())
-}
-
-/// Generate a fresh type metavariable.
-pub fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: &Kind) -> Type {
-    Type::Meta(kind.clone(), type_solutions.fresh_meta())
-}
-
 /// Substitute all solved type and kind metavariables in a type.
 pub fn zonk_type(
-    kind_inference_ctx: &mut kind_inference::State,
-    type_solutions: &mut unification::Solutions,
+    kind_inference_state: &kind_inference::State,
+    type_solutions: &unification::Solutions,
     ty: Type,
 ) -> Type {
-    type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty)
+    type_solutions.zonk(kind_inference_state.kind_solutions(), ty)
 }
 
 /// A mutable version of [`zonk_type`].
 pub fn zonk_type_mut(
-    kind_inference_ctx: &mut kind_inference::State,
+    kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     ty: &mut Type,
 ) {
-    type_solutions.zonk_mut(kind_inference_ctx.kind_solutions(), ty);
+    type_solutions.zonk_mut(kind_inference_state.kind_solutions(), ty);
 }
 
 /// Infer an expression's type.
 pub fn infer(
     env: Env,
-    ctx: &mut State,
+    state: &mut State,
     expr: &Spanned<syntax::Expr>,
 ) -> Result<(Expr, Type), Error> {
     match &expr.item {
-        syntax::Expr::Var(name) => match ctx.variables.lookup_name(name) {
+        syntax::Expr::Var(name) => match state.variables.lookup_name(name) {
             Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
             None => match env.type_signatures.get(name) {
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
-                        ctx.kind_inference_ctx,
-                        ctx.type_solutions,
-                        ctx.evidence,
+                        &mut state.kind_inference_state,
+                        &mut state.type_solutions,
+                        state.evidence,
                         expr.pos,
                         Expr::Name(Name::definition(name.clone())),
                         type_signature,
@@ -637,9 +634,9 @@ pub fn infer(
                 None => Err(Error::not_in_scope(env.source, &item.item).with_position(item.pos)),
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(instantiate(
-                        ctx.kind_inference_ctx,
-                        ctx.type_solutions,
-                        ctx.evidence,
+                        &mut state.kind_inference_state,
+                        &mut state.type_solutions,
+                        state.evidence,
                         expr.pos,
                         Expr::Module {
                             id: *id,
@@ -658,9 +655,9 @@ pub fn infer(
         syntax::Expr::True => Ok((Expr::True, Type::Bool)),
         syntax::Expr::False => Ok((Expr::False, Type::Bool)),
         syntax::Expr::IfThenElse(condition, then_expr, else_expr) => {
-            let condition = check(env, ctx, condition, &Type::Bool)?;
-            let (then_expr, then_ty) = infer(env, ctx, then_expr)?;
-            let else_expr = check(env, ctx, else_expr, &then_ty)?;
+            let condition = check(env, state, condition, &Type::Bool)?;
+            let (then_expr, then_ty) = infer(env, state, then_expr)?;
+            let else_expr = check(env, state, else_expr, &then_ty)?;
             Ok((
                 Expr::mk_ifthenelse(condition, then_expr, else_expr),
                 then_ty,
@@ -677,7 +674,7 @@ pub fn infer(
                     syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
                     syntax::CmdPart::Expr(expr) => check(
                         env,
-                        ctx,
+                        state,
                         expr,
                         &Type::app(
                             Type::Array(env.common_kinds.type_to_type.clone()),
@@ -695,17 +692,17 @@ pub fn infer(
                 .map(|string_part| match string_part {
                     syntax::StringPart::String(string) => Ok(StringPart::String(string.clone())),
                     syntax::StringPart::Expr(expr) => {
-                        check(env, ctx, expr, &Type::String).map(StringPart::Expr)
+                        check(env, state, expr, &Type::String).map(StringPart::Expr)
                     }
                 })
                 .collect::<Result<_, _>>()?;
             Ok((Expr::String(string_parts), Type::String))
         }
         syntax::Expr::Array(items) => {
-            let item_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+            let item_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
             let items: Vec<Expr> = items
                 .iter()
-                .map(|item| check(env, ctx, item, &item_ty))
+                .map(|item| check(env, state, item, &item_ty))
                 .collect::<Result<_, _>>()?;
             Ok((
                 Expr::Array(items),
@@ -715,61 +712,61 @@ pub fn infer(
 
         syntax::Expr::Binop(op, left, right) => match op.item {
             syntax::Binop::Add => {
-                let left = check(env, ctx, left, &Type::Int)?;
-                let right = check(env, ctx, right, &Type::Int)?;
+                let left = check(env, state, left, &Type::Int)?;
+                let right = check(env, state, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
             }
             syntax::Binop::Multiply => {
-                let left = check(env, ctx, left, &Type::Int)?;
-                let right = check(env, ctx, right, &Type::Int)?;
+                let left = check(env, state, left, &Type::Int)?;
+                let right = check(env, state, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
             }
             syntax::Binop::Subtract => {
-                let left = check(env, ctx, left, &Type::Int)?;
-                let right = check(env, ctx, right, &Type::Int)?;
+                let left = check(env, state, left, &Type::Int)?;
+                let right = check(env, state, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
             }
             syntax::Binop::Divide => {
-                let left = check(env, ctx, left, &Type::Int)?;
-                let right = check(env, ctx, right, &Type::Int)?;
+                let left = check(env, state, left, &Type::Int)?;
+                let right = check(env, state, right, &Type::Int)?;
                 Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
             }
             syntax::Binop::Append => {
-                let item_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+                let item_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
                 let array_ty = Type::app(Type::mk_array(env.common_kinds), item_ty);
-                let left = check(env, ctx, left, &array_ty)?;
-                let right = check(env, ctx, right, &array_ty)?;
+                let left = check(env, state, left, &array_ty)?;
+                let right = check(env, state, right, &array_ty)?;
                 Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
             }
             syntax::Binop::Or => {
-                let left = check(env, ctx, left, &Type::Bool)?;
-                let right = check(env, ctx, right, &Type::Bool)?;
+                let left = check(env, state, left, &Type::Bool)?;
+                let right = check(env, state, right, &Type::Bool)?;
                 Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
             }
             syntax::Binop::And => {
-                let left = check(env, ctx, left, &Type::Bool)?;
-                let right = check(env, ctx, right, &Type::Bool)?;
+                let left = check(env, state, left, &Type::Bool)?;
+                let right = check(env, state, right, &Type::Bool)?;
                 Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
             }
             syntax::Binop::LApply => {
-                let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-                let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+                let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
                 let left = check(
                     env,
-                    ctx,
+                    state,
                     left,
                     &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
                 )?;
-                let right = check(env, ctx, right, &in_ty)?;
+                let right = check(env, state, right, &in_ty)?;
                 Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
             }
             syntax::Binop::RApply => {
-                let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-                let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-                let left = check(env, ctx, left, &in_ty)?;
+                let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                let left = check(env, state, left, &in_ty)?;
                 let right = check(
                     env,
-                    ctx,
+                    state,
                     right,
                     &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
                 )?;
@@ -784,15 +781,15 @@ pub fn infer(
         },
 
         syntax::Expr::App(fun, arg) => {
-            let in_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-            let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+            let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
             let fun = check(
                 env,
-                ctx,
+                state,
                 fun,
                 &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
             )?;
-            let arg = check(env, ctx, arg, &in_ty)?;
+            let arg = check(env, state, arg, &in_ty)?;
             Ok((Expr::mk_app(fun, arg), out_ty))
         }
         syntax::Expr::Lam { args, body } => {
@@ -802,16 +799,15 @@ pub fn infer(
             let bound_variables: Vec<(Rc<str>, Type)> = args
                 .iter()
                 .flat_map(|arg| {
-                    let result =
-                        infer_pattern(env.common_kinds, ctx.type_solutions, ctx.evidence, arg);
+                    let result = infer_pattern(env, state, arg);
                     inferred_args.push((result.pattern(), result.ty(env.common_kinds)));
                     result.names().into_iter()
                 })
                 .collect();
 
-            ctx.variables.insert(&bound_variables);
-            let (body, body_ty) = infer(env, ctx, body)?;
-            ctx.variables.delete(bound_variables.len());
+            state.variables.insert(&bound_variables);
+            let (body, body_ty) = infer(env, state, body)?;
+            state.variables.delete(bound_variables.len());
 
             let (expr, ty) = inferred_args.into_iter().rev().fold(
                 (body, body_ty),
@@ -843,11 +839,11 @@ pub fn infer(
             Ok((expr, ty))
         }
         syntax::Expr::Let { name, value, rest } => {
-            let (value, value_ty) = infer(env, ctx, value)?;
+            let (value, value_ty) = infer(env, state, value)?;
 
-            ctx.variables.insert(&[(name.clone(), value_ty)]);
-            let (rest, rest_ty) = infer(env, ctx, rest)?;
-            ctx.variables.delete(1);
+            state.variables.insert(&[(name.clone(), value_ty)]);
+            let (rest, rest_ty) = infer(env, state, rest)?;
+            state.variables.delete(1);
 
             Ok((Expr::mk_let(value, rest), rest_ty))
         }
@@ -863,7 +859,7 @@ pub fn infer(
                     .iter()
                     .map(|(field_name, field_expr)| {
                         let field_pos = field_expr.pos;
-                        infer(env, ctx, field_expr).map(|(field_expr, field_ty)| {
+                        infer(env, state, field_expr).map(|(field_expr, field_ty)| {
                             let field_name_str = field_name.as_str();
                             field_to_expr.insert(field_name_str, field_expr);
                             field_to_pos.insert(field_name_str, field_pos);
@@ -873,7 +869,7 @@ pub fn infer(
                     .collect::<Result<_, _>>()?;
                 let rest = rest
                     .as_ref()
-                    .map(|_| fresh_type_meta(ctx.type_solutions, &Kind::Row));
+                    .map(|_| fresh_type_meta(&mut state.type_solutions, Kind::Row));
                 Ok(Type::mk_rows(fields, rest))
             }?;
 
@@ -882,7 +878,7 @@ pub fn infer(
 
             let mut row = &entire_row;
             while let Type::RowCons(field, ty, rest) = row {
-                let field_index = Expr::Placeholder(ctx.evidence.placeholder(
+                let field_index = Expr::Placeholder(state.evidence.placeholder(
                     field_to_pos.get(field.as_ref()).copied().unwrap_or(0),
                     evidence::Constraint::HasField {
                         field: field.clone(),
@@ -900,24 +896,29 @@ pub fn infer(
                 Some(rest) => {
                     let rest = check(
                         env,
-                        ctx,
+                        state,
                         rest,
                         &Type::mk_app(&Type::mk_record_ctor(env.common_kinds), row),
                     )?;
                     Ok((Some(rest), Some(row.clone())))
                 }
                 None => {
-                    unify(
-                        env.common_kinds,
-                        env.types,
-                        env.type_variables,
-                        ctx.kind_inference_ctx,
-                        ctx.type_solutions,
-                        env.source,
-                        None,
-                        &Type::RowNil,
-                        row,
-                    )?;
+                    let expected = Type::RowNil;
+                    let actual = row;
+
+                    unification::unify(
+                        unification::Env {
+                            common_kinds: env.common_kinds,
+                            types: env.types,
+                            type_variables: env.type_variables,
+                        },
+                        &mut state.kind_inference_state,
+                        &mut state.type_solutions,
+                        &expected,
+                        actual,
+                    )
+                    .map_err(|error| Error::unification_error(env.source, error))?;
+
                     Ok((None, None))
                 }
             }?;
@@ -929,14 +930,14 @@ pub fn infer(
         }
         syntax::Expr::Project(expr, field) => {
             let field_name: Rc<str> = Rc::from(field.item.as_str());
-            let field_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+            let field_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
 
-            let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
 
             let pos = expr.pos;
             let expr = check(
                 env,
-                ctx,
+                state,
                 expr,
                 &Type::mk_record(
                     env.common_kinds,
@@ -945,7 +946,7 @@ pub fn infer(
                 ),
             )?;
 
-            let placeholder = Expr::Placeholder(ctx.evidence.placeholder(
+            let placeholder = Expr::Placeholder(state.evidence.placeholder(
                 pos,
                 evidence::Constraint::HasField {
                     field: field_name,
@@ -959,8 +960,8 @@ pub fn infer(
             let pos = constructor.pos;
             let constructor: Rc<str> = Rc::from(constructor.item.as_str());
 
-            let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
-            let placeholder = Expr::Placeholder(ctx.evidence.placeholder(
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+            let placeholder = Expr::Placeholder(state.evidence.placeholder(
                 pos,
                 evidence::Constraint::HasField {
                     field: constructor.clone(),
@@ -968,7 +969,7 @@ pub fn infer(
                 },
             ));
 
-            let arg_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
             Ok((
                 Expr::mk_variant(placeholder),
                 Type::arrow(
@@ -983,18 +984,18 @@ pub fn infer(
             ))
         }
         syntax::Expr::Embed(constructor, expr) => {
-            let rest_row = fresh_type_meta(ctx.type_solutions, &Kind::Row);
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
             let expr = check(
                 env,
-                ctx,
+                state,
                 expr,
                 &Type::app(Type::mk_variant_ctor(env.common_kinds), rest_row.clone()),
             )?;
 
             let constructor_pos = constructor.pos;
             let constructor: Rc<str> = Rc::from(constructor.item.as_str());
-            let arg_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
-            let placeholder = Expr::Placeholder(ctx.evidence.placeholder(
+            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let placeholder = Expr::Placeholder(state.evidence.placeholder(
                 constructor_pos,
                 evidence::Constraint::HasField {
                     field: constructor.clone(),
@@ -1010,7 +1011,7 @@ pub fn infer(
                 ),
             ))
         }
-        syntax::Expr::Case(expr, branches) => infer_case(env, ctx, expr, branches),
+        syntax::Expr::Case(expr, branches) => infer_case(env, state, expr, branches),
 
         syntax::Expr::Comp(_) => {
             panic!("computation expression was not desugared")
@@ -1020,11 +1021,11 @@ pub fn infer(
 
 fn infer_case(
     env: Env,
-    ctx: &mut State,
+    state: &mut State,
     expr: &Spanned<syntax::Expr>,
     branches: &[syntax::Branch],
 ) -> Result<(Expr, Type), Error> {
-    let (expr, mut expr_ty) = infer(env, ctx, expr)?;
+    let (expr, mut expr_ty) = infer(env, state, expr)?;
 
     /*
     [note: peeling constructors when matching on variants]
@@ -1068,7 +1069,7 @@ fn infer_case(
     ```
     */
 
-    let out_ty = fresh_type_meta(ctx.type_solutions, &Kind::Type);
+    let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
     let mut seen_ctors = FnvHashSet::default();
     let mut saw_catchall = false;
     let branches: Vec<Branch> = branches
@@ -1082,26 +1083,16 @@ fn infer_case(
                 seen_ctors.insert(name.as_ref());
             }
 
-            let result = check_pattern(
-                env.common_kinds,
-                env.types,
-                env.type_variables,
-                ctx.kind_inference_ctx,
-                ctx.type_solutions,
-                ctx.evidence,
-                env.source,
-                &branch.pattern,
-                &expr_ty,
-            )?;
+            let result = check_pattern(env, state, &branch.pattern, &expr_ty)?;
 
             if let CheckedPattern::Variant { rest, .. } = &result {
                 expr_ty = Type::app(Type::mk_variant_ctor(env.common_kinds), rest.clone())
             }
 
             let names = result.names();
-            ctx.variables.insert(&names);
-            let body = check(env, ctx, &branch.body, &out_ty)?;
-            ctx.variables.delete(names.len());
+            state.variables.insert(&names);
+            let body = check(env, state, &branch.body, &out_ty)?;
+            state.variables.delete(names.len());
 
             let pattern = result.pattern();
             if let Pattern::Wildcard | Pattern::Name = pattern {
@@ -1111,21 +1102,31 @@ fn infer_case(
             Ok(Branch { pattern, body })
         })
         .collect::<Result<_, _>>()?;
-    zonk_type_mut(ctx.kind_inference_ctx, ctx.type_solutions, &mut expr_ty);
+    zonk_type_mut(
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        &mut expr_ty,
+    );
     match expr_ty.unwrap_variant() {
         Some(RowParts {
             rest: Some(rest), ..
-        }) if !saw_catchall => unify(
-            env.common_kinds,
-            env.types,
-            env.type_variables,
-            ctx.kind_inference_ctx,
-            ctx.type_solutions,
-            env.source,
-            None,
-            &Type::RowNil,
-            rest,
-        ),
+        }) if !saw_catchall => {
+            let expected = Type::RowNil;
+            let actual = rest;
+
+            unification::unify(
+                unification::Env {
+                    common_kinds: env.common_kinds,
+                    types: env.types,
+                    type_variables: env.type_variables,
+                },
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                &expected,
+                actual,
+            )
+            .map_err(|error| Error::unification_error(env.source, error))
+        }
         _ => Ok(()),
     }?;
     Ok((Expr::mk_case(expr, branches), out_ty))
@@ -1134,74 +1135,26 @@ fn infer_case(
 /// Check an expression's type.
 pub fn check(
     env: Env,
-    ctx: &mut State,
+    state: &mut State,
     expr: &Spanned<syntax::Expr>,
     expected: &Type,
 ) -> Result<Expr, Error> {
     let position = expr.pos;
-    let (expr, expr_ty) = infer(env, ctx, expr)?;
-    unify(
-        env.common_kinds,
-        env.types,
-        env.type_variables,
-        ctx.kind_inference_ctx,
-        ctx.type_solutions,
-        env.source,
-        Some(position),
-        expected,
-        &expr_ty,
-    )?;
-    Ok(expr)
-}
+    let (expr, expr_ty) = infer(env, state, expr)?;
 
-/// Unify two types.
-pub fn unify(
-    common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
-    type_solutions: &mut unification::Solutions,
-    source: &Source,
-    position: Option<usize>,
-    expected: &Type,
-    actual: &Type,
-) -> Result<(), Error> {
+    let actual = expr_ty;
     unification::unify(
-        common_kinds,
-        types,
-        type_variables,
-        kind_inference_ctx,
-        type_solutions,
+        unification::Env {
+            common_kinds: env.common_kinds,
+            types: env.types,
+            type_variables: env.type_variables,
+        },
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
         expected,
-        actual,
+        &actual,
     )
-    .map_err(|error| {
-        let error = Error::unification_error(
-            source,
-            /*
-            At the level of an `InferenceError`, a type mismatch should
-            describe full types involved, rather than the specific components
-            that don't match.
+    .map_err(|error| Error::unification_error(env.source, error).with_position(position))?;
 
-            e.g. when `a -> b` and `a -> c` mismatch (because `b` != `c`),
-            `InferenceError` should report that `a -> b` != `a -> c`, instead
-            of saying `b` != `c`.
-            */
-            match error {
-                unification::Error::Mismatch { .. } => unification::Error::Mismatch {
-                    expected: zonk_type(kind_inference_ctx, type_solutions, expected.clone())
-                        .to_syntax()
-                        .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
-                    actual: zonk_type(kind_inference_ctx, type_solutions, actual.clone())
-                        .to_syntax()
-                        .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
-                },
-                _ => error,
-            },
-        );
-        match position {
-            Some(position) => error.with_position(position),
-            None => error,
-        }
-    })
+    Ok(expr)
 }

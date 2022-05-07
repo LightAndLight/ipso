@@ -229,19 +229,31 @@ impl TypeError {
     pub fn message(&self) -> String {
         match self {
             TypeError::TypeError { error, .. } => match &error.info {
-                type_inference::ErrorInfo::UnificationError { error } => match error {
-                    type_inference::unification::Error::Mismatch { expected, actual } => format!(
-                        "expected type \"{}\", got type \"{}\"",
-                        expected.render(),
-                        actual.render()
-                    ),
-                    type_inference::unification::Error::Occurs { meta, ty } => format!(
+                type_inference::ErrorInfo::UnificationError { error } => match &error.info {
+                    type_inference::unification::ErrorInfo::Mismatch { expected, actual } => {
+                        let (expected, actual) = match &error.hint {
+                            Some(hint) => match hint {
+                                type_inference::unification::ErrorHint::WhileUnifying {
+                                    expected,
+                                    actual,
+                                } => (expected, actual),
+                            },
+                            None => (expected, actual),
+                        };
+
+                        format!(
+                            "expected type \"{}\", got type \"{}\"",
+                            expected.render(),
+                            actual.render()
+                        )
+                    }
+                    type_inference::unification::ErrorInfo::Occurs { meta, ty } => format!(
                         "infinite type from equating ?{} with \"{}\"",
                         meta,
                         ty.render()
                     ),
 
-                    type_inference::unification::Error::KindError { error } => {
+                    type_inference::unification::ErrorInfo::KindError { error } => {
                         render_kind_inference_error(error)
                     }
                 },
@@ -605,11 +617,10 @@ pub fn register_from_import(
 
 fn check_definition(
     common_kinds: &CommonKinds,
-    type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
     types: &mut HashMap<Rc<str>, Kind>,
-    context: &mut HashMap<String, core::Signature>,
+    type_signatures: &mut HashMap<String, core::Signature>,
     bound_vars: &mut BoundVars<core::Type>,
     type_variables: &mut BoundVars<Kind>,
     module_context: &HashMap<ModuleId, HashMap<String, core::Signature>>,
@@ -619,7 +630,7 @@ fn check_definition(
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<core::Declaration, TypeError> {
-    let mut kind_inference_ctx = kind_inference::State::new();
+    let mut kind_inference_state = kind_inference::State::new();
 
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = HashSet::new();
@@ -627,10 +638,7 @@ fn check_definition(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((
-                        name.clone(),
-                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
-                    ))
+                    Some((name.clone(), kind_inference_state.fresh_meta()))
                 } else {
                     None
                 }
@@ -644,7 +652,7 @@ fn check_definition(
         common_kinds,
         types,
         type_variables,
-        &mut kind_inference_ctx,
+        &mut kind_inference_state,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
         None,
@@ -652,7 +660,7 @@ fn check_definition(
         &Kind::Type,
     )?;
 
-    let _ = context.insert(
+    let _ = type_signatures.insert(
         name.to_string(),
         core::Signature::TypeSig(core::TypeSig::new(ty_var_kinds.clone(), ty.clone())),
     );
@@ -669,50 +677,66 @@ fn check_definition(
         );
     }
 
+    let mut type_inference_state = type_inference::State {
+        kind_inference_state,
+        type_solutions: Default::default(),
+        variables: bound_vars,
+        evidence,
+    };
+
     let arg_tys: Vec<type_inference::InferredPattern> = args
         .iter()
-        .map(|arg| infer_pattern(common_kinds, type_solutions, evidence, arg))
+        .map(|arg| {
+            infer_pattern(
+                type_inference::Env {
+                    common_kinds,
+                    modules: module_context,
+                    types,
+                    type_variables,
+                    type_signatures,
+                    source,
+                },
+                &mut type_inference_state,
+                arg,
+            )
+        })
         .collect();
-    let out_ty = core::Type::Meta(Kind::Type, type_solutions.fresh_meta());
+    let out_ty = type_inference_state.fresh_type_meta(Kind::Type);
 
-    type_inference::unify(
-        common_kinds,
-        types,
-        type_variables,
-        &mut kind_inference_ctx,
-        type_solutions,
-        source,
-        None,
+    type_inference::unification::unify(
+        type_inference::unification::Env {
+            common_kinds,
+            types,
+            type_variables,
+        },
+        &mut type_inference_state.kind_inference_state,
+        &mut type_inference_state.type_solutions,
         ty,
         &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
             core::Type::mk_arrow(common_kinds, &el.ty(common_kinds), &acc)
         }),
-    )?;
+    )
+    .map_err(|error| type_inference::Error::unification_error(source, error))?;
 
     let arg_bound_vars = arg_tys
         .iter()
         .flat_map(|arg_ty| arg_ty.names().into_iter())
         .collect::<Vec<_>>();
-    bound_vars.insert(&arg_bound_vars);
+    type_inference_state.variables.insert(&arg_bound_vars);
     let body = type_inference::check(
         type_inference::Env {
             common_kinds,
             modules: module_context,
             types,
             type_variables,
-            type_signatures: context,
+            type_signatures,
             source,
         },
-        &mut type_inference::State::new(
-            &mut kind_inference_ctx,
-            type_solutions,
-            bound_vars,
-            evidence,
-        ),
+        &mut type_inference_state,
         body,
         &out_ty,
     )?;
-    bound_vars.delete(arg_bound_vars.len());
+    type_inference_state.variables.delete(arg_bound_vars.len());
 
     let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
         let pattern = arg_ty.pattern();
@@ -733,11 +757,9 @@ fn check_definition(
     let (body, sig) = generalise(
         common_kinds,
         types,
-        &mut kind_inference_ctx,
-        type_solutions,
+        &mut type_inference_state,
         implications,
         type_variables,
-        evidence,
         source,
         body,
         ty.clone(),
@@ -746,7 +768,7 @@ fn check_definition(
 
     type_variables.delete(ty_var_kinds.len());
 
-    context.remove(name);
+    type_signatures.remove(name);
 
     Ok(core::Declaration::Definition {
         name: name.to_string(),
@@ -757,7 +779,7 @@ fn check_definition(
 
 fn check_class_member(
     common_kinds: &CommonKinds,
-    kind_inference_ctx: &mut kind_inference::State,
+    kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut type_inference::unification::Solutions,
     type_context: &mut HashMap<Rc<str>, Kind>,
     bound_tyvars: &mut BoundVars<Kind>,
@@ -775,10 +797,7 @@ fn check_class_member(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((
-                        name.clone(),
-                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
-                    ))
+                    Some((name.clone(), kind_inference_state.fresh_meta()))
                 } else {
                     None
                 }
@@ -791,7 +810,7 @@ fn check_class_member(
         common_kinds,
         type_context,
         bound_tyvars,
-        kind_inference_ctx,
+        kind_inference_state,
         source,
         // TODO: make `ty` `Spanned` and use its position here.
         None,
@@ -802,11 +821,11 @@ fn check_class_member(
 
     let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
         .into_iter()
-        .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
+        .map(|(name, kind)| (name, kind_inference_state.kind_solutions().zonk(true, kind)))
         .collect();
     let sig = core::TypeSig::new(
         ty_vars,
-        type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty),
+        type_solutions.zonk(kind_inference_state.kind_solutions(), ty),
     );
     Ok(core::ClassMember {
         name: name.to_string(),
@@ -825,7 +844,7 @@ fn check_class(
     args: &[Spanned<Rc<str>>],
     members: &[(String, syntax::Type<Rc<str>>)],
 ) -> Result<core::Declaration, TypeError> {
-    let mut kind_inference_ctx = kind_inference::State::new();
+    let mut kind_inference_state = kind_inference::State::new();
 
     let args_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = HashSet::new();
@@ -833,10 +852,7 @@ fn check_class(
             .map(|arg| {
                 if !seen_names.contains(arg.item.as_ref()) {
                     seen_names.insert(arg.item.as_ref());
-                    Ok((
-                        arg.item.clone(),
-                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
-                    ))
+                    Ok((arg.item.clone(), kind_inference_state.fresh_meta()))
                 } else {
                     Err(TypeError::DuplicateClassArgument {
                         source: source.clone(),
@@ -856,7 +872,7 @@ fn check_class(
                 common_kinds,
                 types,
                 type_variables,
-                &mut kind_inference_ctx,
+                &mut kind_inference_state,
                 source,
                 Some(superclass.pos),
                 &superclass.item,
@@ -870,7 +886,7 @@ fn check_class(
         .map(|(member_name, member_type)| {
             check_class_member(
                 common_kinds,
-                &mut kind_inference_ctx,
+                &mut kind_inference_state,
                 type_solutions,
                 types,
                 type_variables,
@@ -889,7 +905,7 @@ fn check_class(
         name: name.clone(),
         args: args_kinds
             .into_iter()
-            .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
+            .map(|(name, kind)| (name, kind_inference_state.kind_solutions().zonk(true, kind)))
             .collect::<Vec<(Rc<str>, Kind)>>(),
         members,
     }))
@@ -897,7 +913,6 @@ fn check_class(
 
 fn check_instance(
     common_kinds: &CommonKinds,
-    type_solutions: &mut type_inference::unification::Solutions,
     implications: &[Implication],
     evidence: &mut Evidence,
     types: &mut HashMap<Rc<str>, Kind>,
@@ -912,7 +927,7 @@ fn check_instance(
     args: &[Spanned<syntax::Type<Rc<str>>>],
     members: &[syntax::InstanceMember],
 ) -> Result<(core::Declaration, core::Declaration), TypeError> {
-    let mut kind_inference_ctx = kind_inference::State::new();
+    let mut kind_inference_state = kind_inference::State::new();
 
     let evidence_name: Rc<str> = {
         let mut buffer = String::new();
@@ -963,10 +978,7 @@ fn check_instance(
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
-                    Some((
-                        name.clone(),
-                        Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta()),
-                    ))
+                    Some((name.clone(), kind_inference_state.fresh_meta()))
                 } else {
                     None
                 }
@@ -983,7 +995,7 @@ fn check_instance(
                 common_kinds,
                 types,
                 type_variables,
-                &mut kind_inference_ctx,
+                &mut kind_inference_state,
                 source,
                 arg.pos,
                 &arg.item,
@@ -999,7 +1011,7 @@ fn check_instance(
                 common_kinds,
                 types,
                 type_variables,
-                &mut kind_inference_ctx,
+                &mut kind_inference_state,
                 source,
                 Some(assume.pos),
                 &assume.item,
@@ -1009,6 +1021,13 @@ fn check_instance(
             Ok(constraint)
         })
         .collect::<Result<_, TypeError>>()?;
+
+    let mut type_inference_state = type_inference::State {
+        kind_inference_state,
+        type_solutions: Default::default(),
+        variables: bound_vars,
+        evidence,
+    };
 
     // locate evidence for superclasses
     let superclass_constructors: Vec<core::Expr> = {
@@ -1021,11 +1040,9 @@ fn check_instance(
                 &mut solver::Context {
                     common_kinds,
                     types,
-                    kind_inference_ctx: &mut kind_inference_ctx,
-                    type_solutions,
+                    type_inference_state: &mut type_inference_state,
                     implications,
                     type_variables,
-                    evidence,
                     source,
                 },
                 name.pos,
@@ -1038,11 +1055,9 @@ fn check_instance(
                 abstract_evidence(
                     common_kinds,
                     types,
-                    &mut kind_inference_ctx,
-                    type_solutions,
+                    &mut type_inference_state,
                     implications,
                     type_variables,
-                    evidence,
                     source,
                     evidence_expr.as_ref().clone(),
                 )
@@ -1071,7 +1086,7 @@ fn check_instance(
         common_kinds,
         types,
         type_variables,
-        &mut kind_inference_ctx,
+        &mut type_inference_state.kind_inference_state,
         source,
         Some(name.pos),
         &head,
@@ -1105,12 +1120,7 @@ fn check_instance(
                             type_signatures: context,
                             source,
                         },
-                        &mut type_inference::State::new(
-                            &mut kind_inference_ctx,
-                            type_solutions,
-                            bound_vars,
-                            evidence,
-                        ),
+                        &mut type_inference_state,
                         &Spanned {
                             pos: member.name.pos,
                             item: syntax::Expr::mk_lam(member.args.clone(), member.body.clone()),
@@ -1120,11 +1130,9 @@ fn check_instance(
                     generalise(
                         common_kinds,
                         types,
-                        &mut kind_inference_ctx,
-                        type_solutions,
+                        &mut type_inference_state,
                         implications,
                         type_variables,
-                        evidence,
                         source,
                         member_body,
                         member_type.sig.body.clone(),
@@ -1139,13 +1147,21 @@ fn check_instance(
             }
         }
     }
-    *evidence = Evidence::new();
+    *type_inference_state.evidence = Evidence::new();
 
     type_variables.delete(ty_var_kinds.len());
 
     let ty_vars = ty_var_kinds
         .into_iter()
-        .map(|(name, kind)| (name, kind_inference_ctx.kind_solutions().zonk(true, kind)))
+        .map(|(name, kind)| {
+            (
+                name,
+                type_inference_state
+                    .kind_inference_state
+                    .kind_solutions()
+                    .zonk(true, kind),
+            )
+        })
         .collect();
 
     let evidence = {
@@ -1182,9 +1198,9 @@ fn check_instance(
         ty_vars,
         assumes: assumes
             .into_iter()
-            .map(|assume| type_solutions.zonk(kind_inference_ctx.kind_solutions(), assume))
+            .map(|assume| type_inference_state.zonk_type(assume))
             .collect(),
-        head: type_solutions.zonk(kind_inference_ctx.kind_solutions(), head),
+        head: type_inference_state.zonk_type(head),
         evidence: evidence_name,
     };
 
@@ -1214,7 +1230,6 @@ fn check_declaration(
             body,
         } => check_definition(
             common_kinds,
-            type_solutions,
             implications,
             evidence,
             type_context,
@@ -1289,7 +1304,6 @@ fn check_declaration(
             members,
         } => check_instance(
             common_kinds,
-            type_solutions,
             implications,
             evidence,
             type_context,
@@ -1311,11 +1325,9 @@ fn check_declaration(
 fn abstract_evidence(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
-    type_solutions: &mut type_inference::unification::Solutions,
+    type_inference_state: &mut type_inference::State,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
-    evidence: &mut Evidence,
     source: &Source,
     mut expr: core::Expr,
 ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
@@ -1324,11 +1336,9 @@ fn abstract_evidence(
             &mut solver::Context {
                 common_kinds,
                 types,
-                kind_inference_ctx,
-                type_solutions,
+                type_inference_state,
                 implications,
                 type_variables,
-                evidence,
                 source,
             },
             *p,
@@ -1341,11 +1351,8 @@ fn abstract_evidence(
     for ev in expr.iter_evars() {
         if !seen_evars.contains(ev) {
             seen_evars.insert(*ev);
-            let constraint = evidence.lookup_evar(ev).unwrap();
-            unsolved_constraints.push((
-                *ev,
-                type_solutions.zonk(kind_inference_ctx.kind_solutions(), constraint.to_type()),
-            ));
+            let constraint = type_inference_state.evidence.lookup_evar(ev).unwrap();
+            unsolved_constraints.push((*ev, type_inference_state.zonk_type(constraint.to_type())));
         }
     }
 
@@ -1369,11 +1376,9 @@ fn abstract_evidence(
 fn generalise(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
-    type_solutions: &mut type_inference::unification::Solutions,
+    type_inference_state: &mut type_inference::State,
     implications: &[Implication],
     type_variables: &BoundVars<Kind>,
-    evidence: &mut Evidence,
     source: &Source,
     expr: core::Expr,
     ty: core::Type,
@@ -1381,16 +1386,14 @@ fn generalise(
     let (expr, unsolved_constraints) = abstract_evidence(
         common_kinds,
         types,
-        kind_inference_ctx,
-        type_solutions,
+        type_inference_state,
         implications,
         type_variables,
-        evidence,
         source,
         expr,
     )?;
 
-    let mut ty = type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty);
+    let mut ty = type_inference_state.zonk_type(ty);
     for constraint in unsolved_constraints.into_iter().rev() {
         ty = core::Type::mk_fatarrow(common_kinds, constraint, ty);
     }
@@ -1401,7 +1404,7 @@ fn generalise(
         .map(|(name, kind)| {
             (
                 name.clone(),
-                kind_inference_ctx.kind_solutions().zonk(true, kind.clone()),
+                type_inference_state.zonk_kind(true, kind.clone()),
             )
         })
         .collect();
@@ -1435,7 +1438,7 @@ fn infer_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
+    kind_inference_state: &mut kind_inference::State,
     source: &Source,
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
@@ -1446,7 +1449,7 @@ fn infer_kind(
             types,
             type_variables,
         },
-        kind_inference_ctx,
+        kind_inference_state,
         ty,
     )
     .map_err(|error| TypeError::KindError {
@@ -1460,7 +1463,7 @@ fn check_kind(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::State,
+    kind_inference_state: &mut kind_inference::State,
     source: &Source,
     pos: Option<usize>,
     ty: &syntax::Type<Rc<str>>,
@@ -1472,7 +1475,7 @@ fn check_kind(
             types,
             type_variables,
         },
-        kind_inference_ctx,
+        kind_inference_state,
         ty,
         kind,
     )
