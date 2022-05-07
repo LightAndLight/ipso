@@ -1,6 +1,5 @@
 use super::{Env, Error, InferredPattern, State};
 use crate::{
-    evidence,
     type_inference::{infer, infer_pattern, unification},
     BoundVars,
 };
@@ -22,7 +21,6 @@ fn with_type_variables_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(
     let modules = HashMap::new();
     let types = HashMap::new();
     let type_signatures = HashMap::new();
-    let mut evidence = evidence::Evidence::new();
     let env = Env {
         common_kinds: &common_kinds,
         modules: &modules,
@@ -31,7 +29,7 @@ fn with_type_variables_env_and_state<A, F: FnOnce(Env, &mut State) -> A>(
         type_signatures: &type_signatures,
         source: &source,
     };
-    let mut state = State::new(&mut evidence);
+    let mut state = State::new();
     f(env, &mut state)
 }
 

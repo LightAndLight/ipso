@@ -38,10 +38,10 @@ Constraint olver context.
 [`solve_placeholder`] and [`solve_constraint`] take many unchanging arguments, so we bundle the
 arguments into a struct for convenience.
 */
-pub struct Context<'a, 'b> {
+pub struct Context<'a> {
     pub common_kinds: &'a CommonKinds,
     pub types: &'a HashMap<Rc<str>, Kind>,
-    pub type_inference_state: &'a mut type_inference::State<'b>,
+    pub type_inference_state: &'a mut type_inference::State,
     pub implications: &'a [Implication],
     pub type_variables: &'a BoundVars<Kind>,
     pub source: &'a Source,
@@ -187,7 +187,7 @@ pub fn solve_constraint(
                 core::Type::Var(_, _) => {
                     let evidence_result = lookup_evidence(
                         &ctx.type_inference_state.type_solutions,
-                        ctx.type_inference_state.evidence,
+                        &ctx.type_inference_state.evidence,
                         constraint,
                     );
                     match evidence_result {
@@ -209,7 +209,7 @@ pub fn solve_constraint(
                 core::Type::App(_, _, _) => {
                     let evidence_result = lookup_evidence(
                         &ctx.type_inference_state.type_solutions,
-                        ctx.type_inference_state.evidence,
+                        &ctx.type_inference_state.evidence,
                         constraint,
                     );
                     match evidence_result {
@@ -250,7 +250,7 @@ pub fn solve_constraint(
                                 }
                                 _ => match lookup_evidence(
                                     &ctx.type_inference_state.type_solutions,
-                                    ctx.type_inference_state.evidence,
+                                    &ctx.type_inference_state.evidence,
                                     constraint,
                                 ) {
                                     None => {

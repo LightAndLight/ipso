@@ -220,20 +220,20 @@ pub struct Env<'a> {
 /**
 Type inference state.
 */
-pub struct State<'a> {
+pub struct State {
     pub kind_inference_state: kind_inference::State,
     pub type_solutions: unification::Solutions,
     variables: BoundVars<Type>,
-    pub evidence: &'a mut Evidence,
+    pub evidence: Evidence,
 }
 
-impl<'a> State<'a> {
-    pub fn new(evidence: &'a mut Evidence) -> Self {
+impl State {
+    pub fn new() -> Self {
         State {
             kind_inference_state: kind_inference::State::new(),
             type_solutions: unification::Solutions::new(),
             variables: BoundVars::new(),
-            evidence,
+            evidence: Evidence::new(),
         }
     }
 
@@ -307,6 +307,12 @@ impl<'a> State<'a> {
         let result = f(self);
         self.variables.delete(bindings.len());
         result
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -482,13 +488,13 @@ pub fn infer_pattern(
         syntax::Pattern::Record { names, rest } => infer_record_pattern(
             env.common_kinds,
             &mut state.type_solutions,
-            state.evidence,
+            &mut state.evidence,
             names,
             rest.as_ref(),
         ),
         syntax::Pattern::Variant { name, arg } => infer_variant_pattern(
             &mut state.type_solutions,
-            state.evidence,
+            &mut state.evidence,
             pattern.pos,
             name,
             arg,

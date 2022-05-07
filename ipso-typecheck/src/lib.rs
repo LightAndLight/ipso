@@ -9,7 +9,7 @@ pub mod type_inference;
 use diagnostic::{Location, Message};
 use evidence::{
     solver::{self, solve_placeholder},
-    Constraint, Evidence,
+    Constraint,
 };
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
@@ -417,7 +417,6 @@ pub fn check_module_with(
     common_kinds: &CommonKinds,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
-    evidence: &mut Evidence,
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &mut HashMap<Rc<str>, core::ClassDeclaration>,
@@ -433,7 +432,6 @@ pub fn check_module_with(
                 common_kinds,
                 type_solutions,
                 implications,
-                evidence,
                 type_context,
                 context,
                 class_context,
@@ -497,7 +495,6 @@ pub fn check_module(
     let mut type_variables = Default::default();
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
-    let mut evidence = Default::default();
     let mut context = Default::default();
     let mut class_context = Default::default();
     let mut module_context = Default::default();
@@ -505,7 +502,6 @@ pub fn check_module(
         common_kinds,
         &mut type_solutions,
         &mut implications,
-        &mut evidence,
         &mut types,
         &mut context,
         &mut class_context,
@@ -594,7 +590,6 @@ pub fn register_from_import(
 fn check_definition(
     common_kinds: &CommonKinds,
     implications: &[Implication],
-    evidence: &mut Evidence,
     types: &mut HashMap<Rc<str>, Kind>,
     type_signatures: &mut HashMap<String, core::Signature>,
     type_variables: &mut BoundVars<Kind>,
@@ -605,7 +600,7 @@ fn check_definition(
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<core::Declaration, TypeError> {
-    let mut type_inference_state = type_inference::State::new(evidence);
+    let mut type_inference_state = type_inference::State::new();
 
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = HashSet::new();
@@ -735,7 +730,6 @@ fn check_definition(
         body,
         ty.clone(),
     )?;
-    *evidence = Evidence::new();
 
     type_variables.delete(ty_var_kinds.len());
 
@@ -885,7 +879,6 @@ fn check_class(
 fn check_instance(
     common_kinds: &CommonKinds,
     implications: &[Implication],
-    evidence: &mut Evidence,
     types: &mut HashMap<Rc<str>, Kind>,
     context: &HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
@@ -897,7 +890,7 @@ fn check_instance(
     args: &[Spanned<syntax::Type<Rc<str>>>],
     members: &[syntax::InstanceMember],
 ) -> Result<(core::Declaration, core::Declaration), TypeError> {
-    let mut type_inference_state = type_inference::State::new(evidence);
+    let mut type_inference_state = type_inference::State::new();
 
     let evidence_name: Rc<str> = {
         let mut buffer = String::new();
@@ -1115,7 +1108,6 @@ fn check_instance(
             }
         }
     }
-    *type_inference_state.evidence = Evidence::new();
 
     type_variables.delete(ty_var_kinds.len());
 
@@ -1176,7 +1168,6 @@ fn check_declaration(
     common_kinds: &CommonKinds,
     type_solutions: &mut type_inference::unification::Solutions,
     implications: &mut Vec<Implication>,
-    evidence: &mut Evidence,
     type_context: &mut HashMap<Rc<str>, Kind>,
     context: &mut HashMap<String, core::Signature>,
     class_context: &HashMap<Rc<str>, core::ClassDeclaration>,
@@ -1195,7 +1186,6 @@ fn check_declaration(
         } => check_definition(
             common_kinds,
             implications,
-            evidence,
             type_context,
             context,
             bound_tyvars,
@@ -1268,7 +1258,6 @@ fn check_declaration(
         } => check_instance(
             common_kinds,
             implications,
-            evidence,
             type_context,
             context,
             class_context,
