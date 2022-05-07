@@ -223,7 +223,7 @@ Type inference state.
 pub struct State<'a> {
     pub kind_inference_state: kind_inference::State,
     pub type_solutions: unification::Solutions,
-    pub variables: BoundVars<Type>,
+    variables: BoundVars<Type>,
     pub evidence: &'a mut Evidence,
 }
 
@@ -296,6 +296,17 @@ impl<'a> State<'a> {
         });
 
         (expr, ty.clone())
+    }
+
+    pub fn with_bound_vars<A>(
+        &mut self,
+        bindings: &[(Rc<str>, Type)],
+        f: impl Fn(&mut Self) -> A,
+    ) -> A {
+        self.variables.insert(bindings);
+        let result = f(self);
+        self.variables.delete(bindings.len());
+        result
     }
 }
 
