@@ -259,10 +259,10 @@ pub fn check_definition(
 
     let (body, sig) = generalise(
         common_kinds,
-        types,
-        &mut type_inference_state,
         implications,
+        types,
         &type_variables,
+        &mut type_inference_state,
         source,
         body,
         ty.clone(),
@@ -552,10 +552,10 @@ pub fn check_instance(
             .and_then(|evidence_expr| {
                 abstract_evidence(
                     common_kinds,
-                    types,
-                    &mut type_inference_state,
                     implications,
+                    types,
                     &type_variables,
+                    &mut type_inference_state,
                     source,
                     evidence_expr.as_ref().clone(),
                 )
@@ -627,10 +627,10 @@ pub fn check_instance(
                     )?;
                     generalise(
                         common_kinds,
-                        types,
-                        &mut type_inference_state,
                         implications,
+                        types,
                         &type_variables,
+                        &mut type_inference_state,
                         source,
                         member_body,
                         member_type.sig.body.clone(),

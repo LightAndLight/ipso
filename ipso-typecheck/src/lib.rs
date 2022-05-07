@@ -364,10 +364,10 @@ fn render_kind_inference_error(error: &kind_inference::Error) -> String {
 
 fn abstract_evidence(
     common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_inference_state: &mut type_inference::State,
     implications: &[Implication],
+    types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
+    type_inference_state: &mut type_inference::State,
     source: &Source,
     mut expr: core::Expr,
 ) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
@@ -413,22 +413,22 @@ fn abstract_evidence(
     Ok((expr, new_unsolved_constraints))
 }
 
-fn generalise(
+pub fn generalise(
     common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_inference_state: &mut type_inference::State,
     implications: &[Implication],
+    types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
+    type_inference_state: &mut type_inference::State,
     source: &Source,
     expr: core::Expr,
     ty: core::Type,
 ) -> Result<(core::Expr, core::TypeSig), TypeError> {
     let (expr, unsolved_constraints) = abstract_evidence(
         common_kinds,
-        types,
-        type_inference_state,
         implications,
+        types,
         type_variables,
+        type_inference_state,
         source,
         expr,
     )?;
