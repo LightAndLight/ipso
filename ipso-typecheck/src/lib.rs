@@ -369,26 +369,6 @@ fn render_kind_inference_error(error: &kind_inference::Error) -> String {
     }
 }
 
-/// The results of typechecking a pattern
-#[derive(Debug, PartialEq, Eq)]
-pub struct CheckedPattern {
-    /// The elaborated pattern
-    pub pattern: core::Pattern,
-    /// The variables bound by the pattern, and their types
-    pub bindings: Vec<(Rc<str>, core::Type)>,
-}
-
-/// The results of inferring a type for a pattern
-#[derive(Debug, PartialEq, Eq)]
-pub struct InferredPattern {
-    /// The elaborated pattern
-    pub pattern: core::Pattern,
-    /// The pattern's inferred type
-    pub r#type: core::Type,
-    /// The variables bound by the pattern, and their types
-    pub bindings: Vec<(Rc<str>, core::Type)>,
-}
-
 pub fn register_declaration(
     common_kinds: &CommonKinds,
     implications: &mut Vec<Implication>,
