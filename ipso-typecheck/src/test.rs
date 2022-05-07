@@ -279,7 +279,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 &type_solutions,
                 &constraint
             )
@@ -308,7 +308,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 &type_solutions,
                 &constraint
             )
@@ -337,7 +337,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 &type_solutions,
                 &constraint
             )

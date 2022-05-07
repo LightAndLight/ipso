@@ -246,7 +246,7 @@ impl<'a> State<'a> {
     /// A mutable version of [`State::zonk_type`].
     fn zonk_type_mut(&self, ty: &mut Type) {
         self.type_solutions
-            .zonk_mut(self.kind_inference_state.kind_solutions(), ty);
+            .zonk_mut(&self.kind_inference_state.kind_solutions, ty);
     }
 
     pub fn zonk_kind(&self, close_unsolved: bool, kind: Kind) -> Kind {

@@ -10,11 +10,6 @@ Kind checking and inference.
 
 * [`check_with_hint`]
 * [`infer_with_hint`]
-
-## Unification
-
-* [`unification`]
-* [`unify_with_hint`]
 */
 
 #[cfg(test)]
@@ -120,7 +115,7 @@ pub struct Env<'a> {
 
 /// Kind inference state.
 pub struct State {
-    kind_solutions: unification::Solutions,
+    pub kind_solutions: unification::Solutions,
 }
 
 impl State {
@@ -128,10 +123,6 @@ impl State {
         State {
             kind_solutions: unification::Solutions::new(),
         }
-    }
-
-    pub fn kind_solutions(&self) -> &unification::Solutions {
-        &self.kind_solutions
     }
 
     pub fn zonk(&self, close_unsolved: bool, kind: Kind) -> Kind {
@@ -148,17 +139,6 @@ impl Default for State {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Unify two kinds, providing an error hint.
-pub fn unify_with_hint(
-    state: &mut State,
-    hint: &dyn Fn() -> ErrorHint,
-    expected: &Kind,
-    actual: &Kind,
-) -> Result<(), Error> {
-    unification::unify(&mut state.kind_solutions, expected, actual)
-        .map_err(|err| Error::from(err).with_hint(hint()))
 }
 
 /// Infer a type's kind, providing an error hint.
@@ -266,7 +246,8 @@ pub fn check_with_hint(
     expected_kind: &Kind,
 ) -> Result<core::Type, Error> {
     let (ty, actual_kind) = infer_with_hint(env, state, hint, ty)?;
-    unify_with_hint(state, hint, expected_kind, &actual_kind)?;
+    unification::unify(&mut state.kind_solutions, expected_kind, &actual_kind)
+        .map_err(|err| Error::from(err).with_hint(hint()))?;
     Ok(ty)
 }
 

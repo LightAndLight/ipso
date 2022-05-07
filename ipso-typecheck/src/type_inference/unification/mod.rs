@@ -1,3 +1,5 @@
+//! Type unification.
+
 use crate::{
     kind_inference,
     metavariables::{self, Meta, Solution},
@@ -157,6 +159,7 @@ impl Solutions {
     }
 }
 
+/// Type unification error hints.
 #[derive(PartialEq, Eq, Debug)]
 pub enum ErrorHint {
     WhileUnifying {
@@ -165,6 +168,7 @@ pub enum ErrorHint {
     },
 }
 
+/// Type unification errors.
 #[derive(PartialEq, Eq, Debug)]
 pub struct Error {
     pub info: ErrorInfo,
@@ -298,12 +302,12 @@ pub fn unify(
         Error::from(error).with_hint({
             ErrorHint::WhileUnifying {
                 expected: type_solutions
-                    .zonk(kind_inference_state.kind_solutions(), expected.clone())
+                    .zonk(&kind_inference_state.kind_solutions, expected.clone())
                     .to_syntax()
                     .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
 
                 actual: type_solutions
-                    .zonk(kind_inference_state.kind_solutions(), actual.clone())
+                    .zonk(&kind_inference_state.kind_solutions, actual.clone())
                     .to_syntax()
                     .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
             }
@@ -348,7 +352,7 @@ fn unify_inner(
             Err(ErrorInfo::occurs(
                 type_variables,
                 meta,
-                &type_solutions.zonk(kind_inference_state.kind_solutions(), actual.clone()),
+                &type_solutions.zonk(&kind_inference_state.kind_solutions, actual.clone()),
             ))
         } else {
             type_solutions.set(meta, actual);
@@ -375,7 +379,7 @@ fn unify_inner(
             Err(ErrorInfo::occurs(
                 type_variables,
                 meta,
-                &type_solutions.zonk(kind_inference_state.kind_solutions(), expected.clone()),
+                &type_solutions.zonk(&kind_inference_state.kind_solutions, expected.clone()),
             ))
         } else {
             type_solutions.set(meta, expected);
@@ -457,15 +461,26 @@ fn unify_inner(
         }
     }
 
-    let hint: &dyn Fn() -> kind_inference::ErrorHint =
-        &|| kind_inference::ErrorHint::WhileChecking {
-            ty: actual
-                .to_syntax()
-                .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
-            has_kind: expected.kind(),
-        };
+    kind_inference::unification::unify(
+        &mut kind_inference_state.kind_solutions,
+        &expected.kind(),
+        &actual.kind(),
+    )
+    .map_err(|error| ErrorInfo::KindError {
+        error: kind_inference::Error::from(error).with_hint(
+            kind_inference::ErrorHint::WhileChecking {
+                ty: actual
+                    .to_syntax()
+                    .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
+                has_kind: expected.kind(),
+            },
+        ),
+    })?;
+    /*
+
     kind_inference::unify_with_hint(kind_inference_state, hint, &expected.kind(), &actual.kind())
         .map_err(|error| ErrorInfo::KindError { error })?;
+        */
 
     match expected {
         Type::Meta(_, meta) => unify_meta_left(
@@ -489,7 +504,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -508,7 +523,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -527,7 +542,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -546,7 +561,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -565,7 +580,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -584,7 +599,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -603,7 +618,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -622,7 +637,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -641,7 +656,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -660,7 +675,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -679,7 +694,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -698,7 +713,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -717,7 +732,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -736,7 +751,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -755,7 +770,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -774,7 +789,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -812,7 +827,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -841,7 +856,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -877,7 +892,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),
@@ -894,11 +909,11 @@ fn unify_inner(
                 metavariable or the empty row. This ending is called the 'tail'.
                 */
                 let expected =
-                    type_solutions.zonk(kind_inference_state.kind_solutions(), expected.clone());
+                    type_solutions.zonk(&kind_inference_state.kind_solutions, expected.clone());
                 let expected_row_parts = expected.unwrap_rows();
 
                 let actual =
-                    type_solutions.zonk(kind_inference_state.kind_solutions(), actual.clone());
+                    type_solutions.zonk(&kind_inference_state.kind_solutions, actual.clone());
                 let actual_row_parts = actual.unwrap_rows();
 
                 // The fields common to both known prefixes will be unified.
@@ -1002,7 +1017,7 @@ fn unify_inner(
                 meta,
             ),
             _ => Err(ErrorInfo::mismatch(
-                kind_inference_state.kind_solutions(),
+                &kind_inference_state.kind_solutions,
                 type_solutions,
                 type_variables,
                 expected.clone(),

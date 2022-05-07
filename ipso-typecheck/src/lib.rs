@@ -821,11 +821,11 @@ fn check_class_member(
 
     let ty_vars: Vec<(Rc<str>, Kind)> = ty_var_kinds
         .into_iter()
-        .map(|(name, kind)| (name, kind_inference_state.kind_solutions().zonk(true, kind)))
+        .map(|(name, kind)| (name, kind_inference_state.zonk(true, kind)))
         .collect();
     let sig = core::TypeSig::new(
         ty_vars,
-        type_solutions.zonk(kind_inference_state.kind_solutions(), ty),
+        type_solutions.zonk(&kind_inference_state.kind_solutions, ty),
     );
     Ok(core::ClassMember {
         name: name.to_string(),
@@ -905,7 +905,7 @@ fn check_class(
         name: name.clone(),
         args: args_kinds
             .into_iter()
-            .map(|(name, kind)| (name, kind_inference_state.kind_solutions().zonk(true, kind)))
+            .map(|(name, kind)| (name, kind_inference_state.zonk(true, kind)))
             .collect::<Vec<(Rc<str>, Kind)>>(),
         members,
     }))
@@ -1156,10 +1156,7 @@ fn check_instance(
         .map(|(name, kind)| {
             (
                 name,
-                type_inference_state
-                    .kind_inference_state
-                    .kind_solutions()
-                    .zonk(true, kind),
+                type_inference_state.kind_inference_state.zonk(true, kind),
             )
         })
         .collect();
