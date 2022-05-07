@@ -210,7 +210,7 @@ pub enum ErrorInfo {
 
 impl ErrorInfo {
     /**
-    Construct a [`Error::Mismatch`].
+    Construct an [`ErrorInfo::Mismatch`].
 
     Uses `type_variables` to replace de Bruijn indices with names.
     */
@@ -234,7 +234,7 @@ impl ErrorInfo {
     }
 
     /**
-    Construct a [`Error::Occurs`].
+    Construct an [`ErrorInfo::Occurs`].
 
     Uses `type_variables` to replace de Bruijn indices with names.
     */
