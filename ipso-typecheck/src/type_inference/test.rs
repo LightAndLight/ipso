@@ -21,8 +21,7 @@ fn with_type_variables_ctx<A, F: FnOnce(&mut InferenceContext) -> A>(
     };
     let modules = HashMap::new();
     let types = HashMap::new();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
+    let mut kind_inference_ctx = kind_inference::State::new();
     let mut type_solutions = unification::Solutions::new();
     let type_signatures = HashMap::new();
     let mut variables = BoundVars::new();

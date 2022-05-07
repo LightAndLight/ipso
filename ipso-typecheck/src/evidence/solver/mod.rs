@@ -41,7 +41,7 @@ arguments into a struct for convenience.
 pub struct Context<'a> {
     pub common_kinds: &'a CommonKinds,
     pub types: &'a HashMap<Rc<str>, Kind>,
-    pub kind_inference_ctx: &'a mut kind_inference::Context<'a>,
+    pub kind_inference_ctx: &'a mut kind_inference::State,
     pub type_solutions: &'a mut type_inference::unification::Solutions,
     pub implications: &'a [Implication],
     pub type_variables: &'a BoundVars<Kind>,
@@ -59,7 +59,7 @@ pub fn solve_constraint(
         Constraint::Type(constraint) => {
             debug_assert!(
                 ctx.kind_inference_ctx
-                    .kind_solutions_mut()
+                    .kind_solutions()
                     .zonk(false, constraint.kind())
                     == Kind::Constraint
             );

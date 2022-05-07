@@ -248,7 +248,7 @@ pub struct InferenceContext<'a> {
     pub modules: &'a HashMap<ModuleId, HashMap<String, Signature>>,
     pub types: &'a HashMap<Rc<str>, Kind>,
     pub type_variables: &'a BoundVars<Kind>,
-    pub kind_inference_ctx: &'a mut kind_inference::Context<'a>,
+    pub kind_inference_ctx: &'a mut kind_inference::State,
     pub type_solutions: &'a mut unification::Solutions,
     pub type_signatures: &'a HashMap<String, Signature>,
     pub variables: &'a mut BoundVars<Type>,
@@ -275,7 +275,7 @@ Replaces `type_signature`'s type variables with metavariables, and applies `expr
 to a placeholder for each constraint in `type_signature`.
 */
 pub fn instantiate(
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     evidence: &mut Evidence,
     pos: usize,
@@ -475,7 +475,7 @@ fn check_pattern(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     evidence: &mut Evidence,
     source: &Source,
@@ -512,7 +512,7 @@ fn check_pattern(
 }
 
 /// Generate a fresh kind metavariable.
-pub fn fresh_kind_meta(kind_inference_ctx: &mut kind_inference::Context) -> Kind {
+pub fn fresh_kind_meta(kind_inference_ctx: &mut kind_inference::State) -> Kind {
     Kind::Meta(kind_inference_ctx.kind_solutions_mut().fresh_meta())
 }
 
@@ -523,7 +523,7 @@ pub fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: &Kind)
 
 /// Substitute all solved type and kind metavariables in a type.
 pub fn zonk_type(
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     ty: Type,
 ) -> Type {
@@ -532,7 +532,7 @@ pub fn zonk_type(
 
 /// A mutable version of [`zonk_type`].
 pub fn zonk_type_mut(
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     ty: &mut Type,
 ) {
@@ -1122,7 +1122,7 @@ pub fn unify(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut unification::Solutions,
     source: &Source,
     position: Option<usize>,

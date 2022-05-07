@@ -218,13 +218,13 @@ pub fn unify(
     common_kinds: &CommonKinds,
     types: &HashMap<Rc<str>, Kind>,
     type_variables: &BoundVars<Kind>,
-    kind_inference_ctx: &mut kind_inference::Context,
+    kind_inference_ctx: &mut kind_inference::State,
     type_solutions: &mut Solutions,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), Error> {
     fn solve_left(
-        kind_inference_ctx: &mut kind_inference::Context,
+        kind_inference_ctx: &mut kind_inference::State,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         meta: Meta,
@@ -260,7 +260,7 @@ pub fn unify(
     }
 
     fn solve_right(
-        kind_inference_ctx: &mut kind_inference::Context,
+        kind_inference_ctx: &mut kind_inference::State,
         type_variables: &BoundVars<Kind>,
         type_solutions: &mut Solutions,
         expected: &Type,
@@ -300,7 +300,7 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_inference_ctx: &mut kind_inference::Context,
+        kind_inference_ctx: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         meta: &usize,
         actual: &Type,
@@ -332,7 +332,7 @@ pub fn unify(
         common_kinds: &CommonKinds,
         types: &HashMap<Rc<str>, Kind>,
         type_variables: &BoundVars<Kind>,
-        kind_inference_ctx: &mut kind_inference::Context,
+        kind_inference_ctx: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         expected: &Type,
         meta: &usize,
@@ -367,8 +367,7 @@ pub fn unify(
                 .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
             has_kind: expected.kind(),
         };
-    kind_inference_ctx
-        .unify(hint, &expected.kind(), &actual.kind())
+    kind_inference::unify_with_hint(kind_inference_ctx, hint, &expected.kind(), &actual.kind())
         .map_err(|error| Error::KindError { error })?;
 
     match expected {

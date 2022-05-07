@@ -160,8 +160,7 @@ fn infer_record_1() {
     let modules = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
+    let mut kind_inference_ctx = kind_inference::State::new();
     let mut type_solutions = Default::default();
     let implications = Default::default();
     let type_signatures = Default::default();
@@ -240,7 +239,7 @@ fn infer_record_1() {
     .map(|(expr, ty)| {
         (
             expr,
-            type_solutions.zonk(&kind_inference_ctx.kind_solutions(), ty),
+            type_solutions.zonk(kind_inference_ctx.kind_solutions(), ty),
         )
     });
     assert_eq!(expected_result, actual_result, "checking results");
@@ -289,7 +288,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_ctx.kind_solutions(),
+                kind_inference_ctx.kind_solutions(),
                 &type_solutions,
                 &constraint
             )
@@ -320,7 +319,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_ctx.kind_solutions(),
+                kind_inference_ctx.kind_solutions(),
                 &type_solutions,
                 &constraint
             )
@@ -351,7 +350,7 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_ctx.kind_solutions(),
+                kind_inference_ctx.kind_solutions(),
                 &type_solutions,
                 &constraint
             )
@@ -365,8 +364,6 @@ fn check_declaration(
     let common_kinds = Default::default();
     let mut types = Default::default();
     let mut type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
@@ -380,7 +377,6 @@ fn check_declaration(
     };
     crate::check_declaration(
         &common_kinds,
-        &mut kind_inference_ctx,
         &mut type_solutions,
         &mut implications,
         &mut evidence,
@@ -945,8 +941,6 @@ fn check_instance_1() {
     let common_kinds = CommonKinds::default();
     let mut types = Default::default();
     let mut type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
@@ -1019,7 +1013,6 @@ fn check_instance_1() {
     */
     let actual = crate::check_declaration(
         &common_kinds,
-        &mut kind_inference_ctx,
         &mut type_solutions,
         &mut implications,
         &mut evidence,

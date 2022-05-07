@@ -16,8 +16,7 @@ fn solve_constraint(
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
+    let mut kind_inference_ctx = kind_inference::State::new();
     let mut type_solutions = Default::default();
     let implications = Default::default();
     let mut evidence = Default::default();
@@ -84,8 +83,7 @@ fn solve_constraint_3() {
     let common_kinds = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
+    let mut kind_inference_ctx = kind_inference::State::new();
     let mut type_solutions = type_inference::unification::Solutions::default();
     let implications = Default::default();
     let mut evidence = Evidence::default();
@@ -154,8 +152,7 @@ fn solve_constraint_4() {
     let common_kinds = Default::default();
     let mut types = Default::default();
     let type_variables = Default::default();
-    let mut kind_inference_ctx =
-        kind_inference::Context::new(&common_kinds, &types, &type_variables);
+    let mut kind_inference_ctx = kind_inference::State::new();
     let mut type_solutions = Default::default();
     let mut implications = Default::default();
     let mut evidence = Default::default();
