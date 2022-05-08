@@ -1,11 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    eq_zonked_constraint,
-    evidence::{Constraint, Evidence, Item},
-    fill_ty_names, metavariables, type_inference, BoundVars,
-};
+use crate::{evidence::Constraint, fill_ty_names, metavariables, type_inference, BoundVars};
 use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind};
@@ -38,26 +34,6 @@ impl Implication {
             evidence: self.evidence.clone(),
         }
     }
-}
-
-pub fn lookup_evidence(
-    type_solutions: &type_inference::unification::Solutions,
-    evidence: &Evidence,
-    constraint: &Constraint,
-) -> Option<Rc<core::Expr>> {
-    evidence.environment.iter().find_map(
-        |Item {
-             constraint: other_constraint,
-             expr: other_evidence,
-             ..
-         }| {
-            if eq_zonked_constraint(type_solutions, constraint, other_constraint) {
-                other_evidence.as_ref().cloned()
-            } else {
-                None
-            }
-        },
-    )
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -286,11 +262,9 @@ pub fn solve_constraint(
                 core::Type::Name(_, n) => todo!("deduce HasField for Name({})", n),
 
                 core::Type::Var(_, _) => {
-                    let evidence_result = lookup_evidence(
-                        &type_inference_state.type_solutions,
-                        &type_inference_state.evidence,
-                        constraint,
-                    );
+                    let evidence_result = type_inference_state
+                        .evidence
+                        .find(&type_inference_state.type_solutions, constraint);
                     match evidence_result {
                         None => {
                             // we're allow to conjure evidence for non-extistent HasField constraints,
@@ -303,11 +277,9 @@ pub fn solve_constraint(
                     }
                 }
                 core::Type::App(_, _, _) => {
-                    let evidence_result = lookup_evidence(
-                        &type_inference_state.type_solutions,
-                        &type_inference_state.evidence,
-                        constraint,
-                    );
+                    let evidence_result = type_inference_state
+                        .evidence
+                        .find(&type_inference_state.type_solutions, constraint);
                     match evidence_result {
                         None => {
                             panic!(
@@ -344,11 +316,10 @@ pub fn solve_constraint(
                                     })?;
                                     solve_constraint(env, type_inference_state, pos, constraint)
                                 }
-                                _ => match lookup_evidence(
-                                    &type_inference_state.type_solutions,
-                                    &type_inference_state.evidence,
-                                    constraint,
-                                ) {
+                                _ => match type_inference_state
+                                    .evidence
+                                    .find(&type_inference_state.type_solutions, constraint)
+                                {
                                     None => {
                                         panic!(
                                         "impossible: cannot deduce HasField({:?}, {:?}) given {:?}",
