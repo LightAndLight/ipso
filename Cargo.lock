@@ -220,6 +220,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipso-repl"
+version = "0.1.0"
+
+[[package]]
 name = "ipso-rope"
 version = "0.1.0"
 

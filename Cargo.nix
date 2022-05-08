@@ -16,6 +16,7 @@ args@{
     "ipso-lex/default"
     "ipso-rope/default"
     "ipso-typecheck/default"
+    "ipso-repl/default"
   ],
   rustPackages,
   buildRustPackages,
@@ -58,6 +59,7 @@ in
     ipso-lex = rustPackages.unknown.ipso-lex."0.1.0";
     ipso-rope = rustPackages.unknown.ipso-rope."0.1.0";
     ipso-typecheck = rustPackages.unknown.ipso-typecheck."0.1.0";
+    ipso-repl = rustPackages.unknown.ipso-repl."0.1.0";
   };
   "registry+https://github.com/rust-lang/crates.io-index".anes."0.1.6" = overridableMkRustCrate (profileName: rec {
     name = "anes";
@@ -348,6 +350,13 @@ in
       ipso_lex = rustPackages."unknown".ipso-lex."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
     };
+  });
+  
+  "unknown".ipso-repl."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "ipso-repl";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/ipso-repl");
   });
   
   "unknown".ipso-rope."0.1.0" = overridableMkRustCrate (profileName: rec {
