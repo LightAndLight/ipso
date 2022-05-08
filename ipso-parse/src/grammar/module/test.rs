@@ -1,5 +1,5 @@
 use super::{definition, from_import, import, type_alias};
-use crate::{keep_left, map2, ParseError, Parser};
+use crate::{keep_left, map2, Error, Parser};
 use ipso_diagnostic::Source;
 use ipso_lex::{
     token::{self, Relation},
@@ -87,7 +87,7 @@ fn parse_import_as_3() {
          */
         "import yes\nas no",
         import,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
@@ -151,7 +151,7 @@ fn parse_definition_3() {
          */
         "x : Int\nx =\n1",
         definition,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },

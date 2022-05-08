@@ -23,15 +23,15 @@ pub struct Config {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    ParseError(parse::ParseError),
+    ParseError(parse::Error),
     TypeError(Box<typecheck::Error>),
     ModuleError(import::ModuleError),
     MissingEntrypoint(String),
     FileDoesNotExist(PathBuf),
 }
 
-impl From<parse::ParseError> for InterpreterError {
-    fn from(err: parse::ParseError) -> Self {
+impl From<parse::Error> for InterpreterError {
+    fn from(err: parse::Error) -> Self {
         InterpreterError::ParseError(err)
     }
 }

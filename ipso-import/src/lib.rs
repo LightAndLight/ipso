@@ -24,7 +24,7 @@ pub enum ModuleError {
         pos: usize,
     },
     IO(io::Error),
-    Parse(parse::ParseError),
+    Parse(parse::Error),
     Desugar(desugar::Error),
     Check(Box<typecheck::Error>),
 }
@@ -70,8 +70,8 @@ impl From<io::Error> for ModuleError {
     }
 }
 
-impl From<parse::ParseError> for ModuleError {
-    fn from(err: parse::ParseError) -> Self {
+impl From<parse::Error> for ModuleError {
+    fn from(err: parse::Error) -> Self {
         ModuleError::Parse(err)
     }
 }

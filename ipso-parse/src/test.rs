@@ -1,4 +1,4 @@
-use super::{ParseError, Parser};
+use super::{Error, Parser};
 use crate::{keep_left, map2};
 use ipso_diagnostic::Source;
 use ipso_lex::{token, Lexer};
@@ -30,7 +30,7 @@ fn parse_ident_2() {
     parse_test!(
         "import",
         ident,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
