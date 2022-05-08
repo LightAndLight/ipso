@@ -76,7 +76,8 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     let source = Source::Interactive {
         label: main.clone(),
     };
-    let target_path = PathBuf::from(config.filename.as_str());
+
+    let target_path = PathBuf::from(config.filename);
     if !target_path.exists() {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }

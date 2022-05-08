@@ -11,6 +11,7 @@ name = "ipso"
 path = "./src/main.rs"
 
 [dependencies]
+clap = { version = "^3.1", features = ["derive"] }
 fnv = "1.0.7"
 ipso-builtins = { path = "../ipso-builtins" }
 ipso-core = { path = "../ipso-core" }
@@ -24,6 +25,7 @@ ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
 ipso-util = { path = "../ipso-util" }
 lazy_static = "1.4.0"
+termion = "^1.5"
 typed-arena = "2.0.1"
 
 [dev-dependencies]
