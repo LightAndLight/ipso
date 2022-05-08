@@ -1,0 +1,12 @@
+[package]
+name = "ipso-repl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ipso-core = { path = "../ipso-core" }
+ipso-diagnostic = { path = "../ipso-diagnostic" }
+ipso-eval = { path = "../ipso-eval" }
+ipso-syntax = { path = "../ipso-syntax" }
+ipso-typecheck = { path = "../ipso-typecheck" }
+typed-arena = "2.0.1"
