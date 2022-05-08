@@ -170,57 +170,22 @@ impl Error {
 
     pub fn message(&self) -> String {
         match self {
-            Error::TypeError { error, .. } => match &error.info {
-                type_inference::ErrorInfo::UnificationError { error } => error.message(),
-
-                type_inference::ErrorInfo::NotInScope { .. } => {
-                    String::from("variable not in scope")
-                }
-                type_inference::ErrorInfo::DuplicateArgument { .. } => {
-                    String::from("duplicate argument")
-                }
-                type_inference::ErrorInfo::RedundantPattern => String::from("redundant pattern"),
-                type_inference::ErrorInfo::NotAValue { .. } => String::from("not a value"),
-                type_inference::ErrorInfo::NotAModule => String::from("not a module"),
-            },
+            Error::TypeError { error, .. } => error.message(),
             Error::KindError { error, .. } => error.message(),
+            Error::ConstraintError { error } => error.message(),
             Error::DuplicateClassArgument { .. } => String::from("duplicate type class argument"),
             Error::NoSuchClass { .. } => String::from("type class not in scope"),
             Error::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
-            Error::ConstraintError { error } => error.message(),
         }
     }
 
     pub fn addendum(&self) -> Option<String> {
         match self {
-            Error::TypeError { error, .. } => match &error.info {
-                type_inference::ErrorInfo::UnificationError { .. } => None,
-                type_inference::ErrorInfo::NotInScope { .. } => None,
-                type_inference::ErrorInfo::DuplicateArgument { .. } => None,
-                type_inference::ErrorInfo::RedundantPattern { .. } => None,
-                type_inference::ErrorInfo::NotAValue { .. } => None,
-                type_inference::ErrorInfo::NotAModule => None,
-            },
+            Error::TypeError { .. } => None,
             Error::ConstraintError { .. } => None,
-            Error::KindError { error, .. } => match error.info {
-                kind_inference::ErrorInfo::NotInScope { .. } => None,
-                kind_inference::ErrorInfo::UnificationError { .. } => {
-                    error.hint.as_ref().map(|hint| match hint {
-                        kind_inference::ErrorHint::WhileChecking { ty, has_kind } => {
-                            format!(
-                                "While checking that \"{}\" has kind \"{}\"",
-                                ty.render(),
-                                has_kind.render()
-                            )
-                        }
-                        kind_inference::ErrorHint::WhileInferring { ty } => {
-                            format!("While inferring the kind of \"{}\"", ty.render())
-                        }
-                    })
-                }
-            },
+            Error::KindError { error, .. } => error.addendum(),
             Error::DuplicateClassArgument { .. } => None,
             Error::NoSuchClass { .. } => None,
             Error::NotAMember { .. } => None,

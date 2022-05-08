@@ -110,6 +110,24 @@ impl Error {
             },
         }
     }
+
+    pub fn addendum(&self) -> Option<String> {
+        match self.info {
+            ErrorInfo::NotInScope { .. } => None,
+            ErrorInfo::UnificationError { .. } => self.hint.as_ref().map(|hint| match hint {
+                ErrorHint::WhileChecking { ty, has_kind } => {
+                    format!(
+                        "While checking that \"{}\" has kind \"{}\"",
+                        ty.render(),
+                        has_kind.render()
+                    )
+                }
+                ErrorHint::WhileInferring { ty } => {
+                    format!("While inferring the kind of \"{}\"", ty.render())
+                }
+            }),
+        }
+    }
 }
 
 impl<T: Into<ErrorInfo>> From<T> for Error {

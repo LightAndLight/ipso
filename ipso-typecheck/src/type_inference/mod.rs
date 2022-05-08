@@ -105,6 +105,18 @@ impl Error {
             info: ErrorInfo::UnificationError { error },
         }
     }
+
+    pub fn message(&self) -> String {
+        match &self.info {
+            ErrorInfo::UnificationError { error } => error.message(),
+
+            ErrorInfo::NotInScope { .. } => String::from("variable not in scope"),
+            ErrorInfo::DuplicateArgument { .. } => String::from("duplicate argument"),
+            ErrorInfo::RedundantPattern => String::from("redundant pattern"),
+            ErrorInfo::NotAValue { .. } => String::from("not a value"),
+            ErrorInfo::NotAModule => String::from("not a module"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
