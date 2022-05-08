@@ -9,7 +9,7 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
     match err {
         InterpreterError::ParseError(err) => err.report(&mut diagnostic),
         InterpreterError::TypeError(err) => err.report(&mut diagnostic),
-        InterpreterError::ModuleError(err) => err.report(&mut diagnostic),
+        InterpreterError::ImportError(err) => err.report(&mut diagnostic),
         InterpreterError::MissingEntrypoint(name) => diagnostic.item(
             Some(Location {
                 source: Source::File {

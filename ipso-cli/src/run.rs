@@ -6,7 +6,7 @@ use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
 use ipso_syntax::{kind::Kind, ModuleKey, ModuleRef, Modules};
-use ipso_typecheck::{self as typecheck, Typechecker};
+use ipso_typecheck::{self as typecheck, kind_inference, type_inference, BoundVars};
 use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
@@ -23,28 +23,34 @@ pub struct Config {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    ParseError(parse::ParseError),
-    TypeError(typecheck::TypeError),
-    ModuleError(import::ModuleError),
+    ParseError(parse::Error),
+    TypeError(Box<typecheck::Error>),
+    ImportError(import::Error),
     MissingEntrypoint(String),
     FileDoesNotExist(PathBuf),
 }
 
-impl From<parse::ParseError> for InterpreterError {
-    fn from(err: parse::ParseError) -> Self {
+impl From<parse::Error> for InterpreterError {
+    fn from(err: parse::Error) -> Self {
         InterpreterError::ParseError(err)
     }
 }
 
-impl From<typecheck::TypeError> for InterpreterError {
-    fn from(err: typecheck::TypeError) -> Self {
-        InterpreterError::TypeError(err)
+impl From<typecheck::Error> for InterpreterError {
+    fn from(err: typecheck::Error) -> Self {
+        InterpreterError::TypeError(Box::new(err))
     }
 }
 
-impl From<import::ModuleError> for InterpreterError {
-    fn from(err: import::ModuleError) -> Self {
-        InterpreterError::ModuleError(err)
+impl From<type_inference::Error> for InterpreterError {
+    fn from(err: type_inference::Error) -> Self {
+        Self::from(typecheck::Error::from(err))
+    }
+}
+
+impl From<import::Error> for InterpreterError {
+    fn from(err: import::Error) -> Self {
+        InterpreterError::ImportError(err)
     }
 }
 
@@ -95,13 +101,27 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     };
     let target_sig = find_entrypoint_signature(entrypoint, module)?;
     {
-        let mut tc = Typechecker::new(source, &common_kinds, &modules);
+        let mut kind_inference_state = kind_inference::State::new();
+        let mut type_solutions = type_inference::unification::Solutions::new();
+
         let expected = core::Type::app(
             core::Type::mk_io(&common_kinds),
-            tc.fresh_type_meta(&Kind::Type),
+            core::Type::Meta(Kind::Type, type_solutions.fresh_meta()),
         );
         let actual = target_sig.body;
-        let _ = tc.unify_type(&expected, &actual)?;
+
+        let _ = type_inference::unification::unify(
+            type_inference::unification::Env {
+                common_kinds: &common_kinds,
+                types: &HashMap::new(),
+                type_variables: &BoundVars::new(),
+            },
+            &mut kind_inference_state,
+            &mut type_solutions,
+            &expected,
+            &actual,
+        )
+        .map_err(|error| type_inference::Error::unification_error(&source, error))?;
     }
 
     let bytes = Arena::new();

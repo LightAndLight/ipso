@@ -3,7 +3,7 @@ use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};
 use ipso_parse as parse;
 use ipso_syntax::{self as syntax, desugar, ModuleId, ModuleKey, ModuleRef, Modules, Spanned};
-use ipso_typecheck::{self as typecheck, Typechecker};
+use ipso_typecheck::{self as typecheck};
 use ipso_util::hash_multi_set::HashMultiset;
 use std::{
     collections::{HashMap, HashSet},
@@ -13,26 +13,26 @@ use std::{
 };
 
 #[derive(Debug)]
-pub enum ModuleError {
-    NotFound {
+pub enum Error {
+    ModuleNotFound {
         source: Source,
         pos: usize,
         module_path: PathBuf,
     },
-    DoesNotDefine {
+    NameNotFound {
         source: Source,
         pos: usize,
     },
     IO(io::Error),
-    Parse(parse::ParseError),
+    Parse(parse::Error),
     Desugar(desugar::Error),
-    Check(typecheck::TypeError),
+    Check(Box<typecheck::Error>),
 }
 
-impl ModuleError {
+impl Error {
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         match self {
-            ModuleError::NotFound {
+            Error::ModuleNotFound {
                 source,
                 pos,
                 module_path,
@@ -46,7 +46,7 @@ impl ModuleError {
                     addendum: Some(format!("file {} does not exist", module_path.display())),
                 },
             ),
-            ModuleError::DoesNotDefine { source, pos } => diagnostic.item(
+            Error::NameNotFound { source, pos } => diagnostic.item(
                 Some(Location {
                     source: source.clone(),
                     offset: Some(*pos),
@@ -56,35 +56,35 @@ impl ModuleError {
                     addendum: None,
                 },
             ),
-            ModuleError::IO(err) => panic!("ioerror: {}", err),
-            ModuleError::Parse(err) => err.report(diagnostic),
-            ModuleError::Desugar(err) => err.report(diagnostic),
-            ModuleError::Check(err) => err.report(diagnostic),
+            Error::IO(err) => panic!("ioerror: {}", err),
+            Error::Parse(err) => err.report(diagnostic),
+            Error::Desugar(err) => err.report(diagnostic),
+            Error::Check(err) => err.report(diagnostic),
         }
     }
 }
 
-impl From<io::Error> for ModuleError {
+impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        ModuleError::IO(err)
+        Error::IO(err)
     }
 }
 
-impl From<parse::ParseError> for ModuleError {
-    fn from(err: parse::ParseError) -> Self {
-        ModuleError::Parse(err)
+impl From<parse::Error> for Error {
+    fn from(err: parse::Error) -> Self {
+        Error::Parse(err)
     }
 }
 
-impl From<desugar::Error> for ModuleError {
+impl From<desugar::Error> for Error {
     fn from(err: desugar::Error) -> Self {
-        ModuleError::Desugar(err)
+        Error::Desugar(err)
     }
 }
 
-impl From<typecheck::TypeError> for ModuleError {
-    fn from(err: typecheck::TypeError) -> Self {
-        ModuleError::Check(err)
+impl From<typecheck::Error> for Error {
+    fn from(err: typecheck::Error) -> Self {
+        Error::Check(Box::new(err))
     }
 }
 
@@ -322,7 +322,7 @@ fn resolve_imports(
     working_dir: &Path,
     path: &Path,
     module: &mut syntax::Module,
-) -> Result<(), ModuleError> {
+) -> Result<(), Error> {
     fn resolve_from_import_all(
         common_kinds: &CommonKinds,
         imported_items: &mut HashMap<String, ImportedItemInfo>,
@@ -357,7 +357,7 @@ fn resolve_imports(
         imported_items: &mut HashMap<String, ImportedItemInfo>,
         imported_module_id: ModuleId,
         names: &syntax::Names,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), Error> {
         let imported_module = modules.lookup(imported_module_id);
 
         match names {
@@ -400,7 +400,7 @@ fn resolve_imports(
                             Err(name)
                         }
                     })
-                    .map_err(|name| ModuleError::DoesNotDefine {
+                    .map_err(|name| Error::NameNotFound {
                         source,
                         pos: name.pos,
                     })
@@ -422,7 +422,7 @@ fn resolve_imports(
     module
         .decls
         .iter_mut()
-        .try_for_each(|decl| -> Result<_, ModuleError> {
+        .try_for_each(|decl| -> Result<_, Error> {
             match &mut decl.item {
                 syntax::Declaration::Import {
                     resolved,
@@ -568,16 +568,16 @@ pub fn import(
     pos: usize,
     path: &Path,
     common_kinds: &CommonKinds,
-) -> Result<ModuleId, ModuleError> {
+) -> Result<ModuleId, Error> {
     match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
             if path.exists() {
-                let input_location = Source::File {
+                let target_source = Source::File {
                     path: PathBuf::from(path),
                 };
 
                 let module = parse::parse_file(path)?;
-                let mut module = desugar::desugar_module(&input_location, module)?;
+                let mut module = desugar::desugar_module(&target_source, module)?;
 
                 let working_dir = path.parent().unwrap();
 
@@ -590,13 +590,13 @@ pub fn import(
                     &mut module,
                 )?;
 
-                let module = Typechecker::new(input_location, common_kinds, modules)
-                    .check_module(&module)?;
+                let module =
+                    typecheck::module::check(common_kinds, modules, &target_source, &module)?;
                 let module_id: ModuleId = modules.insert(ModuleKey::from(path), module);
 
                 Ok(module_id)
             } else {
-                Err(ModuleError::NotFound {
+                Err(Error::ModuleNotFound {
                     source: source.clone(),
                     pos,
                     module_path: path.to_path_buf(),
