@@ -343,7 +343,7 @@ fn infer_record_1() {
 
 fn check_declaration(
     decl: &Spanned<syntax::Declaration>,
-) -> std::result::Result<declaration::Checked, crate::TypeError> {
+) -> std::result::Result<declaration::Checked, crate::Error> {
     let common_kinds = Default::default();
     let types = Default::default();
     let implications = Default::default();

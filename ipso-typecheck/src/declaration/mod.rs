@@ -5,7 +5,7 @@ use crate::{
     constraint_solving::{self, solve_constraint},
     evidence, fill_ty_names, generalise, infer_kind, kind_inference,
     type_inference::{self, infer_pattern},
-    BoundVars, Implication, TypeError,
+    BoundVars, Error, Implication,
 };
 use ipso_core::{self as core, CommonKinds, TypeSig};
 use ipso_diagnostic::Source;
@@ -51,7 +51,7 @@ pub struct Env<'a> {
     pub source: &'a Source,
 }
 
-pub fn check(env: Env, decl: &syntax::Spanned<syntax::Declaration>) -> Result<Checked, TypeError> {
+pub fn check(env: Env, decl: &syntax::Spanned<syntax::Declaration>) -> Result<Checked, Error> {
     match &decl.item {
         syntax::Declaration::Definition {
             name,
@@ -96,7 +96,7 @@ pub fn check_definition(
     ty: &syntax::Type<Rc<str>>,
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
-) -> Result<Checked, TypeError> {
+) -> Result<Checked, Error> {
     let mut type_signatures = env.context.clone();
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
@@ -249,7 +249,7 @@ pub fn check_class_member(
     class_args_kinds: &[(Rc<str>, Kind)],
     name: &str,
     ty: &syntax::Type<Rc<str>>,
-) -> Result<core::ClassMember, TypeError> {
+) -> Result<core::ClassMember, Error> {
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = class_args_kinds
             .iter()
@@ -302,7 +302,7 @@ pub fn check_class(
     name: &Rc<str>,
     args: &[Spanned<Rc<str>>],
     members: &[(String, syntax::Type<Rc<str>>)],
-) -> Result<Checked, TypeError> {
+) -> Result<Checked, Error> {
     let mut type_variables = BoundVars::new();
     let mut type_solutions = type_inference::unification::Solutions::new();
     let mut kind_inference_state = kind_inference::State::new();
@@ -315,7 +315,7 @@ pub fn check_class(
                     seen_names.insert(arg.item.as_ref());
                     Ok((arg.item.clone(), kind_inference_state.fresh_meta()))
                 } else {
-                    Err(TypeError::DuplicateClassArgument {
+                    Err(Error::DuplicateClassArgument {
                         source: env.source.clone(),
                         pos: arg.pos,
                     })
@@ -378,7 +378,7 @@ pub fn check_instance(
     name: &Spanned<Rc<str>>,
     args: &[Spanned<syntax::Type<Rc<str>>>],
     members: &[syntax::InstanceMember],
-) -> Result<Checked, TypeError> {
+) -> Result<Checked, Error> {
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
@@ -411,7 +411,7 @@ pub fn check_instance(
     };
 
     let class_decl: core::ClassDeclaration = match env.class_context.get(&name.item) {
-        None => Err(TypeError::NoSuchClass {
+        None => Err(Error::NoSuchClass {
             source: env.source.clone(),
             pos: name.pos,
         }),
@@ -458,7 +458,7 @@ pub fn check_instance(
             )?;
             Ok(res.0)
         })
-        .collect::<Result<_, TypeError>>()?;
+        .collect::<Result<_, Error>>()?;
 
     let assumes: Vec<core::Type> = assumes
         .iter()
@@ -478,7 +478,7 @@ pub fn check_instance(
                 .assume(assume.pos, evidence::Constraint::from_type(&constraint));
             Ok(constraint)
         })
-        .collect::<Result<_, TypeError>>()?;
+        .collect::<Result<_, Error>>()?;
 
     // locate evidence for superclasses
     let superclass_constructors: Vec<core::Expr> = {
@@ -500,7 +500,7 @@ pub fn check_instance(
                 &evidence::Constraint::from_type(&superclass),
             )
             .map_err(|error| {
-                TypeError::from(
+                Error::from(
                     error.with_hint(constraint_solving::ErrorHint::WhileSolving {
                         constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
                     }),
@@ -556,7 +556,7 @@ pub fn check_instance(
             .find(|class_member| class_member.name == member.name.item)
         {
             None => {
-                return Err(TypeError::NotAMember {
+                return Err(Error::NotAMember {
                     source: env.source.clone(),
                     pos: member.name.pos,
                     cls: name.item.clone(),

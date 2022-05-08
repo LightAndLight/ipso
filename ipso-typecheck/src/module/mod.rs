@@ -1,6 +1,6 @@
 //! Module checking.
 
-use crate::{declaration, Implication, TypeError};
+use crate::{declaration, Error, Implication};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, ModuleId, ModuleRef, Modules};
@@ -201,7 +201,7 @@ pub fn check(
     modules: &Modules<core::Module>,
     source: &Source,
     module: &syntax::Module,
-) -> Result<core::Module, TypeError> {
+) -> Result<core::Module, Error> {
     let mut state = State::new();
 
     module.decls.iter().try_for_each(|decl| {

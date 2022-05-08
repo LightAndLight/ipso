@@ -146,32 +146,23 @@ impl Implication {
     }
 }
 
+/// Type checking errors.
 #[derive(PartialEq, Eq, Debug)]
-pub enum TypeError {
+pub enum Error {
     TypeError {
         error: type_inference::Error,
     },
     ConstraintError {
         error: constraint_solving::Error,
     },
-    DuplicateClassArgument {
-        source: Source,
-        pos: usize,
-    },
-    NotInScope {
-        source: Source,
-        pos: usize,
-        name: String,
-    },
-    NotInModule {
-        source: Source,
-        pos: usize,
-        item: String,
-    },
     KindError {
         source: Source,
         pos: usize,
         error: kind_inference::Error,
+    },
+    DuplicateClassArgument {
+        source: Source,
+        pos: usize,
     },
     NoSuchClass {
         source: Source,
@@ -184,36 +175,32 @@ pub enum TypeError {
     },
 }
 
-impl TypeError {
+impl Error {
     pub fn source(&self) -> Source {
         match self {
-            TypeError::TypeError { error } => error.source.clone(),
-            TypeError::ConstraintError { error } => error.source.clone(),
-            TypeError::KindError { source, .. } => source.clone(),
-            TypeError::NotInScope { source, .. } => source.clone(),
-            TypeError::NotInModule { source, .. } => source.clone(),
-            TypeError::DuplicateClassArgument { source, .. } => source.clone(),
-            TypeError::NoSuchClass { source, .. } => source.clone(),
-            TypeError::NotAMember { source, .. } => source.clone(),
+            Error::TypeError { error } => error.source.clone(),
+            Error::ConstraintError { error } => error.source.clone(),
+            Error::KindError { source, .. } => source.clone(),
+            Error::DuplicateClassArgument { source, .. } => source.clone(),
+            Error::NoSuchClass { source, .. } => source.clone(),
+            Error::NotAMember { source, .. } => source.clone(),
         }
     }
 
     pub fn position(&self) -> usize {
         match self {
-            TypeError::TypeError { error } => error.position.unwrap_or(0),
-            TypeError::ConstraintError { error } => error.position.unwrap_or(0),
-            TypeError::KindError { pos, .. } => *pos,
-            TypeError::NotInScope { pos, .. } => *pos,
-            TypeError::NotInModule { pos, .. } => *pos,
-            TypeError::DuplicateClassArgument { pos, .. } => *pos,
-            TypeError::NoSuchClass { pos, .. } => *pos,
-            TypeError::NotAMember { pos, .. } => *pos,
+            Error::TypeError { error } => error.position.unwrap_or(0),
+            Error::ConstraintError { error } => error.position.unwrap_or(0),
+            Error::KindError { pos, .. } => *pos,
+            Error::DuplicateClassArgument { pos, .. } => *pos,
+            Error::NoSuchClass { pos, .. } => *pos,
+            Error::NotAMember { pos, .. } => *pos,
         }
     }
 
     pub fn message(&self) -> String {
         match self {
-            TypeError::TypeError { error, .. } => match &error.info {
+            Error::TypeError { error, .. } => match &error.info {
                 type_inference::ErrorInfo::UnificationError { error } => error.message(),
 
                 type_inference::ErrorInfo::NotInScope { .. } => {
@@ -226,23 +213,19 @@ impl TypeError {
                 type_inference::ErrorInfo::NotAValue { .. } => String::from("not a value"),
                 type_inference::ErrorInfo::NotAModule => String::from("not a module"),
             },
-            TypeError::KindError { error, .. } => error.message(),
-            TypeError::NotInScope { .. } => String::from("not in scope"),
-            TypeError::NotInModule { .. } => String::from("not in scope"),
-            TypeError::DuplicateClassArgument { .. } => {
-                String::from("duplicate type class argument")
-            }
-            TypeError::NoSuchClass { .. } => String::from("type class not in scope"),
-            TypeError::NotAMember { cls, .. } => {
+            Error::KindError { error, .. } => error.message(),
+            Error::DuplicateClassArgument { .. } => String::from("duplicate type class argument"),
+            Error::NoSuchClass { .. } => String::from("type class not in scope"),
+            Error::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
-            TypeError::ConstraintError { error } => error.message(),
+            Error::ConstraintError { error } => error.message(),
         }
     }
 
     pub fn addendum(&self) -> Option<String> {
         match self {
-            TypeError::TypeError { error, .. } => match &error.info {
+            Error::TypeError { error, .. } => match &error.info {
                 type_inference::ErrorInfo::UnificationError { .. } => None,
                 type_inference::ErrorInfo::NotInScope { .. } => None,
                 type_inference::ErrorInfo::DuplicateArgument { .. } => None,
@@ -250,8 +233,8 @@ impl TypeError {
                 type_inference::ErrorInfo::NotAValue { .. } => None,
                 type_inference::ErrorInfo::NotAModule => None,
             },
-            TypeError::ConstraintError { .. } => None,
-            TypeError::KindError { error, .. } => match error.info {
+            Error::ConstraintError { .. } => None,
+            Error::KindError { error, .. } => match error.info {
                 kind_inference::ErrorInfo::NotInScope { .. } => None,
                 kind_inference::ErrorInfo::UnificationError { .. } => {
                     error.hint.as_ref().map(|hint| match hint {
@@ -268,11 +251,9 @@ impl TypeError {
                     })
                 }
             },
-            TypeError::DuplicateClassArgument { .. } => None,
-            TypeError::NotInScope { .. } => None,
-            TypeError::NotInModule { .. } => None,
-            TypeError::NoSuchClass { .. } => None,
-            TypeError::NotAMember { .. } => None,
+            Error::DuplicateClassArgument { .. } => None,
+            Error::NoSuchClass { .. } => None,
+            Error::NotAMember { .. } => None,
         }
     }
 
@@ -290,15 +271,15 @@ impl TypeError {
     }
 }
 
-impl From<type_inference::Error> for TypeError {
+impl From<type_inference::Error> for Error {
     fn from(error: type_inference::Error) -> Self {
-        TypeError::TypeError { error }
+        Error::TypeError { error }
     }
 }
 
-impl From<constraint_solving::Error> for TypeError {
+impl From<constraint_solving::Error> for Error {
     fn from(error: constraint_solving::Error) -> Self {
-        TypeError::ConstraintError { error }
+        Error::ConstraintError { error }
     }
 }
 
@@ -310,8 +291,8 @@ fn abstract_evidence(
     type_inference_state: &mut type_inference::State,
     source: &Source,
     mut expr: core::Expr,
-) -> Result<(core::Expr, Vec<core::Type>), TypeError> {
-    expr.subst_placeholder(&mut |p| -> Result<_, TypeError> {
+) -> Result<(core::Expr, Vec<core::Type>), Error> {
+    expr.subst_placeholder(&mut |p| -> Result<_, Error> {
         let (expr, _solved_constraint) = solve_placeholder(
             constraint_solving::Env {
                 common_kinds,
@@ -362,7 +343,7 @@ pub fn generalise(
     source: &Source,
     expr: core::Expr,
     ty: core::Type,
-) -> Result<(core::Expr, core::TypeSig), TypeError> {
+) -> Result<(core::Expr, core::TypeSig), Error> {
     let (expr, unsolved_constraints) = abstract_evidence(
         common_kinds,
         implications,
@@ -422,7 +403,7 @@ fn infer_kind(
     source: &Source,
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
-) -> Result<(core::Type, Kind), TypeError> {
+) -> Result<(core::Type, Kind), Error> {
     kind_inference::infer(
         kind_inference::Env {
             common_kinds,
@@ -432,7 +413,7 @@ fn infer_kind(
         kind_inference_state,
         ty,
     )
-    .map_err(|error| TypeError::KindError {
+    .map_err(|error| Error::KindError {
         source: source.clone(),
         pos,
         error,
@@ -448,7 +429,7 @@ fn check_kind(
     pos: Option<usize>,
     ty: &syntax::Type<Rc<str>>,
     kind: &Kind,
-) -> Result<core::Type, TypeError> {
+) -> Result<core::Type, Error> {
     kind_inference::check(
         kind_inference::Env {
             common_kinds,
@@ -459,7 +440,7 @@ fn check_kind(
         ty,
         kind,
     )
-    .map_err(|error| TypeError::KindError {
+    .map_err(|error| Error::KindError {
         source: source.clone(),
         pos: pos.unwrap_or(0),
         error,
