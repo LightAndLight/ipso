@@ -4,12 +4,41 @@ mod test;
 use crate::{
     eq_zonked_constraint,
     evidence::{Constraint, Evidence, Item},
-    fill_ty_names, metavariables, type_inference, BoundVars, Implication,
+    fill_ty_names, metavariables, type_inference, BoundVars,
 };
 use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
+
+#[derive(Debug, Clone)]
+pub struct Implication {
+    pub ty_vars: Vec<Kind>,
+    pub antecedents: Vec<core::Type>,
+    pub consequent: core::Type,
+    pub evidence: Rc<core::Expr>,
+}
+
+impl Implication {
+    pub fn instantiate_many(&self, tys: &[core::Type]) -> Self {
+        let mut ty_vars = self.ty_vars.clone();
+        for _ in tys.iter().rev() {
+            let _ = ty_vars.pop();
+        }
+        let antecedents = self
+            .antecedents
+            .iter()
+            .map(|ty| ty.instantiate_many(tys))
+            .collect();
+        let consequent = self.consequent.instantiate_many(tys);
+        Implication {
+            ty_vars,
+            antecedents,
+            consequent,
+            evidence: self.evidence.clone(),
+        }
+    }
+}
 
 pub fn lookup_evidence(
     type_solutions: &type_inference::unification::Solutions,

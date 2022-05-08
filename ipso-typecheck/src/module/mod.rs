@@ -1,6 +1,6 @@
 //! Module checking.
 
-use crate::{declaration, Error, Implication};
+use crate::{constraint_solving::Implication, declaration, Error};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, ModuleId, ModuleRef, Modules};

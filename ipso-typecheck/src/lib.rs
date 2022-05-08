@@ -9,7 +9,7 @@ pub mod metavariables;
 pub mod module;
 pub mod type_inference;
 
-use constraint_solving::solve_placeholder;
+use constraint_solving::{solve_placeholder, Implication};
 use diagnostic::{Location, Message};
 use evidence::Constraint;
 use ipso_core::{self as core, CommonKinds};
@@ -114,35 +114,6 @@ impl<A> BoundVars<A> {
 impl<A> Default for BoundVars<A> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Implication {
-    pub ty_vars: Vec<Kind>,
-    pub antecedents: Vec<core::Type>,
-    pub consequent: core::Type,
-    pub evidence: Rc<core::Expr>,
-}
-
-impl Implication {
-    pub fn instantiate_many(&self, tys: &[core::Type]) -> Self {
-        let mut ty_vars = self.ty_vars.clone();
-        for _ in tys.iter().rev() {
-            let _ = ty_vars.pop();
-        }
-        let antecedents = self
-            .antecedents
-            .iter()
-            .map(|ty| ty.instantiate_many(tys))
-            .collect();
-        let consequent = self.consequent.instantiate_many(tys);
-        Implication {
-            ty_vars,
-            antecedents,
-            consequent,
-            evidence: self.evidence.clone(),
-        }
     }
 }
 
