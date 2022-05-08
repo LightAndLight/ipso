@@ -11,7 +11,6 @@ pub mod type_inference;
 
 use constraint_solving::{solve_placeholder, Implication};
 use diagnostic::{Location, Message};
-use evidence::Constraint;
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Source};
 use ipso_syntax::{self as syntax, kind::Kind};
@@ -343,20 +342,6 @@ pub fn generalise(
     let sig = core::TypeSig::new(ty_vars, ty);
 
     Ok((expr, sig))
-}
-
-pub fn zonk_constraint(
-    kind_solutions: &kind_inference::unification::Solutions,
-    type_solutions: &type_inference::unification::Solutions,
-    constraint: &Constraint,
-) -> Constraint {
-    match constraint {
-        Constraint::HasField { field, rest } => Constraint::HasField {
-            field: field.clone(),
-            rest: type_solutions.zonk(kind_solutions, rest.clone()),
-        },
-        Constraint::Type(ty) => Constraint::Type(type_solutions.zonk(kind_solutions, ty.clone())),
-    }
 }
 
 pub fn fill_ty_names(

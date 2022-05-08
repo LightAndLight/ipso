@@ -1,14 +1,26 @@
 use crate::constraint_solving::{self, solve_placeholder};
 use crate::declaration;
-use crate::{
-    evidence::Constraint, kind_inference, module, type_inference, zonk_constraint, BoundVars,
-};
+use crate::{evidence::Constraint, kind_inference, module, type_inference, BoundVars};
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, Spanned};
 use ipso_util::void::Void;
 use std::collections::HashSet;
 use std::rc::Rc;
+
+fn zonk_constraint(
+    kind_solutions: &kind_inference::unification::Solutions,
+    type_solutions: &type_inference::unification::Solutions,
+    constraint: &Constraint,
+) -> Constraint {
+    match constraint {
+        Constraint::HasField { field, rest } => Constraint::HasField {
+            field: field.clone(),
+            rest: type_solutions.zonk(kind_solutions, rest.clone()),
+        },
+        Constraint::Type(ty) => Constraint::Type(type_solutions.zonk(kind_solutions, ty.clone())),
+    }
+}
 
 #[test]
 fn context_test_1() {
