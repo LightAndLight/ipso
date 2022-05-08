@@ -222,6 +222,14 @@ dependencies = [
 [[package]]
 name = "ipso-repl"
 version = "0.1.0"
+dependencies = [
+ "ipso-core",
+ "ipso-diagnostic",
+ "ipso-eval",
+ "ipso-syntax",
+ "ipso-typecheck",
+ "typed-arena",
+]
 
 [[package]]
 name = "ipso-rope"
