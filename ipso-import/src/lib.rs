@@ -13,13 +13,13 @@ use std::{
 };
 
 #[derive(Debug)]
-pub enum ModuleError {
-    NotFound {
+pub enum Error {
+    ModuleNotFound {
         source: Source,
         pos: usize,
         module_path: PathBuf,
     },
-    DoesNotDefine {
+    NameNotFound {
         source: Source,
         pos: usize,
     },
@@ -29,10 +29,10 @@ pub enum ModuleError {
     Check(Box<typecheck::Error>),
 }
 
-impl ModuleError {
+impl Error {
     pub fn report(&self, diagnostic: &mut Diagnostic) {
         match self {
-            ModuleError::NotFound {
+            Error::ModuleNotFound {
                 source,
                 pos,
                 module_path,
@@ -46,7 +46,7 @@ impl ModuleError {
                     addendum: Some(format!("file {} does not exist", module_path.display())),
                 },
             ),
-            ModuleError::DoesNotDefine { source, pos } => diagnostic.item(
+            Error::NameNotFound { source, pos } => diagnostic.item(
                 Some(Location {
                     source: source.clone(),
                     offset: Some(*pos),
@@ -56,35 +56,35 @@ impl ModuleError {
                     addendum: None,
                 },
             ),
-            ModuleError::IO(err) => panic!("ioerror: {}", err),
-            ModuleError::Parse(err) => err.report(diagnostic),
-            ModuleError::Desugar(err) => err.report(diagnostic),
-            ModuleError::Check(err) => err.report(diagnostic),
+            Error::IO(err) => panic!("ioerror: {}", err),
+            Error::Parse(err) => err.report(diagnostic),
+            Error::Desugar(err) => err.report(diagnostic),
+            Error::Check(err) => err.report(diagnostic),
         }
     }
 }
 
-impl From<io::Error> for ModuleError {
+impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        ModuleError::IO(err)
+        Error::IO(err)
     }
 }
 
-impl From<parse::Error> for ModuleError {
+impl From<parse::Error> for Error {
     fn from(err: parse::Error) -> Self {
-        ModuleError::Parse(err)
+        Error::Parse(err)
     }
 }
 
-impl From<desugar::Error> for ModuleError {
+impl From<desugar::Error> for Error {
     fn from(err: desugar::Error) -> Self {
-        ModuleError::Desugar(err)
+        Error::Desugar(err)
     }
 }
 
-impl From<typecheck::Error> for ModuleError {
+impl From<typecheck::Error> for Error {
     fn from(err: typecheck::Error) -> Self {
-        ModuleError::Check(Box::new(err))
+        Error::Check(Box::new(err))
     }
 }
 
@@ -322,7 +322,7 @@ fn resolve_imports(
     working_dir: &Path,
     path: &Path,
     module: &mut syntax::Module,
-) -> Result<(), ModuleError> {
+) -> Result<(), Error> {
     fn resolve_from_import_all(
         common_kinds: &CommonKinds,
         imported_items: &mut HashMap<String, ImportedItemInfo>,
@@ -357,7 +357,7 @@ fn resolve_imports(
         imported_items: &mut HashMap<String, ImportedItemInfo>,
         imported_module_id: ModuleId,
         names: &syntax::Names,
-    ) -> Result<(), ModuleError> {
+    ) -> Result<(), Error> {
         let imported_module = modules.lookup(imported_module_id);
 
         match names {
@@ -400,7 +400,7 @@ fn resolve_imports(
                             Err(name)
                         }
                     })
-                    .map_err(|name| ModuleError::DoesNotDefine {
+                    .map_err(|name| Error::NameNotFound {
                         source,
                         pos: name.pos,
                     })
@@ -422,7 +422,7 @@ fn resolve_imports(
     module
         .decls
         .iter_mut()
-        .try_for_each(|decl| -> Result<_, ModuleError> {
+        .try_for_each(|decl| -> Result<_, Error> {
             match &mut decl.item {
                 syntax::Declaration::Import {
                     resolved,
@@ -568,7 +568,7 @@ pub fn import(
     pos: usize,
     path: &Path,
     common_kinds: &CommonKinds,
-) -> Result<ModuleId, ModuleError> {
+) -> Result<ModuleId, Error> {
     match modules.lookup_id(&ModuleKey::from(path)) {
         None => {
             if path.exists() {
@@ -596,7 +596,7 @@ pub fn import(
 
                 Ok(module_id)
             } else {
-                Err(ModuleError::NotFound {
+                Err(Error::ModuleNotFound {
                     source: source.clone(),
                     pos,
                     module_path: path.to_path_buf(),
