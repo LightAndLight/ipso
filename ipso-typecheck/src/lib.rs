@@ -403,7 +403,7 @@ fn check_kind(
     })
 }
 
-fn eq_zonked_type(
+pub fn eq_zonked_type(
     type_solutions: &type_inference::unification::Solutions,
     t1: &core::Type,
     t2: &core::Type,
@@ -420,6 +420,7 @@ fn eq_zonked_type(
             t => t,
         }
     }
+
     let t2: &core::Type = zonk_just_enough(type_solutions, t2);
     match t1 {
         core::Type::Name(_, n) => match t2 {
