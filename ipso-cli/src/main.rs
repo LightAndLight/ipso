@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
             }
         }
         None => {
-            ipso_cli::repl::run();
+            ipso_cli::repl::run()?;
             Ok(())
         }
     }

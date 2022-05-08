@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     io::{self, BufReader, BufWriter},
     rc::Rc,
 };
@@ -10,6 +11,7 @@ use ipso_syntax::Spanned;
 use ipso_typecheck::type_inference::{self, infer};
 use typed_arena::Arena;
 
+#[derive(Debug)]
 pub enum Error {
     TypeError(type_inference::Error),
 }

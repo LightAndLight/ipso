@@ -216,6 +216,7 @@ dependencies = [
  "ipso-import",
  "ipso-lex",
  "ipso-parse",
+ "ipso-repl",
  "ipso-rope",
  "ipso-syntax",
  "ipso-typecheck",
