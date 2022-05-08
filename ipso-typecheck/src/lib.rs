@@ -325,19 +325,16 @@ fn infer_kind(
     pos: usize,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), Error> {
-    kind_inference::infer(
-        kind_inference::Env {
-            common_kinds,
-            types,
-            type_variables,
-        },
-        kind_inference_state,
-        ty,
-    )
-    .map_err(|error| Error::KindError {
+    let env = kind_inference::Env {
+        common_kinds,
+        types,
+        type_variables,
+    };
+
+    kind_inference::infer(env, kind_inference_state, ty).map_err(|error| Error::KindError {
         source: source.clone(),
         pos,
-        error,
+        error: error.with_hint(kind_inference::ErrorHint::WhileInferring { ty: ty.clone() }),
     })
 }
 
@@ -351,20 +348,19 @@ fn check_kind(
     ty: &syntax::Type<Rc<str>>,
     kind: &Kind,
 ) -> Result<core::Type, Error> {
-    kind_inference::check(
-        kind_inference::Env {
-            common_kinds,
-            types,
-            type_variables,
-        },
-        kind_inference_state,
-        ty,
-        kind,
-    )
-    .map_err(|error| Error::KindError {
+    let env = kind_inference::Env {
+        common_kinds,
+        types,
+        type_variables,
+    };
+
+    kind_inference::check(env, kind_inference_state, ty, kind).map_err(|error| Error::KindError {
         source: source.clone(),
         pos: pos.unwrap_or(0),
-        error,
+        error: error.with_hint(kind_inference::ErrorHint::WhileChecking {
+            ty: ty.clone(),
+            has_kind: kind.clone(),
+        }),
     })
 }
 

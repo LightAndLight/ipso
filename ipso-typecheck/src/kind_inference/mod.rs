@@ -175,11 +175,10 @@ impl Default for State {
     }
 }
 
-/// Infer a type's kind, providing an error hint.
-pub fn infer_with_hint(
+/// Infer a type's kind.
+pub fn infer(
     env: Env,
     state: &mut State,
-    hint: &dyn Fn() -> ErrorHint,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), Error> {
     match ty {
@@ -213,12 +212,12 @@ pub fn infer_with_hint(
         }
         syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
         syntax::Type::RowCons(field, ty, rest) => {
-            let ty = check_with_hint(env, state, hint, ty, &Kind::Type)?;
-            let rest = check_with_hint(env, state, hint, rest, &Kind::Row)?;
+            let ty = check(env, state, ty, &Kind::Type)?;
+            let rest = check(env, state, rest, &Kind::Row)?;
             Ok((core::Type::mk_rowcons(field.clone(), ty, rest), Kind::Row))
         }
         syntax::Type::HasField(field, row) => {
-            let row = check_with_hint(env, state, hint, row, &Kind::Row)?;
+            let row = check(env, state, row, &Kind::Row)?;
             Ok((
                 core::Type::mk_hasfield(field.clone(), row),
                 Kind::Constraint,
@@ -232,7 +231,7 @@ pub fn infer_with_hint(
         syntax::Type::Constraints(constraints) => {
             let constraints: Vec<core::Type> = constraints
                 .iter()
-                .map(|constraint| check_with_hint(env, state, hint, constraint, &Kind::Constraint))
+                .map(|constraint| check(env, state, constraint, &Kind::Constraint))
                 .collect::<Result<_, _>>()?;
             Ok((core::Type::Constraints(constraints), Kind::Constraint))
         }
@@ -240,18 +239,18 @@ pub fn infer_with_hint(
         syntax::Type::App(a, b) => {
             let in_kind = state.fresh_meta();
             let out_kind = state.fresh_meta();
-            let a = check_with_hint(env, state, hint, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
-            let b = check_with_hint(env, state, hint, b, &in_kind)?;
+            let a = check(env, state, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
+            let b = check(env, state, b, &in_kind)?;
             Ok((core::Type::app(a, b), out_kind))
         }
 
         syntax::Type::Name(name) => match env.types.get(name) {
             Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
-            None => Err(Error::not_in_scope(name.clone()).with_hint(hint())),
+            None => Err(Error::not_in_scope(name.clone())),
         },
         syntax::Type::Var(name) => match env.type_variables.lookup_name(name) {
             Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
-            None => Err(Error::not_in_scope(name.clone()).with_hint(hint())),
+            None => Err(Error::not_in_scope(name.clone())),
         },
         syntax::Type::Meta(meta) => {
             /*
@@ -264,34 +263,6 @@ pub fn infer_with_hint(
     }
 }
 
-/// Infer a type's kind.
-pub fn infer(
-    env: Env,
-    state: &mut State,
-    ty: &syntax::Type<Rc<str>>,
-) -> Result<(core::Type, Kind), Error> {
-    infer_with_hint(
-        env,
-        state,
-        &|| ErrorHint::WhileInferring { ty: ty.clone() },
-        ty,
-    )
-}
-
-/// Check a type's kind, providing an error hint.
-pub fn check_with_hint(
-    env: Env,
-    state: &mut State,
-    hint: &dyn Fn() -> ErrorHint,
-    ty: &syntax::Type<Rc<str>>,
-    expected_kind: &Kind,
-) -> Result<core::Type, Error> {
-    let (ty, actual_kind) = infer_with_hint(env, state, hint, ty)?;
-    unification::unify(&mut state.kind_solutions, expected_kind, &actual_kind)
-        .map_err(|err| Error::from(err).with_hint(hint()))?;
-    Ok(ty)
-}
-
 /// Check a type's kind.
 pub fn check(
     env: Env,
@@ -299,14 +270,7 @@ pub fn check(
     ty: &syntax::Type<Rc<str>>,
     expected_kind: &Kind,
 ) -> Result<core::Type, Error> {
-    check_with_hint(
-        env,
-        state,
-        &|| ErrorHint::WhileChecking {
-            ty: ty.clone(),
-            has_kind: expected_kind.clone(),
-        },
-        ty,
-        expected_kind,
-    )
+    let (ty, actual_kind) = infer(env, state, ty)?;
+    unification::unify(&mut state.kind_solutions, expected_kind, &actual_kind)?;
+    Ok(ty)
 }
