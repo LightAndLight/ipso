@@ -253,7 +253,14 @@ pub fn infer_with_hint(
             Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
             None => Err(Error::not_in_scope(name.clone()).with_hint(hint())),
         },
-        syntax::Type::Meta(_) => todo!(),
+        syntax::Type::Meta(meta) => {
+            /*
+            This should be impossible because there is no syntax for metavariables.
+
+            The `Meta` constructor exists only for pretty-printing types that contain metavariables.
+            */
+            panic!("found meta ?{} in syntax", meta)
+        }
     }
 }
 
