@@ -1,5 +1,4 @@
 use std::{
-    fmt::Display,
     io::{self, BufReader, BufWriter},
     rc::Rc,
 };
