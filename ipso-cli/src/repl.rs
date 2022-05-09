@@ -7,6 +7,15 @@ use termion::{
     raw::IntoRawMode,
 };
 
+const IPSO_BANNER: &str = r#" _
+(_)
+ _ _ __  ___  ___
+| | '_ \/ __|/ _ \
+| | |_) \__ \ (_) |
+|_| .__/|___/\___/
+  | |
+  |_|"#;
+
 struct InputState {
     terminal_size: (u16, u16),
     cursor_row: u16,
@@ -29,7 +38,7 @@ impl InputState {
         self.buffer.clear();
     }
 
-    fn cursor_left(&mut self, stdout: &mut dyn Write, count: u16) -> io::Result<()> {
+    fn left(&mut self, stdout: &mut dyn Write, count: u16) -> io::Result<()> {
         if count > 0 && self.buffer_index >= count as usize {
             write!(stdout, "{}", termion::cursor::Left(count))?;
             stdout.flush()?;
@@ -40,7 +49,7 @@ impl InputState {
         }
     }
 
-    fn cursor_right(&mut self, stdout: &mut dyn Write, count: u16) -> io::Result<()> {
+    fn right(&mut self, stdout: &mut dyn Write, count: u16) -> io::Result<()> {
         if count > 0 && self.buffer_index + count as usize <= self.buffer.len() {
             write!(stdout, "{}", termion::cursor::Right(count))?;
             stdout.flush()?;
@@ -56,6 +65,21 @@ impl InputState {
         self.buffer_index += 1;
 
         Ok(())
+    }
+
+    fn delete(&mut self) {
+        if self.buffer_index < self.buffer.len() {
+            self.buffer.remove(self.buffer_index);
+        }
+    }
+
+    fn backspace(&mut self, stdout: &mut dyn Write) -> io::Result<()> {
+        if self.buffer_index >= 1 {
+            self.buffer.remove(self.buffer_index - 1);
+            self.left(stdout, 1)
+        } else {
+            Ok(())
+        }
     }
 
     fn newline(&mut self, stdout: &mut dyn Write) -> io::Result<()> {
@@ -91,19 +115,10 @@ pub fn run() -> io::Result<()> {
     let mut stdout = io::stdout();
     let repl = ipso_repl::Repl::new();
 
-    let ipso = r#" _                  
-(_)                 
- _ _ __  ___  ___   
-| | '_ \/ __|/ _ \  
-| | |_) \__ \ (_) | 
-|_| .__/|___/\___/
-  | |               
-  |_|"#;
-
     writeln!(
         stdout,
         "{}\n\nType :quit<ENTER> to quit.\nType :help<ENTER> to view all commands.\n",
-        ipso
+        IPSO_BANNER
     )?;
 
     let mut stdout = stdout.into_raw_mode()?;
@@ -118,51 +133,45 @@ pub fn run() -> io::Result<()> {
         if let Event::Key(key) = event? {
             match key {
                 Key::Backspace => {
-                    if input_state.buffer_index >= 1 {
-                        input_state.buffer.remove(input_state.buffer_index - 1);
-                        input_state.cursor_left(&mut stdout, 1)?;
-                    }
+                    input_state.backspace(&mut stdout)?;
                 }
                 Key::Delete => {
-                    if input_state.buffer_index < input_state.buffer.len() {
-                        input_state.buffer.remove(input_state.buffer_index);
-                    }
+                    input_state.delete();
                 }
                 Key::Left => {
-                    input_state.cursor_left(&mut stdout, 1)?;
+                    input_state.left(&mut stdout, 1)?;
                 }
                 Key::Right => {
-                    input_state.cursor_right(&mut stdout, 1)?;
+                    input_state.right(&mut stdout, 1)?;
+                }
+                Key::Char('\n') => {
+                    if input_state.buffer == ":quit" {
+                        break;
+                    } else {
+                        input_state.newline(&mut stdout)?;
+
+                        let mut parser = ipso_parse::Parser::new(
+                            Source::Interactive {
+                                label: String::from("repl"),
+                            },
+                            ipso_lex::Lexer::new(&input_state.buffer),
+                        );
+                        let parsed = ipso_parse::grammar::expr::expr(&mut parser);
+                        match parser.into_parse_error(parsed.result) {
+                            Err(err) => write!(stdout, "{:?}", err)?,
+                            Ok(expr) => match repl.eval(expr) {
+                                Err(err) => write!(stdout, "{:?}", err)?,
+                                Ok(value) => write!(stdout, "{:?}", value)?,
+                            },
+                        }
+
+                        input_state.newline(&mut stdout)?;
+                        input_state.newline(&mut stdout)?;
+                        input_state.reset();
+                    }
                 }
                 Key::Char(c) => {
-                    if c == '\n' {
-                        if input_state.buffer == ":quit" {
-                            break;
-                        } else {
-                            input_state.newline(&mut stdout)?;
-
-                            let mut parser = ipso_parse::Parser::new(
-                                Source::Interactive {
-                                    label: String::from("repl"),
-                                },
-                                ipso_lex::Lexer::new(&input_state.buffer),
-                            );
-                            let parsed = ipso_parse::grammar::expr::expr(&mut parser);
-                            match parser.into_parse_error(parsed.result) {
-                                Err(err) => write!(stdout, "{:?}", err)?,
-                                Ok(expr) => match repl.eval(expr) {
-                                    Err(err) => write!(stdout, "{:?}", err)?,
-                                    Ok(value) => write!(stdout, "{:?}", value)?,
-                                },
-                            }
-
-                            input_state.newline(&mut stdout)?;
-                            input_state.newline(&mut stdout)?;
-                            input_state.reset();
-                        }
-                    } else {
-                        input_state.insert(c)?;
-                    }
+                    input_state.insert(c)?;
                 }
                 _ => {}
             }
