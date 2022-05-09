@@ -160,9 +160,9 @@ pub fn run() -> io::Result<()> {
                         let parsed = ipso_parse::grammar::expr::expr(&mut parser);
                         match parser.into_parse_error(parsed.result) {
                             Err(err) => write!(stdout, "{:?}", err)?,
-                            Ok(expr) => match repl.eval(expr) {
+                            Ok(expr) => match repl.eval_show(expr) {
                                 Err(err) => write!(stdout, "{:?}", err)?,
-                                Ok(value) => write!(stdout, "{:?}", value)?,
+                                Ok(value) => write!(stdout, "{}", value)?,
                             },
                         }
 

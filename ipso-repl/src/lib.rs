@@ -1,18 +1,37 @@
 use std::{
+    collections::HashMap,
     io::{self, BufReader, BufWriter},
     rc::Rc,
 };
 
-use ipso_core::CommonKinds;
+use ipso_core::{ClassDeclaration, CommonKinds, Signature, Type};
 use ipso_diagnostic::Source;
-use ipso_eval::{Env, Interpreter};
-use ipso_syntax::Spanned;
-use ipso_typecheck::type_inference::{self, infer};
+use ipso_eval::{Env, Interpreter, Object};
+use ipso_import::{resolve_from_import_all, rewrite_module_accessors_expr, ImportedItemInfo};
+use ipso_syntax::{
+    desugar::{self, desugar_expr},
+    kind::Kind,
+    ModuleId, ModuleKey, Modules, Names, Spanned,
+};
+use ipso_typecheck::{
+    abstract_evidence,
+    constraint_solving::Implication,
+    module::register_from_import,
+    type_inference::{self, infer},
+};
 use typed_arena::Arena;
 
 #[derive(Debug)]
 pub enum Error {
     TypeError(type_inference::Error),
+    CheckError(ipso_typecheck::Error),
+    DesugarError(desugar::Error),
+}
+
+impl From<ipso_typecheck::Error> for Error {
+    fn from(err: ipso_typecheck::Error) -> Self {
+        Error::CheckError(err)
+    }
 }
 
 impl From<type_inference::Error> for Error {
@@ -21,23 +40,87 @@ impl From<type_inference::Error> for Error {
     }
 }
 
+impl From<desugar::Error> for Error {
+    fn from(err: desugar::Error) -> Self {
+        Error::DesugarError(err)
+    }
+}
+
 pub struct Repl {
     common_kinds: CommonKinds,
     source: Source,
+    module_context: HashMap<ModuleId, HashMap<String, ipso_core::Signature>>,
+    imported_items: HashMap<String, ImportedItemInfo>,
+    implications: Vec<Implication>,
+    type_context: HashMap<Rc<str>, Kind>,
+
+    #[allow(dead_code)] // We'll need this to implement imports
+    modules: Modules<ipso_core::Module>,
+
+    #[allow(dead_code)] // We'll need this to implement bindings
+    context: HashMap<String, Signature>,
+
+    #[allow(dead_code)] // We'll need this to implement class declarations
+    class_context: HashMap<Rc<str>, ClassDeclaration>,
 }
 
 impl Repl {
     pub fn new(source: Source) -> Self {
+        let common_kinds = CommonKinds::default();
+
+        let mut modules = Modules::new();
+
+        let builtins_module_id = {
+            let builtins = ipso_builtins::builtins(&common_kinds);
+            modules.insert(ModuleKey::from("builtins"), builtins)
+        };
+        let builtins = modules.lookup(builtins_module_id);
+
+        let mut imported_items = HashMap::new();
+        resolve_from_import_all(
+            &common_kinds,
+            &mut imported_items,
+            builtins_module_id,
+            builtins,
+        );
+
+        let mut implications = Vec::new();
+        let mut type_context = HashMap::new();
+        let mut context = HashMap::new();
+        let mut class_context = HashMap::new();
+        register_from_import(
+            &common_kinds,
+            &mut implications,
+            &mut type_context,
+            &mut context,
+            &mut class_context,
+            &modules,
+            builtins_module_id,
+            &Names::All,
+        );
+
+        let module_context =
+            HashMap::from([(builtins_module_id, builtins.get_signatures(&common_kinds))]);
         Repl {
-            common_kinds: Default::default(),
+            common_kinds,
             source,
+            modules,
+            module_context,
+            imported_items,
+            implications,
+            type_context,
+            context,
+            class_context,
         }
     }
 
-    pub fn type_of(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<ipso_core::Type, Error> {
+    pub fn type_of(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<Type, Error> {
+        let mut expr = desugar_expr(&self.source, expr)?;
+        rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
+
         let env = type_inference::Env {
             common_kinds: &self.common_kinds,
-            modules: &Default::default(),
+            modules: &self.module_context,
             types: &Default::default(),
             type_variables: &Default::default(),
             type_signatures: &Default::default(),
@@ -48,17 +131,106 @@ impl Repl {
         Ok(ty)
     }
 
-    pub fn eval(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<Value, Error> {
-        let env = type_inference::Env {
-            common_kinds: &self.common_kinds,
-            modules: &Default::default(),
-            types: &Default::default(),
-            type_variables: &Default::default(),
-            type_signatures: &Default::default(),
-            source: &self.source,
-        };
-        let mut state = type_inference::State::new();
-        let (expr, _) = infer(env, &mut state, &expr)?;
+    pub fn eval_show(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<String, Error> {
+        let mut expr = desugar_expr(&self.source, expr)?;
+        rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
+
+        let expr = {
+            let env = type_inference::Env {
+                common_kinds: &self.common_kinds,
+                modules: &self.module_context,
+                types: &Default::default(),
+                type_variables: &Default::default(),
+                type_signatures: &Default::default(),
+                source: &self.source,
+            };
+
+            let mut state = type_inference::State::new();
+            let (_, ty) = infer(env, &mut state, &expr)?;
+
+            let ty = state.zonk_type(ty);
+            let mut expr = match ty {
+                Type::Bool
+                | Type::Int
+                | Type::Char
+                | Type::String
+                | Type::Bytes
+                | Type::Unit
+                | Type::Arrow(_)
+                | Type::FatArrow(_)
+                | Type::Record(_)
+                | Type::Variant(_)
+                | Type::Array(_)
+                | Type::Name(_, _)
+                | Type::Var(_, _)
+                | Type::IO(_)
+                | Type::Cmd => ipso_syntax::Expr::mk_app(
+                    Spanned {
+                        pos: 0,
+                        item: ipso_syntax::Expr::Var(String::from("toString")),
+                    },
+                    expr,
+                ),
+                Type::App(_, a, _) => {
+                    if matches!(a.as_ref(), Type::IO(_)) {
+                        ipso_syntax::Expr::mk_app(
+                            ipso_syntax::Expr::mk_app(
+                                Spanned {
+                                    pos: 0,
+                                    item: ipso_syntax::Expr::mk_project(
+                                        Spanned {
+                                            pos: 0,
+                                            item: ipso_syntax::Expr::mk_var("io"),
+                                        },
+                                        Spanned {
+                                            pos: 0,
+                                            item: String::from("map"),
+                                        },
+                                    ),
+                                },
+                                Spanned {
+                                    pos: 0,
+                                    item: ipso_syntax::Expr::Var(String::from("toString")),
+                                },
+                            ),
+                            expr,
+                        )
+                    } else {
+                        ipso_syntax::Expr::mk_app(
+                            Spanned {
+                                pos: 0,
+                                item: ipso_syntax::Expr::Var(String::from("toString")),
+                            },
+                            expr,
+                        )
+                    }
+                }
+                Type::Meta(_, _) => unreachable!(),
+                Type::Constraints(_)
+                | Type::RowNil
+                | Type::RowCons(_, _, _)
+                | Type::HasField(_, _) => unreachable!(),
+            };
+
+            rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
+            let (expr, _) = infer(env, &mut state, &expr)?;
+
+            let (expr, unsolved) = abstract_evidence(
+                &self.common_kinds,
+                &self.implications,
+                &self.type_context,
+                &Default::default(),
+                &mut state,
+                &self.source,
+                expr,
+            )?;
+
+            if !unsolved.is_empty() {
+                todo!("unsolved: {:?}", unsolved)
+            }
+
+            Ok::<_, Error>(expr)
+        }?;
 
         let stdin = io::stdin();
         let mut stdin = BufReader::new(stdin);
@@ -66,7 +238,6 @@ impl Repl {
         let stdout = io::stdout();
         let mut stdout = BufWriter::new(stdout);
 
-        let modules = Default::default();
         let context = Default::default();
 
         let bytes = Arena::new();
@@ -77,7 +248,7 @@ impl Repl {
             &mut stdin,
             &mut stdout,
             &self.common_kinds,
-            &modules,
+            &self.modules,
             &context,
             &bytes,
             &values,
@@ -86,7 +257,26 @@ impl Repl {
 
         let value = interpreter.eval(&mut Env::new(), &expr);
 
-        Ok(Value::from(value))
+        match value {
+            ipso_eval::Value::Object(object) => match object {
+                Object::Bytes(_)
+                | Object::Variant(_, _)
+                | Object::Array(_)
+                | Object::Record(_)
+                | Object::Closure { .. }
+                | Object::StaticClosure { .. }
+                | Object::Cmd(_) => todo!(),
+                Object::String(s) => Ok(String::from(*s)),
+                Object::IO { env, body } => Ok(String::from(
+                    body.run(&mut interpreter, env).unpack_string(),
+                )),
+            },
+            ipso_eval::Value::True
+            | ipso_eval::Value::False
+            | ipso_eval::Value::Int(_)
+            | ipso_eval::Value::Char(_)
+            | ipso_eval::Value::Unit => unreachable!(),
+        }
     }
 }
 
