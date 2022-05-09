@@ -27,12 +27,10 @@ pub struct Repl {
 }
 
 impl Repl {
-    pub fn new() -> Self {
+    pub fn new(source: Source) -> Self {
         Repl {
             common_kinds: Default::default(),
-            source: Source::Interactive {
-                label: String::from("repl"),
-            },
+            source,
         }
     }
 
@@ -89,12 +87,6 @@ impl Repl {
         let value = interpreter.eval(&mut Env::new(), &expr);
 
         Ok(Value::from(value))
-    }
-}
-
-impl Default for Repl {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
