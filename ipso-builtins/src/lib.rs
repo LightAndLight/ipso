@@ -7,7 +7,7 @@ pub mod string;
 
 use ipso_core::{
     Branch, Builtin, ClassDeclaration, ClassMember, CommonKinds, Declaration, Expr, Module, Name,
-    Pattern, Type, TypeSig,
+    Pattern, StringPart, Type, TypeSig,
 };
 use ipso_syntax::{kind::Kind, ModuleRef};
 use std::rc::Rc;
@@ -918,6 +918,117 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         )],
                         None,
                     ),
+                )),
+            },
+            /*
+            class ToString a where
+              toString : a -> String
+            */
+            Declaration::Class(ClassDeclaration {
+                supers: vec![],
+                name: Rc::from("ToString"),
+                args: vec![(Rc::from("a"), Kind::Type)],
+                members: vec![ClassMember {
+                    name: String::from("toString"),
+                    sig: TypeSig::new(
+                        vec![],
+                        Type::arrow(common_kinds, Type::Var(Kind::Type, 0), Type::String),
+                    ),
+                }],
+            }),
+            /*
+            instance ToString () where
+              toString x = "()"
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("ToString"),
+                    ),
+                    Type::Unit,
+                ),
+                evidence: Rc::from("ToString ()"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("ToString ()"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // toString
+                        Expr::Int(0),
+                        // \x -> "()"
+                        Expr::mk_lam(true, Expr::String(vec![StringPart::from("()")])),
+                    )],
+                    None,
+                )),
+            },
+            /*
+            instance ToString Int where
+              toString = int.show
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("ToString"),
+                    ),
+                    Type::Int,
+                ),
+                evidence: Rc::from("ToString Int"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("ToString Int"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // toString
+                        Expr::Int(0),
+                        // int.toString
+                        Expr::Module {
+                            id: ModuleRef::This,
+                            path: vec![String::from("int")],
+                            item: Name::definition("show"),
+                        },
+                    )],
+                    None,
+                )),
+            },
+            /*
+            instance ToString Bool where
+              toString b = if b then "true" else "false"
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("ToString"),
+                    ),
+                    Type::Bool,
+                ),
+                evidence: Rc::from("ToString Bool"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("ToString Bool"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // toString
+                        Expr::Int(0),
+                        // \b -> if b then "true" else "false"
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_ifthenelse(
+                                Expr::Var(0),
+                                Expr::String(vec![StringPart::from("true")]),
+                                Expr::String(vec![StringPart::from("false")]),
+                            ),
+                        ),
+                    )],
+                    None,
                 )),
             },
         ],
