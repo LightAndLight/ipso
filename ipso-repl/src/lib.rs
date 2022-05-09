@@ -131,11 +131,11 @@ impl Repl {
         Ok(ty)
     }
 
-    pub fn eval_show(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<String, Error> {
+    pub fn eval_show(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<Option<String>, Error> {
         let mut expr = desugar_expr(&self.source, expr)?;
         rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
 
-        let expr = {
+        let (expr, show_final_value) = {
             let env = type_inference::Env {
                 common_kinds: &self.common_kinds,
                 modules: &self.module_context,
@@ -149,7 +149,7 @@ impl Repl {
             let (_, ty) = infer(env, &mut state, &expr)?;
 
             let ty = state.zonk_type(ty);
-            let mut expr = match ty {
+            let (mut expr, show_final_value) = match ty {
                 Type::Bool
                 | Type::Int
                 | Type::Char
@@ -164,44 +164,57 @@ impl Repl {
                 | Type::Name(_, _)
                 | Type::Var(_, _)
                 | Type::IO(_)
-                | Type::Cmd => ipso_syntax::Expr::mk_app(
-                    Spanned {
-                        pos: 0,
-                        item: ipso_syntax::Expr::Var(String::from("toString")),
-                    },
-                    expr,
+                | Type::Cmd => (
+                    ipso_syntax::Expr::mk_app(
+                        Spanned {
+                            pos: 0,
+                            item: ipso_syntax::Expr::Var(String::from("toString")),
+                        },
+                        expr,
+                    ),
+                    true,
                 ),
-                Type::App(_, a, _) => {
-                    if matches!(a.as_ref(), Type::IO(_)) {
-                        ipso_syntax::Expr::mk_app(
-                            ipso_syntax::Expr::mk_app(
-                                Spanned {
-                                    pos: 0,
-                                    item: ipso_syntax::Expr::mk_project(
+                Type::App(_, a, b) => {
+                    if let Type::IO(_) = a.as_ref() {
+                        if let Type::Unit = b.as_ref() {
+                            (expr, false)
+                        } else {
+                            (
+                                ipso_syntax::Expr::mk_app(
+                                    ipso_syntax::Expr::mk_app(
                                         Spanned {
                                             pos: 0,
-                                            item: ipso_syntax::Expr::mk_var("io"),
+                                            item: ipso_syntax::Expr::mk_project(
+                                                Spanned {
+                                                    pos: 0,
+                                                    item: ipso_syntax::Expr::mk_var("io"),
+                                                },
+                                                Spanned {
+                                                    pos: 0,
+                                                    item: String::from("map"),
+                                                },
+                                            ),
                                         },
                                         Spanned {
                                             pos: 0,
-                                            item: String::from("map"),
+                                            item: ipso_syntax::Expr::Var(String::from("toString")),
                                         },
                                     ),
-                                },
+                                    expr,
+                                ),
+                                true,
+                            )
+                        }
+                    } else {
+                        (
+                            ipso_syntax::Expr::mk_app(
                                 Spanned {
                                     pos: 0,
                                     item: ipso_syntax::Expr::Var(String::from("toString")),
                                 },
+                                expr,
                             ),
-                            expr,
-                        )
-                    } else {
-                        ipso_syntax::Expr::mk_app(
-                            Spanned {
-                                pos: 0,
-                                item: ipso_syntax::Expr::Var(String::from("toString")),
-                            },
-                            expr,
+                            true,
                         )
                     }
                 }
@@ -229,7 +242,7 @@ impl Repl {
                 todo!("unsolved: {:?}", unsolved)
             }
 
-            Ok::<_, Error>(expr)
+            Ok::<_, Error>((expr, show_final_value))
         }?;
 
         let stdin = io::stdin();
@@ -266,10 +279,17 @@ impl Repl {
                 | Object::Closure { .. }
                 | Object::StaticClosure { .. }
                 | Object::Cmd(_) => todo!(),
-                Object::String(s) => Ok(String::from(*s)),
-                Object::IO { env, body } => Ok(String::from(
-                    body.run(&mut interpreter, env).unpack_string(),
-                )),
+                Object::String(s) => Ok(Some(String::from(*s))),
+                Object::IO { env, body } => {
+                    let result = body.run(&mut interpreter, env);
+                    Ok(if show_final_value {
+                        Some(String::from(result.unpack_string()))
+                    } else {
+                        // `show_final_value` should only be false for `IO ()`
+                        debug_assert!(result == ipso_eval::Value::Unit);
+                        None
+                    })
+                }
             },
             ipso_eval::Value::True
             | ipso_eval::Value::False

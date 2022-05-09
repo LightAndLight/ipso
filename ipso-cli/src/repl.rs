@@ -163,7 +163,13 @@ pub fn run() -> io::Result<()> {
                             Err(err) => writeln!(stdout, "{:?}", err)?,
                             Ok(expr) => match repl.eval_show(expr) {
                                 Err(err) => writeln!(stdout, "{:?}", err)?,
-                                Ok(value) => writeln!(stdout, "{}", value)?,
+                                Ok(value) => {
+                                    if let Some(value) = value {
+                                        writeln!(stdout, "{}", value)
+                                    } else {
+                                        Ok(())
+                                    }?
+                                }
                             },
                         }
                         stdout.activate_raw_mode()?;
