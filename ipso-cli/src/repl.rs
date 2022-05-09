@@ -153,6 +153,7 @@ pub fn run() -> io::Result<()> {
                     } else {
                         input_state.newline(&mut stdout)?;
 
+                        stdout.suspend_raw_mode()?;
                         let mut parser = ipso_parse::Parser::new(
                             source.clone(),
                             ipso_lex::Lexer::new(&input_state.buffer),
@@ -165,6 +166,7 @@ pub fn run() -> io::Result<()> {
                                 Ok(value) => write!(stdout, "{}", value)?,
                             },
                         }
+                        stdout.activate_raw_mode()?;
 
                         input_state.newline(&mut stdout)?;
                         input_state.newline(&mut stdout)?;
