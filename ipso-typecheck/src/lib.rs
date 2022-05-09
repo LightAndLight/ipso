@@ -218,7 +218,7 @@ impl From<constraint_solving::Error> for Error {
     }
 }
 
-fn abstract_evidence(
+pub fn abstract_evidence(
     common_kinds: &CommonKinds,
     implications: &[Implication],
     types: &HashMap<Rc<str>, Kind>,
