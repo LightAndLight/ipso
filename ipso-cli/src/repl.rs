@@ -112,8 +112,11 @@ impl InputState {
 }
 
 pub fn run() -> io::Result<()> {
+    let source = Source::Interactive {
+        label: String::from("repl"),
+    };
     let mut stdout = io::stdout();
-    let repl = ipso_repl::Repl::new();
+    let repl = ipso_repl::Repl::new(source.clone());
 
     writeln!(
         stdout,
@@ -151,9 +154,7 @@ pub fn run() -> io::Result<()> {
                         input_state.newline(&mut stdout)?;
 
                         let mut parser = ipso_parse::Parser::new(
-                            Source::Interactive {
-                                label: String::from("repl"),
-                            },
+                            source.clone(),
                             ipso_lex::Lexer::new(&input_state.buffer),
                         );
                         let parsed = ipso_parse::grammar::expr::expr(&mut parser);
