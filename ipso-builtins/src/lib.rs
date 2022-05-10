@@ -921,15 +921,15 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 )),
             },
             /*
-            class ToString a where
-              toString : a -> String
+            class Debug a where
+              Debug : a -> String
             */
             Declaration::Class(ClassDeclaration {
                 supers: vec![],
-                name: Rc::from("ToString"),
+                name: Rc::from("Debug"),
                 args: vec![(Rc::from("a"), Kind::Type)],
                 members: vec![ClassMember {
-                    name: String::from("toString"),
+                    name: String::from("debug"),
                     sig: TypeSig::new(
                         vec![],
                         Type::arrow(common_kinds, Type::Var(Kind::Type, 0), Type::String),
@@ -937,8 +937,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 }],
             }),
             /*
-            instance ToString () where
-              toString x = "()"
+            instance Debug () where
+              debug x = "()"
             */
             Declaration::Instance {
                 ty_vars: vec![],
@@ -946,17 +946,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("ToString"),
+                        Rc::from("Debug"),
                     ),
                     Type::Unit,
                 ),
-                evidence: Rc::from("ToString ()"),
+                evidence: Rc::from("Debug ()"),
             },
             Declaration::Evidence {
-                name: Rc::from("ToString ()"),
+                name: Rc::from("Debug ()"),
                 body: Rc::new(Expr::mk_record(
                     vec![(
-                        // toString
+                        // debug
                         Expr::Int(0),
                         // \x -> "()"
                         Expr::mk_lam(true, Expr::String(vec![StringPart::from("()")])),
@@ -965,8 +965,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 )),
             },
             /*
-            instance ToString Int where
-              toString = int.show
+            instance Debug Int where
+              debug = int.show
             */
             Declaration::Instance {
                 ty_vars: vec![],
@@ -974,19 +974,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("ToString"),
+                        Rc::from("Debug"),
                     ),
                     Type::Int,
                 ),
-                evidence: Rc::from("ToString Int"),
+                evidence: Rc::from("Debug Int"),
             },
             Declaration::Evidence {
-                name: Rc::from("ToString Int"),
+                name: Rc::from("Debug Int"),
                 body: Rc::new(Expr::mk_record(
                     vec![(
-                        // toString
+                        // debug
                         Expr::Int(0),
-                        // int.toString
+                        // int.show
                         Expr::Module {
                             id: ModuleRef::This,
                             path: vec![String::from("int")],
@@ -997,8 +997,8 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 )),
             },
             /*
-            instance ToString Bool where
-              toString b = if b then "true" else "false"
+            instance Debug Bool where
+              debug b = if b then "true" else "false"
             */
             Declaration::Instance {
                 ty_vars: vec![],
@@ -1006,17 +1006,17 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("ToString"),
+                        Rc::from("Debug"),
                     ),
                     Type::Bool,
                 ),
-                evidence: Rc::from("ToString Bool"),
+                evidence: Rc::from("Debug Bool"),
             },
             Declaration::Evidence {
-                name: Rc::from("ToString Bool"),
+                name: Rc::from("Debug Bool"),
                 body: Rc::new(Expr::mk_record(
                     vec![(
-                        // toString
+                        // debug
                         Expr::Int(0),
                         // \b -> if b then "true" else "false"
                         Expr::mk_lam(

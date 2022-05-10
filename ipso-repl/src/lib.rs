@@ -186,7 +186,7 @@ impl Repl {
                     ipso_syntax::Expr::mk_app(
                         Spanned {
                             pos: 0,
-                            item: ipso_syntax::Expr::Var(String::from("toString")),
+                            item: ipso_syntax::Expr::Var(String::from("debug")),
                         },
                         expr,
                     ),
@@ -215,7 +215,7 @@ impl Repl {
                                         },
                                         Spanned {
                                             pos: 0,
-                                            item: ipso_syntax::Expr::Var(String::from("toString")),
+                                            item: ipso_syntax::Expr::Var(String::from("debug")),
                                         },
                                     ),
                                     expr,
@@ -228,7 +228,7 @@ impl Repl {
                             ipso_syntax::Expr::mk_app(
                                 Spanned {
                                     pos: 0,
-                                    item: ipso_syntax::Expr::Var(String::from("toString")),
+                                    item: ipso_syntax::Expr::Var(String::from("debug")),
                                 },
                                 expr,
                             ),
