@@ -46,6 +46,24 @@ impl From<desugar::Error> for Error {
     }
 }
 
+impl Error {
+    pub fn position(&self) -> usize {
+        match self {
+            Error::TypeError(err) => err.position.unwrap_or(0),
+            Error::CheckError(err) => err.position(),
+            Error::DesugarError(err) => err.position(),
+        }
+    }
+
+    pub fn message(&self) -> String {
+        match self {
+            Error::TypeError(err) => err.message(),
+            Error::CheckError(err) => err.message(),
+            Error::DesugarError(err) => err.message(),
+        }
+    }
+}
+
 pub struct Repl {
     common_kinds: CommonKinds,
     source: Source,
