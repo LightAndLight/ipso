@@ -46,14 +46,14 @@ impl Error {
         }
     }
 
-    fn position(&self) -> usize {
+    pub fn position(&self) -> usize {
         match self {
             Error::Unexpected { pos, .. } => *pos,
             Error::AmbiguousUseOf { pos, .. } => *pos,
         }
     }
 
-    fn message(&self) -> String {
+    pub fn message(&self) -> String {
         match self {
             Error::Unexpected { expecting, .. } => {
                 let mut str = String::from("expected one of: ");

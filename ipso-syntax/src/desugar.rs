@@ -1,8 +1,7 @@
-use ipso_diagnostic::{Diagnostic, Location, Message, Source};
-
 use crate::{
     Binop, Branch, CmdPart, CompLine, Declaration, Expr, Module, Pattern, Spanned, StringPart,
 };
+use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use std::rc::Rc;
 
 /// An invalid ending for a computation expression.

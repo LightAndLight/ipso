@@ -133,6 +133,16 @@ pub struct IOBody<'heap>(
     fn(&mut Interpreter<'_, '_, 'heap>, &'heap [Value<'heap>]) -> Value<'heap>,
 );
 
+impl<'heap> IOBody<'heap> {
+    pub fn run(
+        &self,
+        interpreter: &mut Interpreter<'_, '_, 'heap>,
+        env: &'heap [Value<'heap>],
+    ) -> Value<'heap> {
+        self.0(interpreter, env)
+    }
+}
+
 impl<'heap> Debug for IOBody<'heap> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("IO()")

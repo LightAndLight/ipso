@@ -89,7 +89,7 @@ impl From<typecheck::Error> for Error {
 }
 
 #[derive(Debug, Clone)]
-enum ImportedItemInfo {
+pub enum ImportedItemInfo {
     /**
     A definition was imported from a specific module.
 
@@ -114,7 +114,7 @@ enum ImportedItemInfo {
     ModuleImportedAs { id: ModuleId },
 }
 
-fn rewrite_module_accessors_expr(
+pub fn rewrite_module_accessors_expr(
     exclude: &mut HashMultiset<Rc<str>>,
     imported_items: &HashMap<String, ImportedItemInfo>,
     expr: &mut Spanned<syntax::Expr>,
@@ -315,6 +315,33 @@ fn rewrite_module_accessors_expr(
     }
 }
 
+pub fn resolve_from_import_all(
+    common_kinds: &CommonKinds,
+    imported_items: &mut HashMap<String, ImportedItemInfo>,
+    imported_module_id: ModuleId,
+    imported_module: &core::Module,
+) {
+    imported_items.extend(
+        imported_module
+            .get_bindings(common_kinds)
+            .into_keys()
+            .filter_map(|name| match name {
+                core::Name::Definition(name) => Some((
+                    name,
+                    ImportedItemInfo::DefinitionImportedFrom {
+                        id: imported_module_id,
+                        path: vec![],
+                    },
+                )),
+                /*
+                Only definitions are brought into scope. Evidence values
+                are internal to their respective modules.
+                */
+                core::Name::Evidence(_) => None,
+            }),
+    );
+}
+
 fn resolve_imports(
     common_kinds: &CommonKinds,
     modules: &mut Modules<core::Module>,
@@ -323,33 +350,6 @@ fn resolve_imports(
     path: &Path,
     module: &mut syntax::Module,
 ) -> Result<(), Error> {
-    fn resolve_from_import_all(
-        common_kinds: &CommonKinds,
-        imported_items: &mut HashMap<String, ImportedItemInfo>,
-        imported_module_id: ModuleId,
-        imported_module: &core::Module,
-    ) {
-        imported_items.extend(
-            imported_module
-                .get_bindings(common_kinds)
-                .into_keys()
-                .filter_map(|name| match name {
-                    core::Name::Definition(name) => Some((
-                        name,
-                        ImportedItemInfo::DefinitionImportedFrom {
-                            id: imported_module_id,
-                            path: vec![],
-                        },
-                    )),
-                    /*
-                    Only definitions are brought into scope. Evidence values
-                    are internal to their respective modules.
-                    */
-                    core::Name::Evidence(_) => None,
-                }),
-        );
-    }
-
     fn resolve_from_import(
         common_kinds: &CommonKinds,
         modules: &mut Modules<core::Module>,

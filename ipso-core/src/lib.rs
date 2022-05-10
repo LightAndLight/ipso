@@ -722,6 +722,15 @@ impl StringPart {
     }
 }
 
+impl<A> From<A> for StringPart
+where
+    String: From<A>,
+{
+    fn from(s: A) -> Self {
+        StringPart::String(String::from(s))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Builtin {
     MapIO,

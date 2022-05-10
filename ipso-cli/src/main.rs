@@ -1,8 +1,7 @@
-mod run;
-
+use clap::Parser;
+use ipso_cli::run::{run_interpreter, InterpreterError};
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
-use run::{run_interpreter, Config, InterpreterError};
-use std::{env, io, path::PathBuf};
+use std::{io, path::PathBuf};
 
 fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Result<()> {
     let mut diagnostic = Diagnostic::new();
@@ -33,62 +32,29 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
     diagnostic.report_all()
 }
 
-#[derive(Debug)]
-enum ConfigError {
-    MissingFilename,
-    MissingEntrypoint,
-}
+#[derive(Parser)]
+#[clap(name = "ipso")]
+struct Cli {
+    /// The file to run. Starts a REPL if omitted.
+    filename: Option<String>,
 
-fn get_filename(args: &[String]) -> Result<String, ConfigError> {
-    if args.len() > 1 {
-        Ok(args[1].clone())
-    } else {
-        Err(ConfigError::MissingFilename)
-    }
-}
-
-fn get_entrypoint(args: &[String]) -> Result<Option<String>, ConfigError> {
-    match args
-        .iter()
-        .enumerate()
-        .find_map(|(ix, val)| if val == "--run" { Some(ix) } else { None })
-    {
-        None => Ok(None),
-        Some(option_ix) => match args.get(option_ix + 1) {
-            None => Err(ConfigError::MissingEntrypoint),
-            Some(entrypoint) => Ok(Some(entrypoint.clone())),
-        },
-    }
-}
-
-fn get_config(args: &[String]) -> Result<Config, ConfigError> {
-    let filename = get_filename(args)?;
-    let entrypoint = get_entrypoint(args)?;
-    Ok(Config {
-        filename,
-        entrypoint,
-        stdin: None,
-        stdout: None,
-    })
-}
-
-fn parse_args() -> Result<Config, ConfigError> {
-    let args: Vec<String> = env::args().collect();
-    get_config(&args)
-}
-
-fn report_config_error(err: ConfigError) {
-    println!("{:?}", err)
+    /// Run a specific IO action from the file. Defaults to "main".
+    #[clap(long = "run")]
+    entrypoint: Option<String>,
 }
 
 fn main() -> io::Result<()> {
-    match parse_args() {
-        Err(err) => {
-            report_config_error(err);
-            std::process::exit(1)
-        }
-        Ok(config) => {
-            let filename = config.filename.clone();
+    let cli = Cli::parse();
+
+    match cli.filename {
+        Some(filename) => {
+            let config = ipso_cli::run::Config {
+                filename: filename.clone(),
+                entrypoint: cli.entrypoint,
+                stdin: None,
+                stdout: None,
+            };
+
             match run_interpreter(config) {
                 Ok(()) => Ok(()),
                 Err(err) => {
@@ -96,6 +62,10 @@ fn main() -> io::Result<()> {
                     std::process::exit(1)
                 }
             }
+        }
+        None => {
+            ipso_cli::repl::run()?;
+            Ok(())
         }
     }
 }
