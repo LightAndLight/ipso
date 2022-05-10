@@ -109,7 +109,6 @@ impl Error {
     pub fn message(&self) -> String {
         match &self.info {
             ErrorInfo::UnificationError { error } => error.message(),
-
             ErrorInfo::NotInScope { .. } => String::from("variable not in scope"),
             ErrorInfo::DuplicateArgument { .. } => String::from("duplicate argument"),
             ErrorInfo::RedundantPattern => String::from("redundant pattern"),
