@@ -1,3 +1,5 @@
+pub mod circular_buffer;
+
 use ipso_diagnostic::Source;
 use std::io::{self, Write};
 use termion::{
@@ -6,6 +8,8 @@ use termion::{
     input::TermRead,
     raw::IntoRawMode,
 };
+
+use self::circular_buffer::CircularBuffer;
 
 const IPSO_BANNER: &str = r#" _
 (_)
@@ -32,6 +36,12 @@ impl InputState {
             buffer_index: 0,
             buffer: String::new(),
         })
+    }
+
+    #[allow(clippy::ptr_arg)]
+    fn set(&mut self, value: &String) {
+        self.buffer_index = value.len();
+        self.buffer.clone_from(value)
     }
 
     fn reset(&mut self) {
@@ -131,6 +141,9 @@ pub fn run() -> io::Result<()> {
     let mut stdout = io::stdout();
     let repl = ipso_repl::Repl::new(source.clone());
 
+    let mut history: CircularBuffer<String> = CircularBuffer::new(100);
+    let mut history_index = 0;
+
     writeln!(stdout, "{}\n\nType :quit<ENTER> to quit.\n", IPSO_BANNER)?;
 
     let mut stdout = stdout.into_raw_mode()?;
@@ -155,10 +168,31 @@ pub fn run() -> io::Result<()> {
                 Key::Right => {
                     input_state.right(&mut stdout, 1)?;
                 }
+                Key::Up => {
+                    if history_index > 0 {
+                        history_index -= 1;
+                        input_state.set(&history[history_index]);
+                        input_state.draw(&mut stdout, prompt)?;
+                    }
+                }
+                Key::Down => {
+                    if history_index < history.len() {
+                        history_index += 1;
+                        if history_index < history.len() {
+                            input_state.set(&history[history_index]);
+                        } else {
+                            input_state.reset();
+                        }
+                        input_state.draw(&mut stdout, prompt)?;
+                    }
+                }
                 Key::Char('\n') => {
                     if input_state.buffer == ":quit" {
                         break;
                     } else {
+                        history.push(input_state.buffer.clone());
+                        history_index = history.len();
+
                         input_state.newline(&mut stdout)?;
 
                         stdout.suspend_raw_mode()?;
