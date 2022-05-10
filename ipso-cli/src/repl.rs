@@ -93,8 +93,7 @@ impl InputState {
         Ok(())
     }
 
-    fn draw(&self, stdout: &mut dyn Write) -> io::Result<()> {
-        let prompt = "> ";
+    fn draw(&self, stdout: &mut dyn Write, prompt: &str) -> io::Result<()> {
         write!(
             stdout,
             "{}{}{}{}{}",
@@ -111,12 +110,25 @@ impl InputState {
     }
 }
 
+fn render_error(
+    stdout: &mut termion::raw::RawTerminal<io::Stdout>,
+    prompt: &str,
+    error_position: usize,
+    error_message: String,
+) -> Result<(), io::Error> {
+    writeln!(stdout, "{}^", " ".repeat(prompt.len() + error_position))?;
+    writeln!(stdout, "error: {}", error_message)?;
+    Ok(())
+}
+
 pub fn run() -> io::Result<()> {
     let source = Source::Interactive {
         label: String::from("repl"),
     };
     let mut stdout = io::stdout();
     let repl = ipso_repl::Repl::new(source.clone());
+
+    let prompt = "> ";
 
     writeln!(
         stdout,
@@ -129,7 +141,7 @@ pub fn run() -> io::Result<()> {
     let (_, cursor_row) = stdout.cursor_pos()?;
     let mut input_state = InputState::new(terminal_size, cursor_row);
 
-    input_state.draw(&mut stdout)?;
+    input_state.draw(&mut stdout, prompt)?;
 
     let stdin = io::stdin();
     for event in stdin.events() {
@@ -160,9 +172,18 @@ pub fn run() -> io::Result<()> {
                         );
                         let parsed = ipso_parse::grammar::expr::expr(&mut parser);
                         match parser.into_parse_error(parsed.result) {
-                            Err(err) => writeln!(stdout, "{:?}", err)?,
+                            Err(err) => {
+                                render_error(&mut stdout, prompt, err.position(), err.message())?;
+                            }
                             Ok(expr) => match repl.eval_show(expr) {
-                                Err(err) => writeln!(stdout, "{:?}", err)?,
+                                Err(err) => {
+                                    render_error(
+                                        &mut stdout,
+                                        prompt,
+                                        err.position(),
+                                        err.message(),
+                                    )?;
+                                }
                                 Ok(value) => {
                                     if let Some(value) = value {
                                         writeln!(stdout, "{}", value)
@@ -185,7 +206,7 @@ pub fn run() -> io::Result<()> {
             }
         }
 
-        input_state.draw(&mut stdout)?;
+        input_state.draw(&mut stdout, prompt)?;
     }
 
     Ok(())
