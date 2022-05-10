@@ -1,10 +1,4 @@
-use std::{
-    collections::HashMap,
-    io::{self, BufReader, BufWriter},
-    rc::Rc,
-};
-
-use ipso_core::{ClassDeclaration, CommonKinds, Signature, Type};
+use ipso_core::{CommonKinds, Type};
 use ipso_diagnostic::Source;
 use ipso_eval::{Env, Interpreter, Object};
 use ipso_import::{resolve_from_import_all, rewrite_module_accessors_expr, ImportedItemInfo};
@@ -18,6 +12,11 @@ use ipso_typecheck::{
     constraint_solving::Implication,
     module::register_from_import,
     type_inference::{self, infer},
+};
+use std::{
+    collections::HashMap,
+    io::{self, BufReader, BufWriter},
+    rc::Rc,
 };
 use typed_arena::Arena;
 
@@ -71,15 +70,7 @@ pub struct Repl {
     imported_items: HashMap<String, ImportedItemInfo>,
     implications: Vec<Implication>,
     type_context: HashMap<Rc<str>, Kind>,
-
-    #[allow(dead_code)] // We'll need this to implement imports
     modules: Modules<ipso_core::Module>,
-
-    #[allow(dead_code)] // We'll need this to implement bindings
-    context: HashMap<String, Signature>,
-
-    #[allow(dead_code)] // We'll need this to implement class declarations
-    class_context: HashMap<Rc<str>, ClassDeclaration>,
 }
 
 impl Repl {
@@ -127,8 +118,6 @@ impl Repl {
             imported_items,
             implications,
             type_context,
-            context,
-            class_context,
         }
     }
 
@@ -314,53 +303,6 @@ impl Repl {
             | ipso_eval::Value::Int(_)
             | ipso_eval::Value::Char(_)
             | ipso_eval::Value::Unit => unreachable!(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    True,
-    False,
-    Int(u32),
-    Char(char),
-    Unit,
-    String(String),
-    Bytes(Vec<u8>),
-    Variant(usize, Box<Value>),
-    Array(Vec<Value>),
-    Record(Vec<Value>),
-    Closure,
-    IO,
-    Cmd(Vec<Rc<str>>),
-}
-
-impl<'a> From<ipso_eval::Value<'a>> for Value {
-    fn from(value: ipso_eval::Value) -> Self {
-        match value {
-            ipso_eval::Value::True => Value::True,
-            ipso_eval::Value::False => Value::False,
-            ipso_eval::Value::Int(i) => Value::Int(i),
-            ipso_eval::Value::Char(c) => Value::Char(c),
-            ipso_eval::Value::Unit => Value::Unit,
-            ipso_eval::Value::Object(object) => match object {
-                ipso_eval::Object::String(s) => Value::String(String::from(*s)),
-                ipso_eval::Object::Bytes(b) => Value::Bytes(Vec::from(*b)),
-                ipso_eval::Object::Variant(tag, arg) => {
-                    Value::Variant(*tag, Box::new(Value::from(*arg)))
-                }
-                ipso_eval::Object::Array(items) => {
-                    Value::Array(items.iter().map(|item| Value::from(*item)).collect())
-                }
-                ipso_eval::Object::Record(items) => {
-                    Value::Record(items.iter().map(|item| Value::from(*item)).collect())
-                }
-                ipso_eval::Object::Closure { .. } | ipso_eval::Object::StaticClosure { .. } => {
-                    Value::Closure
-                }
-                ipso_eval::Object::IO { .. } => Value::IO,
-                ipso_eval::Object::Cmd(parts) => Value::Cmd(parts.clone()),
-            },
         }
     }
 }
