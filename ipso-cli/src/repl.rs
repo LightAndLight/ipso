@@ -130,11 +130,7 @@ pub fn run() -> io::Result<()> {
 
     let prompt = "> ";
 
-    writeln!(
-        stdout,
-        "{}\n\nType :quit<ENTER> to quit.\nType :help<ENTER> to view all commands.\n",
-        IPSO_BANNER
-    )?;
+    writeln!(stdout, "{}\n\nType :quit<ENTER> to quit.\n", IPSO_BANNER)?;
 
     let mut stdout = stdout.into_raw_mode()?;
     let terminal_size = termion::terminal_size()?;
