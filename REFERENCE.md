@@ -44,6 +44,7 @@
 * [Type Classes](#type-classes)
   * [Equality](#equality)
   * [Comparison](#comparison)
+  * [Debugging](#debugging)
   * [JSON](#json)
 * [Grammar](#grammar)
     
@@ -667,6 +668,17 @@ instance Ord Char
 instance Ord String
 instance Ord Int
 instance Ord a => Ord (Array a)
+```
+
+### Debugging
+
+```ipso
+class Debug a where
+  debug : a -> String
+
+instance Debug ()
+instance Debug Bool
+instance Debug Int
 ```
 
 ### JSON
