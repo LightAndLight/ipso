@@ -33,6 +33,7 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
 }
 
 #[derive(Parser)]
+#[clap(name = "ipso")]
 struct Cli {
     /// The file to run. Starts a REPL if omitted.
     filename: Option<String>,
