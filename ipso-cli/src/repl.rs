@@ -24,13 +24,14 @@ struct InputState {
 }
 
 impl InputState {
-    fn new(terminal_size: (u16, u16), cursor_row: u16) -> Self {
-        InputState {
+    fn new(cursor_current_row: u16) -> io::Result<Self> {
+        let terminal_size = termion::terminal_size()?;
+        Ok(InputState {
             terminal_size,
-            cursor_row,
+            cursor_row: cursor_current_row,
             buffer_index: 0,
             buffer: String::new(),
-        }
+        })
     }
 
     fn reset(&mut self) {
@@ -125,17 +126,16 @@ pub fn run() -> io::Result<()> {
     let source = Source::Interactive {
         label: String::from("repl"),
     };
+    let prompt = "> ";
+
     let mut stdout = io::stdout();
     let repl = ipso_repl::Repl::new(source.clone());
-
-    let prompt = "> ";
 
     writeln!(stdout, "{}\n\nType :quit<ENTER> to quit.\n", IPSO_BANNER)?;
 
     let mut stdout = stdout.into_raw_mode()?;
-    let terminal_size = termion::terminal_size()?;
-    let (_, cursor_row) = stdout.cursor_pos()?;
-    let mut input_state = InputState::new(terminal_size, cursor_row);
+    let (_, cursor_current_row) = stdout.cursor_pos()?;
+    let mut input_state = InputState::new(cursor_current_row)?;
 
     input_state.draw(&mut stdout, prompt)?;
 
