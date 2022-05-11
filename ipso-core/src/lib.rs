@@ -42,6 +42,7 @@ pub enum Type {
     Meta(Kind, usize),
     Cmd,
     DebugRecordFields,
+    DebugVariantCtor,
 }
 
 pub struct CommonKinds {
@@ -97,6 +98,7 @@ impl Type {
             Type::Meta(_, m) => r#type::Type::Meta(*m),
             Type::Cmd => r#type::Type::Cmd,
             Type::DebugRecordFields => r#type::Type::DebugRecordFields,
+            Type::DebugVariantCtor => r#type::Type::DebugVariantCtor,
         }
     }
 
@@ -124,6 +126,7 @@ impl Type {
             Type::App(k, _, _) => k.clone(),
             Type::Meta(k, _) => k.clone(),
             Type::DebugRecordFields => Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+            Type::DebugVariantCtor => Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
         }
     }
 
@@ -263,6 +266,7 @@ impl Type {
             Type::Meta(k, n) => f(k, *n),
             Type::Cmd => Type::Cmd,
             Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -292,6 +296,7 @@ impl Type {
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
             Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -334,6 +339,7 @@ impl Type {
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
             Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -492,6 +498,7 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::Meta(_, n) => Step::Yield(*n),
                 Type::Cmd => Step::Skip,
                 Type::DebugRecordFields => Step::Skip,
+                Type::DebugVariantCtor => Step::Skip,
             }
         }
 

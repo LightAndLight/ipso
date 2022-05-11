@@ -27,6 +27,7 @@ pub enum Type<A> {
     Meta(usize),
     Cmd,
     DebugRecordFields,
+    DebugVariantCtor,
 }
 
 pub struct RowParts<'a, A> {
@@ -168,6 +169,7 @@ impl<A> Type<A> {
             Type::Meta(n) => Type::Meta(*n),
             Type::Cmd => Type::Cmd,
             Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -197,6 +199,7 @@ impl<A> Type<A> {
             Type::Meta(n) => Type::Meta(*n),
             Type::Cmd => Type::Cmd,
             Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -501,6 +504,7 @@ impl<A> Type<A> {
             }
             Type::Cmd => s.push_str("Cmd"),
             Type::DebugRecordFields => s.push_str("DebugRecordFields"),
+            Type::DebugVariantCtor => s.push_str("DebugVariantCtor"),
         }
         s
     }
@@ -573,6 +577,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::Meta(n) => Step::Yield(*n),
                 Type::Cmd => Step::Skip,
                 Type::DebugRecordFields => Step::Skip,
+                Type::DebugVariantCtor => Step::Skip,
             }
         }
 
@@ -651,6 +656,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 Type::Meta(_) => Step::Skip,
                 Type::Cmd => Step::Skip,
                 Type::DebugRecordFields => Step::Skip,
+                Type::DebugVariantCtor => Step::Skip,
             }
         }
 
