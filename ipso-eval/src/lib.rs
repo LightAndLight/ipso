@@ -1151,6 +1151,29 @@ where {
                     }
                 )
             }
+            Builtin::JoinString => {
+                function2!(
+                    join_string,
+                    self,
+                    |eval: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let sep = env[0].unpack_string();
+                        let strings = arg.unpack_array();
+                        if strings.is_empty() {
+                            eval.alloc(Object::String(""))
+                        } else {
+                            let mut joined = String::from(strings[0].unpack_string());
+                            for string in &strings[1..] {
+                                joined.push_str(sep);
+                                joined.push_str(string.unpack_string());
+                            }
+                            let joined = eval.alloc_str(&joined);
+                            eval.alloc(Object::String(joined))
+                        }
+                    }
+                )
+            }
             Builtin::FoldlString => {
                 function3!(
                     foldl_string,
@@ -1339,6 +1362,23 @@ where {
                     for x in xs {
                         result.extend(f.apply(interpreter, *x).unpack_array())
                     }
+
+                    interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
+                }
+            ),
+            Builtin::MapArray => function2!(
+                map_array,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 env: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let f = env[0];
+                    let xs = arg.unpack_array();
+
+                    let result = xs
+                        .iter()
+                        .map(|x| f.apply(interpreter, *x))
+                        .collect::<Vec<_>>();
 
                     interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
                 }
