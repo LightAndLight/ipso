@@ -230,7 +230,8 @@ impl Repl {
                 | Type::RowNil
                 | Type::RowCons(_, _, _)
                 | Type::HasField(_, _)
-                | Type::DebugRecordFields => unreachable!(),
+                | Type::DebugRecordFields
+                | Type::DebugVariantCtor => unreachable!(),
             };
 
             rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
