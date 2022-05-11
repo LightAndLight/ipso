@@ -229,7 +229,8 @@ impl Repl {
                 Type::Constraints(_)
                 | Type::RowNil
                 | Type::RowCons(_, _, _)
-                | Type::HasField(_, _) => unreachable!(),
+                | Type::HasField(_, _)
+                | Type::DebugRecordFields => unreachable!(),
             };
 
             rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
