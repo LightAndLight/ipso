@@ -189,6 +189,10 @@ pub fn infer(
         syntax::Type::String => Ok((core::Type::String, Kind::Type)),
         syntax::Type::Bytes => Ok((core::Type::Bytes, Kind::Type)),
         syntax::Type::Cmd => Ok((core::Type::Cmd, Kind::Type)),
+        syntax::Type::DebugRecordFields => Ok((
+            core::Type::DebugRecordFields,
+            Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+        )),
         syntax::Type::Arrow => {
             let kind = env.common_kinds.type_to_type_to_type.clone();
             Ok((core::Type::Arrow(kind.clone()), kind))

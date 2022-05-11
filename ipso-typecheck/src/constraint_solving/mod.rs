@@ -2,7 +2,7 @@
 mod test;
 
 use crate::{evidence::Constraint, fill_ty_names, metavariables, type_inference, BoundVars};
-use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder};
+use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder, StringPart, Type};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
@@ -259,8 +259,6 @@ pub fn solve_constraint(
                     }
                 }
 
-                core::Type::Name(_, n) => todo!("deduce HasField for Name({})", n),
-
                 core::Type::Var(_, _) => {
                     let evidence_result = type_inference_state
                         .evidence
@@ -272,20 +270,6 @@ pub fn solve_constraint(
                             let ev = type_inference_state.evidence.assume(0, constraint.clone());
                             debug_assert!(type_inference_state.evidence.lookup_evar(&ev) != None);
                             Ok(Rc::new(core::Expr::EVar(ev)))
-                        }
-                        Some(evidence) => Ok(evidence),
-                    }
-                }
-                core::Type::App(_, _, _) => {
-                    let evidence_result = type_inference_state
-                        .evidence
-                        .find(&type_inference_state.type_solutions, constraint);
-                    match evidence_result {
-                        None => {
-                            panic!(
-                                "impossible: cannot deduce HasField({:?}, {:?})",
-                                field, rest
-                            )
                         }
                         Some(evidence) => Ok(evidence),
                     }
@@ -356,10 +340,157 @@ pub fn solve_constraint(
                 | core::Type::Variant(_)
                 | core::Type::IO(_)
                 | core::Type::Unit
-                | core::Type::Cmd => panic!("impossible"),
+                | core::Type::Cmd
+                | core::Type::Name(_, _)
+                | core::Type::App(_, _, _)
+                | core::Type::DebugRecordFields => {
+                    let evidence_result = type_inference_state
+                        .evidence
+                        .find(&type_inference_state.type_solutions, constraint);
+                    match evidence_result {
+                        None => {
+                            panic!(
+                                "impossible: cannot deduce HasField({:?}, {:?})",
+                                field, rest
+                            )
+                        }
+                        Some(evidence) => Ok(evidence),
+                    }
+                }
             }?;
 
             Ok(new_evidence)
+        }
+        Constraint::DebugRecordFields(row) => {
+            enum DebugRecordFieldsResult {
+                RecordFields(Vec<Expr>),
+                Other(Rc<Expr>),
+            }
+
+            fn go(
+                env: Env,
+                type_inference_state: &mut type_inference::State,
+                pos: usize,
+                constraint: &Constraint,
+                mut debug_record_fields: Vec<Expr>,
+                row: &Type,
+            ) -> Result<DebugRecordFieldsResult, Error> {
+                match row {
+                    Type::Meta(_, _) => {
+                        todo!("instance DebugRecordFields ?")
+                    }
+                    Type::RowNil => Ok(DebugRecordFieldsResult::RecordFields(debug_record_fields)),
+                    Type::RowCons(field_name, field_type, rest) => {
+                        // debug_dict : { debug : <field_type> -> String }
+                        let debug_dict = solve_constraint(
+                            env,
+                            type_inference_state,
+                            pos,
+                            &Constraint::from_type(&Type::mk_app(
+                                &Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Debug"),
+                                ),
+                                field_type,
+                            )),
+                        )?;
+
+                        // field_offset : Int
+                        let field_offset = solve_constraint(
+                            env,
+                            type_inference_state,
+                            pos,
+                            &Constraint::HasField {
+                                field: field_name.clone(),
+                                rest: rest.as_ref().clone(),
+                            },
+                        )?;
+
+                        // { field : String, value : String }
+                        debug_record_fields.push(Expr::mk_record(
+                            vec![
+                                (
+                                    Expr::Int(0),
+                                    Expr::String(vec![StringPart::from(field_name.as_ref())]),
+                                ),
+                                // debug_dict.debug record.<field_name>
+                                (
+                                    Expr::Int(1),
+                                    Expr::App(
+                                        // debug_dict.debug
+                                        Rc::new(Expr::Project(debug_dict, Rc::new(Expr::Int(0)))),
+                                        // record.<field_name>
+                                        Rc::new(Expr::Project(Rc::new(Expr::Var(0)), field_offset)),
+                                    ),
+                                ),
+                            ],
+                            None,
+                        ));
+
+                        go(
+                            env,
+                            type_inference_state,
+                            pos,
+                            constraint,
+                            debug_record_fields,
+                            rest,
+                        )
+                    }
+                    Type::Var(_, _)
+                    | Type::App(_, _, _)
+                    | Type::Bool
+                    | Type::Int
+                    | Type::Char
+                    | Type::String
+                    | Type::Bytes
+                    | Type::Unit
+                    | Type::Constraints(_)
+                    | Type::HasField(_, _)
+                    | Type::Arrow(_)
+                    | Type::FatArrow(_)
+                    | Type::Array(_)
+                    | Type::Record(_)
+                    | Type::Variant(_)
+                    | Type::Cmd
+                    | Type::DebugRecordFields
+                    | Type::IO(_)
+                    | Type::Name(_, _) => {
+                        let evidence_result = type_inference_state
+                            .evidence
+                            .find(&type_inference_state.type_solutions, constraint);
+                        match evidence_result {
+                            None => Err(Error::cannot_deduce(
+                                env.source.clone(),
+                                fill_ty_names(
+                                    env.type_variables,
+                                    type_inference_state
+                                        .zonk_type(constraint.to_type())
+                                        .to_syntax(),
+                                ),
+                            )),
+                            Some(evidence) => Ok(DebugRecordFieldsResult::Other(evidence)),
+                        }
+                    }
+                }
+            }
+
+            let zonked_row = type_inference_state.zonk_type(row.clone());
+
+            let result = go(
+                env,
+                type_inference_state,
+                pos,
+                constraint,
+                Vec::new(),
+                &zonked_row,
+            )?;
+
+            Ok(match result {
+                DebugRecordFieldsResult::RecordFields(fields) => {
+                    Rc::from(Expr::mk_lam(true, Expr::Array(fields)))
+                }
+                DebugRecordFieldsResult::Other(evidence) => evidence,
+            })
         }
     }
 }

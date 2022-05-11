@@ -66,6 +66,7 @@ impl Evidence {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Constraint {
     HasField { field: Rc<str>, rest: core::Type },
+    DebugRecordFields(core::Type),
     Type(core::Type),
 }
 
@@ -76,6 +77,9 @@ impl Constraint {
                 field: field.clone(),
                 rest: rest.as_ref().clone(),
             },
+            core::Type::App(_, a, b) if a.as_ref() == &core::Type::DebugRecordFields => {
+                Constraint::DebugRecordFields(b.as_ref().clone())
+            }
             _ => Constraint::Type(ty.clone()),
         }
     }
@@ -84,6 +88,9 @@ impl Constraint {
         match self {
             Constraint::HasField { field, rest } => {
                 core::Type::mk_hasfield(field.clone(), rest.clone())
+            }
+            Constraint::DebugRecordFields(ty) => {
+                core::Type::app(core::Type::DebugRecordFields, ty.clone())
             }
             Constraint::Type(ty) => ty.clone(),
         }
