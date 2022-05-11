@@ -2,7 +2,9 @@
 mod test;
 
 use crate::{evidence::Constraint, fill_ty_names, metavariables, type_inference, BoundVars};
-use ipso_core::{self as core, Binop, CommonKinds, Expr, Placeholder, StringPart, Type};
+use ipso_core::{
+    self as core, Binop, Branch, CommonKinds, Expr, Pattern, Placeholder, StringPart, Type,
+};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
@@ -326,24 +328,7 @@ pub fn solve_constraint(
                     }
                 }
 
-                core::Type::Bool
-                | core::Type::Int
-                | core::Type::Char
-                | core::Type::String
-                | core::Type::Bytes
-                | core::Type::Arrow(_)
-                | core::Type::FatArrow(_)
-                | core::Type::Constraints(_)
-                | core::Type::HasField(_, _)
-                | core::Type::Array(_)
-                | core::Type::Record(_)
-                | core::Type::Variant(_)
-                | core::Type::IO(_)
-                | core::Type::Unit
-                | core::Type::Cmd
-                | core::Type::Name(_, _)
-                | core::Type::App(_, _, _)
-                | core::Type::DebugRecordFields => {
+                _ => {
                     let evidence_result = type_inference_state
                         .evidence
                         .find(&type_inference_state.type_solutions, constraint);
@@ -376,9 +361,6 @@ pub fn solve_constraint(
                 row: &Type,
             ) -> Result<DebugRecordFieldsResult, Error> {
                 match row {
-                    Type::Meta(_, _) => {
-                        todo!("instance DebugRecordFields ?")
-                    }
                     Type::RowNil => Ok(DebugRecordFieldsResult::RecordFields(debug_record_fields)),
                     Type::RowCons(field_name, field_type, rest) => {
                         // debug_dict : { debug : <field_type> -> String }
@@ -436,25 +418,7 @@ pub fn solve_constraint(
                             rest,
                         )
                     }
-                    Type::Var(_, _)
-                    | Type::App(_, _, _)
-                    | Type::Bool
-                    | Type::Int
-                    | Type::Char
-                    | Type::String
-                    | Type::Bytes
-                    | Type::Unit
-                    | Type::Constraints(_)
-                    | Type::HasField(_, _)
-                    | Type::Arrow(_)
-                    | Type::FatArrow(_)
-                    | Type::Array(_)
-                    | Type::Record(_)
-                    | Type::Variant(_)
-                    | Type::Cmd
-                    | Type::DebugRecordFields
-                    | Type::IO(_)
-                    | Type::Name(_, _) => {
+                    _ => {
                         let evidence_result = type_inference_state
                             .evidence
                             .find(&type_inference_state.type_solutions, constraint);
@@ -490,6 +454,153 @@ pub fn solve_constraint(
                     Rc::from(Expr::mk_lam(true, Expr::Array(fields)))
                 }
                 DebugRecordFieldsResult::Other(evidence) => evidence,
+            })
+        }
+        Constraint::DebugVariantCtor(row) => {
+            enum DebugVariantCtorResult {
+                CaseBranches(Vec<Branch>),
+                Other(Rc<Expr>),
+            }
+
+            fn go(
+                env: Env,
+                type_inference_state: &mut type_inference::State,
+                pos: usize,
+                constraint: &Constraint,
+                mut case_branches: Vec<Branch>,
+                row: &Type,
+            ) -> Result<DebugVariantCtorResult, Error> {
+                match row {
+                    /*
+                    `row` should already be zonked, so this meta is unsolved.
+
+                    If the this meta is not mentioned in the type of the expression that generated
+                    it, then it's ambiguous and we can default it to the empty row.
+                    */
+                    Type::Meta(kind, _) if kind == &Kind::Row => {
+                        type_inference::unification::unify(
+                            type_inference::unification::Env {
+                                common_kinds: env.common_kinds,
+                                types: env.types,
+                                type_variables: env.type_variables,
+                            },
+                            &mut type_inference_state.kind_inference_state,
+                            &mut type_inference_state.type_solutions,
+                            &core::Type::RowNil,
+                            row,
+                        )
+                        .map_err(|error| Error::unification_error(env.source.clone(), error))?;
+
+                        Ok(DebugVariantCtorResult::CaseBranches(case_branches))
+                    }
+                    Type::RowNil => Ok(DebugVariantCtorResult::CaseBranches(case_branches)),
+                    Type::RowCons(field_name, field_type, rest) => {
+                        // debug_dict : { debug : <field_type> -> String }
+                        let debug_dict = solve_constraint(
+                            env,
+                            type_inference_state,
+                            pos,
+                            &Constraint::from_type(&Type::mk_app(
+                                &Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Debug"),
+                                ),
+                                field_type,
+                            )),
+                        )?;
+
+                        // field_offset : Int
+                        let field_offset = solve_constraint(
+                            env,
+                            type_inference_state,
+                            pos,
+                            &Constraint::HasField {
+                                field: field_name.clone(),
+                                rest: rest.as_ref().clone(),
+                            },
+                        )?;
+
+                        /*
+                        <field_name> value ->
+                          { ctor = "<field name>", value = debug_dict.debug value }
+                        */
+                        case_branches.push(Branch {
+                            pattern: Pattern::Variant { tag: field_offset },
+                            body: Expr::mk_record(
+                                vec![
+                                    (
+                                        Expr::Int(0),
+                                        Expr::String(vec![StringPart::from(field_name.as_ref())]),
+                                    ),
+                                    // debug_dict.debug value
+                                    (
+                                        Expr::Int(1),
+                                        Expr::App(
+                                            // debug_dict.debug
+                                            Rc::new(Expr::Project(
+                                                debug_dict,
+                                                Rc::new(Expr::Int(0)),
+                                            )),
+                                            // value
+                                            Rc::new(Expr::Var(0)),
+                                        ),
+                                    ),
+                                ],
+                                None,
+                            ),
+                        });
+
+                        go(
+                            env,
+                            type_inference_state,
+                            pos,
+                            constraint,
+                            case_branches,
+                            rest,
+                        )
+                    }
+                    _ => {
+                        let evidence_result = type_inference_state
+                            .evidence
+                            .find(&type_inference_state.type_solutions, constraint);
+                        match evidence_result {
+                            None => Err(Error::cannot_deduce(
+                                env.source.clone(),
+                                fill_ty_names(
+                                    env.type_variables,
+                                    type_inference_state
+                                        .zonk_type(constraint.to_type())
+                                        .to_syntax(),
+                                ),
+                            )),
+                            Some(evidence) => Ok(DebugVariantCtorResult::Other(evidence)),
+                        }
+                    }
+                }
+            }
+
+            let zonked_row = type_inference_state.zonk_type(row.clone());
+            let result = go(
+                env,
+                type_inference_state,
+                pos,
+                constraint,
+                Vec::new(),
+                &zonked_row,
+            )?;
+
+            Ok(match result {
+                DebugVariantCtorResult::CaseBranches(case_branches) => {
+                    /*
+                    \variant -> case variant of
+                      <case_branches>
+                    */
+                    Rc::from(Expr::mk_lam(
+                        true,
+                        Expr::mk_case(Expr::Var(0), case_branches),
+                    ))
+                }
+                DebugVariantCtorResult::Other(evidence) => evidence,
             })
         }
     }

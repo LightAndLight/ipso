@@ -193,6 +193,10 @@ pub fn infer(
             core::Type::DebugRecordFields,
             Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
         )),
+        syntax::Type::DebugVariantCtor => Ok((
+            core::Type::DebugVariantCtor,
+            Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+        )),
         syntax::Type::Arrow => {
             let kind = env.common_kinds.type_to_type_to_type.clone();
             Ok((core::Type::Arrow(kind.clone()), kind))

@@ -64,6 +64,7 @@ impl Solutions {
             | Type::Unit
             | Type::Cmd
             | Type::DebugRecordFields
+            | Type::DebugVariantCtor
             | Type::Arrow(_)
             | Type::FatArrow(_)
             | Type::Array(_)
@@ -122,7 +123,8 @@ impl Solutions {
             | Type::RowNil
             | Type::Unit
             | Type::Cmd
-            | Type::DebugRecordFields => {}
+            | Type::DebugRecordFields
+            | Type::DebugVariantCtor => {}
             Type::Constraints(constraints) => constraints.iter_mut().for_each(|constraint| {
                 self.zonk_mut(kind_solutions, constraint);
             }),
@@ -522,6 +524,25 @@ fn unify_inner(
         ),
         Type::DebugRecordFields => match actual {
             Type::DebugRecordFields => Ok(()),
+            Type::Meta(_, meta) => unify_meta_right(
+                common_kinds,
+                types,
+                type_variables,
+                kind_inference_state,
+                type_solutions,
+                expected,
+                meta,
+            ),
+            _ => Err(ErrorInfo::mismatch(
+                &kind_inference_state.kind_solutions,
+                type_solutions,
+                type_variables,
+                expected.clone(),
+                actual.clone(),
+            )),
+        },
+        Type::DebugVariantCtor => match actual {
+            Type::DebugVariantCtor => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
                 common_kinds,
                 types,

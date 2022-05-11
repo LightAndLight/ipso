@@ -67,6 +67,7 @@ impl Evidence {
 pub enum Constraint {
     HasField { field: Rc<str>, rest: core::Type },
     DebugRecordFields(core::Type),
+    DebugVariantCtor(core::Type),
     Type(core::Type),
 }
 
@@ -80,6 +81,9 @@ impl Constraint {
             core::Type::App(_, a, b) if a.as_ref() == &core::Type::DebugRecordFields => {
                 Constraint::DebugRecordFields(b.as_ref().clone())
             }
+            core::Type::App(_, a, b) if a.as_ref() == &core::Type::DebugVariantCtor => {
+                Constraint::DebugVariantCtor(b.as_ref().clone())
+            }
             _ => Constraint::Type(ty.clone()),
         }
     }
@@ -91,6 +95,9 @@ impl Constraint {
             }
             Constraint::DebugRecordFields(ty) => {
                 core::Type::app(core::Type::DebugRecordFields, ty.clone())
+            }
+            Constraint::DebugVariantCtor(ty) => {
+                core::Type::app(core::Type::DebugVariantCtor, ty.clone())
             }
             Constraint::Type(ty) => ty.clone(),
         }
