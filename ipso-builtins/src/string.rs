@@ -56,6 +56,23 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::SplitString),
         }),
+        // join : String -> Array String -> String
+        Rc::new(Declaration::Definition {
+            name: String::from("join"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::String,
+                    Type::arrow(
+                        common_kinds,
+                        Type::app(Type::mk_array(common_kinds), Type::String),
+                        Type::String,
+                    ),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::JoinString),
+        }),
         // foldl : (a -> Char -> a) -> a -> String -> a
         Rc::new(Declaration::Definition {
             name: String::from("foldl"),
