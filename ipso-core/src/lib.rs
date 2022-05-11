@@ -41,6 +41,7 @@ pub enum Type {
     App(Kind, Rc<Type>, Rc<Type>),
     Meta(Kind, usize),
     Cmd,
+    DebugRecordFields,
 }
 
 pub struct CommonKinds {
@@ -95,6 +96,7 @@ impl Type {
             Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
             Type::Cmd => r#type::Type::Cmd,
+            Type::DebugRecordFields => r#type::Type::DebugRecordFields,
         }
     }
 
@@ -121,6 +123,7 @@ impl Type {
             Type::Var(k, _) => k.clone(),
             Type::App(k, _, _) => k.clone(),
             Type::Meta(k, _) => k.clone(),
+            Type::DebugRecordFields => Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
         }
     }
 
@@ -259,6 +262,7 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => f(k, *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
         }
     }
 
@@ -287,6 +291,7 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
         }
     }
 
@@ -328,6 +333,7 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
         }
     }
 
@@ -485,6 +491,7 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::Unit => Step::Skip,
                 Type::Meta(_, n) => Step::Yield(*n),
                 Type::Cmd => Step::Skip,
+                Type::DebugRecordFields => Step::Skip,
             }
         }
 
@@ -757,6 +764,7 @@ pub enum Builtin {
     EqChar,
     CompareChar,
     SplitString,
+    JoinString,
     FoldlString,
     SnocArray,
     Run,
@@ -764,6 +772,7 @@ pub enum Builtin {
     Lines,
     ShowCmd,
     FlatMap,
+    MapArray,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
