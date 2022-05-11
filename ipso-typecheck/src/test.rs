@@ -18,6 +18,9 @@ fn zonk_constraint(
             field: field.clone(),
             rest: type_solutions.zonk(kind_solutions, rest.clone()),
         },
+        Constraint::DebugRecordFields(ty) => {
+            Constraint::DebugRecordFields(type_solutions.zonk(kind_solutions, ty.clone()))
+        }
         Constraint::Type(ty) => Constraint::Type(type_solutions.zonk(kind_solutions, ty.clone())),
     }
 }
