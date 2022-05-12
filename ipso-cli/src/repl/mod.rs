@@ -186,6 +186,7 @@ pub fn run() -> io::Result<()> {
                         input_state.draw(&mut stdout, prompt)?;
                     }
                 }
+                Key::Ctrl('c') => input_state.reset(),
                 Key::Char('\n') => {
                     if input_state.buffer == ":quit" {
                         break;
