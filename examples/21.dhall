@@ -9,6 +9,7 @@
        |
     10 | instance B (Array a) where
        |          ^
+    couldn't find instance for "B a"
     '',
   exitcode = 1
 }

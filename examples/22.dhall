@@ -9,6 +9,7 @@
        |
     15 |   io.andThen (print (a [1, 2, 3])) (\_ ->
        |                      ^
+    couldn't find instance for "B Int"
     '',
   exitcode = 1
 }

@@ -184,7 +184,7 @@ impl Error {
     pub fn addendum(&self) -> Option<String> {
         match self {
             Error::TypeError { .. } => None,
-            Error::ConstraintError { .. } => None,
+            Error::ConstraintError { error } => error.addendum(),
             Error::KindError { error, .. } => error.addendum(),
             Error::DuplicateClassArgument { .. } => None,
             Error::NoSuchClass { .. } => None,

@@ -9,8 +9,27 @@ use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
 
+/// What gave rise to the [`Implication`]?
+#[derive(Debug, Clone, Copy)]
+pub enum Sort {
+    /**
+    This implication exists due to a class definition.
+
+    The implication projects a superclass dictionary from an
+    existing dictionary.
+    */
+    Class,
+    /**
+    This implication exists due to an instance definition.
+
+    The implication constructs a dictionary given some assumptions.
+    */
+    Instance,
+}
+
 #[derive(Debug, Clone)]
 pub struct Implication {
+    pub sort: Sort,
     pub ty_vars: Vec<Kind>,
     pub antecedents: Vec<core::Type>,
     pub consequent: core::Type,
@@ -30,6 +49,7 @@ impl Implication {
             .collect();
         let consequent = self.consequent.instantiate_many(tys);
         Implication {
+            sort: self.sort,
             ty_vars,
             antecedents,
             consequent,
@@ -99,11 +119,40 @@ impl Error {
                     },
                     None => constraint,
                 };
-                format!("cannot deduce \"{:}\"", constraint.render())
+                format!("cannot deduce \"{}\"", constraint.render())
             }
             ErrorInfo::UnificationError { error } => error.message(),
         }
     }
+
+    pub fn addendum(&self) -> Option<String> {
+        match &self.info {
+            ErrorInfo::CannotDeduce { constraint } => match &self.hint {
+                Some(hint) => match hint {
+                    ErrorHint::WhileSolving {
+                        constraint: hint_constraint,
+                    } => {
+                        if constraint == hint_constraint {
+                            None
+                        } else {
+                            Some(format!(
+                                "couldn't find instance for \"{}\"",
+                                constraint.render()
+                            ))
+                        }
+                    }
+                },
+                None => None,
+            },
+            ErrorInfo::UnificationError { .. } => None,
+        }
+    }
+}
+
+trait A {}
+
+trait B: A {
+    fn thingo(&self);
 }
 
 /**
@@ -169,6 +218,7 @@ pub fn solve_constraint(
                     }
                     Ok(()) => {
                         let implication = Implication {
+                            sort: implication.sort,
                             ty_vars: implication.ty_vars,
                             antecedents: implication
                                 .antecedents
@@ -179,32 +229,95 @@ pub fn solve_constraint(
                             evidence: implication.evidence,
                         };
 
-                        let mut evidence_result = Ok(implication.evidence);
+                        let mut evidence_result = implication.evidence;
+                        match implication.sort {
+                            Sort::Class => {
+                                debug_assert!(implication.antecedents.len() == 1);
 
-                        for antecedent in &implication.antecedents {
-                            match solve_constraint(
-                                env,
-                                type_inference_state,
-                                pos,
-                                &Constraint::from_type(antecedent),
-                            ) {
-                                Err(err) => {
-                                    evidence_result = Err(err);
-                                    break;
-                                }
-                                Ok(arg) => {
-                                    evidence_result = evidence_result
-                                        .map(|evidence| Rc::new(Expr::app(evidence, arg)));
+                                match type_inference_state.evidence.find(
+                                    &type_inference_state.type_solutions,
+                                    &Constraint::from_type(&implication.antecedents[0]),
+                                ) {
+                                    None => {
+                                        // This implication isn't going to help us. Keep searching.
+                                        continue;
+                                    }
+                                    Some(arg) => {
+                                        evidence_result = Rc::new(Expr::app(evidence_result, arg));
+
+                                        // We successfully satisfied all assumptions. Search over.
+                                        result = Some(evidence_result);
+                                        break;
+                                    }
                                 }
                             }
-                        }
+                            Sort::Instance => {
+                                /*
+                                We only backwards-chain for instance-generated implications.
 
-                        match evidence_result {
-                            Err(_err) => {
-                                continue;
-                            }
-                            Ok(evidence) => {
-                                result = Some(evidence);
+                                Here's the argument:
+
+                                A class-generated implication projects some dictionary E from an instance
+                                dictionary D. If we can construct D using the current environment, then we
+                                can also construct E using the current environment. Backward-chaining to
+                                construct D in order to project E from it would be inefficient; we should
+                                just construct E directly.
+
+                                This means that class-generated implications only need to project from
+                                already-constructed dictionaries, and that if we can't find such a dictionary
+                                then we just continue searching.
+
+                                Example:
+
+                                These definitions
+
+                                ```
+                                class Eq a
+
+                                class Eq a => Ord a
+
+                                instance Eq Int
+
+                                instance Ord Int
+                                ```
+
+                                give these implications:
+
+                                ```
+                                Ord a -{class}----> Eq a
+                                      -{instance}-> Eq Int
+                                      -{instance}-> Ord Int
+                                ```
+
+                                If we require `Eq Int`, we *could* get it by projecting from `Ord Int`.
+                                But the fact that we have access to `Ord Int` means that we have more direct
+                                access to `Eq Int`. When `instance Ord Int` was defined, we checked that `Eq Int`
+                                was constructable under the same assumptions (In this case there are no assumptions.
+                                In an example like `instance Ord a => Ord (Array a)` we'd check that given `Ord a` we
+                                can construct `Eq (Array a)`).
+
+                                See section 7.3 in *Jones, M. P. (1999, September). Typing haskell in haskell. In Haskell workshop (Vol. 7).*
+                                for another explanation.
+                                */
+                                for antecedent in &implication.antecedents {
+                                    match solve_constraint(
+                                        env,
+                                        type_inference_state,
+                                        pos,
+                                        &Constraint::from_type(antecedent),
+                                    ) {
+                                        Err(err) => {
+                                            return Err(err);
+                                        }
+                                        Ok(arg) => {
+                                            evidence_result =
+                                                Rc::new(Expr::app(evidence_result, arg));
+                                        }
+                                    }
+                                }
+
+                                // We successfully satisfied all assumptions. Search over.
+                                result = Some(evidence_result);
                                 break;
                             }
                         }
@@ -420,10 +533,11 @@ pub fn solve_constraint(
                             rest,
                         )
                     }
-                    _ => {
+                    ty => {
+                        let constraint = Constraint::DebugRecordFields(ty.clone());
                         let evidence_result = type_inference_state
                             .evidence
-                            .find(&type_inference_state.type_solutions, constraint);
+                            .find(&type_inference_state.type_solutions, &constraint);
                         match evidence_result {
                             None => Err(Error::cannot_deduce(
                                 env.source.clone(),
@@ -433,7 +547,8 @@ pub fn solve_constraint(
                                         .zonk_type(constraint.to_type())
                                         .to_syntax(),
                                 ),
-                            )),
+                            )
+                            .with_position(pos)),
                             Some(evidence) => Ok(DebugRecordFieldsResult::Other(evidence)),
                         }
                     }
@@ -577,7 +692,8 @@ pub fn solve_constraint(
                                         .zonk_type(constraint.to_type())
                                         .to_syntax(),
                                 ),
-                            )),
+                            )
+                            .with_position(pos)),
                             Some(evidence) => Ok(DebugVariantCtorResult::Other(evidence)),
                         }
                     }
