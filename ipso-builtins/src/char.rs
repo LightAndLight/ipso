@@ -16,5 +16,14 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::EqChar),
         }),
+        // toString : Char -> String
+        Rc::new(Declaration::Definition {
+            name: String::from("toString"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(common_kinds, Type::Char, Type::String),
+            },
+            body: Expr::alloc_builtin(Builtin::CharToString),
+        }),
     ]
 }

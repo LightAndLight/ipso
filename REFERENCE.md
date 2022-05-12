@@ -398,6 +398,8 @@ Char
 module char where
 
   eq : Char -> Char -> Bool
+
+  toString : Char -> String
 ```
 
 ### Strings
@@ -683,6 +685,9 @@ class Debug a where
 instance Debug ()
 instance Debug Bool
 instance Debug Int
+instance Debug Char
+instance Debug String
+instance Debug a => Debug (Array a)
 instance DebugRecordFields a => Debug { a }
 instance DebugVariantCtor a => Debug (| a |)
 ```

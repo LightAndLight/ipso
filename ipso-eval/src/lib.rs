@@ -1383,6 +1383,28 @@ where {
                     interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
                 }
             ),
+            Builtin::CharToString => function1!(
+                char_to_string,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let char = arg.unpack_char();
+                    let string = format!("{:?}", char);
+                    interpreter.alloc(Object::String(interpreter.alloc_str(&string)))
+                }
+            ),
+            Builtin::DebugString => function1!(
+                debug_string,
+                self,
+                |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                 _: &'heap [Value<'heap>],
+                 arg: Value<'heap>| {
+                    let string = arg.unpack_string();
+                    let new_string = format!("{:?}", string);
+                    interpreter.alloc(Object::String(interpreter.alloc_str(&new_string)))
+                }
+            ),
         }
     }
 
