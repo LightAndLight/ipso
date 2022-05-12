@@ -1,0 +1,27 @@
+f1 : { s : Int, t : Int, a : Int, r : Int } -> Array { field : String, value : String }
+f1 { a, ..rest } = debugRecordFields rest
+
+f2 : { s : Int, t : Int, a : Int, r : Int } -> String
+f2 { a, ..rest } = debug rest
+
+f3 : DebugRecordFields x => { s : Int, t : Int, x } -> String
+f3 = debug
+
+main : IO ()
+main = 
+  comp
+    println <| debug { switch = true }
+
+    let r1 = f1 { a = 3, r = 4, s = 1, t = 2 } 
+    println <| debug (array.map (\x -> x.field) r1 == ["s", "t", "r"])
+    println <| debug (array.map (\x -> x.value) r1 == ["1", "2", "4"])
+
+    let r2 = f1 { s = 1, t = 2, a = 3, r = 4 } 
+    println <| debug (array.map (\x -> x.field) r2 == ["s", "t", "r"])
+    println <| debug (array.map (\x -> x.value) r2 == ["1", "2", "4"])
+    
+    println <| f2 { a = 3, r = 4, s = 1, t = 2 }
+    println <| f2 { s = 1, t = 2, a = 3, r = 4 }
+    
+    println <| f3 { a = 3, r = 4, s = 1, t = 2 }
+    println <| f3 { s = 1, t = 2, r = 4, a = 3 }
