@@ -586,7 +586,6 @@ pub fn solve_constraint(
                 pos: usize,
                 constraint: &Constraint,
                 mut case_branches: Vec<Branch>,
-                entire_row: &Type,
                 current_row: &Type,
             ) -> Result<DebugVariantCtorResult, Error> {
                 match current_row {
@@ -635,7 +634,14 @@ pub fn solve_constraint(
                             pos,
                             &Constraint::HasField {
                                 field: field_name.clone(),
-                                rest: entire_row.clone(),
+                                /*
+                                The HasField constraint for DebugRecordFields uses the entire
+                                row, but for variants we only use the rest of the row.
+
+                                See [note: peeling constructors when matching on variants] for
+                                an explanation of why we do this.
+                                */
+                                rest: rest.as_ref().clone(),
                             },
                         )?;
 
@@ -675,14 +681,14 @@ pub fn solve_constraint(
                             pos,
                             constraint,
                             case_branches,
-                            entire_row,
                             rest,
                         )
                     }
-                    _ => {
+                    ty => {
+                        let constraint = Constraint::DebugVariantCtor(ty.clone());
                         let evidence_result = type_inference_state
                             .evidence
-                            .find(&type_inference_state.type_solutions, constraint);
+                            .find(&type_inference_state.type_solutions, &constraint);
                         match evidence_result {
                             None => Err(Error::cannot_deduce(
                                 env.source.clone(),
@@ -707,7 +713,6 @@ pub fn solve_constraint(
                 pos,
                 constraint,
                 Vec::new(),
-                &zonked_row,
                 &zonked_row,
             )?;
 
