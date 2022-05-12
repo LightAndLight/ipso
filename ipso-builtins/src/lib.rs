@@ -997,6 +997,38 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 )),
             },
             /*
+            instance Debug Char where
+              debug = char.toString
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Debug"),
+                    ),
+                    Type::Char,
+                ),
+                evidence: Rc::from("Debug Char"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Debug Char"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // debug
+                        Expr::Int(0),
+                        // char.toString
+                        Expr::Module {
+                            id: ModuleRef::This,
+                            path: vec![String::from("char")],
+                            item: Name::definition("toString"),
+                        },
+                    )],
+                    None,
+                )),
+            },
+            /*
             instance Debug Bool where
               debug b = if b then "true" else "false"
             */
