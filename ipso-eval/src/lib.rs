@@ -1541,7 +1541,17 @@ where {
                     let b = self.eval(env, b).unpack_int();
                     Value::Int(a / b)
                 }
-                Binop::Append => todo!("eval append"),
+                Binop::Append => {
+                    let a = self.eval(env, a).unpack_array();
+                    let b = self.eval(env, b).unpack_array();
+                    let c = {
+                        let mut c = Vec::with_capacity(a.len() + b.len());
+                        c.extend(a);
+                        c.extend(b);
+                        c
+                    };
+                    self.alloc(Object::Array(self.alloc_values(c)))
+                }
                 Binop::Or => {
                     if self.eval(env, a).unpack_bool() {
                         Value::True
@@ -1761,13 +1771,12 @@ where {
                                 }
                                 Pattern::Record { names, rest } => {
                                     let fields = expr.unpack_record();
-                                    let mut extracted = Vec::with_capacity(names.len());
-                                    for name in names {
-                                        let ix = self.eval(env, name).unpack_int() as usize;
-                                        env.push(fields[ix]);
-                                        extracted.push(ix);
-                                    }
-                                    if *rest {
+                                    let mut extracted: Vec<usize> = names
+                                        .iter()
+                                        .map(|name| self.eval(env, name).unpack_int() as usize)
+                                        .collect();
+
+                                    let leftover_record = if *rest {
                                         let mut leftover_fields = Rope::from_vec(fields);
                                         extracted.sort_unstable();
                                         for ix in extracted.iter().rev() {
@@ -1775,10 +1784,19 @@ where {
                                         }
                                         let leftover_fields =
                                             self.alloc_values(leftover_fields.iter().copied());
-                                        let leftover_record =
-                                            self.alloc(Object::Record(leftover_fields));
-                                        env.push(leftover_record);
+
+                                        Some(self.alloc(Object::Record(leftover_fields)))
+                                    } else {
+                                        None
+                                    };
+
+                                    for ix in extracted.iter() {
+                                        env.push(fields[*ix]);
                                     }
+                                    if let Some(leftover_record) = leftover_record {
+                                        env.push(leftover_record)
+                                    };
+
                                     target = Some(&branch.body);
                                     break;
                                 }
