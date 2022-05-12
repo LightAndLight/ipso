@@ -358,9 +358,10 @@ pub fn solve_constraint(
                 pos: usize,
                 constraint: &Constraint,
                 mut debug_record_fields: Vec<Expr>,
-                row: &Type,
+                entire_row: &Type,
+                current_row: &Type,
             ) -> Result<DebugRecordFieldsResult, Error> {
-                match row {
+                match current_row {
                     Type::RowNil => Ok(DebugRecordFieldsResult::RecordFields(debug_record_fields)),
                     Type::RowCons(field_name, field_type, rest) => {
                         // debug_dict : { debug : <field_type> -> String }
@@ -384,7 +385,7 @@ pub fn solve_constraint(
                             pos,
                             &Constraint::HasField {
                                 field: field_name.clone(),
-                                rest: rest.as_ref().clone(),
+                                rest: entire_row.clone(),
                             },
                         )?;
 
@@ -415,6 +416,7 @@ pub fn solve_constraint(
                             pos,
                             constraint,
                             debug_record_fields,
+                            entire_row,
                             rest,
                         )
                     }
@@ -447,6 +449,7 @@ pub fn solve_constraint(
                 constraint,
                 Vec::new(),
                 &zonked_row,
+                &zonked_row,
             )?;
 
             Ok(match result {
@@ -468,11 +471,12 @@ pub fn solve_constraint(
                 pos: usize,
                 constraint: &Constraint,
                 mut case_branches: Vec<Branch>,
-                row: &Type,
+                entire_row: &Type,
+                current_row: &Type,
             ) -> Result<DebugVariantCtorResult, Error> {
-                match row {
+                match current_row {
                     /*
-                    `row` should already be zonked, so this meta is unsolved.
+                    `current_row` should already be zonked, so this meta is unsolved.
 
                     If the this meta is not mentioned in the type of the expression that generated
                     it, then it's ambiguous and we can default it to the empty row.
@@ -487,7 +491,7 @@ pub fn solve_constraint(
                             &mut type_inference_state.kind_inference_state,
                             &mut type_inference_state.type_solutions,
                             &core::Type::RowNil,
-                            row,
+                            current_row,
                         )
                         .map_err(|error| Error::unification_error(env.source.clone(), error))?;
 
@@ -516,7 +520,7 @@ pub fn solve_constraint(
                             pos,
                             &Constraint::HasField {
                                 field: field_name.clone(),
-                                rest: rest.as_ref().clone(),
+                                rest: entire_row.clone(),
                             },
                         )?;
 
@@ -556,6 +560,7 @@ pub fn solve_constraint(
                             pos,
                             constraint,
                             case_branches,
+                            entire_row,
                             rest,
                         )
                     }
@@ -586,6 +591,7 @@ pub fn solve_constraint(
                 pos,
                 constraint,
                 Vec::new(),
+                &zonked_row,
                 &zonked_row,
             )?;
 
