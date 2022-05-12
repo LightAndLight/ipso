@@ -679,6 +679,13 @@ class Debug a where
 instance Debug ()
 instance Debug Bool
 instance Debug Int
+instance DebugRecordFields a => Debug { a }
+instance DebugVariantCtor a => Debug (| a |)
+```
+
+```ipso
+debugRecordFields : DebugRecordFields a => { a } -> Array { field : String, value : String }
+debugVariantCtor : DebugVariantCtor a => (| a |) -> { ctor : String, value : String }
 ```
 
 ### JSON
