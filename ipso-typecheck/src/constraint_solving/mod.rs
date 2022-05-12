@@ -575,11 +575,6 @@ pub fn solve_constraint(
             })
         }
         Constraint::DebugVariantCtor(row) => {
-            enum DebugVariantCtorResult {
-                CaseBranches(Vec<Branch>),
-                Other(Rc<Expr>),
-            }
-
             fn go(
                 env: Env,
                 type_inference_state: &mut type_inference::State,
@@ -587,15 +582,17 @@ pub fn solve_constraint(
                 constraint: &Constraint,
                 mut case_branches: Vec<Branch>,
                 current_row: &Type,
-            ) -> Result<DebugVariantCtorResult, Error> {
+            ) -> Result<Vec<Branch>, Error> {
                 match current_row {
-                    /*
-                    `current_row` should already be zonked, so this meta is unsolved.
+                    Type::RowNil => Ok(case_branches),
 
+                    /*
                     If the this meta is not mentioned in the type of the expression that generated
                     it, then it's ambiguous and we can default it to the empty row.
                     */
-                    Type::Meta(kind, _) if kind == &Kind::Row => {
+                    Type::Meta(kind, _) => {
+                        debug_assert!(kind == &Kind::Row);
+
                         type_inference::unification::unify(
                             type_inference::unification::Env {
                                 common_kinds: env.common_kinds,
@@ -609,9 +606,8 @@ pub fn solve_constraint(
                         )
                         .map_err(|error| Error::unification_error(env.source.clone(), error))?;
 
-                        Ok(DebugVariantCtorResult::CaseBranches(case_branches))
+                        Ok(case_branches)
                     }
-                    Type::RowNil => Ok(DebugVariantCtorResult::CaseBranches(case_branches)),
                     Type::RowCons(field_name, field_type, rest) => {
                         // debug_dict : { debug : <field_type> -> String }
                         let debug_dict = solve_constraint(
@@ -700,14 +696,20 @@ pub fn solve_constraint(
                                 ),
                             )
                             .with_position(pos)),
-                            Some(evidence) => Ok(DebugVariantCtorResult::Other(evidence)),
+                            Some(evidence) => {
+                                case_branches.push(Branch {
+                                    pattern: Pattern::Name,
+                                    body: Expr::App(evidence, Rc::new(Expr::Var(0))),
+                                });
+                                Ok(case_branches)
+                            }
                         }
                     }
                 }
             }
 
             let zonked_row = type_inference_state.zonk_type(row.clone());
-            let result = go(
+            let case_branches = go(
                 env,
                 type_inference_state,
                 pos,
@@ -716,19 +718,16 @@ pub fn solve_constraint(
                 &zonked_row,
             )?;
 
-            Ok(match result {
-                DebugVariantCtorResult::CaseBranches(case_branches) => {
-                    /*
-                    \variant -> case variant of
-                      <case_branches>
-                    */
-                    Rc::from(Expr::mk_lam(
-                        true,
-                        Expr::mk_case(Expr::Var(0), case_branches),
-                    ))
-                }
-                DebugVariantCtorResult::Other(evidence) => evidence,
-            })
+            Ok(
+                /*
+                \variant -> case variant of
+                  <case_branches>
+                */
+                Rc::from(Expr::mk_lam(
+                    true,
+                    Expr::mk_case(Expr::Var(0), case_branches),
+                )),
+            )
         }
     }
 }
