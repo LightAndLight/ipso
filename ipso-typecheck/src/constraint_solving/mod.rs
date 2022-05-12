@@ -460,9 +460,10 @@ pub fn solve_constraint(
             Ok(new_evidence)
         }
         Constraint::DebugRecordFields(row) => {
-            enum DebugRecordFieldsResult {
-                RecordFields(Vec<Expr>),
-                Other(Rc<Expr>),
+            struct DebugRecordFieldsResult {
+                fields: Vec<Expr>,
+                field_offsets: Vec<Expr>,
+                rest: Option<Rc<Expr>>,
             }
 
             fn go(
@@ -470,12 +471,17 @@ pub fn solve_constraint(
                 type_inference_state: &mut type_inference::State,
                 pos: usize,
                 constraint: &Constraint,
-                mut debug_record_fields: Vec<Expr>,
+                mut record_fields: Vec<Expr>,
+                mut field_offsets: Vec<Expr>,
                 entire_row: &Type,
                 current_row: &Type,
             ) -> Result<DebugRecordFieldsResult, Error> {
                 match current_row {
-                    Type::RowNil => Ok(DebugRecordFieldsResult::RecordFields(debug_record_fields)),
+                    Type::RowNil => Ok(DebugRecordFieldsResult {
+                        fields: record_fields,
+                        field_offsets,
+                        rest: None,
+                    }),
                     Type::RowCons(field_name, field_type, rest) => {
                         // debug_dict : { debug : <field_type> -> String }
                         let debug_dict = solve_constraint(
@@ -501,9 +507,10 @@ pub fn solve_constraint(
                                 rest: entire_row.clone(),
                             },
                         )?;
+                        field_offsets.push(field_offset.as_ref().clone());
 
                         // { field : String, value : String }
-                        debug_record_fields.push(Expr::mk_record(
+                        record_fields.push(Expr::mk_record(
                             vec![
                                 (
                                     Expr::Int(0),
@@ -528,7 +535,8 @@ pub fn solve_constraint(
                             type_inference_state,
                             pos,
                             constraint,
-                            debug_record_fields,
+                            record_fields,
+                            field_offsets,
                             entire_row,
                             rest,
                         )
@@ -549,7 +557,11 @@ pub fn solve_constraint(
                                 ),
                             )
                             .with_position(pos)),
-                            Some(evidence) => Ok(DebugRecordFieldsResult::Other(evidence)),
+                            Some(evidence) => Ok(DebugRecordFieldsResult {
+                                fields: record_fields,
+                                field_offsets,
+                                rest: Some(evidence),
+                            }),
                         }
                     }
                 }
@@ -557,22 +569,58 @@ pub fn solve_constraint(
 
             let zonked_row = type_inference_state.zonk_type(row.clone());
 
-            let result = go(
+            let DebugRecordFieldsResult {
+                fields,
+                field_offsets,
+                rest,
+            } = go(
                 env,
                 type_inference_state,
                 pos,
                 constraint,
                 Vec::new(),
+                Vec::new(),
                 &zonked_row,
                 &zonked_row,
             )?;
 
-            Ok(match result {
-                DebugRecordFieldsResult::RecordFields(fields) => {
-                    Rc::from(Expr::mk_lam(true, Expr::Array(fields)))
-                }
-                DebugRecordFieldsResult::Other(evidence) => evidence,
-            })
+            // \record ->
+            //    <fields> ++ debugRecordFields ((\{ <fields>, ..rest } -> rest) record)
+            Ok(Rc::from(Expr::mk_lam(
+                true,
+                match rest {
+                    Some(debug_record_fields) => Expr::mk_binop(
+                        Binop::Append,
+                        Expr::Array(fields),
+                        // debugRecordFields ((\{ f_1, f_2, ..., f_n, ..rest } -> rest) record)
+                        Expr::App(
+                            debug_record_fields,
+                            /*
+                            \x ->
+                              case x of
+                                { f_1, f_2, ..., f_n, ..rest } -> rest
+                            */
+                            Rc::new(Expr::mk_app(
+                                Expr::mk_lam(
+                                    true,
+                                    Expr::mk_case(
+                                        Expr::Var(0),
+                                        vec![Branch {
+                                            pattern: Pattern::Record {
+                                                names: field_offsets,
+                                                rest: true,
+                                            },
+                                            body: Expr::Var(0),
+                                        }],
+                                    ),
+                                ),
+                                Expr::Var(0),
+                            )),
+                        ),
+                    ),
+                    None => Expr::Array(fields),
+                },
+            )))
         }
         Constraint::DebugVariantCtor(row) => {
             fn go(
