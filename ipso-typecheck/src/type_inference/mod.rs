@@ -1054,9 +1054,38 @@ fn infer_case(
       B y -> ...
 
       c -> ...
+    ```
+
+    But if we change the example to
+
+    ```
+    # expr : (| A : a, B : b, c : C, d : D |)
+    case expr of
+      # check that `B x` has type `(| A : a, B : b, c : C, d : D |)`
+      B y -> ...
+
+      # check that `A y` has type `(| A : a, c : C, d : D |)`
+      A x -> ...
+
+      # check that `c` has type `(| c : C, d : D |)`
+      c -> ...
+    ```
+
+    then we get
+
+    ```
+    case expr of
+      # B's tag is 1
+      B x -> ...
+
+      # A's tag is 0 (because `A` is lexicographically the first constructor
+      # in `(| A : a, c : C, d : D |)`)
+      A y -> ...
+
+      c -> ...
+    ```
 
     The interpreter needs to account for this when checking pattern matches.
-    ```
     */
 
     let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
