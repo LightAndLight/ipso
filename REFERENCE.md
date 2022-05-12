@@ -429,6 +429,8 @@ module string where
 
   split : Char -> String -> Array String
 
+  join : String -> Array String -> String
+
   foldl : (a -> Char -> a) -> a -> String -> a
 ```
 
@@ -500,6 +502,8 @@ module array where
 
   snoc : Array a -> a -> Array a
 
+  map : (a -> b) -> Array a -> Array b
+  
   flatMap : (a -> Array b) -> Array a -> Array b
 ```
 
