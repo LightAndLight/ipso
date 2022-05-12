@@ -781,6 +781,7 @@ pub enum Builtin {
     FlatMap,
     MapArray,
     CharToString,
+    DebugString,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

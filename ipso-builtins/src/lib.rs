@@ -1029,6 +1029,33 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 )),
             },
             /*
+            instance Debug String where
+              debug = <debugString>
+            */
+            Declaration::Instance {
+                ty_vars: vec![],
+                assumes: vec![],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Debug"),
+                    ),
+                    Type::String,
+                ),
+                evidence: Rc::from("Debug String"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Debug String"),
+                body: Rc::new(Expr::mk_record(
+                    vec![(
+                        // debug
+                        Expr::Int(0),
+                        Expr::Builtin(Builtin::DebugString),
+                    )],
+                    None,
+                )),
+            },
+            /*
             instance Debug Bool where
               debug b = if b then "true" else "false"
             */
