@@ -72,7 +72,7 @@ impl InputState {
     }
 
     fn insert(&mut self, c: char) -> io::Result<()> {
-        self.buffer.push(c);
+        self.buffer.insert(self.buffer_index, c);
         self.buffer_index += 1;
 
         Ok(())
