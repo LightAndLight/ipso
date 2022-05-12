@@ -172,7 +172,6 @@ pub fn run() -> io::Result<()> {
                     if history_index > 0 {
                         history_index -= 1;
                         input_state.set(&history[history_index]);
-                        input_state.draw(&mut stdout, prompt)?;
                     }
                 }
                 Key::Down => {
@@ -183,7 +182,6 @@ pub fn run() -> io::Result<()> {
                         } else {
                             input_state.reset();
                         }
-                        input_state.draw(&mut stdout, prompt)?;
                     }
                 }
                 Key::Ctrl('c') => input_state.reset(),
