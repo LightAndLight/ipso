@@ -683,6 +683,7 @@ class Debug a where
 instance Debug ()
 instance Debug Bool
 instance Debug Int
+instance Debug a => Debug (Array a)
 instance DebugRecordFields a => Debug { a }
 instance DebugVariantCtor a => Debug (| a |)
 ```

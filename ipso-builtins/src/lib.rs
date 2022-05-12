@@ -1239,7 +1239,6 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             /*
             instance DebugVariantCtor a => Debug (| a |) where
               debug variant = let result = debugVariantCtor variant in "${result.ctor} ${result.value}"
-
             */
             Declaration::Instance {
                 ty_vars: vec![(Rc::from("a"), Kind::Row)],
@@ -1287,6 +1286,77 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         None,
                     ),
                 )),
+            },
+            /*
+            instance Debug a => Debug (Array a) where
+              debug x = string.join ", " <| array.map debug x
+            */
+            {
+                let debug = Type::Name(
+                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                    Rc::from("Debug"),
+                );
+                let a = Type::Var(Kind::Type, 0);
+                
+                Declaration::Instance {
+                    ty_vars: vec![(Rc::from("a"), Kind::Type)],
+                    assumes: vec![
+                        // Debug a
+                        Type::app(debug.clone(), a.clone()),
+                    ],
+                    head: 
+                    // Debug (Array a)
+                    Type::app(
+                        debug,
+                        Type::app(Type::mk_array(common_kinds), a),
+                    ),
+                    evidence: Rc::from("Debug Array"),
+                }
+            },
+            Declaration::Evidence {
+                name: Rc::from("Debug Array"),
+                
+                // \debugDict -> { debug = ... }
+                body: Rc::new(Expr::mk_lam(true, Expr::mk_record(
+                    vec![(
+                        // debug
+                        Expr::Int(0),
+                        // \x -> "[${string.join ", " (array.map (debug debugDict) x)}]"
+                        Expr::mk_lam(
+                            true,
+                            Expr::String(
+                                vec![
+                                    StringPart::from("["),
+                                    StringPart::Expr(
+                                        Expr::mk_app(
+                                            Expr::mk_app(
+                                                Expr::Module {
+                                                    id: ModuleRef::This,
+                                                    path: vec![String::from("string")],
+                                                    item: Name::definition("join"),
+                                                },
+                                                Expr::String(vec![StringPart::from(", ")]),
+                                            ),
+                                            Expr::mk_app(
+                                                Expr::mk_app(
+                                                    Expr::Module {
+                                                        id: ModuleRef::This,
+                                                        path: vec![String::from("array")],
+                                                        item: Name::definition("map"),
+                                                    },
+                                                    Expr::mk_app(Expr::Name(Name::definition("debug")), Expr::Var(1)),
+                                                ),
+                                                Expr::Var(0),
+                                            ),
+                                        ),
+                                    ),
+                                    StringPart::from("]"),
+                                ]
+                            )
+                        ),
+                    )],
+                    None,
+                ))),
             },
         ],
     }
