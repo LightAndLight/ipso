@@ -97,8 +97,8 @@ impl Type {
             Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
             Type::Cmd => r#type::Type::Cmd,
-            Type::DebugRecordFields => r#type::Type::DebugRecordFields,
-            Type::DebugVariantCtor => r#type::Type::DebugVariantCtor,
+            Type::DebugRecordFields => r#type::Type::Name(Rc::from("DebugRecordFields")),
+            Type::DebugVariantCtor => r#type::Type::Name(Rc::from("DebugVariantCtor")),
         }
     }
 
