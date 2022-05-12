@@ -184,7 +184,7 @@ impl Error {
     pub fn addendum(&self) -> Option<String> {
         match self {
             Error::TypeError { .. } => None,
-            Error::ConstraintError { .. } => None,
+            Error::ConstraintError { error } => error.addendum(),
             Error::KindError { error, .. } => error.addendum(),
             Error::DuplicateClassArgument { .. } => None,
             Error::NoSuchClass { .. } => None,
@@ -399,6 +399,8 @@ pub fn eq_zonked_type(
         core::Type::Bytes => matches!(t2, core::Type::Bytes),
         core::Type::Cmd => matches!(t2, core::Type::Cmd),
         core::Type::Arrow(_) => matches!(t2, core::Type::Arrow(_)),
+        core::Type::DebugRecordFields => matches!(t2, core::Type::DebugRecordFields),
+        core::Type::DebugVariantCtor => matches!(t2, core::Type::DebugVariantCtor),
         core::Type::FatArrow(_) => matches!(t2, core::Type::FatArrow(_)),
         core::Type::Array(_) => matches!(t2, core::Type::Arrow(_)),
         core::Type::Record(_) => matches!(t2, core::Type::Record(_)),
@@ -455,6 +457,14 @@ pub fn eq_zonked_constraint(
                 field: field2,
                 rest: rest2,
             } => field == field2 && eq_zonked_type(type_solutions, rest, rest2),
+            _ => false,
+        },
+        evidence::Constraint::DebugRecordFields(ty) => match c2 {
+            evidence::Constraint::DebugRecordFields(ty2) => eq_zonked_type(type_solutions, ty, ty2),
+            _ => false,
+        },
+        evidence::Constraint::DebugVariantCtor(ty) => match c2 {
+            evidence::Constraint::DebugVariantCtor(ty2) => eq_zonked_type(type_solutions, ty, ty2),
             _ => false,
         },
         evidence::Constraint::Type(ty) => match c2 {

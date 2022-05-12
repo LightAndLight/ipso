@@ -1031,6 +1031,263 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     None,
                 )),
             },
+            /*
+            debugRecordFields :
+              DebugRecordFields a =>
+              Record a ->
+              Array { field : String, value : String }
+            */
+            Declaration::Definition {
+                name: String::from("debugRecordFields"),
+                sig: {
+                    let a = Type::unsafe_mk_var(0, Kind::Row);
+                    TypeSig {
+                        ty_vars: vec![
+                            // a : Type
+                            (Rc::from("a"), a.kind()),
+                        ],
+                        body: Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(Type::DebugRecordFields, a.clone()),
+                            Type::arrow(
+                                common_kinds,
+                                Type::app(Type::mk_record_ctor(common_kinds), a),
+                                Type::app(
+                                    Type::mk_array(common_kinds),
+                                    Type::mk_record(
+                                        common_kinds,
+                                        vec![
+                                            (Rc::from("field"), Type::String),
+                                            (Rc::from("value"), Type::String),
+                                        ],
+                                        None,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    }
+                },
+                /*
+                The evidence for DebugRecordFields is a function
+                of type `Record a -> Array { field : String, value : String }`
+
+                `\x -> x` takes that function and returns it.
+                */
+                body: Rc::new(Expr::mk_lam(true, Expr::Var(0))),
+            },
+            /*
+            instance DebugRecordFields a => Debug { a } where
+              debug record =
+                let fields = debugRecordFields record in
+                if fields == []
+                then "{}"
+                else "{ ${string.join ", " (array.map (\field -> "${field.field} = ${field.value}") fields)} }"
+            */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Row)],
+                assumes: vec![Type::app(Type::DebugRecordFields, Type::Var(Kind::Row, 0))],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Debug"),
+                    ),
+                    // { a }
+                    Type::app(Type::mk_record_ctor(common_kinds), Type::Var(Kind::Row, 0)),
+                ),
+                evidence: Rc::from("Debug Record"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Debug Record"),
+                // \debugRecordFields -> { debug = ... }
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![(
+                            // debug
+                            Expr::Int(0),
+                            /*
+                            \record ->
+                              let fields = debugRecordFields record in
+                               if fields == []
+                               then "{}"
+                               else "{ ${string.join ", " (array.map (\field -> "${field.field} = ${field.value}") fields)} }"
+                            */
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_let(
+                                    Expr::mk_app(Expr::Var(1), Expr::Var(0)),
+                                    Expr::mk_ifthenelse(
+                                        // eqArray eqString fields []
+                                        Expr::mk_app(
+                                            // eqArray eqString fields
+                                            Expr::mk_app(
+                                                // eqArray eqString
+                                                Expr::mk_app(
+                                                    Expr::Builtin(Builtin::EqArray),
+                                                    Expr::Builtin(Builtin::EqString),
+                                                ),
+                                                // fields
+                                                Expr::Var(0),
+                                            ),
+                                            Expr::Array(vec![]),
+                                        ),
+                                        Expr::String(vec![StringPart::from("{}")]),
+                                        Expr::String(vec![
+                                            StringPart::from("{ "),
+                                            StringPart::Expr(
+                                                // string.join ", " (array.map (\field -> "${field.field} = ${field.value}") fields)
+                                                Expr::mk_app(
+                                                    // string.join ", "
+                                                    Expr::mk_app(
+                                                        Expr::Module {
+                                                            id: ModuleRef::This,
+                                                            path: vec![String::from("string")],
+                                                            item: Name::definition("join"),
+                                                        },
+                                                        Expr::String(vec![StringPart::from(", ")]),
+                                                    ),
+                                                    // array.map (\field -> "${field.field} = ${field.value}") fields
+                                                    Expr::mk_app(
+                                                        // array.map (\field -> "${field.field} = ${field.value}")
+                                                        Expr::mk_app(
+                                                            Expr::Module {
+                                                                id: ModuleRef::This,
+                                                                path: vec![String::from("array")],
+                                                                item: Name::definition("map"),
+                                                            },
+                                                            // \field -> "${field.field} = ${field.value}"
+                                                            Expr::mk_lam(
+                                                                true,
+                                                                Expr::String(vec![
+                                                                    StringPart::Expr(
+                                                                        Expr::mk_project(
+                                                                            Expr::Var(0),
+                                                                            // .field
+                                                                            Expr::Int(0),
+                                                                        ),
+                                                                    ),
+                                                                    StringPart::from(" = "),
+                                                                    StringPart::Expr(
+                                                                        Expr::mk_project(
+                                                                            Expr::Var(0),
+                                                                            // .value
+                                                                            Expr::Int(1),
+                                                                        ),
+                                                                    ),
+                                                                ]),
+                                                            ),
+                                                        ),
+                                                        // fields
+                                                        Expr::Var(0),
+                                                    ),
+                                                ),
+                                            ),
+                                            StringPart::from(" }"),
+                                        ]),
+                                    ),
+                                ),
+                            ),
+                        )],
+                        None,
+                    ),
+                )),
+            },
+            /*
+            debugVariantCtor :
+              DebugVariantCtor a =>
+              Variant a ->
+              { ctor : String, value : String }
+            */
+            Declaration::Definition {
+                name: String::from("debugVariantCtor"),
+                sig: {
+                    let a = Type::unsafe_mk_var(0, Kind::Row);
+                    TypeSig {
+                        ty_vars: vec![
+                            // a : Type
+                            (Rc::from("a"), a.kind()),
+                        ],
+                        body: Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(Type::DebugVariantCtor, a.clone()),
+                            Type::arrow(
+                                common_kinds,
+                                Type::app(Type::mk_variant_ctor(common_kinds), a),
+                                Type::app(
+                                    Type::mk_array(common_kinds),
+                                    Type::mk_record(
+                                        common_kinds,
+                                        vec![
+                                            (Rc::from("ctor"), Type::String),
+                                            (Rc::from("value"), Type::String),
+                                        ],
+                                        None,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    }
+                },
+                /*
+                The evidence for DebugVariantCtor is a function
+                of type `Variant a -> { ctor : String, value : String }`
+
+                `\x -> x` takes that function and returns it.
+                */
+                body: Rc::new(Expr::mk_lam(true, Expr::Var(0))),
+            },
+            /*
+            instance DebugVariantCtor a => Debug (| a |) where
+              debug variant = let result = debugVariantCtor variant in "${result.ctor} ${result.value}"
+
+            */
+            Declaration::Instance {
+                ty_vars: vec![(Rc::from("a"), Kind::Row)],
+                assumes: vec![Type::app(Type::DebugVariantCtor, Type::Var(Kind::Row, 0))],
+                head: Type::app(
+                    Type::Name(
+                        Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                        Rc::from("Debug"),
+                    ),
+                    // (| a |)
+                    Type::app(Type::mk_variant_ctor(common_kinds), Type::Var(Kind::Row, 0)),
+                ),
+                evidence: Rc::from("Debug Variant"),
+            },
+            Declaration::Evidence {
+                name: Rc::from("Debug Variant"),
+                // \debugVariantCtor -> { debug = ... }
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![(
+                            // debug
+                            Expr::Int(0),
+                            /*
+                            \variant -> let result = debugVariantCtor variant in "${result.ctor} ${result.value}"
+                            */
+                            Expr::mk_lam(
+                                true,
+                                Expr::mk_let(
+                                    Expr::mk_app(Expr::Var(1), Expr::Var(0)),
+                                    Expr::String(vec![
+                                        StringPart::Expr(Expr::mk_project(
+                                            Expr::Var(0),
+                                            Expr::Int(0),
+                                        )),
+                                        StringPart::from(" "),
+                                        StringPart::Expr(Expr::mk_project(
+                                            Expr::Var(0),
+                                            Expr::Int(1),
+                                        )),
+                                    ]),
+                                ),
+                            ),
+                        )],
+                        None,
+                    ),
+                )),
+            },
         ],
     }
 }

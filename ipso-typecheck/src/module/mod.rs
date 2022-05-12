@@ -1,5 +1,6 @@
 //! Module checking.
 
+use crate::constraint_solving::Sort;
 use crate::{constraint_solving::Implication, declaration, Error};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::Source;
@@ -339,6 +340,7 @@ pub fn register_class(
             .iter()
             .enumerate()
             .map(|(pos, superclass)| Implication {
+                sort: Sort::Class,
                 ty_vars: decl.args.iter().map(|(_, kind)| kind.clone()).collect(),
                 antecedents: vec![applied_type.clone()],
                 consequent: superclass.clone(),
@@ -370,6 +372,7 @@ pub fn register_instance(
     evidence_name: Rc<str>,
 ) {
     implications.push(Implication {
+        sort: Sort::Instance,
         ty_vars: ty_vars.iter().map(|(_, a)| a.clone()).collect(),
         antecedents: Vec::from(assumes),
         consequent: head.clone(),

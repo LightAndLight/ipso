@@ -161,6 +161,27 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::SnocArray),
         }),
+        // map : (a -> b) -> Array a -> Array b
+        Rc::new(Declaration::Definition {
+            name: String::from("map"),
+            sig: TypeSig::new(
+                vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
+                Type::arrow(
+                    common_kinds,
+                    Type::arrow(
+                        common_kinds,
+                        Type::Var(Kind::Type, 1),
+                        Type::Var(Kind::Type, 0),
+                    ),
+                    Type::arrow(
+                        common_kinds,
+                        Type::app(Type::mk_array(common_kinds), Type::Var(Kind::Type, 1)),
+                        Type::app(Type::mk_array(common_kinds), Type::Var(Kind::Type, 0)),
+                    ),
+                ),
+            ),
+            body: Rc::new(Expr::Builtin(Builtin::MapArray)),
+        }),
         // flatMap : (a -> Array b) -> Array a -> Array b
         Rc::new(Declaration::Definition {
             name: String::from("flatMap"),

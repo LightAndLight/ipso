@@ -4,7 +4,7 @@
 pub type Meta = usize;
 
 /// A metavariable solution.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Solution<T> {
     Unsolved,
     Solved(T),

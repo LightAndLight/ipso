@@ -244,9 +244,19 @@ pub fn infer(
             Ok((core::Type::app(a, b), out_kind))
         }
 
-        syntax::Type::Name(name) => match env.types.get(name) {
-            Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
-            None => Err(Error::not_in_scope(name.clone())),
+        syntax::Type::Name(name) => match name.as_ref() {
+            "DebugRecordFields" => Ok((
+                core::Type::DebugRecordFields,
+                Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+            )),
+            "DebugVariantCtor" => Ok((
+                core::Type::DebugVariantCtor,
+                Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+            )),
+            _ => match env.types.get(name) {
+                Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
+                None => Err(Error::not_in_scope(name.clone())),
+            },
         },
         syntax::Type::Var(name) => match env.type_variables.lookup_name(name) {
             Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
