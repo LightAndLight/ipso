@@ -10,6 +10,7 @@ use ipso_syntax::{
 use ipso_typecheck::{
     abstract_evidence,
     constraint_solving::Implication,
+    fill_ty_names,
     module::register_from_import,
     type_inference::{self, infer},
 };
@@ -121,7 +122,10 @@ impl Repl {
         }
     }
 
-    pub fn type_of(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<Type, Error> {
+    pub fn type_of(
+        &self,
+        expr: Spanned<ipso_syntax::Expr>,
+    ) -> Result<ipso_syntax::Type<Rc<str>>, Error> {
         let mut expr = desugar_expr(&self.source, expr)?;
         rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
 
@@ -135,6 +139,9 @@ impl Repl {
         };
         let mut state = type_inference::State::new();
         let (_, ty) = infer(env, &mut state, &expr)?;
+
+        let ty = fill_ty_names(env.type_variables, state.zonk_type(ty).to_syntax());
+
         Ok(ty)
     }
 
