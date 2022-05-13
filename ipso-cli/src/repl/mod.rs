@@ -188,6 +188,52 @@ pub fn run() -> io::Result<()> {
                 Key::Char('\n') => {
                     if input_state.buffer == ":quit" {
                         break;
+                    } else if input_state.buffer.starts_with(":type") {
+                        history.push(input_state.buffer.clone());
+                        history_index = history.len();
+
+                        input_state.newline(&mut stdout)?;
+
+                        let prefix = ":type";
+                        let input = input_state.buffer.trim_start_matches(prefix);
+                        let mut error_offset = prefix.as_bytes().len();
+
+                        let new_input = input.trim_start();
+                        error_offset += input.as_bytes().len() - new_input.as_bytes().len();
+
+                        let input = new_input;
+
+                        stdout.suspend_raw_mode()?;
+                        let mut parser =
+                            ipso_parse::Parser::new(source.clone(), ipso_lex::Lexer::new(input));
+                        let parsed = ipso_parse::grammar::expr::expr(&mut parser);
+                        match parser.into_parse_error(parsed.result) {
+                            Err(err) => {
+                                render_error(
+                                    &mut stdout,
+                                    prompt,
+                                    error_offset + err.position(),
+                                    err.message(),
+                                )?;
+                            }
+                            Ok(expr) => match repl.type_of(expr) {
+                                Err(err) => {
+                                    render_error(
+                                        &mut stdout,
+                                        prompt,
+                                        error_offset + err.position(),
+                                        err.message(),
+                                    )?;
+                                }
+                                Ok(value) => {
+                                    writeln!(stdout, "{}", value.render())?;
+                                }
+                            },
+                        }
+                        stdout.activate_raw_mode()?;
+
+                        input_state.newline(&mut stdout)?;
+                        input_state.reset();
                     } else {
                         history.push(input_state.buffer.clone());
                         history_index = history.len();
