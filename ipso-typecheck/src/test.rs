@@ -399,7 +399,10 @@ fn check_definition_1() {
         pos: 0,
         item: syntax::Declaration::Definition {
             name: String::from("id"),
-            ty: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
+            ty: Spanned {
+                pos: 5,
+                item: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
+            },
             args: vec![syntax::Spanned {
                 pos: 14,
                 item: syntax::Pattern::Name(syntax::Spanned {
@@ -439,13 +442,16 @@ fn check_definition_2() {
         pos: 0,
         item: syntax::Declaration::Definition {
             name: String::from("thing"),
-            ty: Type::mk_arrow(
-                Type::mk_record(Vec::new(), Some(Type::Var(Rc::from("r")))),
-                Type::mk_record(
-                    vec![(Rc::from("x"), Type::Int)],
-                    Some(Type::Var(Rc::from("r"))),
+            ty: Spanned {
+                pos: 8,
+                item: Type::mk_arrow(
+                    Type::mk_record(Vec::new(), Some(Type::Var(Rc::from("r")))),
+                    Type::mk_record(
+                        vec![(Rc::from("x"), Type::Int)],
+                        Some(Type::Var(Rc::from("r"))),
+                    ),
                 ),
-            ),
+            },
             args: vec![syntax::Spanned {
                 pos: 37,
                 item: syntax::Pattern::Name(syntax::Spanned {
@@ -515,14 +521,17 @@ fn check_definition_3() {
         pos: 0,
         item: syntax::Declaration::Definition {
             name: String::from("thing"),
-            ty: Type::mk_record(
-                vec![
-                    (Rc::from("z"), Type::Bool),
-                    (Rc::from("y"), Type::String),
-                    (Rc::from("x"), Type::Int),
-                ],
-                None,
-            ),
+            ty: Spanned {
+                pos: 8,
+                item: Type::mk_record(
+                    vec![
+                        (Rc::from("z"), Type::Bool),
+                        (Rc::from("y"), Type::String),
+                        (Rc::from("x"), Type::Int),
+                    ],
+                    None,
+                ),
+            },
             args: Vec::new(),
             body: syntax::Spanned {
                 pos: 1,
@@ -594,13 +603,16 @@ fn check_definition_4() {
         pos: 0,
         item: syntax::Declaration::Definition {
             name: String::from("getx"),
-            ty: Type::mk_arrow(
-                Type::mk_record(
-                    vec![(Rc::from("x"), Type::Int)],
-                    Some(Type::Var(Rc::from("r"))),
+            ty: Spanned {
+                pos: 7,
+                item: Type::mk_arrow(
+                    Type::mk_record(
+                        vec![(Rc::from("x"), Type::Int)],
+                        Some(Type::Var(Rc::from("r"))),
+                    ),
+                    Type::Int,
                 ),
-                Type::Int,
-            ),
+            },
             args: vec![syntax::Spanned {
                 pos: 3,
                 item: syntax::Pattern::Record {

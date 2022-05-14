@@ -525,7 +525,7 @@ pub struct InstanceMember {
 pub enum Declaration {
     Definition {
         name: String,
-        ty: Type<Rc<str>>,
+        ty: Spanned<Type<Rc<str>>>,
         args: Vec<Spanned<Pattern>>,
         body: Spanned<Expr>,
     },

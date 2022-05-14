@@ -49,7 +49,7 @@ impl From<desugar::Error> for Error {
 impl Error {
     pub fn position(&self) -> usize {
         match self {
-            Error::TypeError(err) => err.position.unwrap_or(0),
+            Error::TypeError(err) => err.position,
             Error::CheckError(err) => err.position(),
             Error::DesugarError(err) => err.position(),
         }

@@ -159,7 +159,7 @@ impl Error {
 
     pub fn position(&self) -> usize {
         match self {
-            Error::TypeError { error } => error.position.unwrap_or(0),
+            Error::TypeError { error } => error.position,
             Error::ConstraintError { error } => error.position.unwrap_or(0),
             Error::KindError { pos, .. } => *pos,
             Error::DuplicateClassArgument { pos, .. } => *pos,

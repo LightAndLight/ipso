@@ -122,7 +122,12 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             &expected,
             &actual,
         )
-        .map_err(|error| type_inference::Error::unification_error(&source, error))?;
+        .map_err(|error| {
+            type_inference::Error::unification_error(
+                &source, // TODO: figure out how to give a useful position?
+                0, error,
+            )
+        })?;
     }
 
     let bytes = Arena::new();
