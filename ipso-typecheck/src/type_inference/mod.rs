@@ -37,22 +37,16 @@ pub enum ErrorInfo {
 #[derive(PartialEq, Eq, Debug)]
 pub struct Error {
     pub source: Source,
-    pub position: Option<usize>,
+    pub position: usize,
     pub info: ErrorInfo,
 }
 
 impl Error {
-    /// Attach a position to an [`Error`].
-    pub fn with_position(mut self, position: usize) -> Self {
-        self.position = Some(position);
-        self
-    }
-
     /// Construct an [`ErrorInfo::NotInScope`].
-    pub fn not_in_scope(source: &Source, name: &str) -> Self {
+    pub fn not_in_scope(source: &Source, position: usize, name: &str) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::NotInScope {
                 name: String::from(name),
             },
@@ -60,10 +54,10 @@ impl Error {
     }
 
     /// Construct an [`ErrorInfo::NotAValue`].
-    pub fn not_a_value(source: &Source, name: &str) -> Self {
+    pub fn not_a_value(source: &Source, position: usize, name: &str) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::NotAValue {
                 name: String::from(name),
             },
@@ -71,37 +65,37 @@ impl Error {
     }
 
     /// Construct an [`ErrorInfo::NotAModule`].
-    pub fn not_a_module(source: &Source) -> Self {
+    pub fn not_a_module(source: &Source, position: usize) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::NotAModule,
         }
     }
 
     /// Construct an [`ErrorInfo::DuplicateArgument`].
-    pub fn duplicate_argument(source: &Source, name: Rc<str>) -> Self {
+    pub fn duplicate_argument(source: &Source, position: usize, name: Rc<str>) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::DuplicateArgument { name },
         }
     }
 
     /// Construct an [`ErrorInfo::RedundantPattern`].
-    pub fn redundant_pattern(source: &Source) -> Self {
+    pub fn redundant_pattern(source: &Source, position: usize) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::RedundantPattern,
         }
     }
 
     /// Lift a [`unification::Error`].
-    pub fn unification_error(source: &Source, error: unification::Error) -> Self {
+    pub fn unification_error(source: &Source, position: usize, error: unification::Error) -> Self {
         Error {
             source: source.clone(),
-            position: None,
+            position,
             info: ErrorInfo::UnificationError { error },
         }
     }
@@ -349,7 +343,7 @@ fn check_duplicate_args(source: &Source, args: &[Spanned<syntax::Pattern>]) -> R
         .flat_map(|arg| arg.item.get_arg_names().into_iter())
         .try_for_each(|arg| {
             if seen.contains(&arg.item.as_ref()) {
-                Err(Error::duplicate_argument(source, arg.item.clone()).with_position(arg.pos))
+                Err(Error::duplicate_argument(source, arg.pos, arg.item.clone()))
             } else {
                 seen.insert(&arg.item);
                 Ok(())
@@ -537,7 +531,7 @@ pub fn check_pattern(
         expected,
         &actual,
     )
-    .map_err(|error| Error::unification_error(env.source, error).with_position(pattern.pos))?;
+    .map_err(|error| Error::unification_error(env.source, pattern.pos, error))?;
     Ok(match result {
         InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
         InferredPattern::Variant {
@@ -571,11 +565,9 @@ pub fn infer(
                         Expr::Name(Name::definition(name.clone())),
                         type_signature,
                     )),
-                    Signature::Module(_) => {
-                        Err(Error::not_a_value(env.source, name).with_position(expr.pos))
-                    }
+                    Signature::Module(_) => Err(Error::not_a_value(env.source, expr.pos, name)),
                 },
-                None => Err(Error::not_in_scope(env.source, name).with_position(expr.pos)),
+                None => Err(Error::not_in_scope(env.source, expr.pos, name)),
             },
         },
         syntax::Expr::Module { id, path, item } => {
@@ -588,14 +580,9 @@ pub fn infer(
                     Ok(definitions)
                 } else {
                     match definitions.get(&path[0].item) {
-                        None => {
-                            Err(Error::not_in_scope(source, &path[0].item)
-                                .with_position(path[0].pos))
-                        }
+                        None => Err(Error::not_in_scope(source, path[0].pos, &path[0].item)),
                         Some(signature) => match signature {
-                            Signature::TypeSig(_) => {
-                                Err(Error::not_a_module(source).with_position(path[0].pos))
-                            }
+                            Signature::TypeSig(_) => Err(Error::not_a_module(source, path[0].pos)),
                             Signature::Module(definitions) => {
                                 lookup_path(source, definitions, &path[1..])
                             }
@@ -624,7 +611,7 @@ pub fn infer(
             let definitions = lookup_path(env.source, definitions, path)?;
 
             match definitions.get(&item.item) {
-                None => Err(Error::not_in_scope(env.source, &item.item).with_position(item.pos)),
+                None => Err(Error::not_in_scope(env.source, item.pos, &item.item)),
                 Some(signature) => match signature {
                     Signature::TypeSig(type_signature) => Ok(state.instantiate(
                         expr.pos,
@@ -636,7 +623,7 @@ pub fn infer(
                         type_signature,
                     )),
                     Signature::Module(_) => {
-                        Err(Error::not_a_value(env.source, &item.item).with_position(item.pos))
+                        Err(Error::not_a_value(env.source, item.pos, &item.item))
                     }
                 },
             }
@@ -907,7 +894,7 @@ pub fn infer(
                         &expected,
                         actual,
                     )
-                    .map_err(|error| Error::unification_error(env.source, error))?;
+                    .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
                     Ok((None, None))
                 }
@@ -1015,6 +1002,7 @@ fn infer_case(
     expr: &Spanned<syntax::Expr>,
     branches: &[syntax::Branch],
 ) -> Result<(Expr, Type), Error> {
+    let position = expr.pos;
     let (expr, mut expr_ty) = infer(env, state, expr)?;
 
     /*
@@ -1095,7 +1083,7 @@ fn infer_case(
         .iter()
         .map(|branch| {
             if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                return Err(Error::redundant_pattern(env.source).with_position(branch.pattern.pos));
+                return Err(Error::redundant_pattern(env.source, branch.pattern.pos));
             }
 
             if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
@@ -1121,6 +1109,7 @@ fn infer_case(
             Ok(Branch { pattern, body })
         })
         .collect::<Result<_, _>>()?;
+
     state.zonk_type_mut(&mut expr_ty);
     match expr_ty.unwrap_variant() {
         Some(RowParts {
@@ -1140,10 +1129,11 @@ fn infer_case(
                 &expected,
                 actual,
             )
-            .map_err(|error| Error::unification_error(env.source, error))
+            .map_err(|error| Error::unification_error(env.source, position, error))
         }
         _ => Ok(()),
     }?;
+
     Ok((Expr::mk_case(expr, branches), out_ty))
 }
 
@@ -1169,7 +1159,7 @@ pub fn check(
         expected,
         &actual,
     )
-    .map_err(|error| Error::unification_error(env.source, error).with_position(position))?;
+    .map_err(|error| Error::unification_error(env.source, position, error))?;
 
     Ok(expr)
 }

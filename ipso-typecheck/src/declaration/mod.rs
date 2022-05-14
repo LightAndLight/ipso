@@ -93,17 +93,20 @@ pub fn check(env: Env, decl: &syntax::Spanned<syntax::Declaration>) -> Result<Ch
 pub fn check_definition(
     env: Env,
     name: &str,
-    ty: &syntax::Type<Rc<str>>,
+    ty: &Spanned<syntax::Type<Rc<str>>>,
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<Checked, Error> {
+    let position = ty.pos;
+
     let mut type_signatures = env.context.clone();
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
 
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = HashSet::new();
-        ty.iter_vars()
+        ty.item
+            .iter_vars()
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
@@ -126,9 +129,8 @@ pub fn check_definition(
         &type_variables,
         &mut type_inference_state.kind_inference_state,
         env.source,
-        // TODO: make `ty` `Spanned` and use its position here.
-        None,
-        ty,
+        Some(position),
+        &ty.item,
         &Kind::Type,
     )?;
 
@@ -181,7 +183,7 @@ pub fn check_definition(
             core::Type::mk_arrow(env.common_kinds, &el.ty(env.common_kinds), &acc)
         }),
     )
-    .map_err(|error| type_inference::Error::unification_error(env.source, error))?;
+    .map_err(|error| type_inference::Error::unification_error(env.source, position, error))?;
 
     let arg_bound_vars = arg_tys
         .iter()

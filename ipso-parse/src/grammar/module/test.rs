@@ -114,7 +114,10 @@ fn parse_definition_1() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            ty: Type::Int,
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: Vec::new(),
             body: Spanned {
                 pos: 12,
@@ -131,7 +134,10 @@ fn parse_definition_2() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            ty: Type::Int,
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: Vec::new(),
             body: Spanned {
                 pos: 14,
@@ -170,7 +176,10 @@ fn parse_definition_4() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("x"),
-            ty: Type::Int,
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: vec![
                 Spanned {
                     pos: 10,
@@ -199,7 +208,10 @@ fn parse_definition_5() {
         definition,
         Ok(Declaration::Definition {
             name: String::from("main"),
-            ty: Type::mk_app(Type::IO, Type::Unit),
+            ty: Spanned {
+                pos: 7,
+                item: Type::mk_app(Type::IO, Type::Unit)
+            },
             args: vec![],
             body: Expr::mk_app(
                 Spanned {

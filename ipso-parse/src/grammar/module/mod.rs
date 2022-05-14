@@ -29,7 +29,7 @@ pub fn definition(parser: &mut Parser) -> Parsed<Declaration> {
             indent!(parser, Relation::Gt, parser.token(&token::Data::Colon))
         )
         .and_then(|name| {
-            type_(parser).and_then(|ty| {
+            spanned!(parser, type_(parser)).and_then(|ty| {
                 keep_right!(
                     indent!(
                         parser,

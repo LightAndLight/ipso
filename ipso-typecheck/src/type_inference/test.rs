@@ -567,14 +567,14 @@ fn infer_array_2() {
                 &Source::Interactive {
                     label: String::from(SOURCE_LABEL)
                 },
+                4,
                 unification::Error::mismatch(syntax::Type::Int, syntax::Type::Bool,).with_hint(
                     unification::ErrorHint::WhileUnifying {
                         expected: syntax::Type::Int,
                         actual: syntax::Type::Bool,
                     }
                 )
-            )
-            .with_position(4))
+            ))
         )
     })
 }
@@ -917,6 +917,7 @@ fn infer_record_4() {
             &Source::Interactive {
                 label: String::from(SOURCE_LABEL),
             },
+            22,
             unification::Error::mismatch(
                 syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
                 syntax::Type::Int,
@@ -925,8 +926,7 @@ fn infer_record_4() {
                 expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
                 actual: syntax::Type::Int,
             }),
-        )
-        .with_position(22));
+        ));
         let actual = infer(env, state, &syntax::Spanned { pos: 0, item: term })
             .map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
@@ -1288,10 +1288,12 @@ fn infer_case_4() {
                 },
             ),
         };
-        let expected = Err(Error::redundant_pattern(&Source::Interactive {
-            label: String::from(SOURCE_LABEL),
-        })
-        .with_position(32));
+        let expected = Err(Error::redundant_pattern(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            32,
+        ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         assert_eq!(expected, actual)
     })
