@@ -3,12 +3,9 @@
 <!-- omit in toc -->
 ## Contents
 
-* [Packages](#packages)
-  * [Using Packages](#using-packages)
 * [Modules](#modules)
   * [Comments](#comments)
   * [Declarations](#declarations)
-  * [Type Aliases](#type-aliases)
   * [Imports](#imports)
     * [Basic Imports](#basic-imports)
     * [Renaming Imports](#renaming-imports)
@@ -48,30 +45,6 @@
   * [JSON](#json)
 * [Grammar](#grammar)
     
-## Packages
-
-A package is a directory that contains `.ipso` files.
-
-```
-my_package
-├── a.ipso
-├── b.ipso
-└── b
-    ├── c.ipso
-    └── d.ipso
-└── e.ipso
-```
-
-### Using Packages
-
-Packages are made available to `ipso` via the `IPSO_PACKAGES` environment variable.
-
-Example:
-
-```bash
-$ IPSO_PACKAGES=/path/to/a:/path/to/b ipso my_file.ipso
-```
-    
 ## Modules
 
 ### Comments
@@ -87,12 +60,6 @@ x = 1
 
 y : String
 y = "hello"
-```
-
-### Type Aliases
-
-```ipso
-type Person = { name : String, age : Int }
 ```
 
 ### Imports
