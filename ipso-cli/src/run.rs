@@ -12,7 +12,6 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
 };
-use typed_arena::Arena;
 
 pub struct Config {
     pub filename: String,
@@ -130,9 +129,6 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         })?;
     }
 
-    let bytes = Arena::new();
-    let values = Arena::new();
-    let objects = Arena::new();
     let mut env = Env::new();
     let _result = {
         let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
@@ -144,16 +140,8 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             .iter()
             .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
             .collect();
-        let mut interpreter = Interpreter::new(
-            &mut stdin,
-            &mut stdout,
-            &common_kinds,
-            &modules,
-            &context,
-            &bytes,
-            &values,
-            &objects,
-        );
+        let mut interpreter =
+            Interpreter::new(&mut stdin, &mut stdout, &common_kinds, &modules, &context);
         let action = interpreter.eval_from_module(
             &mut env,
             &ModuleRef::from(module_id),

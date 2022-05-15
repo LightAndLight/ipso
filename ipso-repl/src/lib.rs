@@ -19,7 +19,6 @@ use std::{
     io::{self, BufReader, BufWriter},
     rc::Rc,
 };
-use typed_arena::Arena;
 
 #[derive(Debug)]
 pub enum Error {
@@ -269,25 +268,18 @@ impl Repl {
 
         let context = Default::default();
 
-        let bytes = Arena::new();
-        let values = Arena::new();
-        let objects = Arena::new();
-
         let mut interpreter = Interpreter::new(
             &mut stdin,
             &mut stdout,
             &self.common_kinds,
             &self.modules,
             &context,
-            &bytes,
-            &values,
-            &objects,
         );
 
         let value = interpreter.eval(&mut Env::new(), &expr);
 
         match value {
-            ipso_eval::Value::Object(object) => match object {
+            ipso_eval::Value::Object(object) => match object.as_ref() {
                 Object::Bytes(_)
                 | Object::Variant(_, _)
                 | Object::Array(_)
@@ -295,9 +287,9 @@ impl Repl {
                 | Object::Closure { .. }
                 | Object::StaticClosure { .. }
                 | Object::Cmd(_) => todo!(),
-                Object::String(s) => Ok(Some(String::from(*s))),
+                Object::String(s) => Ok(Some(String::from(s.as_ref()))),
                 Object::IO { env, body } => {
-                    let result = body.run(&mut interpreter, env);
+                    let result = body.run(&mut interpreter, env.clone());
                     Ok(if show_final_value {
                         Some(String::from(result.unpack_string()))
                     } else {
