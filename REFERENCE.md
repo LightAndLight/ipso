@@ -342,7 +342,9 @@ module int where
 
   eq : Int -> Int -> Bool
 
-  show : Int -> String
+  toString : Int -> String
+
+  mod : Int -> Int -> Int
 ```
 
 ### Characters

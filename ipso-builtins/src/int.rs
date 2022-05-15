@@ -16,14 +16,14 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::EqInt),
         }),
-        // show : Int -> String
+        // toString : Int -> String
         Rc::new(Declaration::Definition {
-            name: String::from("show"),
+            name: String::from("toString"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(common_kinds, Type::Int, Type::String),
             },
-            body: Expr::alloc_builtin(Builtin::ShowInt),
+            body: Expr::alloc_builtin(Builtin::IntToString),
         }),
     ]
 }

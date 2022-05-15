@@ -1,2 +1,2 @@
 main : IO ()
-main = print (int.show (5 * 9))
+main = print (int.toString (5 * 9))

@@ -966,7 +966,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             /*
             instance Debug Int where
-              debug = int.show
+              debug = int.toString
             */
             Declaration::Instance {
                 ty_vars: vec![],
@@ -986,11 +986,11 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     vec![(
                         // debug
                         Expr::Int(0),
-                        // int.show
+                        // int.toString
                         Expr::Module {
                             id: ModuleRef::This,
                             path: vec![String::from("int")],
-                            item: Name::definition("show"),
+                            item: Name::definition("toString"),
                         },
                     )],
                     None,

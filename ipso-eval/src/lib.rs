@@ -892,9 +892,9 @@ where {
                     }
                 )
             }
-            Builtin::ShowInt => {
+            Builtin::IntToString => {
                 function1!(
-                    show_int,
+                    int_to_string,
                     self,
                     |eval: &mut Interpreter<'_, '_, 'heap>,
                      _env: &'heap [Value<'heap>],

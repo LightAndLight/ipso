@@ -4,4 +4,4 @@ f x y =
     _ -> y
 
 main : IO ()
-main = print (int.show (f 0 1))
+main = print (int.toString (f 0 1))
