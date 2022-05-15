@@ -3,15 +3,15 @@
 <!-- omit in toc -->
 ## Contents
 
-* [Modules](#modules)
-  * [Comments](#comments)
-  * [Declarations](#declarations)
+* [Execution](#execution)
+* [Comments](#comments)
+* [Declarations](#declarations)
+  * [Definitions](#definitions)
   * [Imports](#imports)
     * [Basic Imports](#basic-imports)
     * [Renaming Imports](#renaming-imports)
     * [Selective Imports](#selective-imports)
     * [Wildcard Imports](#wildcard-imports)
-  * [Execution](#execution)
 * [Pattern Matching](#pattern-matching)
 * [Let Bindings](#let-bindings)
 * [Computation Expressions](#computation-expressions)
@@ -42,20 +42,46 @@
   * [Equality](#equality)
   * [Comparison](#comparison)
   * [Debugging](#debugging)
-  * [JSON](#json)
 * [Grammar](#grammar)
-    
-## Modules
 
-### Comments
+## Execution
+
+`ipso` will look for an IO action named `main` when called from the command line:
+
+```
+$ cat > example.ipso <<EOF
+main : IO ()
+main = print "hello"
+EOF
+
+$ ipso example.ipso
+hello
+```
+
+This behaviour can be overridden with `-r`/`--run`:
+
+```
+$ cat > example.ipso <<EOF
+sayHello : IO ()
+sayHello = print "hello"
+EOF
+
+$ ipso example.ipso --run sayHello
+hello
+```
+
+## Comments
 
 ```ipso
 # this is a single line comment
 ```
 
-### Declarations
+## Declarations
+
+### Definitions
 
 ```ipso
+x : Int
 x = 1
 
 y : String
@@ -102,32 +128,6 @@ from string import *
 
 loudly : String -> String
 loudly = map to_upper
-```
-
-### Execution
-
-`ipso` will look for an IO action named `main` when called from the command line:
-
-```
-$ cat > example.ipso <<EOF
-main : IO ()
-main = print "hello"
-EOF
-
-$ ipso example.ipso
-hello
-```
-
-This behaviour can be overridden with `-r`/`--run`:
-
-```
-$ cat > example.ipso <<EOF
-sayHello : IO ()
-sayHello = print "hello"
-EOF
-
-$ ipso example.ipso --run sayHello
-hello
 ```
 
 ## Pattern Matching
@@ -662,40 +662,6 @@ instance DebugVariantCtor a => Debug (| a |)
 ```ipso
 debugRecordFields : DebugRecordFields a => { a } -> Array { field : String, value : String }
 debugVariantCtor : DebugVariantCtor a => (| a |) -> { ctor : String, value : String }
-```
-
-### JSON
-
-```ipso
-class ToJson a where
-  encoder : a -> Json
-  
-toJson : ToJson a => a -> String
-```
-
-```ipso
-instance ToJson Bool
-instance ToJson Int
-instance ToJson Char
-instance ToJson String
-instance ToJson a => ToJson (Array a)
-instance Fields ToJson row => ToJson (Record row)
-```
-
-```
-class FromJson a where
-  decoder : Decoder a
-  
-fromJson : FromJson a => String -> (| Err : DecodeError, Ok : a |)
-```
-
-```ipso
-instance FromJson Bool
-instance FromJson Int
-instance FromJson Char
-instance FromJson String
-instance FromJson a => ToJson (Array a)
-instance Fields FromJson row => FromJson (Record row)
 ```
 
 ## Grammar
