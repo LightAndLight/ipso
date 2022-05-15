@@ -1405,6 +1405,52 @@ where {
                     interpreter.alloc(Object::String(interpreter.alloc_str(&new_string)))
                 }
             ),
+            Builtin::ArrayUnfoldr => {
+                function2!(
+                    array_unfoldr,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
+                     env: &'heap [Value<'heap>],
+                     arg: Value<'heap>| {
+                        let mut s = env[0];
+                        let f = arg;
+
+                        let mut array = Vec::new();
+                        loop {
+                            // (| Step : ..., Skip : ..., Done : ... |)
+                            let (tag, value) = f.apply(interpreter, s).unpack_variant();
+
+                            match tag {
+                                // Done
+                                0 => {
+                                    debug_assert!(*value == Value::Unit);
+                                    break;
+                                }
+
+                                // Skip
+                                1 => {
+                                    // value : { next : s }
+                                    let value = value.unpack_record();
+                                    s = value[0];
+                                }
+
+                                // Step
+                                2 => {
+                                    // value : { value : a, next : s }
+                                    let value = value.unpack_record();
+                                    s = value[0];
+                                    array.push(value[1])
+                                }
+
+                                _ => unreachable!(),
+                            }
+                        }
+
+                        let array = interpreter.alloc_values(array);
+                        interpreter.alloc(Object::Array(array))
+                    }
+                )
+            }
         }
     }
 

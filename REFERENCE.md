@@ -476,6 +476,8 @@ module array where
   map : (a -> b) -> Array a -> Array b
   
   flatMap : (a -> Array b) -> Array a -> Array b
+
+  unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
 ```
 
 ### Byte Arrays

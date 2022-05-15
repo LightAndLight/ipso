@@ -782,6 +782,7 @@ pub enum Builtin {
     MapArray,
     CharToString,
     DebugString,
+    ArrayUnfoldr,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

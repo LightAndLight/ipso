@@ -203,5 +203,55 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             ),
             body: Rc::new(Expr::Builtin(Builtin::FlatMap)),
         }),
+        {
+            let s = Type::Var(Kind::Type, 1);
+            let a = Type::Var(Kind::Type, 0);
+            // unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
+            Rc::new(Declaration::Definition {
+                name: String::from("unfoldr"),
+                sig: TypeSig {
+                    ty_vars: vec![(Rc::from("s"), a.kind()), (Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        s.clone(),
+                        Type::arrow(
+                            common_kinds,
+                            Type::arrow(
+                                common_kinds,
+                                s.clone(),
+                                Type::mk_variant(
+                                    common_kinds,
+                                    vec![
+                                        (
+                                            Rc::from("Step"),
+                                            Type::mk_record(
+                                                common_kinds,
+                                                vec![
+                                                    (Rc::from("value"), a.clone()),
+                                                    (Rc::from("next"), s.clone()),
+                                                ],
+                                                None,
+                                            ),
+                                        ),
+                                        (
+                                            Rc::from("Skip"),
+                                            Type::mk_record(
+                                                common_kinds,
+                                                vec![(Rc::from("next"), s)],
+                                                None,
+                                            ),
+                                        ),
+                                        (Rc::from("Done"), Type::Unit),
+                                    ],
+                                    None,
+                                ),
+                            ),
+                            Type::app(Type::mk_array(common_kinds), a),
+                        ),
+                    ),
+                },
+                body: Expr::alloc_builtin(Builtin::ArrayUnfoldr),
+            })
+        },
     ]
 }
