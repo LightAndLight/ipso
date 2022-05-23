@@ -783,6 +783,7 @@ pub enum Builtin {
     CharToString,
     DebugString,
     ArrayUnfoldr,
+    IntMod,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

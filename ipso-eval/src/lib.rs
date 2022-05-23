@@ -1339,6 +1339,17 @@ where {
                     }
                 )
             }
+            Builtin::IntMod => {
+                function2!(
+                    int_mod,
+                    self,
+                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        Value::Int(a % b)
+                    }
+                )
+            }
         }
     }
 
