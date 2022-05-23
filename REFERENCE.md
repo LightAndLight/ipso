@@ -478,6 +478,10 @@ module array where
   flatMap : (a -> Array b) -> Array a -> Array b
 
   unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
+
+  sum : Array Int -> Int
+  
+  any : (a -> Bool) -> Array a -> Bool
 ```
 
 ### Byte Arrays
