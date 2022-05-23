@@ -2,7 +2,7 @@ class Show a where
   show : a -> String
 
 instance Show Int where
-  show = int.show
+  show = int.toString
 
 prettyArray : Show a => Array a -> String
 prettyArray arr = 

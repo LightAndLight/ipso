@@ -342,7 +342,9 @@ module int where
 
   eq : Int -> Int -> Bool
 
-  show : Int -> String
+  toString : Int -> String
+
+  mod : Int -> Int -> Int
 ```
 
 ### Characters
@@ -474,6 +476,12 @@ module array where
   map : (a -> b) -> Array a -> Array b
   
   flatMap : (a -> Array b) -> Array a -> Array b
+
+  unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
+
+  sum : Array Int -> Int
+  
+  any : (a -> Bool) -> Array a -> Bool
 ```
 
 ### Byte Arrays

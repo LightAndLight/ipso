@@ -757,7 +757,7 @@ pub enum Builtin {
     Readln,
     EqInt,
     CompareInt,
-    ShowInt,
+    IntToString,
     FoldlArray,
     EqArray,
     CompareArray,
@@ -782,6 +782,8 @@ pub enum Builtin {
     MapArray,
     CharToString,
     DebugString,
+    ArrayUnfoldr,
+    IntMod,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

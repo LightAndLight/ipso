@@ -6,4 +6,4 @@ recount n =
 
 main : IO ()
 main =
-  println (int.show (recount 10))
+  println (int.toString (recount 10))

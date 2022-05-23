@@ -2,7 +2,7 @@ snoc3 : Array Int -> { before : Array Int, after : Array Int }
 snoc3 xs = { before = xs, after = array.snoc xs 3 }
 
 showArray : Array Int -> String
-showArray = array.foldl (\acc el -> "$acc${int.show el}") ""
+showArray = array.foldl (\acc el -> "$acc${int.toString el}") ""
 
 main : IO ()
 main = 

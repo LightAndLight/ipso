@@ -1,5 +1,5 @@
 showArray : Array Int -> String
-showArray = array.foldl (\acc el -> "$acc${int.show el}") ""
+showArray = array.foldl (\acc el -> "$acc${int.toString el}") ""
 
 main : IO ()
 main = 

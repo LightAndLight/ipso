@@ -16,7 +16,6 @@ use std::{
     process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
-use typed_arena::Arena;
 
 fn check_exit_status(cmd: &str, status: &ExitStatus) {
     match status.code() {
@@ -37,11 +36,11 @@ fn check_exit_status(cmd: &str, status: &ExitStatus) {
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
         paste! {
-            fn [<$name _code_0>]<'heap>(
-                eval: &mut Interpreter<'_, '_, 'heap>,
-                env: &'heap [Value<'heap>],
-                arg: Value<'heap>,
-            ) -> Value<'heap> {
+            fn [<$name _code_0>](
+                eval: &mut Interpreter<'_, '_>,
+                env: Rc<[Value]>,
+                arg: Value,
+            ) -> Value {
                 // This clippy lint is `allow`ed because requiring `$body` to be a function
                 // seems to be the only way to make sure it's scope-checked.
                 #[allow(clippy::redundant_closure_call)]
@@ -49,7 +48,7 @@ macro_rules! function1 {
             }
 
             let closure = $self.alloc(Object::StaticClosure {
-                env: &[],
+                env: Rc::new([]),
                 body: StaticClosureBody([<$name _code_0>]),
             });
             closure
@@ -62,19 +61,17 @@ macro_rules! function2 {
         function1!(
             $name,
             $self,
-            (|eval: &mut Interpreter<'_, '_, 'heap>,
-              env: &'heap [Value<'heap>],
-              arg: Value<'heap>| {
+            (|eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                 paste! {
-                    fn [<$name _code_1>]<'heap>(
-                        eval: &mut Interpreter<'_, '_, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>,
-                    ) -> Value<'heap> {
+                    fn [<$name _code_1>](
+                        eval: &mut Interpreter<'_, '_>,
+                        env: Rc<[Value]>,
+                        arg: Value,
+                    ) -> Value {
                         $body(eval, env, arg)
                     }
                     let env = eval.alloc_values({
-                        let mut env = Vec::from(env);
+                        let mut env = Vec::from(env.as_ref());
                         env.push(arg);
                         env
                     });
@@ -93,17 +90,17 @@ macro_rules! function3 {
         function2!(
             $name,
             $self,
-            (|eval: &mut Interpreter<'_, '_, 'heap>, env: &'heap [Value<'heap>], arg| {
+            (|eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg| {
                 paste! {
-                    fn [<$name _code_2>]<'heap>(
-                        eval: &mut Interpreter<'_, '_, 'heap>,
-                        env: &'heap [Value<'heap>],
-                        arg: Value<'heap>,
-                    ) -> Value<'heap> {
+                    fn [<$name _code_2>](
+                        eval: &mut Interpreter<'_, '_>,
+                        env: Rc<[Value]>,
+                        arg: Value,
+                    ) -> Value {
                         $body(eval, env, arg)
                     }
                     let env = eval.alloc_values({
-                        let mut env = Vec::from(env);
+                        let mut env = Vec::from(env.as_ref());
                         env.push(arg);
                         env
                     });
@@ -118,54 +115,48 @@ macro_rules! function3 {
 }
 
 #[derive(Clone)]
-pub struct StaticClosureBody<'heap>(
-    fn(&mut Interpreter<'_, '_, 'heap>, &'heap [Value<'heap>], Value<'heap>) -> Value<'heap>,
-);
+pub struct StaticClosureBody(fn(&mut Interpreter<'_, '_>, Rc<[Value]>, Value) -> Value);
 
-impl<'heap> Debug for StaticClosureBody<'heap> {
+impl Debug for StaticClosureBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("StaticClosure()")
     }
 }
 
 #[derive(Clone)]
-pub struct IOBody<'heap>(
-    fn(&mut Interpreter<'_, '_, 'heap>, &'heap [Value<'heap>]) -> Value<'heap>,
-);
+pub struct IOBody(fn(&mut Interpreter<'_, '_>, Rc<[Value]>) -> Value);
 
-impl<'heap> IOBody<'heap> {
-    pub fn run(
-        &self,
-        interpreter: &mut Interpreter<'_, '_, 'heap>,
-        env: &'heap [Value<'heap>],
-    ) -> Value<'heap> {
+impl IOBody {
+    pub fn run(&self, interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>) -> Value {
         self.0(interpreter, env)
     }
 }
 
-impl<'heap> Debug for IOBody<'heap> {
+impl Debug for IOBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("IO()")
     }
 }
 
-/// Equivalent to `Cow<[Value<'heap>]>`, but `push` is faster when going from
-/// borrowed to owned.
 #[derive(Debug)]
-pub enum Env<'heap> {
-    Borrowed(&'heap [Value<'heap>]),
-    Owned(Vec<Value<'heap>>),
+pub enum Env {
+    Empty,
+    Borrowed(Rc<[Value]>),
+    Owned(Vec<Value>),
 }
 
-impl<'heap> Default for Env<'heap> {
+impl Default for Env {
     fn default() -> Self {
-        Env::Owned(Default::default())
+        Env::Empty
     }
 }
 
-impl<'heap> Env<'heap> {
-    fn push(&mut self, value: Value<'heap>) {
+impl Env {
+    fn push(&mut self, value: Value) {
         match self {
+            Env::Empty => {
+                *self = Env::Owned(vec![value]);
+            }
             Env::Borrowed(vs) => {
                 let mut new_vs = Vec::with_capacity(vs.len() + 1);
                 new_vs.extend_from_slice(vs);
@@ -178,6 +169,7 @@ impl<'heap> Env<'heap> {
 
     fn len(&self) -> usize {
         match self {
+            Env::Empty => 0,
             Env::Borrowed(vs) => vs.len(),
             Env::Owned(vs) => vs.len(),
         }
@@ -188,17 +180,18 @@ impl<'heap> Env<'heap> {
     }
 }
 
-impl<'heap> From<&'heap [Value<'heap>]> for Env<'heap> {
-    fn from(value: &'heap [Value<'heap>]) -> Self {
+impl From<Rc<[Value]>> for Env {
+    fn from(value: Rc<[Value]>) -> Self {
         Env::Borrowed(value)
     }
 }
 
-impl<'heap> Index<usize> for Env<'heap> {
-    type Output = Value<'heap>;
+impl Index<usize> for Env {
+    type Output = Value;
 
     fn index(&self, index: usize) -> &Self::Output {
         match self {
+            Env::Empty => panic!("index {:?} out of bounds", index),
             Env::Borrowed(vs) => &vs[index],
             Env::Owned(vs) => &vs[index],
         }
@@ -206,14 +199,14 @@ impl<'heap> Index<usize> for Env<'heap> {
 }
 
 #[derive(Debug)]
-pub enum Object<'heap> {
-    String(&'heap str),
-    Bytes(&'heap [u8]),
-    Variant(usize, Value<'heap>),
-    Array(&'heap [Value<'heap>]),
-    Record(&'heap [Value<'heap>]),
+pub enum Object {
+    String(Rc<str>),
+    Bytes(Rc<[u8]>),
+    Variant(usize, Value),
+    Array(Rc<[Value]>),
+    Record(Rc<[Value]>),
     Closure {
-        env: &'heap [Value<'heap>],
+        env: Rc<[Value]>,
         arg: bool,
         /**
         The module from which the closure originated.
@@ -224,74 +217,67 @@ pub enum Object<'heap> {
         body: Rc<Expr>,
     },
     StaticClosure {
-        env: &'heap [Value<'heap>],
-        body: StaticClosureBody<'heap>,
+        env: Rc<[Value]>,
+        body: StaticClosureBody,
     },
     IO {
-        env: &'heap [Value<'heap>],
-        body: IOBody<'heap>,
+        env: Rc<[Value]>,
+        body: IOBody,
     },
     Cmd(Vec<Rc<str>>),
 }
 
-impl<'heap> Object<'heap> {
-    pub fn unpack_array(&'heap self) -> &'heap [Value<'heap>] {
+impl Object {
+    pub fn unpack_array(&self) -> Rc<[Value]> {
         match self {
-            Object::Array(vals) => vals,
+            Object::Array(vals) => vals.clone(),
             val => panic!("expected array, got {:?}", val),
         }
     }
 
-    pub fn perform_io<'io, 'ctx>(
-        &'heap self,
-        interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-    ) -> Value<'heap> {
+    pub fn perform_io<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>) -> Value {
         match self {
-            Object::IO { env, body } => body.0(interpreter, env),
+            Object::IO { env, body } => body.0(interpreter, env.clone()),
             val => panic!("expected io, got {:?}", val),
         }
     }
 
-    pub fn unpack_string(&'heap self) -> &'heap str {
+    pub fn unpack_string(&self) -> &str {
         match self {
             Object::String(str) => str,
             val => panic!("expected string, got {:?}", val),
         }
     }
 
-    pub fn unpack_bytes(&'heap self) -> &'heap [u8] {
+    pub fn unpack_bytes(&self) -> &[u8] {
         match self {
             Object::Bytes(bs) => bs,
             val => panic!("expected bytes, got {:?}", val),
         }
     }
 
-    pub fn unpack_variant(&'heap self) -> (&'heap usize, &'heap Value<'heap>) {
+    pub fn unpack_variant(&self) -> (&usize, &Value) {
         match self {
             Object::Variant(tag, rest) => (tag, rest),
             val => panic!("expected variant, got {:?}", val),
         }
     }
 
-    fn unpack_record(&'heap self) -> &'heap [Value] {
+    fn unpack_record(&self) -> Rc<[Value]> {
         match self {
-            Object::Record(fields) => fields,
+            Object::Record(fields) => fields.clone(),
             val => panic!("expected record,got {:?}", val),
         }
     }
 
-    pub fn unpack_cmd(&'heap self) -> &'heap [Rc<str>] {
+    pub fn unpack_cmd(&self) -> &[Rc<str>] {
         match self {
             Object::Cmd(values) => values,
             val => panic!("expected command, got {:?}", val),
         }
     }
 
-    pub fn apply<'io, 'ctx>(
-        &'heap self,
-        interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-        arg: Value<'heap>,
-    ) -> Value<'heap> {
+    pub fn apply<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>, arg: Value) -> Value {
         match self {
             Object::Closure {
                 env,
@@ -299,7 +285,7 @@ impl<'heap> Object<'heap> {
                 module,
                 body,
             } => {
-                let mut env = Env::from(*env);
+                let mut env = Env::from(env.clone());
                 if *use_arg {
                     env.push(arg);
                 }
@@ -313,7 +299,7 @@ impl<'heap> Object<'heap> {
                 }
                 result
             }
-            Object::StaticClosure { env, body } => body.0(interpreter, env, arg),
+            Object::StaticClosure { env, body } => body.0(interpreter, env.clone(), arg),
             a => panic!("expected closure, got {:?}", a),
         }
     }
@@ -373,7 +359,7 @@ impl<'heap> Object<'heap> {
     }
 }
 
-impl<'heap> PartialEq for Object<'heap> {
+impl PartialEq for Object {
     fn eq(&self, other: &Self) -> bool {
         match self {
             Object::Closure {
@@ -432,54 +418,47 @@ impl<'heap> PartialEq for Object<'heap> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Value<'heap> {
+#[derive(Debug, Clone)]
+pub enum Value {
     True,
     False,
     Int(u32),
     Char(char),
     Unit,
 
-    Object(&'heap Object<'heap>),
+    Object(Rc<Object>),
 }
 
-impl<'heap> Value<'heap> {
-    pub fn apply<'io, 'ctx>(
-        &self,
-        interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-        arg: Value<'heap>,
-    ) -> Value<'heap> {
+impl Value {
+    pub fn apply<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>, arg: Value) -> Value {
         self.unpack_object().apply(interpreter, arg)
     }
 
-    pub fn perform_io<'io, 'ctx>(
-        &self,
-        interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-    ) -> Value<'heap> {
+    pub fn perform_io<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>) -> Value {
         self.unpack_object().perform_io(interpreter)
     }
 
-    pub fn unpack_string(&self) -> &'heap str {
+    pub fn unpack_string(&self) -> &str {
         self.unpack_object().unpack_string()
     }
 
-    pub fn unpack_bytes(&self) -> &'heap [u8] {
+    pub fn unpack_bytes(&self) -> &[u8] {
         self.unpack_object().unpack_bytes()
     }
 
-    pub fn unpack_array(&self) -> &'heap [Value<'heap>] {
+    pub fn unpack_array(&self) -> Rc<[Value]> {
         self.unpack_object().unpack_array()
     }
 
-    pub fn unpack_variant(&self) -> (&'heap usize, &'heap Value<'heap>) {
+    pub fn unpack_variant(&self) -> (&usize, &Value) {
         self.unpack_object().unpack_variant()
     }
 
-    pub fn unpack_cmd(&self) -> &'heap [Rc<str>] {
+    pub fn unpack_cmd(&self) -> &[Rc<str>] {
         self.unpack_object().unpack_cmd()
     }
 
-    pub fn unpack_object(&self) -> &'heap Object<'heap> {
+    pub fn unpack_object(&self) -> &Object {
         match self {
             Value::Object(obj) => obj,
             val => panic!("expected object, got {:?}", val),
@@ -508,7 +487,7 @@ impl<'heap> Value<'heap> {
         }
     }
 
-    pub fn unpack_record(&self) -> &'heap [Value<'heap>] {
+    pub fn unpack_record(&self) -> Rc<[Value]> {
         self.unpack_object().unpack_record()
     }
 
@@ -524,7 +503,7 @@ impl<'heap> Value<'heap> {
     }
 }
 
-impl<'heap> PartialEq for Value<'heap> {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match self {
             Value::True => matches!(other, Value::True),
@@ -555,27 +534,20 @@ struct Context<'ctx> {
     base: &'ctx HashMap<Name, Binding>,
 }
 
-pub struct Interpreter<'io, 'ctx, 'heap> {
+pub struct Interpreter<'io, 'ctx> {
     stdin: &'io mut dyn BufRead,
     stdout: &'io mut dyn io::Write,
-    bytes: &'heap Arena<u8>,
-    values: &'heap Arena<Value<'heap>>,
-    objects: &'heap Arena<Object<'heap>>,
     context: Context<'ctx>,
     modules: HashMap<ModuleId, Module>,
 }
 
-impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
-    #[allow(clippy::too_many_arguments)]
+impl<'io, 'ctx> Interpreter<'io, 'ctx> {
     pub fn new(
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
         common_kinds: &'ctx CommonKinds,
         modules: &'ctx Modules<core::Module>,
         context: &'ctx HashMap<Name, Binding>,
-        bytes: &'heap Arena<u8>,
-        values: &'heap Arena<Value<'heap>>,
-        objects: &'heap Arena<Object<'heap>>,
     ) -> Self {
         let modules = modules
             .iter_ids()
@@ -597,33 +569,29 @@ impl<'io, 'ctx, 'heap> Interpreter<'io, 'ctx, 'heap> {
                 base: context,
             },
             modules,
-            bytes,
-            values,
-            objects,
         }
     }
 
-    pub fn alloc(&self, obj: Object<'heap>) -> Value<'heap> {
-        Value::Object(self.objects.alloc(obj))
+    pub fn alloc(&self, obj: Object) -> Value {
+        Value::Object(Rc::new(obj))
     }
 
-    pub fn alloc_str(&self, s: &str) -> &'heap str {
-        self.bytes.alloc_str(s)
+    pub fn alloc_str(&self, s: &str) -> Rc<str> {
+        Rc::from(s)
     }
 
-    pub fn alloc_bytes<I: IntoIterator<Item = u8>>(&self, s: I) -> &'heap [u8] {
-        self.bytes.alloc_extend(s)
+    pub fn alloc_bytes<I: IntoIterator<Item = u8>>(&self, s: I) -> Rc<[u8]> {
+        let bytes: Vec<u8> = s.into_iter().collect();
+        Rc::from(bytes)
     }
 
-    pub fn alloc_values<I: IntoIterator<Item = Value<'heap>>>(
-        &self,
-        vals: I,
-    ) -> &'heap [Value<'heap>]
+    pub fn alloc_values<I: IntoIterator<Item = Value>>(&self, vals: I) -> Rc<[Value]>
 where {
-        self.values.alloc_extend(vals)
+        let values: Vec<Value> = vals.into_iter().collect();
+        Rc::from(values)
     }
 
-    pub fn alloc_ordering(&self, ordering: Ordering) -> Value<'heap> {
+    pub fn alloc_ordering(&self, ordering: Ordering) -> Value {
         match ordering {
             std::cmp::Ordering::Less => {
                 // Less () : (| Equal : (), Greater : (), Less : () |)
@@ -640,23 +608,18 @@ where {
         }
     }
 
-    pub fn eval_builtin(&self, name: &Builtin) -> Value<'heap> {
+    pub fn eval_builtin(&self, name: &Builtin) -> Value {
         match name {
             Builtin::Pure => {
                 function1!(
                     pure,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn pure_io_1<'io, 'ctx, 'heap>(
-                            _: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
-                            env[0]
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn pure_io_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            env[0].clone()
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
+                            let mut env = Vec::from(env.as_ref());
                             env.push(arg);
                             env
                         });
@@ -672,20 +635,15 @@ where {
                 function2!(
                     map_io,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn map_io_2<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
-                            let f = env[0];
-                            let io_a = env[1];
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        fn map_io_2(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let f = env[0].clone();
+                            let io_a = env[1].clone();
                             let a = io_a.perform_io(interpreter); // type: a
                             f.apply(interpreter, a) // type: b
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
+                            let mut env = Vec::from(env.as_ref());
                             env.push(arg);
                             env
                         });
@@ -701,22 +659,17 @@ where {
                 function2!(
                     bind_io,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn bind_io_2<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
-                            let io_a = env[0];
-                            let f = env[1];
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        fn bind_io_2(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let io_a = env[0].clone();
+                            let f = env[1].clone();
                             let a = io_a.perform_io(interpreter); // type: a
                             let io_b = f.apply(interpreter, a); // type: IO b
                             io_b.perform_io(interpreter) // type: b
                         }
                         let env = interpreter.alloc_values({
                             let mut new_env = Vec::with_capacity(env.len() + 1);
-                            new_env.extend_from_slice(env);
+                            new_env.extend_from_slice(env.as_ref());
                             new_env.push(arg);
                             new_env
                         });
@@ -732,9 +685,7 @@ where {
                 function2!(
                     trace,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
@@ -744,11 +695,9 @@ where {
                 function1!(
                     to_utf8,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     _: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_string();
-                        interpreter.alloc(Object::Bytes(a.as_bytes()))
+                        interpreter.alloc(Object::Bytes(Rc::from(a.as_bytes())))
                     }
                 )
             }
@@ -756,13 +705,8 @@ where {
                 function1!(
                     println,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn println<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        fn println(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             // env[0] : String
                             let value = env[0].unpack_string();
                             writeln!(interpreter.stdout, "{}", value)
@@ -770,15 +714,15 @@ where {
                             Value::Unit
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
+                            let mut env = Vec::from(env.as_ref());
                             env.push(arg);
                             env
                         });
-                        let closure = interpreter.alloc(Object::IO {
+
+                        interpreter.alloc(Object::IO {
                             env,
                             body: IOBody(println),
-                        });
-                        closure
+                        })
                     }
                 )
             }
@@ -786,13 +730,8 @@ where {
                 function1!(
                     print,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn print<'io, 'ctx, 'heap>(
-                            interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        fn print(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             // env[0] : String
                             let value = env[0].unpack_string();
                             {
@@ -803,42 +742,37 @@ where {
                             Value::Unit
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
+                            let mut env = Vec::from(env.as_ref());
                             env.push(arg);
                             env
                         });
-                        let closure = interpreter.alloc(Object::IO {
+
+                        interpreter.alloc(Object::IO {
                             env,
                             body: IOBody(print),
-                        });
-                        closure
+                        })
                     }
                 )
             }
             Builtin::Readln => {
-                fn readln<'io, 'ctx, 'heap>(
-                    interpreter: &mut Interpreter<'io, 'ctx, 'heap>,
-                    _: &'heap [Value<'heap>],
-                ) -> Value<'heap> {
+                fn readln(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
                     // env[0] : Stdin
                     let mut str = String::new();
                     let _ = interpreter.stdin.read_line(&mut str).unwrap();
                     let str = interpreter.alloc_str(&str);
                     interpreter.alloc(Object::String(str))
                 }
-                let closure = self.alloc(Object::IO {
-                    env: &[],
+
+                self.alloc(Object::IO {
+                    env: Rc::from([]),
                     body: IOBody(readln),
-                });
-                closure
+                })
             }
             Builtin::EqString => {
                 function2!(
                     eq_string,
                     self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
                         if a == b {
@@ -853,9 +787,7 @@ where {
                 function2!(
                     compare_string,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
                         interpreter.alloc_ordering(a.cmp(b))
@@ -866,9 +798,7 @@ where {
                 function2!(
                     eq_int,
                     self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         if a == b {
@@ -883,22 +813,18 @@ where {
                 function2!(
                     compare_int,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         interpreter.alloc_ordering(a.cmp(&b))
                     }
                 )
             }
-            Builtin::ShowInt => {
+            Builtin::IntToString => {
                 function1!(
-                    show_int,
+                    int_to_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     _env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, _env: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_int();
                         let str = eval.alloc_str(&format!("{}", a));
                         eval.alloc(Object::String(str))
@@ -909,17 +835,18 @@ where {
                 function3!(
                     eq_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let f = env[0];
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let f = env[0].clone();
                         let a = env[1].unpack_array();
                         let b = arg.unpack_array();
 
                         let mut acc = Value::True;
                         if a.len() == b.len() {
                             for (a, b) in a.iter().zip(b.iter()) {
-                                let res = f.apply(eval, *a).apply(eval, *b).unpack_bool();
+                                let res = f
+                                    .apply(eval, a.clone())
+                                    .apply(eval, b.clone())
+                                    .unpack_bool();
                                 if !res {
                                     acc = Value::False;
                                     break;
@@ -936,10 +863,8 @@ where {
                 function3!(
                     compare_array,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let f = env[0];
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let f = env[0].clone();
                         let a = env[1].unpack_array();
                         let b = arg.unpack_array();
 
@@ -966,8 +891,8 @@ where {
                                 if index < b_len {
                                     // precondition: a[0..index] == b[0..index]
                                     match unpack_ordering(
-                                        &f.apply(interpreter, a[index])
-                                            .apply(interpreter, b[index]),
+                                        &f.apply(interpreter, a[index].clone())
+                                            .apply(interpreter, b[index].clone()),
                                     ) {
                                         Ordering::Less => {
                                             ordering = Ordering::Less;
@@ -1007,16 +932,14 @@ where {
                 function3!(
                     foldl_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let f = env[0];
-                        let z = env[1];
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let f = env[0].clone();
+                        let z = env[1].clone();
                         let arr = arg.unpack_array();
 
                         let mut acc = z;
-                        for el in arr {
-                            acc = f.apply(eval, acc).apply(eval, *el);
+                        for el in arr.as_ref() {
+                            acc = f.apply(eval, acc).apply(eval, el.clone());
                         }
                         acc
                     }
@@ -1026,9 +949,7 @@ where {
                 function2!(
                     generate_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let len = env[0].unpack_int();
                         let f = arg;
 
@@ -1047,9 +968,7 @@ where {
                 function1!(
                     length_array,
                     self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     _env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |_: &mut Interpreter<'_, '_>, _env: Rc<[Value]>, arg: Value| {
                         let arr = arg.unpack_array();
 
                         Value::Int(arr.len() as u32)
@@ -1060,13 +979,11 @@ where {
                 function2!(
                     index_array,
                     self,
-                    |_eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |_eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let ix = env[0].unpack_int() as usize;
                         let arr = arg.unpack_array();
 
-                        arr[ix]
+                        arr[ix].clone()
                     }
                 )
             }
@@ -1074,14 +991,12 @@ where {
                 function3!(
                     slice_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let start = env[0].unpack_int() as usize;
                         let len = env[1].unpack_int() as usize;
                         let arr = arg.unpack_array();
 
-                        eval.alloc(Object::Array(&arr[start..start + len]))
+                        eval.alloc(Object::Array(Rc::from(&arr[start..start + len])))
                     }
                 )
             }
@@ -1089,10 +1004,8 @@ where {
                 function2!(
                     filter_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let predicate = env[0];
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let predicate = env[0].clone();
                         let string = arg.unpack_string();
                         let new_string: String = string
                             .chars()
@@ -1110,9 +1023,7 @@ where {
                 function2!(
                     eq_char,
                     self,
-                    |_: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
                         if c1 == c2 {
@@ -1127,9 +1038,7 @@ where {
                 function2!(
                     compare_char,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
                         interpreter.alloc_ordering(c1.cmp(&c2))
@@ -1140,13 +1049,12 @@ where {
                 function2!(
                     split_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
-                        let a =
-                            eval.alloc_values(s.split(c).map(|s| eval.alloc(Object::String(s))));
+                        let a = eval.alloc_values(
+                            s.split(c).map(|s| eval.alloc(Object::String(Rc::from(s)))),
+                        );
                         eval.alloc(Object::Array(a))
                     }
                 )
@@ -1155,13 +1063,11 @@ where {
                 function2!(
                     join_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let sep = env[0].unpack_string();
                         let strings = arg.unpack_array();
                         if strings.is_empty() {
-                            eval.alloc(Object::String(""))
+                            eval.alloc(Object::String(Rc::from("")))
                         } else {
                             let mut joined = String::from(strings[0].unpack_string());
                             for string in &strings[1..] {
@@ -1178,11 +1084,9 @@ where {
                 function3!(
                     foldl_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        let f = env[0];
-                        let mut acc = env[1];
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let f = env[0].clone();
+                        let mut acc = env[1].clone();
                         let s = arg.unpack_string();
                         for c in s.chars() {
                             let c_value = Value::Char(c);
@@ -1196,12 +1100,10 @@ where {
                 function2!(
                     snoc_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
+                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                         let array = env[0].unpack_array();
                         let new_array = eval.alloc_values({
-                            let mut new_array = Vec::from(array);
+                            let mut new_array = Vec::from(array.as_ref());
                             new_array.push(arg);
                             new_array
                         });
@@ -1213,13 +1115,8 @@ where {
                 function1!(
                     run,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                     env: &'heap [Value<'heap>],
-                     arg: Value<'heap>| {
-                        fn run_1<'io, 'ctx, 'heap>(
-                            _: &mut Interpreter<'io, 'ctx, 'heap>,
-                            env: &'heap [Value<'heap>],
-                        ) -> Value<'heap> {
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        fn run_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let cmd = env[0].unpack_cmd();
                             if cmd.is_empty() {
                                 Value::Unit
@@ -1240,7 +1137,7 @@ where {
                             }
                         }
                         let env = interpreter.alloc_values({
-                            let mut env = Vec::from(env);
+                            let mut env = Vec::from(env.as_ref());
                             env.push(arg);
                             env
                         });
@@ -1255,9 +1152,7 @@ where {
             Builtin::EqBool => function2!(
                 eq_bool,
                 self,
-                |_: &mut Interpreter<'_, '_, 'heap>,
-                 env: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
+                |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
                     let a = env[0].unpack_bool();
                     let b = arg.unpack_bool();
                     if a == b {
@@ -1270,13 +1165,11 @@ where {
             Builtin::Lines => function1!(
                 lines,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 _: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
-                    fn lines_io_body<'heap>(
-                        interpreter: &mut Interpreter<'_, '_, 'heap>,
-                        env: &[Value],
-                    ) -> Value<'heap> {
+                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
+                    fn lines_io_body(
+                        interpreter: &mut Interpreter<'_, '_>,
+                        env: Rc<[Value]>,
+                    ) -> Value {
                         let cmd: &[Rc<str>] = env[0].unpack_cmd();
                         if cmd.is_empty() {
                             Value::Unit
@@ -1320,9 +1213,7 @@ where {
             Builtin::ShowCmd => function1!(
                 show_cmd,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 _: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
+                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
                     let cmd = arg
                         .unpack_cmd()
                         .iter()
@@ -1352,15 +1243,19 @@ where {
             Builtin::FlatMap => function2!(
                 flat_map,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 env: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
-                    let f = env[0];
+                |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    let f = env[0].clone();
                     let xs = arg.unpack_array();
 
                     let mut result: Vec<Value> = Vec::new();
-                    for x in xs {
-                        result.extend(f.apply(interpreter, *x).unpack_array())
+                    for x in xs.as_ref() {
+                        result.extend(
+                            f.apply(interpreter, x.clone())
+                                .unpack_array()
+                                .as_ref()
+                                .iter()
+                                .cloned(),
+                        )
                     }
 
                     interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
@@ -1369,15 +1264,13 @@ where {
             Builtin::MapArray => function2!(
                 map_array,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 env: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
-                    let f = env[0];
+                |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    let f = env[0].clone();
                     let xs = arg.unpack_array();
 
                     let result = xs
                         .iter()
-                        .map(|x| f.apply(interpreter, *x))
+                        .map(|x| f.apply(interpreter, x.clone()))
                         .collect::<Vec<_>>();
 
                     interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
@@ -1386,9 +1279,7 @@ where {
             Builtin::CharToString => function1!(
                 char_to_string,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 _: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
+                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
                     let char = arg.unpack_char();
                     let string = format!("{:?}", char);
                     interpreter.alloc(Object::String(interpreter.alloc_str(&string)))
@@ -1397,14 +1288,68 @@ where {
             Builtin::DebugString => function1!(
                 debug_string,
                 self,
-                |interpreter: &mut Interpreter<'_, '_, 'heap>,
-                 _: &'heap [Value<'heap>],
-                 arg: Value<'heap>| {
+                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
                     let string = arg.unpack_string();
                     let new_string = format!("{:?}", string);
                     interpreter.alloc(Object::String(interpreter.alloc_str(&new_string)))
                 }
             ),
+            Builtin::ArrayUnfoldr => {
+                function2!(
+                    array_unfoldr,
+                    self,
+                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let mut s = env[0].clone();
+                        let f = arg;
+
+                        let mut array = Vec::new();
+                        loop {
+                            // (| Step : ..., Skip : ..., Done : ... |)
+                            let value = f.apply(interpreter, s);
+                            let (tag, value) = value.unpack_variant();
+
+                            match tag {
+                                // Done
+                                0 => {
+                                    debug_assert!(*value == Value::Unit);
+                                    break;
+                                }
+
+                                // Skip
+                                1 => {
+                                    // value : { next : s }
+                                    let value = value.unpack_record();
+                                    s = value[0].clone();
+                                }
+
+                                // Step
+                                2 => {
+                                    // value : { value : a, next : s }
+                                    let value = value.unpack_record();
+                                    s = value[0].clone();
+                                    array.push(value[1].clone())
+                                }
+
+                                _ => unreachable!(),
+                            }
+                        }
+
+                        let array = interpreter.alloc_values(array);
+                        interpreter.alloc(Object::Array(array))
+                    }
+                )
+            }
+            Builtin::IntMod => {
+                function2!(
+                    int_mod,
+                    self,
+                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        Value::Int(a % b)
+                    }
+                )
+            }
         }
     }
 
@@ -1417,11 +1362,11 @@ where {
 
     pub fn eval_from_module(
         &mut self,
-        env: &mut Env<'heap>,
+        env: &mut Env,
         id: &ModuleRef,
         path: &[String],
         item: &Name,
-    ) -> Value<'heap> {
+    ) -> Value {
         fn lookup_path<'a>(
             bindings: &'a HashMap<Name, Binding>,
             path: &[String],
@@ -1492,9 +1437,9 @@ where {
         self.context.modules.last().copied()
     }
 
-    pub fn eval(&mut self, env: &mut Env<'heap>, expr: &Expr) -> Value<'heap> {
+    pub fn eval(&mut self, env: &mut Env, expr: &Expr) -> Value {
         let out = match expr {
-            Expr::Var(ix) => env[env.len() - 1 - ix],
+            Expr::Var(ix) => env[env.len() - 1 - ix].clone(),
             Expr::EVar(n) => panic!("found EVar({:?})", n),
             Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
             Expr::Name(name) => {
@@ -1511,8 +1456,9 @@ where {
             }
             Expr::Lam { arg, body } => {
                 let env = match env {
-                    Env::Borrowed(env) => env,
-                    Env::Owned(env) => self.alloc_values(env.iter().copied()),
+                    Env::Empty => Rc::from([]),
+                    Env::Borrowed(env) => env.clone(),
+                    Env::Owned(env) => self.alloc_values(env.iter().cloned()),
                 };
 
                 self.alloc(Object::Closure {
@@ -1568,8 +1514,8 @@ where {
                     let b = self.eval(env, b).unpack_array();
                     let c = {
                         let mut c = Vec::with_capacity(a.len() + b.len());
-                        c.extend(a);
-                        c.extend(b);
+                        c.extend(a.as_ref().iter().cloned());
+                        c.extend(b.as_ref().iter().cloned());
                         c
                     };
                     self.alloc(Object::Array(self.alloc_values(c)))
@@ -1608,7 +1554,8 @@ where {
                 for part in parts {
                     match part {
                         StringPart::Expr(expr) => {
-                            let s = self.eval(env, expr).unpack_string();
+                            let s = self.eval(env, expr);
+                            let s = s.unpack_string();
                             value.push_str(s);
                         }
                         StringPart::String(s) => value.push_str(s.as_str()),
@@ -1646,8 +1593,8 @@ where {
                 }
             }
             Expr::Record(fields) => {
-                let mut record: Vec<Value<'heap>> = Vec::with_capacity(fields.len());
-                let mut fields: Vec<(u32, Value<'heap>)> = fields
+                let mut record: Vec<Value> = Vec::with_capacity(fields.len());
+                let mut fields: Vec<(u32, Value)> = fields
                     .iter()
                     .map(|(ev, field)| (self.eval(env, ev).unpack_int(), self.eval(env, field)))
                     .collect();
@@ -1663,7 +1610,7 @@ where {
                 let index = self.eval(env, index).unpack_int();
                 let expr = self.eval(env, expr);
                 match expr.unpack_object() {
-                    Object::Record(fields) => fields[index as usize],
+                    Object::Record(fields) => fields[index as usize].clone(),
                     expr => panic!("expected record, got {:?}", expr),
                 }
             }
@@ -1671,11 +1618,11 @@ where {
             Expr::Variant(tag) => {
                 let tag = self.eval(env, tag);
                 let env = self.alloc_values(vec![tag]);
-                fn code<'heap>(
-                    interpreter: &mut Interpreter<'_, '_, 'heap>,
-                    env: &'heap [Value<'heap>],
-                    arg: Value<'heap>,
-                ) -> Value<'heap> {
+                fn code(
+                    interpreter: &mut Interpreter<'_, '_>,
+                    env: Rc<[Value]>,
+                    arg: Value,
+                ) -> Value {
                     let tag = env[0].unpack_int() as usize;
                     interpreter.alloc(Object::Variant(tag, arg))
                 }
@@ -1691,7 +1638,7 @@ where {
                 let (&old_tag, arg) = rest.unpack_variant();
                 self.alloc(Object::Variant(
                     if tag <= old_tag { old_tag + 1 } else { old_tag },
-                    *arg,
+                    arg.clone(),
                 ))
             }
             Expr::Case(expr, branches) => {
@@ -1700,13 +1647,18 @@ where {
                 let mut target: Option<&Expr> = None;
 
                 match expr {
-                    Value::Object(&Object::Variant(tag, value)) => {
+                    Value::Object(object) if matches!(object.as_ref(), Object::Variant(_, _)) => {
+                        let (tag, value) = match object.as_ref() {
+                            Object::Variant(tag, value) => (tag, value),
+                            _ => unreachable!(),
+                        };
+
                         /*
                         Because of the way constructors are peeled from variants during
                         pattern matching (see [note: peeling constructors when matching on variants]),
                         the expected tag must change as each branch is checked.
                         */
-                        let mut expected_tag = tag;
+                        let mut expected_tag: usize = *tag;
 
                         for branch in branches {
                             match &branch.pattern {
@@ -1736,7 +1688,7 @@ where {
                                         std::cmp::Ordering::Less => {}
 
                                         std::cmp::Ordering::Equal => {
-                                            env.push(value);
+                                            env.push(value.clone());
                                             target = Some(&branch.body);
                                             break;
                                         }
@@ -1765,7 +1717,9 @@ where {
                                     }
                                 }
                                 Pattern::Name => {
-                                    env.push(self.alloc(Object::Variant(expected_tag, value)));
+                                    env.push(
+                                        self.alloc(Object::Variant(expected_tag, value.clone())),
+                                    );
 
                                     target = Some(&branch.body);
                                     break;
@@ -1799,13 +1753,13 @@ where {
                                         .collect();
 
                                     let leftover_record = if *rest {
-                                        let mut leftover_fields = Rope::from_vec(fields);
+                                        let mut leftover_fields = Rope::from_vec(fields.as_ref());
                                         extracted.sort_unstable();
                                         for ix in extracted.iter().rev() {
                                             leftover_fields = leftover_fields.delete(*ix).unwrap();
                                         }
                                         let leftover_fields =
-                                            self.alloc_values(leftover_fields.iter().copied());
+                                            self.alloc_values(leftover_fields.iter().cloned());
 
                                         Some(self.alloc(Object::Record(leftover_fields)))
                                     } else {
@@ -1813,7 +1767,7 @@ where {
                                     };
 
                                     for ix in extracted.iter() {
-                                        env.push(fields[*ix]);
+                                        env.push(fields[*ix].clone());
                                     }
                                     if let Some(leftover_record) = leftover_record {
                                         env.push(leftover_record)
@@ -1827,7 +1781,7 @@ where {
                                     let branch_tag =
                                         self.eval(env, branch_tag).unpack_int() as usize;
                                     if *tag == branch_tag {
-                                        env.push(*value);
+                                        env.push(value.clone());
                                         target = Some(&branch.body);
                                         break;
                                     }
