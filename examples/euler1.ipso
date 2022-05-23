@@ -1,0 +1,32 @@
+any : (a -> Bool) -> Array a -> Bool
+any f = array.foldl (\a b -> a || f b) false
+
+mod : Int -> Int -> Int
+mod x d =
+  if x <= d
+  then d - x
+  else mod (x - d) d
+
+multiplesOf : Array Int -> (| Below : Int |) -> Array Int
+multiplesOf factors limit =
+  case limit of
+    Below limit ->
+      array.unfoldr 
+        0 
+        (\n -> 
+          if n < limit
+          then
+            if any (\factor -> mod n factor == 0) factors
+            then Step { value = n, next = n + 1 }
+            else Skip { next = n + 1 }
+          else Done ()
+        )
+
+answer : Int
+answer = 
+  multiplesOf [3, 5] (Below 200)
+  |> array.foldl (\a b -> a + b) 0
+
+main : IO ()
+main = 
+  println <| int.toString answer
