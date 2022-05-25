@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod test;
 
+pub mod bindings;
+
+use bindings::{Binding, Bindings};
 use ipso_core::{
     self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
 };
@@ -522,44 +525,6 @@ impl PartialEq for Value {
                 _ => false,
             },
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Binding {
-    Expr(Rc<Expr>),
-    Module(Bindings),
-}
-
-impl From<ipso_core::Binding> for Binding {
-    fn from(binding: ipso_core::Binding) -> Self {
-        match binding {
-            core::Binding::Expr(expr) => Self::Expr(expr),
-            core::Binding::Module(bindings) => Self::Module(Bindings::from(bindings)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bindings(HashMap<Name, Binding>);
-
-impl Bindings {
-    pub fn get(&self, name: &Name) -> Option<&Binding> {
-        self.0.get(name)
-    }
-}
-
-impl<A> From<HashMap<Name, A>> for Bindings
-where
-    Binding: From<A>,
-{
-    fn from(bindings: HashMap<Name, A>) -> Self {
-        Self(
-            bindings
-                .into_iter()
-                .map(|(name, binding)| (name, Binding::from(binding)))
-                .collect(),
-        )
     }
 }
 
@@ -1429,7 +1394,7 @@ where {
         let expr = match bindings.get(item) {
             None => panic!("{:?} not found in {:?}", item, id),
             Some(binding) => match binding {
-                Binding::Expr(expr) => expr.clone(),
+                Binding::Expr(expr) => expr,
                 Binding::Module(module) => panic!("unexpected module {:?}", module),
             },
         };
