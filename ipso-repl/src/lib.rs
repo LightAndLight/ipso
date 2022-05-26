@@ -1,6 +1,6 @@
 use ipso_core::{CommonKinds, Type};
 use ipso_diagnostic::Source;
-use ipso_eval::{Env, Interpreter, Object};
+use ipso_eval::{closure_conversion, Env, Interpreter, Object};
 use ipso_import::{resolve_from_import_all, rewrite_module_accessors_expr, ImportedItemInfo};
 use ipso_syntax::{
     desugar::{self, desugar_expr},
@@ -257,6 +257,8 @@ impl Repl {
             if !unsolved.is_empty() {
                 todo!("unsolved: {:?}", unsolved)
             }
+
+            let expr = closure_conversion::convert(&expr);
 
             Ok::<_, Error>((expr, show_final_value))
         }?;

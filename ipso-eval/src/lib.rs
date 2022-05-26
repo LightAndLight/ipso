@@ -2,11 +2,11 @@
 mod test;
 
 pub mod bindings;
+pub mod closure_conversion;
 
 use bindings::{Binding, Bindings};
-use ipso_core::{
-    self as core, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
-};
+use closure_conversion::{CmdPart, Expr, Pattern, StringPart};
+use ipso_core::{self as core, Binop, Builtin, CommonKinds, Name};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
@@ -1353,10 +1353,10 @@ where {
         }
     }
 
-    fn current_bindings(&self) -> &Bindings {
+    fn current_bindings(&mut self) -> &mut Bindings {
         match self.context.modules.last() {
-            Some(id) => &self.modules.get(id).unwrap().bindings,
-            None => &self.context.base,
+            Some(id) => &mut self.modules.get_mut(id).unwrap().bindings,
+            None => &mut self.context.base,
         }
     }
 
@@ -1367,7 +1367,7 @@ where {
         path: &[String],
         item: &Name,
     ) -> Value {
-        fn lookup_path<'a>(bindings: &'a Bindings, path: &[String]) -> &'a Bindings {
+        fn lookup_path<'a>(bindings: &'a mut Bindings, path: &[String]) -> &'a mut Bindings {
             if path.is_empty() {
                 bindings
             } else {
@@ -1383,9 +1383,9 @@ where {
 
         let bindings = match id {
             ModuleRef::This => self.current_bindings(),
-            ModuleRef::Id(id) => match self.modules.get(id) {
+            ModuleRef::Id(id) => match self.modules.get_mut(id) {
                 None => panic!("{:?} not found", id),
-                Some(module) => &module.bindings,
+                Some(module) => &mut module.bindings,
             },
         };
 
@@ -1412,15 +1412,15 @@ where {
         result
     }
 
-    fn lookup_name(&self, name: &Name) -> Rc<Expr> {
+    fn lookup_name(&mut self, name: &Name) -> Rc<Expr> {
         let binding = match self.context.modules.last() {
             None => match self.context.base.get(name) {
                 None => panic!("{:?} not in base scope", name),
-                Some(binding) => binding.clone(),
+                Some(binding) => binding,
             },
-            Some(module_id) => match self.modules.get(module_id).unwrap().bindings.get(name) {
+            Some(module_id) => match self.modules.get_mut(module_id).unwrap().bindings.get(name) {
                 None => panic!("{:?} not in {:?}'s scope", name, module_id),
-                Some(binding) => binding.clone(),
+                Some(binding) => binding,
             },
         };
 
@@ -1435,10 +1435,27 @@ where {
     }
 
     pub fn eval(&mut self, env: &mut Env, expr: &Expr) -> Value {
+        fn lookup_index(env: &Env, ix: usize) -> Value {
+            let env_len = env.len();
+            if ix < env_len {
+                env[env_len - 1 - ix].clone()
+            } else {
+                panic!(
+                    "index {} out of bounds. env(len = {}): {:?}",
+                    ix, env_len, env
+                )
+            }
+        }
+
+        fn lookup_indices(env: &Env, ixs: &[usize]) -> Rc<[Value]> {
+            ixs.iter()
+                .copied()
+                .map(|ix| lookup_index(env, ix))
+                .collect()
+        }
+
         let out = match expr {
-            Expr::Var(ix) => env[env.len() - 1 - ix].clone(),
-            Expr::EVar(n) => panic!("found EVar({:?})", n),
-            Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
+            Expr::Var(ix) => lookup_index(env, *ix),
             Expr::Name(name) => {
                 let body = self.lookup_name(name);
                 self.eval(env, body.as_ref())
@@ -1451,20 +1468,16 @@ where {
                 let b = self.eval(env, b);
                 a.apply(self, b)
             }
-            Expr::Lam { arg, body } => {
-                let env = match env {
-                    Env::Empty => Rc::from([]),
-                    Env::Borrowed(env) => env.clone(),
-                    Env::Owned(env) => self.alloc_values(env.iter().cloned()),
-                };
-
-                self.alloc(Object::Closure {
-                    env,
-                    arg: *arg,
-                    module: self.current_module(),
-                    body: body.clone(),
-                })
-            }
+            Expr::Lam {
+                env: new_env,
+                arg,
+                body,
+            } => self.alloc(Object::Closure {
+                env: lookup_indices(env, new_env),
+                arg: *arg,
+                module: self.current_module(),
+                body: body.clone(),
+            }),
 
             Expr::Let { value, rest } => {
                 let value = self.eval(env, value);

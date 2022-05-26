@@ -673,6 +673,15 @@ pub enum Pattern {
 }
 
 impl Pattern {
+    pub fn bound_vars(&self) -> usize {
+        match self {
+            Pattern::Name => 1,
+            Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
+            Pattern::Variant { tag: _ } => 1,
+            Pattern::Char(_) | Pattern::Int(_) | Pattern::String(_) | Pattern::Wildcard => 0,
+        }
+    }
+
     pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
         match self {
             Pattern::Name => Pattern::Name,
@@ -998,11 +1007,15 @@ pub enum Expr {
 
     Array(Vec<Expr>),
 
+    // TODO: use struct arguments - { index, value, record }
     Extend(Rc<Expr>, Rc<Expr>, Rc<Expr>),
     Record(Vec<(Expr, Expr)>),
+    // TODO: use struct arguments - { record, index }
     Project(Rc<Expr>, Rc<Expr>),
 
+    // TODO: use struct arguments - { tag }
     Variant(Rc<Expr>),
+    // TODO: use struct arguments - { tag, variant }
     Embed(Rc<Expr>, Rc<Expr>),
     Case(Rc<Expr>, Vec<Branch>),
     Unit,

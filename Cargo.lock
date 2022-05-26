@@ -239,6 +239,7 @@ version = "0.1.0"
 name = "ipso-eval"
 version = "0.1.0"
 dependencies = [
+ "fnv",
  "ipso-core",
  "ipso-import",
  "ipso-rope",
