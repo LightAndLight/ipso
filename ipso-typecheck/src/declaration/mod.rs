@@ -1,13 +1,13 @@
 //! Declaration checking.
 
 use crate::{
-    abstract_evidence, check_kind,
-    constraint_solving::{self, solve_constraint},
+    check_kind,
+    constraint_solving::{self, solve_constraint, solve_placeholder},
     evidence, fill_ty_names, generalise, infer_kind, kind_inference,
     type_inference::{self, infer_pattern},
     BoundVars, Error, Implication,
 };
-use ipso_core::{self as core, CommonKinds, TypeSig};
+use ipso_core::{self as core, CommonKinds, EVar, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, ModuleId, Modules, Spanned};
 use std::{
@@ -228,6 +228,7 @@ pub fn check_definition(
         &type_variables,
         &mut type_inference_state,
         env.source,
+        ty_var_kinds.len(),
         body,
         ty.clone(),
     )?;
@@ -462,7 +463,7 @@ pub fn check_instance(
         })
         .collect::<Result<_, Error>>()?;
 
-    let assumes: Vec<core::Type> = assumes
+    let assumes: Vec<(EVar, core::Type)> = assumes
         .iter()
         .map(|assume| {
             let constraint = check_kind(
@@ -475,10 +476,10 @@ pub fn check_instance(
                 &assume.item,
                 &Kind::Constraint,
             )?;
-            let _ = type_inference_state
+            let evar = type_inference_state
                 .evidence
                 .assume(assume.pos, evidence::Constraint::from_type(&constraint));
-            Ok(constraint)
+            Ok((evar, constraint))
         })
         .collect::<Result<_, Error>>()?;
 
@@ -507,23 +508,12 @@ pub fn check_instance(
                         constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
                     }),
                 )
-            })
-            .and_then(|evidence_expr| {
-                abstract_evidence(
-                    env.common_kinds,
-                    env.implications,
-                    env.type_context,
-                    &type_variables,
-                    &mut type_inference_state,
-                    env.source,
-                    evidence_expr.as_ref().clone(),
-                )
             }) {
                 Err(err) => {
                     return Err(err);
                 }
-                Ok((evidence, _)) => {
-                    superclass_constructors.push(evidence);
+                Ok(evidence) => {
+                    superclass_constructors.push(evidence.as_ref().clone());
                 }
             }
         }
@@ -568,6 +558,12 @@ pub fn check_instance(
                 type_variables.insert(&member_type.sig.ty_vars);
 
                 match {
+                    let expr = Spanned {
+                        pos: member.name.pos,
+                        item: syntax::Expr::mk_lam(member.args.clone(), member.body.clone()),
+                    };
+                    let ty = &member_type.sig.body;
+
                     let member_body = type_inference::check(
                         type_inference::Env {
                             common_kinds: env.common_kinds,
@@ -578,12 +574,10 @@ pub fn check_instance(
                             source: env.source,
                         },
                         &mut type_inference_state,
-                        &Spanned {
-                            pos: member.name.pos,
-                            item: syntax::Expr::mk_lam(member.args.clone(), member.body.clone()),
-                        },
-                        &member_type.sig.body,
+                        &expr,
+                        ty,
                     )?;
+
                     generalise(
                         env.common_kinds,
                         env.implications,
@@ -591,6 +585,7 @@ pub fn check_instance(
                         &type_variables,
                         &mut type_inference_state,
                         env.source,
+                        member_type.sig.ty_vars.len(),
                         member_body,
                         member_type.sig.body.clone(),
                     )
@@ -621,12 +616,6 @@ pub fn check_instance(
         let mut dictionary: Vec<core::Expr> = superclass_constructors;
         dictionary.extend(checked_members.into_iter());
 
-        for (ix, _assume) in assumes.iter().enumerate().rev() {
-            for item in &mut dictionary {
-                *item = core::Expr::mk_app((*item).clone(), core::Expr::Var(ix));
-            }
-        }
-
         let mut evidence = core::Expr::mk_record(
             dictionary
                 .into_iter()
@@ -636,8 +625,24 @@ pub fn check_instance(
             None,
         );
 
-        for _assume in assumes.iter() {
-            evidence = core::Expr::mk_lam(true, evidence);
+        evidence.subst_placeholder(&mut |p| -> Result<_, Error> {
+            let (expr, _solved_constraint) = solve_placeholder(
+                constraint_solving::Env {
+                    common_kinds: env.common_kinds,
+                    types: env.type_context,
+                    implications: env.implications,
+                    type_variables: &type_variables,
+                    source: env.source,
+                },
+                &mut type_inference_state,
+                *p,
+            )?;
+
+            Ok(expr.as_ref().clone())
+        })?;
+
+        for (evar, _) in assumes.iter().rev() {
+            evidence = evidence.abstract_evar(*evar);
         }
 
         Rc::new(evidence)
@@ -649,7 +654,7 @@ pub fn check_instance(
         instance_ty_vars: ty_vars,
         instance_assumes: assumes
             .into_iter()
-            .map(|assume| type_inference_state.zonk_type(assume))
+            .map(|(_, assume)| type_inference_state.zonk_type(assume))
             .collect(),
         instance_head: type_inference_state.zonk_type(head),
         instance_evidence: evidence_name,

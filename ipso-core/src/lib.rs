@@ -347,6 +347,10 @@ impl Type {
         TypeIterMetas::One(self)
     }
 
+    pub fn iter_vars(&self) -> TypeIterVars {
+        TypeIterVars::One(self)
+    }
+
     pub fn unwrap_variant(&self) -> Option<RowParts> {
         match self {
             Type::App(_, a, b) => match **a {
@@ -496,6 +500,119 @@ impl<'a> Iterator for TypeIterMetas<'a> {
                 Type::HasField(_, a) => Step::Continue1(a),
                 Type::Unit => Step::Skip,
                 Type::Meta(_, n) => Step::Yield(*n),
+                Type::Cmd => Step::Skip,
+                Type::DebugRecordFields => Step::Skip,
+                Type::DebugVariantCtor => Step::Skip,
+            }
+        }
+
+        let mut res = None;
+        loop {
+            match self.pop() {
+                None => {
+                    break;
+                }
+                Some(kind) => match step_kind(kind) {
+                    Step::Yield(n) => {
+                        res = Some(n);
+                        break;
+                    }
+                    Step::Skip => {
+                        continue;
+                    }
+                    Step::Continue1(item) => {
+                        self.push(item);
+                        continue;
+                    }
+                    Step::Continue2(item1, item2) => {
+                        self.push(item2);
+                        self.push(item1);
+                        continue;
+                    }
+                    Step::Continue3(item1, item2, item3) => {
+                        self.push(item3);
+                        self.push(item2);
+                        self.push(item1);
+                        continue;
+                    }
+                    Step::Continue(items) => {
+                        for item in items.iter().rev() {
+                            self.push(item)
+                        }
+                        continue;
+                    }
+                },
+            }
+        }
+        res
+    }
+}
+
+pub enum TypeIterVars<'a> {
+    Zero,
+    One(&'a Type),
+    Many { items: Vec<&'a Type> },
+}
+
+impl<'a> TypeIterVars<'a> {
+    fn pop(&mut self) -> Option<&'a Type> {
+        let (m_new_self, result) = match self {
+            TypeIterVars::Zero => (None, None),
+            TypeIterVars::One(a) => (Some(TypeIterVars::Zero), Some(*a)),
+            TypeIterVars::Many { items } => {
+                let result = items.pop();
+                (None, result)
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self
+        }
+        result
+    }
+
+    fn push(&mut self, item: &'a Type) {
+        let m_new_self = match self {
+            TypeIterVars::Zero => Some(TypeIterVars::One(item)),
+            TypeIterVars::One(a) => Some(TypeIterVars::Many {
+                items: vec![a, item],
+            }),
+            TypeIterVars::Many { items } => {
+                items.push(item);
+                None
+            }
+        };
+        if let Some(new_self) = m_new_self {
+            *self = new_self;
+        }
+    }
+}
+
+impl<'a> Iterator for TypeIterVars<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        fn step_kind(ty: &Type) -> Step<Type, usize> {
+            match ty {
+                Type::Name(_, _) => Step::Skip,
+                Type::Var(_, v) => Step::Yield(*v),
+                Type::Bool => Step::Skip,
+                Type::Int => Step::Skip,
+                Type::Char => Step::Skip,
+                Type::String => Step::Skip,
+                Type::Bytes => Step::Skip,
+                Type::Arrow(_) => Step::Skip,
+                Type::FatArrow(_) => Step::Skip,
+                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
+                Type::Array(_) => Step::Skip,
+                Type::Record(_) => Step::Skip,
+                Type::Variant(_) => Step::Skip,
+                Type::IO(_) => Step::Skip,
+                Type::App(_, a, b) => Step::Continue2(a, b),
+                Type::RowNil => Step::Skip,
+                Type::RowCons(_, a, b) => Step::Continue2(a, b),
+                Type::HasField(_, a) => Step::Continue1(a),
+                Type::Unit => Step::Skip,
+                Type::Meta(_, _) => Step::Skip,
                 Type::Cmd => Step::Skip,
                 Type::DebugRecordFields => Step::Skip,
                 Type::DebugVariantCtor => Step::Skip,

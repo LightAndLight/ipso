@@ -250,6 +250,7 @@ impl Repl {
                 &Default::default(),
                 &mut state,
                 &self.source,
+                0,
                 expr,
             )?;
 
