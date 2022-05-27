@@ -1,7 +1,7 @@
 //! Declaration checking.
 
 use crate::{
-    abstract_evidence, check_kind,
+    check_kind,
     constraint_solving::{self, solve_constraint, solve_placeholder},
     evidence, fill_ty_names, generalise, infer_kind, kind_inference,
     type_inference::{self, infer_pattern},
@@ -228,6 +228,7 @@ pub fn check_definition(
         &type_variables,
         &mut type_inference_state,
         env.source,
+        ty_var_kinds.len(),
         body,
         ty.clone(),
     )?;
@@ -507,23 +508,12 @@ pub fn check_instance(
                         constraint: fill_ty_names(&type_variables, superclass.to_syntax()),
                     }),
                 )
-            })
-            .and_then(|evidence_expr| {
-                abstract_evidence(
-                    env.common_kinds,
-                    env.implications,
-                    env.type_context,
-                    &type_variables,
-                    &mut type_inference_state,
-                    env.source,
-                    evidence_expr.as_ref().clone(),
-                )
             }) {
                 Err(err) => {
                     return Err(err);
                 }
-                Ok((evidence, _)) => {
-                    superclass_constructors.push(evidence);
+                Ok(evidence) => {
+                    superclass_constructors.push(evidence.as_ref().clone());
                 }
             }
         }
@@ -595,6 +585,7 @@ pub fn check_instance(
                         &type_variables,
                         &mut type_inference_state,
                         env.source,
+                        member_type.sig.ty_vars.len(),
                         member_body,
                         member_type.sig.body.clone(),
                     )

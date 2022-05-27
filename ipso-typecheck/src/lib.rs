@@ -218,6 +218,15 @@ impl From<constraint_solving::Error> for Error {
     }
 }
 
+/**
+
+* `range` - the number of most recently bound type variables that
+   are relevant to this round of abstraction.
+
+  Any evidence that depends on type variables outside this range
+  will not be abstracted.
+
+*/
 pub fn abstract_evidence(
     common_kinds: &CommonKinds,
     implications: &[Implication],
@@ -225,6 +234,7 @@ pub fn abstract_evidence(
     type_variables: &BoundVars<Kind>,
     type_inference_state: &mut type_inference::State,
     source: &Source,
+    range: usize,
     mut expr: core::Expr,
 ) -> Result<(core::Expr, Vec<core::Type>), Error> {
     expr.subst_placeholder(&mut |p| -> Result<_, Error> {
@@ -239,16 +249,24 @@ pub fn abstract_evidence(
             type_inference_state,
             *p,
         )?;
+
         Ok(expr.as_ref().clone())
     })?;
 
     let mut unsolved_constraints: Vec<(core::EVar, core::Type)> = Vec::new();
     let mut seen_evars: HashSet<core::EVar> = HashSet::new();
     for ev in expr.iter_evars() {
-        if !seen_evars.contains(ev) {
+        let constraint = type_inference_state.zonk_type(
+            type_inference_state
+                .evidence
+                .lookup_evar(ev)
+                .unwrap()
+                .to_type(),
+        );
+
+        if !seen_evars.contains(ev) && constraint.iter_vars().all(|ix| ix < range) {
             seen_evars.insert(*ev);
-            let constraint = type_inference_state.evidence.lookup_evar(ev).unwrap();
-            unsolved_constraints.push((*ev, type_inference_state.zonk_type(constraint.to_type())));
+            unsolved_constraints.push((*ev, constraint));
         }
     }
 
@@ -269,6 +287,12 @@ pub fn abstract_evidence(
     Ok((expr, new_unsolved_constraints))
 }
 
+/**
+
+* `range` - the number of most recently bound type variables to be included in
+  the resulting type signature.
+
+*/
 pub fn generalise(
     common_kinds: &CommonKinds,
     implications: &[Implication],
@@ -276,6 +300,7 @@ pub fn generalise(
     type_variables: &BoundVars<Kind>,
     type_inference_state: &mut type_inference::State,
     source: &Source,
+    range: usize,
     expr: core::Expr,
     ty: core::Type,
 ) -> Result<(core::Expr, core::TypeSig), Error> {
@@ -286,6 +311,7 @@ pub fn generalise(
         type_variables,
         type_inference_state,
         source,
+        range,
         expr,
     )?;
 
@@ -297,6 +323,9 @@ pub fn generalise(
     let ty_vars: Vec<(Rc<str>, Kind)> = type_variables
         .info
         .iter()
+        .rev()
+        .take(range)
+        .rev()
         .map(|(name, kind)| {
             (
                 name.clone(),
