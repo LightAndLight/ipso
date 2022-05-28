@@ -115,7 +115,7 @@ impl Error {
 #[derive(Debug, PartialEq, Eq)]
 pub enum InferredPattern {
     Any {
-        pattern: Pattern,
+        pattern: Pattern<Expr>,
         names: Vec<(Rc<str>, Type)>,
         ty: Type,
     },
@@ -151,7 +151,7 @@ impl InferredPattern {
         }
     }
 
-    pub fn pattern(&self) -> Pattern {
+    pub fn pattern(&self) -> Pattern<Expr> {
         match self {
             InferredPattern::Any { pattern, .. } => pattern.clone(),
             InferredPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
@@ -170,7 +170,7 @@ impl InferredPattern {
 
 pub enum CheckedPattern {
     Any {
-        pattern: Pattern,
+        pattern: Pattern<Expr>,
         names: Vec<(Rc<str>, Type)>,
     },
     Variant {
@@ -189,7 +189,7 @@ pub enum CheckedPattern {
 }
 
 impl CheckedPattern {
-    fn pattern(&self) -> Pattern {
+    fn pattern(&self) -> Pattern<Expr> {
         match self {
             CheckedPattern::Any { pattern, .. } => pattern.clone(),
             CheckedPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
@@ -660,11 +660,11 @@ pub fn infer(
                     )
                     .map(CmdPart::Expr),
                 })
-                .collect::<Result<Vec<CmdPart>, _>>()?;
+                .collect::<Result<Vec<CmdPart<Expr>>, _>>()?;
             Ok((Expr::Cmd(cmd_parts), Type::Cmd))
         }
         syntax::Expr::String(string_parts) => {
-            let string_parts: Vec<StringPart> = string_parts
+            let string_parts: Vec<StringPart<Expr>> = string_parts
                 .iter()
                 .map(|string_part| match string_part {
                     syntax::StringPart::String(string) => Ok(StringPart::String(string.clone())),
@@ -772,7 +772,7 @@ pub fn infer(
         syntax::Expr::Lam { args, body } => {
             check_duplicate_args(env.source, args)?;
 
-            let mut inferred_args: Vec<(Pattern, Type)> = Vec::with_capacity(args.len());
+            let mut inferred_args: Vec<(Pattern<Expr>, Type)> = Vec::with_capacity(args.len());
             let bound_variables: Vec<(Rc<str>, Type)> = args
                 .iter()
                 .flat_map(|arg| {
@@ -1079,7 +1079,7 @@ fn infer_case(
     let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
     let mut seen_ctors = FnvHashSet::default();
     let mut saw_catchall = false;
-    let branches: Vec<Branch> = branches
+    let branches: Vec<Branch<Expr>> = branches
         .iter()
         .map(|branch| {
             if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {

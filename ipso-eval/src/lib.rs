@@ -1,9 +1,12 @@
 #[cfg(test)]
 mod test;
 
-use ipso_core::{
-    self as core, Binding, Binop, Builtin, CmdPart, CommonKinds, Expr, Name, Pattern, StringPart,
-};
+pub mod bindings;
+pub mod closure_conversion;
+
+use bindings::{Binding, Bindings};
+use closure_conversion::Expr;
+use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Name, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
@@ -37,7 +40,7 @@ macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
         paste! {
             fn [<$name _code_0>](
-                eval: &mut Interpreter<'_, '_>,
+                eval: &mut Interpreter<'_>,
                 env: Rc<[Value]>,
                 arg: Value,
             ) -> Value {
@@ -61,10 +64,10 @@ macro_rules! function2 {
         function1!(
             $name,
             $self,
-            (|eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+            (|eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                 paste! {
                     fn [<$name _code_1>](
-                        eval: &mut Interpreter<'_, '_>,
+                        eval: &mut Interpreter<'_>,
                         env: Rc<[Value]>,
                         arg: Value,
                     ) -> Value {
@@ -90,10 +93,10 @@ macro_rules! function3 {
         function2!(
             $name,
             $self,
-            (|eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg| {
+            (|eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg| {
                 paste! {
                     fn [<$name _code_2>](
-                        eval: &mut Interpreter<'_, '_>,
+                        eval: &mut Interpreter<'_>,
                         env: Rc<[Value]>,
                         arg: Value,
                     ) -> Value {
@@ -115,7 +118,7 @@ macro_rules! function3 {
 }
 
 #[derive(Clone)]
-pub struct StaticClosureBody(fn(&mut Interpreter<'_, '_>, Rc<[Value]>, Value) -> Value);
+pub struct StaticClosureBody(fn(&mut Interpreter<'_>, Rc<[Value]>, Value) -> Value);
 
 impl Debug for StaticClosureBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -124,10 +127,10 @@ impl Debug for StaticClosureBody {
 }
 
 #[derive(Clone)]
-pub struct IOBody(fn(&mut Interpreter<'_, '_>, Rc<[Value]>) -> Value);
+pub struct IOBody(fn(&mut Interpreter<'_>, Rc<[Value]>) -> Value);
 
 impl IOBody {
-    pub fn run(&self, interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>) -> Value {
+    pub fn run(&self, interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
         self.0(interpreter, env)
     }
 }
@@ -235,7 +238,7 @@ impl Object {
         }
     }
 
-    pub fn perform_io<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>) -> Value {
+    pub fn perform_io<'io>(&self, interpreter: &mut Interpreter<'io>) -> Value {
         match self {
             Object::IO { env, body } => body.0(interpreter, env.clone()),
             val => panic!("expected io, got {:?}", val),
@@ -277,7 +280,7 @@ impl Object {
         }
     }
 
-    pub fn apply<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>, arg: Value) -> Value {
+    pub fn apply<'io>(&self, interpreter: &mut Interpreter<'io>, arg: Value) -> Value {
         match self {
             Object::Closure {
                 env,
@@ -430,11 +433,11 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn apply<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>, arg: Value) -> Value {
+    pub fn apply<'io>(&self, interpreter: &mut Interpreter<'io>, arg: Value) -> Value {
         self.unpack_object().apply(interpreter, arg)
     }
 
-    pub fn perform_io<'io, 'ctx>(&self, interpreter: &mut Interpreter<'io, 'ctx>) -> Value {
+    pub fn perform_io<'io>(&self, interpreter: &mut Interpreter<'io>) -> Value {
         self.unpack_object().perform_io(interpreter)
     }
 
@@ -526,28 +529,28 @@ impl PartialEq for Value {
 }
 
 pub struct Module {
-    pub bindings: HashMap<Name, Binding>,
+    pub bindings: Bindings,
 }
 
-struct Context<'ctx> {
+struct Context {
     modules: Vec<ModuleId>,
-    base: &'ctx HashMap<Name, Binding>,
+    base: Bindings,
 }
 
-pub struct Interpreter<'io, 'ctx> {
+pub struct Interpreter<'io> {
     stdin: &'io mut dyn BufRead,
     stdout: &'io mut dyn io::Write,
-    context: Context<'ctx>,
+    context: Context,
     modules: HashMap<ModuleId, Module>,
 }
 
-impl<'io, 'ctx> Interpreter<'io, 'ctx> {
+impl<'io> Interpreter<'io> {
     pub fn new(
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
-        common_kinds: &'ctx CommonKinds,
-        modules: &'ctx Modules<core::Module>,
-        context: &'ctx HashMap<Name, Binding>,
+        common_kinds: &CommonKinds,
+        modules: &Modules<core::Module>,
+        context: &HashMap<Name, ipso_core::Binding>,
     ) -> Self {
         let modules = modules
             .iter_ids()
@@ -555,7 +558,7 @@ impl<'io, 'ctx> Interpreter<'io, 'ctx> {
                 (
                     module_id,
                     Module {
-                        bindings: module.get_bindings(common_kinds),
+                        bindings: Bindings::from(module.get_bindings(common_kinds)),
                     },
                 )
             })
@@ -566,7 +569,7 @@ impl<'io, 'ctx> Interpreter<'io, 'ctx> {
             stdout,
             context: Context {
                 modules: Vec::new(),
-                base: context,
+                base: Bindings::from(context.clone()),
             },
             modules,
         }
@@ -635,7 +638,7 @@ where {
                 function2!(
                     map_io,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         fn map_io_2(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let f = env[0].clone();
                             let io_a = env[1].clone();
@@ -659,7 +662,7 @@ where {
                 function2!(
                     bind_io,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         fn bind_io_2(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let io_a = env[0].clone();
                             let f = env[1].clone();
@@ -685,7 +688,7 @@ where {
                 function2!(
                     trace,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
@@ -695,7 +698,7 @@ where {
                 function1!(
                     to_utf8,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_string();
                         interpreter.alloc(Object::Bytes(Rc::from(a.as_bytes())))
                     }
@@ -705,7 +708,7 @@ where {
                 function1!(
                     println,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         fn println(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             // env[0] : String
                             let value = env[0].unpack_string();
@@ -730,7 +733,7 @@ where {
                 function1!(
                     print,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         fn print(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             // env[0] : String
                             let value = env[0].unpack_string();
@@ -772,7 +775,7 @@ where {
                 function2!(
                     eq_string,
                     self,
-                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
                         if a == b {
@@ -787,7 +790,7 @@ where {
                 function2!(
                     compare_string,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
                         interpreter.alloc_ordering(a.cmp(b))
@@ -798,7 +801,7 @@ where {
                 function2!(
                     eq_int,
                     self,
-                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         if a == b {
@@ -813,7 +816,7 @@ where {
                 function2!(
                     compare_int,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         interpreter.alloc_ordering(a.cmp(&b))
@@ -824,7 +827,7 @@ where {
                 function1!(
                     int_to_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, _env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_int();
                         let str = eval.alloc_str(&format!("{}", a));
                         eval.alloc(Object::String(str))
@@ -835,7 +838,7 @@ where {
                 function3!(
                     eq_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let f = env[0].clone();
                         let a = env[1].unpack_array();
                         let b = arg.unpack_array();
@@ -863,7 +866,7 @@ where {
                 function3!(
                     compare_array,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let f = env[0].clone();
                         let a = env[1].unpack_array();
                         let b = arg.unpack_array();
@@ -932,7 +935,7 @@ where {
                 function3!(
                     foldl_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let f = env[0].clone();
                         let z = env[1].clone();
                         let arr = arg.unpack_array();
@@ -949,7 +952,7 @@ where {
                 function2!(
                     generate_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let len = env[0].unpack_int();
                         let f = arg;
 
@@ -968,7 +971,7 @@ where {
                 function1!(
                     length_array,
                     self,
-                    |_: &mut Interpreter<'_, '_>, _env: Rc<[Value]>, arg: Value| {
+                    |_: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let arr = arg.unpack_array();
 
                         Value::Int(arr.len() as u32)
@@ -979,7 +982,7 @@ where {
                 function2!(
                     index_array,
                     self,
-                    |_eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |_eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let ix = env[0].unpack_int() as usize;
                         let arr = arg.unpack_array();
 
@@ -991,7 +994,7 @@ where {
                 function3!(
                     slice_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let start = env[0].unpack_int() as usize;
                         let len = env[1].unpack_int() as usize;
                         let arr = arg.unpack_array();
@@ -1004,7 +1007,7 @@ where {
                 function2!(
                     filter_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let predicate = env[0].clone();
                         let string = arg.unpack_string();
                         let new_string: String = string
@@ -1023,7 +1026,7 @@ where {
                 function2!(
                     eq_char,
                     self,
-                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
                         if c1 == c2 {
@@ -1038,7 +1041,7 @@ where {
                 function2!(
                     compare_char,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
                         interpreter.alloc_ordering(c1.cmp(&c2))
@@ -1049,7 +1052,7 @@ where {
                 function2!(
                     split_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
                         let a = eval.alloc_values(
@@ -1063,7 +1066,7 @@ where {
                 function2!(
                     join_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let sep = env[0].unpack_string();
                         let strings = arg.unpack_array();
                         if strings.is_empty() {
@@ -1084,7 +1087,7 @@ where {
                 function3!(
                     foldl_string,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let f = env[0].clone();
                         let mut acc = env[1].clone();
                         let s = arg.unpack_string();
@@ -1100,7 +1103,7 @@ where {
                 function2!(
                     snoc_array,
                     self,
-                    |eval: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let array = env[0].unpack_array();
                         let new_array = eval.alloc_values({
                             let mut new_array = Vec::from(array.as_ref());
@@ -1115,7 +1118,7 @@ where {
                 function1!(
                     run,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         fn run_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let cmd = env[0].unpack_cmd();
                             if cmd.is_empty() {
@@ -1152,7 +1155,7 @@ where {
             Builtin::EqBool => function2!(
                 eq_bool,
                 self,
-                |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                     let a = env[0].unpack_bool();
                     let b = arg.unpack_bool();
                     if a == b {
@@ -1165,11 +1168,8 @@ where {
             Builtin::Lines => function1!(
                 lines,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
-                    fn lines_io_body(
-                        interpreter: &mut Interpreter<'_, '_>,
-                        env: Rc<[Value]>,
-                    ) -> Value {
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                    fn lines_io_body(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
                         let cmd: &[Rc<str>] = env[0].unpack_cmd();
                         if cmd.is_empty() {
                             Value::Unit
@@ -1213,7 +1213,7 @@ where {
             Builtin::ShowCmd => function1!(
                 show_cmd,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     let cmd = arg
                         .unpack_cmd()
                         .iter()
@@ -1243,7 +1243,7 @@ where {
             Builtin::FlatMap => function2!(
                 flat_map,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                     let f = env[0].clone();
                     let xs = arg.unpack_array();
 
@@ -1264,7 +1264,7 @@ where {
             Builtin::MapArray => function2!(
                 map_array,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                     let f = env[0].clone();
                     let xs = arg.unpack_array();
 
@@ -1279,7 +1279,7 @@ where {
             Builtin::CharToString => function1!(
                 char_to_string,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     let char = arg.unpack_char();
                     let string = format!("{:?}", char);
                     interpreter.alloc(Object::String(interpreter.alloc_str(&string)))
@@ -1288,7 +1288,7 @@ where {
             Builtin::DebugString => function1!(
                 debug_string,
                 self,
-                |interpreter: &mut Interpreter<'_, '_>, _: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     let string = arg.unpack_string();
                     let new_string = format!("{:?}", string);
                     interpreter.alloc(Object::String(interpreter.alloc_str(&new_string)))
@@ -1298,7 +1298,7 @@ where {
                 function2!(
                     array_unfoldr,
                     self,
-                    |interpreter: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let mut s = env[0].clone();
                         let f = arg;
 
@@ -1343,7 +1343,7 @@ where {
                 function2!(
                     int_mod,
                     self,
-                    |_: &mut Interpreter<'_, '_>, env: Rc<[Value]>, arg: Value| {
+                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         Value::Int(a % b)
@@ -1353,10 +1353,10 @@ where {
         }
     }
 
-    fn current_bindings(&self) -> &HashMap<Name, Binding> {
+    fn current_bindings(&mut self) -> &mut Bindings {
         match self.context.modules.last() {
-            Some(id) => &self.modules.get(id).unwrap().bindings,
-            None => self.context.base,
+            Some(id) => &mut self.modules.get_mut(id).unwrap().bindings,
+            None => &mut self.context.base,
         }
     }
 
@@ -1367,10 +1367,7 @@ where {
         path: &[String],
         item: &Name,
     ) -> Value {
-        fn lookup_path<'a>(
-            bindings: &'a HashMap<Name, Binding>,
-            path: &[String],
-        ) -> &'a HashMap<Name, Binding> {
+        fn lookup_path<'a>(bindings: &'a mut Bindings, path: &[String]) -> &'a mut Bindings {
             if path.is_empty() {
                 bindings
             } else {
@@ -1386,9 +1383,9 @@ where {
 
         let bindings = match id {
             ModuleRef::This => self.current_bindings(),
-            ModuleRef::Id(id) => match self.modules.get(id) {
+            ModuleRef::Id(id) => match self.modules.get_mut(id) {
                 None => panic!("{:?} not found", id),
-                Some(module) => &module.bindings,
+                Some(module) => &mut module.bindings,
             },
         };
 
@@ -1397,7 +1394,7 @@ where {
         let expr = match bindings.get(item) {
             None => panic!("{:?} not found in {:?}", item, id),
             Some(binding) => match binding {
-                Binding::Expr(expr) => expr.clone(),
+                Binding::Expr(expr) => expr,
                 Binding::Module(module) => panic!("unexpected module {:?}", module),
             },
         };
@@ -1415,15 +1412,15 @@ where {
         result
     }
 
-    fn lookup_name(&self, name: &Name) -> Rc<Expr> {
+    fn lookup_name(&mut self, name: &Name) -> Rc<Expr> {
         let binding = match self.context.modules.last() {
             None => match self.context.base.get(name) {
                 None => panic!("{:?} not in base scope", name),
-                Some(binding) => binding.clone(),
+                Some(binding) => binding,
             },
-            Some(module_id) => match self.modules.get(module_id).unwrap().bindings.get(name) {
+            Some(module_id) => match self.modules.get_mut(module_id).unwrap().bindings.get(name) {
                 None => panic!("{:?} not in {:?}'s scope", name, module_id),
-                Some(binding) => binding.clone(),
+                Some(binding) => binding,
             },
         };
 
@@ -1438,10 +1435,27 @@ where {
     }
 
     pub fn eval(&mut self, env: &mut Env, expr: &Expr) -> Value {
+        fn lookup_index(env: &Env, ix: usize) -> Value {
+            let env_len = env.len();
+            if ix < env_len {
+                env[env_len - 1 - ix].clone()
+            } else {
+                panic!(
+                    "index {} out of bounds. env(len = {}): {:?}",
+                    ix, env_len, env
+                )
+            }
+        }
+
+        fn lookup_indices(env: &Env, ixs: &[usize]) -> Rc<[Value]> {
+            ixs.iter()
+                .copied()
+                .map(|ix| lookup_index(env, ix))
+                .collect()
+        }
+
         let out = match expr {
-            Expr::Var(ix) => env[env.len() - 1 - ix].clone(),
-            Expr::EVar(n) => panic!("found EVar({:?})", n),
-            Expr::Placeholder(n) => panic!("found Placeholder({:?})", n),
+            Expr::Var(ix) => lookup_index(env, *ix),
             Expr::Name(name) => {
                 let body = self.lookup_name(name);
                 self.eval(env, body.as_ref())
@@ -1454,20 +1468,16 @@ where {
                 let b = self.eval(env, b);
                 a.apply(self, b)
             }
-            Expr::Lam { arg, body } => {
-                let env = match env {
-                    Env::Empty => Rc::from([]),
-                    Env::Borrowed(env) => env.clone(),
-                    Env::Owned(env) => self.alloc_values(env.iter().cloned()),
-                };
-
-                self.alloc(Object::Closure {
-                    env,
-                    arg: *arg,
-                    module: self.current_module(),
-                    body: body.clone(),
-                })
-            }
+            Expr::Lam {
+                env: new_env,
+                arg,
+                body,
+            } => self.alloc(Object::Closure {
+                env: lookup_indices(env, new_env),
+                arg: *arg,
+                module: self.current_module(),
+                body: body.clone(),
+            }),
 
             Expr::Let { value, rest } => {
                 let value = self.eval(env, value);
@@ -1618,11 +1628,7 @@ where {
             Expr::Variant(tag) => {
                 let tag = self.eval(env, tag);
                 let env = self.alloc_values(vec![tag]);
-                fn code(
-                    interpreter: &mut Interpreter<'_, '_>,
-                    env: Rc<[Value]>,
-                    arg: Value,
-                ) -> Value {
+                fn code(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value) -> Value {
                     let tag = env[0].unpack_int() as usize;
                     interpreter.alloc(Object::Variant(tag, arg))
                 }

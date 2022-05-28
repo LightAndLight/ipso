@@ -662,17 +662,26 @@ impl<'a> Iterator for TypeIterVars<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Pattern {
+pub enum Pattern<E> {
     Name,
-    Record { names: Vec<Expr>, rest: bool },
-    Variant { tag: Rc<Expr> },
+    Record { names: Vec<E>, rest: bool },
+    Variant { tag: Rc<E> },
     Char(char),
     Int(u32),
     String(Rc<str>),
     Wildcard,
 }
 
-impl Pattern {
+impl Pattern<Expr> {
+    pub fn bound_vars(&self) -> usize {
+        match self {
+            Pattern::Name => 1,
+            Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
+            Pattern::Variant { tag: _ } => 1,
+            Pattern::Char(_) | Pattern::Int(_) | Pattern::String(_) | Pattern::Wildcard => 0,
+        }
+    }
+
     pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
         match self {
             Pattern::Name => Pattern::Name,
@@ -688,7 +697,7 @@ impl Pattern {
         }
     }
 
-    pub fn mk_variant(tag: Expr) -> Pattern {
+    pub fn mk_variant(tag: Expr) -> Pattern<Expr> {
         Pattern::Variant { tag: Rc::new(tag) }
     }
 
@@ -753,19 +762,18 @@ impl Pattern {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Branch {
-    pub pattern: Pattern,
-    pub body: Expr,
+pub struct Branch<E> {
+    pub pattern: Pattern<E>,
+    pub body: E,
 }
 
-impl Branch {
-    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch {
+impl Branch<Expr> {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch<Expr> {
         Branch {
             pattern: self.pattern.map_expr(&f),
             body: f(&self.body),
         }
     }
-
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &mut self,
         f: &mut F,
@@ -815,19 +823,12 @@ impl Branch {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum StringPart {
+pub enum StringPart<E> {
     String(String),
-    Expr(Expr),
+    Expr(E),
 }
 
-impl StringPart {
-    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
-        match self {
-            StringPart::String(s) => StringPart::String(s.clone()),
-            StringPart::Expr(e) => StringPart::Expr(f(e)),
-        }
-    }
-
+impl StringPart<Expr> {
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &mut self,
         f: &mut F,
@@ -853,7 +854,16 @@ impl StringPart {
     }
 }
 
-impl<A> From<A> for StringPart
+impl<A> StringPart<A> {
+    pub fn map_expr<F: Fn(&A) -> A>(&self, f: F) -> Self {
+        match self {
+            StringPart::String(s) => StringPart::String(s.clone()),
+            StringPart::Expr(e) => StringPart::Expr(f(e)),
+        }
+    }
+}
+
+impl<A, B> From<A> for StringPart<B>
 where
     String: From<A>,
 {
@@ -926,9 +936,9 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CmdPart {
+pub enum CmdPart<E> {
     Literal(Rc<str>),
-    Expr(Expr),
+    Expr(E),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -994,20 +1004,24 @@ pub enum Expr {
 
     Char(char),
 
-    String(Vec<StringPart>),
+    String(Vec<StringPart<Expr>>),
 
     Array(Vec<Expr>),
 
+    // TODO: use struct arguments - { index, value, record }
     Extend(Rc<Expr>, Rc<Expr>, Rc<Expr>),
     Record(Vec<(Expr, Expr)>),
+    // TODO: use struct arguments - { record, index }
     Project(Rc<Expr>, Rc<Expr>),
 
+    // TODO: use struct arguments - { tag }
     Variant(Rc<Expr>),
+    // TODO: use struct arguments - { tag, variant }
     Embed(Rc<Expr>, Rc<Expr>),
-    Case(Rc<Expr>, Vec<Branch>),
+    Case(Rc<Expr>, Vec<Branch<Expr>>),
     Unit,
 
-    Cmd(Vec<CmdPart>),
+    Cmd(Vec<CmdPart<Expr>>),
 }
 
 impl Expr {
@@ -1119,7 +1133,7 @@ impl Expr {
         Expr::Binop(op, Rc::new(a), b)
     }
 
-    pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
+    pub fn mk_case(expr: Expr, branches: Vec<Branch<Expr>>) -> Expr {
         Expr::Case(Rc::new(expr), branches)
     }
 

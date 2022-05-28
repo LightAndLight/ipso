@@ -1,6 +1,6 @@
 use super::{Interpreter, Value};
-use crate::{Env, Object};
-use ipso_core::{Builtin, CommonKinds, Expr, StringPart};
+use crate::{closure_conversion::Expr, Env, Object};
+use ipso_core::{Builtin, CommonKinds, StringPart};
 use ipso_syntax::Modules;
 use std::{collections::HashMap, rc::Rc};
 
@@ -8,9 +8,12 @@ use std::{collections::HashMap, rc::Rc};
 fn eval_1() {
     let mut stdin = std::io::empty();
     let mut stdout = Vec::new();
-    let term = Expr::mk_app(
-        Expr::mk_app(Expr::Builtin(Builtin::Trace), Expr::Int(0)),
-        Expr::Int(1),
+    let term = Expr::App(
+        Rc::new(Expr::App(
+            Rc::new(Expr::Builtin(Builtin::Trace)),
+            Rc::new(Expr::Int(0)),
+        )),
+        Rc::new(Expr::Int(1)),
     );
     let common_kinds = CommonKinds::default();
     let context = HashMap::new();
@@ -33,9 +36,9 @@ fn eval_2() {
     let mut stdin = std::io::empty();
     let mut stdout = Vec::new();
     let str = String::from("hello");
-    let term = Expr::mk_app(
-        Expr::Builtin(Builtin::ToUtf8),
-        Expr::String(vec![StringPart::String(str.clone())]),
+    let term = Expr::App(
+        Rc::new(Expr::Builtin(Builtin::ToUtf8)),
+        Rc::new(Expr::String(vec![StringPart::String(str.clone())])),
     );
     let common_kinds = CommonKinds::default();
     let context = HashMap::new();
