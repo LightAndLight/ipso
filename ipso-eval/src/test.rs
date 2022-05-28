@@ -1,9 +1,6 @@
 use super::{Interpreter, Value};
-use crate::{
-    closure_conversion::{Expr, StringPart},
-    Env, Object,
-};
-use ipso_core::{Builtin, CommonKinds};
+use crate::{closure_conversion::Expr, Env, Object};
+use ipso_core::{Builtin, CommonKinds, StringPart};
 use ipso_syntax::Modules;
 use std::{collections::HashMap, rc::Rc};
 

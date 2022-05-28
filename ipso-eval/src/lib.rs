@@ -5,8 +5,8 @@ pub mod bindings;
 pub mod closure_conversion;
 
 use bindings::{Binding, Bindings};
-use closure_conversion::{CmdPart, Expr, Pattern, StringPart};
-use ipso_core::{self as core, Binop, Builtin, CommonKinds, Name};
+use closure_conversion::Expr;
+use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Name, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;

@@ -628,9 +628,9 @@ pub fn solve_constraint(
                 type_inference_state: &mut type_inference::State,
                 pos: usize,
                 constraint: &Constraint,
-                mut case_branches: Vec<Branch>,
+                mut case_branches: Vec<Branch<core::Expr>>,
                 current_row: &Type,
-            ) -> Result<Vec<Branch>, Error> {
+            ) -> Result<Vec<Branch<core::Expr>>, Error> {
                 match current_row {
                     Type::RowNil => Ok(case_branches),
 

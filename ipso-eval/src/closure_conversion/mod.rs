@@ -2,7 +2,7 @@
 mod test;
 
 use fnv::FnvHashSet;
-use ipso_core::{Binop, Builtin, Name};
+use ipso_core::{Binop, Branch, Builtin, CmdPart, Name, Pattern, StringPart};
 use ipso_syntax::ModuleRef;
 use std::rc::Rc;
 
@@ -39,7 +39,7 @@ pub enum Expr {
 
     Char(char),
 
-    String(Vec<StringPart>),
+    String(Vec<StringPart<Expr>>),
 
     Array(Vec<Expr>),
 
@@ -49,39 +49,10 @@ pub enum Expr {
 
     Variant(Rc<Expr>),
     Embed(Rc<Expr>, Rc<Expr>),
-    Case(Rc<Expr>, Vec<Branch>),
+    Case(Rc<Expr>, Vec<Branch<Expr>>),
     Unit,
 
-    Cmd(Vec<CmdPart>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum StringPart {
-    String(String),
-    Expr(Expr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CmdPart {
-    Literal(Rc<str>),
-    Expr(Expr),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Branch {
-    pub pattern: Pattern,
-    pub body: Expr,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Pattern {
-    Name,
-    Record { names: Vec<Expr>, rest: bool },
-    Variant { tag: Rc<Expr> },
-    Char(char),
-    Int(u32),
-    String(Rc<str>),
-    Wildcard,
+    Cmd(Vec<CmdPart<Expr>>),
 }
 
 macro_rules! convert_one {
@@ -296,7 +267,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
             convert_two!(left, right, |left, right| Expr::Binop(op, left, right))
         }
         ipso_core::Expr::String(parts) => {
-            let parts: Vec<ConvertResult<StringPart>> =
+            let parts: Vec<ConvertResult<StringPart<Expr>>> =
                 parts.iter().map(|part| convert_string_part(part)).collect();
 
             let required_by_parts = {
@@ -375,7 +346,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
         ipso_core::Expr::Embed(tag, variant) => convert_two!(tag, variant, Expr::Embed),
         ipso_core::Expr::Case(expr, branches) => {
             let (required_by_expr, mk_expr) = convert_expr(expr);
-            let branches: Vec<ConvertResult<Branch>> = branches
+            let branches: Vec<ConvertResult<Branch<Expr>>> = branches
                 .iter()
                 .map(|branch| convert_branch(branch))
                 .collect();
@@ -402,7 +373,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
             )
         }
         ipso_core::Expr::Cmd(parts) => {
-            let parts: Vec<ConvertResult<CmdPart>> =
+            let parts: Vec<ConvertResult<CmdPart<Expr>>> =
                 parts.iter().map(|part| convert_cmd_part(part)).collect();
 
             let required_by_parts = {
@@ -443,16 +414,16 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
     }
 }
 
-pub fn convert_string_part(part: &ipso_core::StringPart) -> ConvertResult<StringPart> {
+pub fn convert_string_part(part: &StringPart<ipso_core::Expr>) -> ConvertResult<StringPart<Expr>> {
     match part {
-        ipso_core::StringPart::String(string) => {
+        StringPart::String(string) => {
             let string = string.clone();
             (
                 FnvHashSet::default(),
                 Box::new(move |_| StringPart::String(string)),
             )
         }
-        ipso_core::StringPart::Expr(expr) => {
+        StringPart::Expr(expr) => {
             let (required_by_expr, mk_expr) = convert_expr(expr);
             (
                 required_by_expr,
@@ -465,16 +436,16 @@ pub fn convert_string_part(part: &ipso_core::StringPart) -> ConvertResult<String
     }
 }
 
-pub fn convert_cmd_part(part: &ipso_core::CmdPart) -> ConvertResult<CmdPart> {
+pub fn convert_cmd_part(part: &CmdPart<ipso_core::Expr>) -> ConvertResult<CmdPart<Expr>> {
     match part {
-        ipso_core::CmdPart::Literal(string) => {
+        CmdPart::Literal(string) => {
             let string = string.clone();
             (
                 FnvHashSet::default(),
                 Box::new(move |_| CmdPart::Literal(string)),
             )
         }
-        ipso_core::CmdPart::Expr(expr) => {
+        CmdPart::Expr(expr) => {
             let (required_by_expr, mk_expr) = convert_expr(expr);
             (
                 required_by_expr,
@@ -484,8 +455,8 @@ pub fn convert_cmd_part(part: &ipso_core::CmdPart) -> ConvertResult<CmdPart> {
     }
 }
 
-pub fn convert_branch(branch: &ipso_core::Branch) -> ConvertResult<Branch> {
-    let ipso_core::Branch { pattern, body } = branch;
+pub fn convert_branch(branch: &Branch<ipso_core::Expr>) -> ConvertResult<Branch<Expr>> {
+    let Branch { pattern, body } = branch;
 
     let (required_by_pattern, mk_pattern) = convert_pattern(pattern);
     let (required_by_body, mk_body) = convert_expr(body);
@@ -526,7 +497,7 @@ pub fn convert_branch(branch: &ipso_core::Branch) -> ConvertResult<Branch> {
     )
 }
 
-pub fn convert_pattern(pattern: &ipso_core::Pattern) -> ConvertResult<Pattern> {
+pub fn convert_pattern(pattern: &Pattern<ipso_core::Expr>) -> ConvertResult<Pattern<Expr>> {
     match pattern {
         ipso_core::Pattern::Record { names, rest } => {
             let rest = *rest;
