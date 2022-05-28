@@ -129,6 +129,7 @@ impl Diagnostic {
             line: usize,
             offset: usize,
         }
+
         enum LocationEntry {
             InteractiveEntry { label: String },
             FileEntry(FileEntry),
@@ -196,17 +197,17 @@ impl Diagnostic {
                         },
                         Some(offset) => {
                             let mut pos = offset;
-                            while offset >= file_entry.offset {
+                            while file_entry.offset < offset {
                                 pos -= file_entry.line_str.len();
                                 file_entry.line_str.clear();
                                 match file_entry.file.read_line(&mut file_entry.line_str) {
                                     Err(err) => return Err(err),
                                     Ok(bytes_read) => {
+                                        file_entry.offset += bytes_read;
+                                        file_entry.line += 1;
+
                                         if bytes_read == 0 {
-                                            return Ok(());
-                                        } else {
-                                            file_entry.offset += bytes_read;
-                                            file_entry.line += 1;
+                                            break;
                                         }
                                     }
                                 }
