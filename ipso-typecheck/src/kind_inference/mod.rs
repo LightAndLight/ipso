@@ -198,6 +198,11 @@ pub fn infer(
             let kind = env.common_kinds.type_to_type_to_type.clone();
             Ok((core::Type::Arrow(kind.clone()), kind))
         }
+        syntax::Type::Function(a, b) => {
+            let a = check(env, state, a.pos, &a.item, &Kind::Type)?;
+            let b = check(env, state, b.pos, &b.item, &Kind::Type)?;
+            Ok((core::Type::arrow(env.common_kinds, a, b), Kind::Type))
+        }
         syntax::Type::Array => {
             let kind = env.common_kinds.type_to_type.clone();
             Ok((core::Type::Array(kind.clone()), kind))

@@ -1,3 +1,4 @@
+use crate::Spanned;
 use ipso_util::iter::Step;
 use std::fmt::Display;
 use std::hash::Hash;
@@ -13,6 +14,7 @@ pub enum Type<A> {
     String,
     Bytes,
     Arrow,
+    Function(Rc<Spanned<Type<A>>>, Rc<Spanned<Type<A>>>),
     FatArrow,
     Constraints(Vec<Type<A>>),
     Array,
@@ -151,6 +153,10 @@ impl<A> Type<A> {
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
             Type::Arrow => Type::Arrow,
+            Type::Function(a, b) => Type::Function(
+                Rc::new(a.as_ref().map(|ty| ty.map(f))),
+                Rc::new(b.as_ref().map(|ty| ty.map(f))),
+            ),
             Type::FatArrow => Type::FatArrow,
             Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.map(f)).collect()),
             Type::Array => Type::Array,
@@ -179,6 +185,10 @@ impl<A> Type<A> {
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
             Type::Arrow => Type::Arrow,
+            Type::Function(a, b) => Type::Function(
+                Rc::new(a.as_ref().map(|ty| ty.subst(f))),
+                Rc::new(b.as_ref().map(|ty| ty.subst(f))),
+            ),
             Type::FatArrow => Type::FatArrow,
             Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.subst(f)).collect()),
             Type::Array => Type::Array,
@@ -390,19 +400,6 @@ impl<A> Type<A> {
             return s;
         }
 
-        if let Some((a, b)) = self.unwrap_arrow() {
-            if a.unwrap_arrow().is_some() {
-                s.push('(')
-            }
-            s.push_str(a.render().as_str());
-            if a.unwrap_arrow().is_some() {
-                s.push(')')
-            }
-            s.push_str(" -> ");
-            s.push_str(b.render().as_str());
-            return s;
-        }
-
         if let Some((a, b)) = self.unwrap_fatarrow() {
             if a.unwrap_arrow().is_some() {
                 s.push('(')
@@ -425,6 +422,17 @@ impl<A> Type<A> {
             Type::String => s.push_str("String"),
             Type::Bytes => s.push_str("Bytes"),
             Type::Arrow => s.push_str("(->)"),
+            Type::Function(a, b) => {
+                if matches!(a.as_ref().item, Type::Function(_, _)) {
+                    s.push('(');
+                }
+                s.push_str(&a.as_ref().item.render());
+                if matches!(a.as_ref().item, Type::Function(_, _)) {
+                    s.push(')');
+                }
+                s.push_str(" -> ");
+                s.push_str(&b.as_ref().item.render());
+            }
             Type::FatArrow => s.push_str("(=>)"),
             Type::Constraints(cs) => {
                 s.push('(');
@@ -555,6 +563,7 @@ impl<'a, A> Iterator for TypeIterMetas<'a, A> {
                 Type::String => Step::Skip,
                 Type::Bytes => Step::Skip,
                 Type::Arrow => Step::Skip,
+                Type::Function(a, b) => Step::Continue2(&a.as_ref().item, &b.as_ref().item),
                 Type::FatArrow => Step::Skip,
                 Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
                 Type::Array => Step::Skip,
@@ -632,6 +641,7 @@ impl<'a, A> Iterator for IterVars<'a, A> {
                 Type::String => Step::Skip,
                 Type::Bytes => Step::Skip,
                 Type::Arrow => Step::Skip,
+                Type::Function(a, b) => Step::Continue2(&a.as_ref().item, &b.as_ref().item),
                 Type::FatArrow => Step::Skip,
                 Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
                 Type::Array => Step::Skip,

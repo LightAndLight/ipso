@@ -21,6 +21,15 @@ pub struct Spanned<A> {
     pub item: A,
 }
 
+impl<A> Spanned<A> {
+    pub fn map<B>(&self, f: impl FnOnce(&A) -> B) -> Spanned<B> {
+        Spanned {
+            pos: self.pos,
+            item: f(&self.item),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
 pub enum Keyword {
     Case,
