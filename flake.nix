@@ -60,6 +60,10 @@
               # for running tests locally
               packages.ipso-golden
               packages.ipso-shebang
+
+              # profiling
+              pkgs.kcachegrind
+              pkgs.valgrind
             ];
           };
       }
