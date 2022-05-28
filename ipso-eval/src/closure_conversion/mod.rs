@@ -57,74 +57,96 @@ pub enum Expr {
 
 macro_rules! convert_one {
     ($target:expr, $build:expr) => {{
-        let (required_by_target, mk_target) = convert_expr($target);
+        let ConvertResult {
+            required_vars,
+            build,
+        } = convert_expr($target);
 
-        (
-            required_by_target,
-            Box::new(move |env| {
-                let target = mk_target(env);
+        ConvertResult {
+            required_vars,
+            build: Box::new(move |env| {
+                let target = build(env);
                 $build(Rc::new(target))
             }),
-        )
+        }
     }};
 }
 
 macro_rules! convert_two {
     ($left:expr, $right:expr, $build:expr) => {{
-        let (required_by_left, mk_left) = convert_expr($left);
-        let (required_by_right, mk_right) = convert_expr($right);
+        let left = convert_expr($left);
+        let build_left = left.build;
+
+        let right = convert_expr($right);
+        let build_right = right.build;
 
         let required_by_both = {
             let mut vars = FnvHashSet::default();
-            vars.extend(required_by_left);
-            vars.extend(required_by_right);
+            vars.extend(left.required_vars);
+            vars.extend(right.required_vars);
             vars
         };
-        (
-            required_by_both,
-            Box::new(move |env| {
-                let left = mk_left(env);
-                let right = mk_right(env);
+        ConvertResult {
+            required_vars: required_by_both,
+            build: Box::new(move |env| {
+                let left = build_left(env);
+                let right = build_right(env);
                 $build(Rc::new(left), Rc::new(right))
             }),
-        )
+        }
     }};
 }
 
 macro_rules! convert_three {
     ($left:expr, $middle:expr, $right:expr, $build:expr) => {{
-        let (required_by_left, mk_left) = convert_expr($left);
-        let (required_by_middle, mk_middle) = convert_expr($middle);
-        let (required_by_right, mk_right) = convert_expr($right);
+        let left = convert_expr($left);
+        let build_left = left.build;
+
+        let middle = convert_expr($middle);
+        let build_middle = middle.build;
+
+        let right = convert_expr($right);
+        let build_right = right.build;
 
         let required_by_all = {
             let mut vars = FnvHashSet::default();
-            vars.extend(required_by_left);
-            vars.extend(required_by_middle);
-            vars.extend(required_by_right);
+            vars.extend(left.required_vars);
+            vars.extend(middle.required_vars);
+            vars.extend(right.required_vars);
             vars
         };
-        (
-            required_by_all,
-            Box::new(move |env| {
-                let left = mk_left(env);
-                let middle = mk_middle(env);
-                let right = mk_right(env);
+        ConvertResult {
+            required_vars: required_by_all,
+            build: Box::new(move |env| {
+                let left = build_left(env);
+                let middle = build_middle(env);
+                let right = build_right(env);
                 $build(Rc::new(left), Rc::new(middle), Rc::new(right))
             }),
-        )
+        }
     }};
 }
 
 pub fn convert(expr: &ipso_core::Expr) -> Expr {
-    let (_, mk_expr) = convert_expr(expr);
-    mk_expr(&[])
+    let result = convert_expr(expr);
+    (result.build)(&[])
 }
 
-type ConvertResult<A> = (FnvHashSet<usize>, Box<dyn FnOnce(&[usize]) -> A>);
+pub struct ConvertResult<A> {
+    pub required_vars: FnvHashSet<usize>,
+    pub build: Box<dyn FnOnce(&[usize]) -> A>,
+}
 
-fn closed<A: 'static>(value: A) -> ConvertResult<A> {
-    (FnvHashSet::default(), Box::new(move |_| value))
+impl<A> ConvertResult<A> {
+    pub fn closed(value: A) -> ConvertResult<A>
+    where
+        A: 'static,
+    {
+        Self {
+            required_vars: FnvHashSet::default(),
+            build: Box::new(move |_| value),
+        }
+    }
 }
 
 pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
@@ -146,33 +168,35 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
         ipso_core::Expr::Var(ix) => {
             let ix = *ix;
 
-            let required_by_var = {
+            let required_vars = {
                 let mut vars = FnvHashSet::default();
                 vars.insert(ix);
                 vars
             };
-            (
-                required_by_var,
-                Box::new(move |env| Expr::Var(get_position_of_var(env, ix))),
-            )
+            ConvertResult {
+                required_vars,
+                build: Box::new(move |env| Expr::Var(get_position_of_var(env, ix))),
+            }
         }
 
         ipso_core::Expr::Lam { arg, body } => {
             let arg = *arg;
-            let (required_by_body, mk_body) = convert_expr(body);
+
+            let body = convert_expr(body);
+            let build_body = body.build;
 
             let required_by_lam = if arg {
-                required_by_body
+                body.required_vars
                     .iter()
                     .copied()
                     .filter_map(|var| if var == 0 { None } else { Some(var - 1) })
                     .collect()
             } else {
-                required_by_body
+                body.required_vars
             };
-            (
-                required_by_lam.clone(),
-                Box::new(move |env| {
+            ConvertResult {
+                required_vars: required_by_lam.clone(),
+                build: Box::new(move |env| {
                     let new_env: Vec<usize> = if arg {
                         let env: Vec<usize> = env
                             .iter()
@@ -192,7 +216,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
                             .collect()
                     };
 
-                    let body = mk_body(&new_env);
+                    let body = build_body(&new_env);
 
                     let env: Vec<usize> = if arg {
                         new_env
@@ -212,7 +236,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
                         body: Rc::new(body),
                     }
                 }),
-            )
+            }
         }
 
         // Compound expressions.
@@ -220,13 +244,18 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
             convert_two!(f, x, Expr::App)
         }
         ipso_core::Expr::Let { value, rest } => {
-            let (required_by_value, mk_value) = convert_expr(value);
-            let (required_by_rest, mk_rest) = convert_expr(rest);
+            let value = convert_expr(value);
+            let build_value = value.build;
+
+            let ConvertResult {
+                build: build_rest,
+                required_vars: rest_required_vars,
+            } = convert_expr(rest);
 
             let required_by_let = {
                 let mut vars = FnvHashSet::default();
-                vars.extend(required_by_value);
-                vars.extend(required_by_rest.iter().copied().filter_map(|var| {
+                vars.extend(value.required_vars);
+                vars.extend(rest_required_vars.iter().copied().filter_map(|var| {
                     if var == 0 {
                         None
                     } else {
@@ -235,20 +264,20 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
                 }));
                 vars
             };
-            (
-                required_by_let,
-                Box::new(move |env| {
-                    let value = mk_value(env);
+            ConvertResult {
+                required_vars: required_by_let,
+                build: Box::new(move |env| {
+                    let value = build_value(env);
 
                     let rest = {
                         let env: Vec<usize> = env
                             .iter()
                             .copied()
                             .map(|var| var + 1)
-                            .filter(|var| required_by_rest.contains(var))
+                            .filter(|var| rest_required_vars.contains(var))
                             .chain(std::iter::once(0))
                             .collect();
-                        mk_rest(&env)
+                        build_rest(&env)
                     };
 
                     Expr::Let {
@@ -256,7 +285,7 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
                         rest: Rc::new(rest),
                     }
                 }),
-            )
+            }
         }
         ipso_core::Expr::IfThenElse(cond, then_expr, else_expr) => {
             convert_three!(cond, then_expr, else_expr, Expr::IfThenElse)
@@ -272,18 +301,18 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
 
             let required_by_parts = {
                 let mut vars = FnvHashSet::default();
-                parts.iter().for_each(|(required_by_part, _)| {
-                    vars.extend(required_by_part);
+                parts.iter().for_each(|part| {
+                    vars.extend(&part.required_vars);
                 });
                 vars
             };
-            (
-                required_by_parts,
-                Box::new(move |env| {
-                    let parts = parts.into_iter().map(|(_, mk_part)| mk_part(env)).collect();
+            ConvertResult {
+                required_vars: required_by_parts,
+                build: Box::new(move |env| {
+                    let parts = parts.into_iter().map(|part| (part.build)(env)).collect();
                     Expr::String(parts)
                 }),
-            )
+            }
         }
         ipso_core::Expr::Array(items) => {
             let items: Vec<ConvertResult<Expr>> =
@@ -291,18 +320,18 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
 
             let required_by_items = {
                 let mut vars = FnvHashSet::default();
-                items.iter().for_each(|(required_by_item, _)| {
-                    vars.extend(required_by_item);
+                items.iter().for_each(|item| {
+                    vars.extend(&item.required_vars);
                 });
                 vars
             };
-            (
-                required_by_items,
-                Box::new(move |env| {
-                    let items = items.into_iter().map(|(_, mk_item)| mk_item(env)).collect();
+            ConvertResult {
+                required_vars: required_by_items,
+                build: Box::new(move |env| {
+                    let items = items.into_iter().map(|item| (item.build)(env)).collect();
                     Expr::Array(items)
                 }),
-            )
+            }
         }
         ipso_core::Expr::Extend(index, value, record) => {
             convert_three!(index, value, record, Expr::Extend)
@@ -315,29 +344,27 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
 
             let required_by_fields = {
                 let mut vars = FnvHashSet::default();
-                fields
-                    .iter()
-                    .for_each(|((required_by_index, _), (required_by_value, _))| {
-                        vars.extend(required_by_index);
-                        vars.extend(required_by_value);
-                    });
+                fields.iter().for_each(|(index, value)| {
+                    vars.extend(&index.required_vars);
+                    vars.extend(&value.required_vars);
+                });
                 vars
             };
-            (
-                required_by_fields,
-                Box::new(move |env| {
+            ConvertResult {
+                required_vars: required_by_fields,
+                build: Box::new(move |env| {
                     let fields = fields
                         .into_iter()
-                        .map(|((_, mk_index), (_, mk_value))| {
-                            let index = mk_index(env);
-                            let value = mk_value(env);
+                        .map(|(index, value)| {
+                            let index = (index.build)(env);
+                            let value = (value.build)(env);
 
                             (index, value)
                         })
                         .collect();
                     Expr::Record(fields)
                 }),
-            )
+            }
         }
         ipso_core::Expr::Project(record, index) => {
             convert_two!(record, index, Expr::Project)
@@ -345,7 +372,9 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
         ipso_core::Expr::Variant(tag) => convert_one!(tag, Expr::Variant),
         ipso_core::Expr::Embed(tag, variant) => convert_two!(tag, variant, Expr::Embed),
         ipso_core::Expr::Case(expr, branches) => {
-            let (required_by_expr, mk_expr) = convert_expr(expr);
+            let expr = convert_expr(expr);
+            let build_expr = expr.build;
+
             let branches: Vec<ConvertResult<Branch<Expr>>> = branches
                 .iter()
                 .map(|branch| convert_branch(branch))
@@ -353,24 +382,24 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
 
             let required_by_case = {
                 let mut vars = FnvHashSet::default();
-                vars.extend(required_by_expr);
-                branches.iter().for_each(|(required_by_branch, _)| {
-                    vars.extend(required_by_branch);
+                vars.extend(expr.required_vars);
+                branches.iter().for_each(|branch| {
+                    vars.extend(&branch.required_vars);
                 });
                 vars
             };
-            (
-                required_by_case,
-                Box::new(move |env| {
-                    let expr = mk_expr(env);
+            ConvertResult {
+                required_vars: required_by_case,
+                build: Box::new(move |env| {
+                    let expr = build_expr(env);
                     let branches = branches
                         .into_iter()
-                        .map(|(_, mk_branch)| mk_branch(env))
+                        .map(|branch| (branch.build)(env))
                         .collect();
 
                     Expr::Case(Rc::new(expr), branches)
                 }),
-            )
+            }
         }
         ipso_core::Expr::Cmd(parts) => {
             let parts: Vec<ConvertResult<CmdPart<Expr>>> =
@@ -378,29 +407,29 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
 
             let required_by_parts = {
                 let mut vars = FnvHashSet::default();
-                parts.iter().for_each(|(required_by_item, _)| {
-                    vars.extend(required_by_item);
+                parts.iter().for_each(|item| {
+                    vars.extend(&item.required_vars);
                 });
                 vars
             };
-            (
-                required_by_parts,
-                Box::new(move |env| {
-                    let parts = parts.into_iter().map(|(_, mk_part)| mk_part(env)).collect();
+            ConvertResult {
+                required_vars: required_by_parts,
+                build: Box::new(move |env| {
+                    let parts = parts.into_iter().map(|part| (part.build)(env)).collect();
                     Expr::Cmd(parts)
                 }),
-            )
+            }
         }
 
         // Simple expressions.
-        ipso_core::Expr::Name(name) => closed(Expr::Name(name.clone())),
-        ipso_core::Expr::True => closed(Expr::True),
-        ipso_core::Expr::False => closed(Expr::False),
-        ipso_core::Expr::Int(i) => closed(Expr::Int(*i)),
-        ipso_core::Expr::Char(c) => closed(Expr::Char(*c)),
-        ipso_core::Expr::Unit => closed(Expr::Unit),
-        ipso_core::Expr::Builtin(builtin) => closed(Expr::Builtin(*builtin)),
-        ipso_core::Expr::Module { id, path, item } => closed(Expr::Module {
+        ipso_core::Expr::Name(name) => ConvertResult::closed(Expr::Name(name.clone())),
+        ipso_core::Expr::True => ConvertResult::closed(Expr::True),
+        ipso_core::Expr::False => ConvertResult::closed(Expr::False),
+        ipso_core::Expr::Int(i) => ConvertResult::closed(Expr::Int(*i)),
+        ipso_core::Expr::Char(c) => ConvertResult::closed(Expr::Char(*c)),
+        ipso_core::Expr::Unit => ConvertResult::closed(Expr::Unit),
+        ipso_core::Expr::Builtin(builtin) => ConvertResult::closed(Expr::Builtin(*builtin)),
+        ipso_core::Expr::Module { id, path, item } => ConvertResult::closed(Expr::Module {
             id: *id,
             path: path.clone(),
             item: item.clone(),
@@ -418,20 +447,19 @@ pub fn convert_string_part(part: &StringPart<ipso_core::Expr>) -> ConvertResult<
     match part {
         StringPart::String(string) => {
             let string = string.clone();
-            (
-                FnvHashSet::default(),
-                Box::new(move |_| StringPart::String(string)),
-            )
+            ConvertResult::closed(StringPart::String(string))
         }
         StringPart::Expr(expr) => {
-            let (required_by_expr, mk_expr) = convert_expr(expr);
-            (
-                required_by_expr,
-                Box::new(move |env| {
-                    let expr = mk_expr(env);
+            let expr = convert_expr(expr);
+            let build_expr = expr.build;
+
+            ConvertResult {
+                required_vars: expr.required_vars,
+                build: Box::new(move |env| {
+                    let expr = build_expr(env);
                     StringPart::Expr(expr)
                 }),
-            )
+            }
         }
     }
 }
@@ -440,34 +468,35 @@ pub fn convert_cmd_part(part: &CmdPart<ipso_core::Expr>) -> ConvertResult<CmdPar
     match part {
         CmdPart::Literal(string) => {
             let string = string.clone();
-            (
-                FnvHashSet::default(),
-                Box::new(move |_| CmdPart::Literal(string)),
-            )
+            ConvertResult::closed(CmdPart::Literal(string))
         }
         CmdPart::Expr(expr) => {
-            let (required_by_expr, mk_expr) = convert_expr(expr);
-            (
-                required_by_expr,
-                Box::new(move |env| CmdPart::Expr(mk_expr(env))),
-            )
+            let expr = convert_expr(expr);
+            let build_expr = expr.build;
+
+            ConvertResult {
+                required_vars: expr.required_vars,
+                build: Box::new(move |env| CmdPart::Expr(build_expr(env))),
+            }
         }
     }
 }
 
 pub fn convert_branch(branch: &Branch<ipso_core::Expr>) -> ConvertResult<Branch<Expr>> {
     let Branch { pattern, body } = branch;
-
-    let (required_by_pattern, mk_pattern) = convert_pattern(pattern);
-    let (required_by_body, mk_body) = convert_expr(body);
-
     let bound_vars = pattern.bound_vars();
+
+    let pattern = convert_pattern(pattern);
+    let build_pattern = pattern.build;
+
+    let body = convert_expr(body);
+
     let required_by_branch = {
         let mut vars = FnvHashSet::default();
 
-        vars.extend(required_by_pattern);
+        vars.extend(pattern.required_vars);
 
-        let required_by_body = required_by_body.iter().filter_map(|var| {
+        let required_by_body = body.required_vars.iter().filter_map(|var| {
             if *var < bound_vars {
                 None
             } else {
@@ -478,10 +507,10 @@ pub fn convert_branch(branch: &Branch<ipso_core::Expr>) -> ConvertResult<Branch<
 
         vars
     };
-    (
-        required_by_branch,
-        Box::new(move |env| {
-            let pattern = mk_pattern(env);
+    ConvertResult {
+        required_vars: required_by_branch,
+        build: Box::new(move |env| {
+            let pattern = build_pattern(env);
 
             let body = {
                 let env: Vec<usize> = env
@@ -490,11 +519,11 @@ pub fn convert_branch(branch: &Branch<ipso_core::Expr>) -> ConvertResult<Branch<
                     .map(|var| var + bound_vars)
                     .chain((0..bound_vars).rev())
                     .collect();
-                mk_body(&env)
+                (body.build)(&env)
             };
             Branch { pattern, body }
         }),
-    )
+    }
 }
 
 pub fn convert_pattern(pattern: &Pattern<ipso_core::Expr>) -> ConvertResult<Pattern<Expr>> {
@@ -509,25 +538,25 @@ pub fn convert_pattern(pattern: &Pattern<ipso_core::Expr>) -> ConvertResult<Patt
                 let mut vars = FnvHashSet::default();
                 names
                     .iter()
-                    .for_each(|(required_by_name, _)| vars.extend(required_by_name));
+                    .for_each(|name| vars.extend(&name.required_vars));
                 vars
             };
-            (
-                required_by_names,
-                Box::new(move |env| {
+            ConvertResult {
+                required_vars: required_by_names,
+                build: Box::new(move |env| {
                     let names: Vec<Expr> =
-                        names.into_iter().map(|(_, mk_name)| mk_name(env)).collect();
+                        names.into_iter().map(|name| (name.build)(env)).collect();
                     Pattern::Record { names, rest }
                 }),
-            )
+            }
         }
         ipso_core::Pattern::Variant { tag } => {
             convert_one!(tag, |tag| Pattern::Variant { tag })
         }
-        ipso_core::Pattern::Name => closed(Pattern::Name),
-        ipso_core::Pattern::Char(c) => closed(Pattern::Char(*c)),
-        ipso_core::Pattern::Int(i) => closed(Pattern::Int(*i)),
-        ipso_core::Pattern::String(s) => closed(Pattern::String(s.clone())),
-        ipso_core::Pattern::Wildcard => closed(Pattern::Wildcard),
+        ipso_core::Pattern::Name => ConvertResult::closed(Pattern::Name),
+        ipso_core::Pattern::Char(c) => ConvertResult::closed(Pattern::Char(*c)),
+        ipso_core::Pattern::Int(i) => ConvertResult::closed(Pattern::Int(*i)),
+        ipso_core::Pattern::String(s) => ConvertResult::closed(Pattern::String(s.clone())),
+        ipso_core::Pattern::Wildcard => ConvertResult::closed(Pattern::Wildcard),
     }
 }
