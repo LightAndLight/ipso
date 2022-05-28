@@ -296,6 +296,7 @@ pub fn unify_with_hint(
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
     hint: &dyn Fn() -> ErrorHint,
+    pos: usize,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), Error> {
@@ -305,6 +306,7 @@ pub fn unify_with_hint(
         env.type_variables,
         kind_inference_state,
         type_solutions,
+        pos,
         expected,
         actual,
     )
@@ -316,6 +318,7 @@ pub fn unify(
     env: Env,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
+    pos: usize,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), Error> {
@@ -325,6 +328,7 @@ pub fn unify(
         env.type_variables,
         kind_inference_state,
         type_solutions,
+        pos,
         expected,
         actual,
     )
@@ -351,6 +355,7 @@ fn unify_inner(
     type_variables: &BoundVars<Kind>,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
+    pos: usize,
     expected: &Type,
     actual: &Type,
 ) -> Result<(), ErrorInfo> {
@@ -433,6 +438,7 @@ fn unify_inner(
         type_variables: &BoundVars<Kind>,
         kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
+        pos: usize,
         meta: &usize,
         actual: &Type,
     ) -> Result<(), ErrorInfo> {
@@ -452,6 +458,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     &expected,
                     &actual,
                 ),
@@ -465,6 +472,7 @@ fn unify_inner(
         type_variables: &BoundVars<Kind>,
         kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
+        pos: usize,
         expected: &Type,
         meta: &usize,
     ) -> Result<(), ErrorInfo> {
@@ -484,6 +492,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     &expected,
                     &actual,
                 ),
@@ -497,7 +506,7 @@ fn unify_inner(
         &actual.kind(),
     )
     .map_err(|error| ErrorInfo::KindError {
-        error: kind_inference::Error::from(error).with_hint(
+        error: kind_inference::Error::unification_error(pos, error).with_hint(
             kind_inference::ErrorHint::WhileChecking {
                 ty: actual
                     .to_syntax()
@@ -506,11 +515,6 @@ fn unify_inner(
             },
         ),
     })?;
-    /*
-
-    kind_inference::unify_with_hint(kind_inference_state, hint, &expected.kind(), &actual.kind())
-        .map_err(|error| ErrorInfo::KindError { error })?;
-        */
 
     match expected {
         Type::Meta(_, meta) => unify_meta_left(
@@ -519,6 +523,7 @@ fn unify_inner(
             type_variables,
             kind_inference_state,
             type_solutions,
+            pos,
             meta,
             actual,
         ),
@@ -530,6 +535,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -549,6 +555,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -568,6 +575,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -587,6 +595,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -606,6 +615,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -625,6 +635,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -644,6 +655,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -663,6 +675,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -682,6 +695,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -701,6 +715,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -720,6 +735,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -739,6 +755,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -758,6 +775,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -777,6 +795,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -796,6 +815,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -815,6 +835,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -834,6 +855,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -853,6 +875,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -872,6 +895,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     expected_a,
                     actual_a,
                 )?;
@@ -881,6 +905,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     expected_b,
                     actual_b,
                 )
@@ -891,6 +916,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -910,6 +936,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     expected_row,
                     actual_row,
                 )
@@ -920,6 +947,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -945,6 +973,7 @@ fn unify_inner(
                             type_variables,
                             kind_inference_state,
                             type_solutions,
+                            pos,
                             expected_constraint,
                             actual_constraint,
                         )
@@ -956,6 +985,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),
@@ -1039,6 +1069,7 @@ fn unify_inner(
                         type_variables,
                         kind_inference_state,
                         type_solutions,
+                        pos,
                         common_field.expected,
                         common_field.actual,
                     )
@@ -1061,6 +1092,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     &Type::mk_rows(remaining_expected_fields, Some(common_tail.clone())),
                     actual_tail,
                 )?;
@@ -1071,6 +1103,7 @@ fn unify_inner(
                     type_variables,
                     kind_inference_state,
                     type_solutions,
+                    pos,
                     expected_tail,
                     &Type::mk_rows(remaining_actual_fields, Some(common_tail)),
                 )
@@ -1081,6 +1114,7 @@ fn unify_inner(
                 type_variables,
                 kind_inference_state,
                 type_solutions,
+                pos,
                 expected,
                 meta,
             ),

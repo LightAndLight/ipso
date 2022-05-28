@@ -123,6 +123,7 @@ pub fn check_definition(
 
     type_variables.insert(&ty_var_kinds);
 
+    let ty_pos = ty.pos;
     let ty = check_kind(
         env.common_kinds,
         env.type_context,
@@ -177,6 +178,7 @@ pub fn check_definition(
         },
         &mut type_inference_state.kind_inference_state,
         &mut type_inference_state.type_solutions,
+        ty_pos,
         ty,
         &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
             core::Type::mk_arrow(env.common_kinds, &el.ty(env.common_kinds), &acc)
@@ -453,8 +455,7 @@ pub fn check_instance(
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 env.source,
-                arg.pos,
-                &arg.item,
+                &arg,
             )?;
             Ok(res.0)
         })

@@ -38,22 +38,34 @@ impl From<unification::Error> for ErrorInfo {
 /// A kind inference error.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Error {
+    pub position: usize,
     pub info: ErrorInfo,
     pub hint: Option<ErrorHint>,
 }
 
 impl Error {
     /// Construct a [`NotInScope`](ErrorInfo::NotInScope) error.
-    pub fn not_in_scope(name: Rc<str>) -> Self {
+    pub fn not_in_scope(position: usize, name: Rc<str>) -> Self {
         Error {
+            position,
             info: ErrorInfo::NotInScope { name },
             hint: None,
         }
     }
 
-    /// Construct a [`Mismatch`](unification::Error::Mismatch) error.
-    pub fn mismatch(expected: &Kind, actual: &Kind) -> Self {
+    /// Construct a [unification error](unification::Error).
+    pub fn unification_error(position: usize, error: unification::Error) -> Self {
         Error {
+            position,
+            info: ErrorInfo::UnificationError { error },
+            hint: None,
+        }
+    }
+
+    /// Construct a [`Mismatch`](unification::Error::Mismatch) error.
+    pub fn mismatch(position: usize, expected: &Kind, actual: &Kind) -> Self {
+        Error {
+            position,
             info: ErrorInfo::UnificationError {
                 error: unification::Error::Mismatch {
                     expected: expected.clone(),
@@ -65,8 +77,9 @@ impl Error {
     }
 
     /// Construct an [`Occurs`](unification::Error::Occurs) error.
-    pub fn occurs(meta: Meta, kind: &Kind) -> Self {
+    pub fn occurs(position: usize, meta: Meta, kind: &Kind) -> Self {
         Error {
+            position,
             info: ErrorInfo::UnificationError {
                 error: unification::Error::Occurs {
                     meta,
@@ -130,15 +143,6 @@ impl Error {
     }
 }
 
-impl<T: Into<ErrorInfo>> From<T> for Error {
-    fn from(error: T) -> Self {
-        Error {
-            info: error.into(),
-            hint: None,
-        }
-    }
-}
-
 /// Kind inference environment.
 #[derive(Clone, Copy)]
 pub struct Env<'a> {
@@ -179,6 +183,7 @@ impl Default for State {
 pub fn infer(
     env: Env,
     state: &mut State,
+    pos: usize,
     ty: &syntax::Type<Rc<str>>,
 ) -> Result<(core::Type, Kind), Error> {
     match ty {
@@ -212,12 +217,12 @@ pub fn infer(
         }
         syntax::Type::RowNil => Ok((core::Type::RowNil, Kind::Row)),
         syntax::Type::RowCons(field, ty, rest) => {
-            let ty = check(env, state, ty, &Kind::Type)?;
-            let rest = check(env, state, rest, &Kind::Row)?;
+            let ty = check(env, state, pos, ty, &Kind::Type)?;
+            let rest = check(env, state, pos, rest, &Kind::Row)?;
             Ok((core::Type::mk_rowcons(field.clone(), ty, rest), Kind::Row))
         }
         syntax::Type::HasField(field, row) => {
-            let row = check(env, state, row, &Kind::Row)?;
+            let row = check(env, state, pos, row, &Kind::Row)?;
             Ok((
                 core::Type::mk_hasfield(field.clone(), row),
                 Kind::Constraint,
@@ -231,7 +236,7 @@ pub fn infer(
         syntax::Type::Constraints(constraints) => {
             let constraints: Vec<core::Type> = constraints
                 .iter()
-                .map(|constraint| check(env, state, constraint, &Kind::Constraint))
+                .map(|constraint| check(env, state, pos, constraint, &Kind::Constraint))
                 .collect::<Result<_, _>>()?;
             Ok((core::Type::Constraints(constraints), Kind::Constraint))
         }
@@ -239,8 +244,8 @@ pub fn infer(
         syntax::Type::App(a, b) => {
             let in_kind = state.fresh_meta();
             let out_kind = state.fresh_meta();
-            let a = check(env, state, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
-            let b = check(env, state, b, &in_kind)?;
+            let a = check(env, state, pos, a, &Kind::mk_arrow(&in_kind, &out_kind))?;
+            let b = check(env, state, pos, b, &in_kind)?;
             Ok((core::Type::app(a, b), out_kind))
         }
 
@@ -255,12 +260,12 @@ pub fn infer(
             )),
             _ => match env.types.get(name) {
                 Some(kind) => Ok((core::Type::Name(kind.clone(), name.clone()), kind.clone())),
-                None => Err(Error::not_in_scope(name.clone())),
+                None => Err(Error::not_in_scope(pos, name.clone())),
             },
         },
         syntax::Type::Var(name) => match env.type_variables.lookup_name(name) {
             Some((index, kind)) => Ok((core::Type::Var(kind.clone(), index), kind.clone())),
-            None => Err(Error::not_in_scope(name.clone())),
+            None => Err(Error::not_in_scope(pos, name.clone())),
         },
         syntax::Type::Meta(meta) => {
             /*
@@ -277,10 +282,12 @@ pub fn infer(
 pub fn check(
     env: Env,
     state: &mut State,
+    pos: usize,
     ty: &syntax::Type<Rc<str>>,
     expected_kind: &Kind,
 ) -> Result<core::Type, Error> {
-    let (ty, actual_kind) = infer(env, state, ty)?;
-    unification::unify(&mut state.kind_solutions, expected_kind, &actual_kind)?;
+    let (ty, actual_kind) = infer(env, state, pos, ty)?;
+    unification::unify(&mut state.kind_solutions, expected_kind, &actual_kind)
+        .map_err(|error| Error::unification_error(pos, error))?;
     Ok(ty)
 }

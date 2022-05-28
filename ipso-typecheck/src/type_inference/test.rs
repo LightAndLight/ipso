@@ -67,6 +67,7 @@ fn occurs_1() {
             },
             &mut state.kind_inference_state,
             &mut state.type_solutions,
+            0,
             &v1,
             &Type::mk_arrow(env.common_kinds, &v1, &v2),
         );
@@ -607,6 +608,7 @@ fn unify_1() {
             },
             &mut state.kind_inference_state,
             &mut state.type_solutions,
+            0,
             &real,
             &holey,
         )
@@ -627,6 +629,7 @@ fn unify_rows_1() {
                 },
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
+                0,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![(Rc::from("x"), Type::Int), (Rc::from("y"), Type::Bool)],
@@ -655,6 +658,7 @@ fn unify_rows_2() {
                 },
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
+                0,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![
@@ -691,6 +695,7 @@ fn unify_rows_3() {
                 },
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
+                0,
                 &Type::mk_record(
                     env.common_kinds,
                     vec![
@@ -758,6 +763,7 @@ fn unify_rows_4() {
             },
             &mut state.kind_inference_state,
             &mut state.type_solutions,
+            0,
             &ty1,
             &ty2,
         );
@@ -1350,6 +1356,7 @@ fn unify_variant_1() {
             },
             &mut state.kind_inference_state,
             &mut state.type_solutions,
+            0,
             &ty1,
             &ty2,
         );
