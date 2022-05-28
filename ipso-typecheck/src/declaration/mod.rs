@@ -129,8 +129,7 @@ pub fn check_definition(
         &type_variables,
         &mut type_inference_state.kind_inference_state,
         env.source,
-        Some(position),
-        &ty.item,
+        ty,
         &Kind::Type,
     )?;
 
@@ -251,14 +250,15 @@ pub fn check_class_member(
     type_solutions: &mut type_inference::unification::Solutions,
     class_args_kinds: &[(Rc<str>, Kind)],
     name: &str,
-    ty: &syntax::Type<Rc<str>>,
+    ty: &Spanned<syntax::Type<Rc<str>>>,
 ) -> Result<core::ClassMember, Error> {
     let ty_var_kinds: Vec<(Rc<str>, Kind)> = {
         let mut seen_names: HashSet<&str> = class_args_kinds
             .iter()
             .map(|(name, _)| name.as_ref())
             .collect();
-        ty.iter_vars()
+        ty.item
+            .iter_vars()
             .filter_map(|name| {
                 if !seen_names.contains(name.as_ref()) {
                     seen_names.insert(name);
@@ -278,8 +278,6 @@ pub fn check_class_member(
         &bound_tyvars,
         kind_inference_state,
         source,
-        // TODO: make `ty` `Spanned` and use its position here.
-        None,
         ty,
         &Kind::Type,
     )?;
@@ -304,7 +302,7 @@ pub fn check_class(
     supers: &[Spanned<syntax::Type<Rc<str>>>],
     name: &Rc<str>,
     args: &[Spanned<Rc<str>>],
-    members: &[(String, syntax::Type<Rc<str>>)],
+    members: &[(String, Spanned<syntax::Type<Rc<str>>>)],
 ) -> Result<Checked, Error> {
     let mut type_variables = BoundVars::new();
     let mut type_solutions = type_inference::unification::Solutions::new();
@@ -338,8 +336,7 @@ pub fn check_class(
                 &type_variables,
                 &mut kind_inference_state,
                 env.source,
-                Some(superclass.pos),
-                &superclass.item,
+                &superclass,
                 &Kind::Constraint,
             )
         })
@@ -472,8 +469,7 @@ pub fn check_instance(
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 env.source,
-                Some(assume.pos),
-                &assume.item,
+                &assume,
                 &Kind::Constraint,
             )?;
             let evar = type_inference_state
@@ -535,8 +531,10 @@ pub fn check_instance(
         &type_variables,
         &mut type_inference_state.kind_inference_state,
         env.source,
-        Some(name.pos),
-        &head,
+        &Spanned {
+            pos: name.pos,
+            item: head,
+        },
         &Kind::Constraint,
     )?;
 

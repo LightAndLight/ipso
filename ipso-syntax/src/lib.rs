@@ -533,7 +533,7 @@ pub enum Declaration {
         supers: Vec<Spanned<Type<Rc<str>>>>,
         name: Rc<str>,
         args: Vec<Spanned<Rc<str>>>,
-        members: Vec<(String, Type<Rc<str>>)>,
+        members: Vec<(String, Spanned<Type<Rc<str>>>)>,
     },
     Instance {
         assumes: Vec<Spanned<Type<Rc<str>>>>,

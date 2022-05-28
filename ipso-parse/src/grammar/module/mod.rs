@@ -183,11 +183,12 @@ class_member ::=
   ident ':' type
 ```
 */
-pub fn class_member(parser: &mut Parser) -> Parsed<(String, Type<Rc<str>>)> {
+pub fn class_member(parser: &mut Parser) -> Parsed<(String, Spanned<Type<Rc<str>>>)> {
     parser.ident_owned().and_then(|name| {
         keep_right!(
             indent!(parser, Relation::Gt, parser.token(&token::Data::Colon)),
-            indent!(parser, Relation::Gt, type_(parser)).map(|type_| (name, type_))
+            indent!(parser, Relation::Gt, spanned!(parser, type_(parser)))
+                .map(|type_| (name, type_))
         )
     })
 }

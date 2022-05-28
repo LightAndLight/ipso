@@ -20,6 +20,7 @@ use std::{
     rc::Rc,
     todo,
 };
+use syntax::Spanned;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -373,8 +374,7 @@ fn check_kind(
     type_variables: &BoundVars<Kind>,
     kind_inference_state: &mut kind_inference::State,
     source: &Source,
-    pos: Option<usize>,
-    ty: &syntax::Type<Rc<str>>,
+    ty: &Spanned<syntax::Type<Rc<str>>>,
     kind: &Kind,
 ) -> Result<core::Type, Error> {
     let env = kind_inference::Env {
@@ -383,13 +383,15 @@ fn check_kind(
         type_variables,
     };
 
-    kind_inference::check(env, kind_inference_state, ty, kind).map_err(|error| Error::KindError {
-        source: source.clone(),
-        pos: pos.unwrap_or(0),
-        error: error.with_hint(kind_inference::ErrorHint::WhileChecking {
-            ty: ty.clone(),
-            has_kind: kind.clone(),
-        }),
+    kind_inference::check(env, kind_inference_state, &ty.item, kind).map_err(|error| {
+        Error::KindError {
+            source: source.clone(),
+            pos: ty.pos,
+            error: error.with_hint(kind_inference::ErrorHint::WhileChecking {
+                ty: ty.item.clone(),
+                has_kind: kind.clone(),
+            }),
+        }
     })
 }
 
