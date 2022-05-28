@@ -210,6 +210,7 @@ pub fn solve_constraint(
                     },
                     &mut type_inference_state.kind_inference_state,
                     &mut type_inference_state.type_solutions,
+                    pos,
                     constraint,
                     &implication.consequent,
                 ) {
@@ -407,6 +408,7 @@ pub fn solve_constraint(
                                         },
                                         &mut type_inference_state.kind_inference_state,
                                         &mut type_inference_state.type_solutions,
+                                        pos,
                                         &core::Type::RowNil,
                                         rest,
                                     )
@@ -649,6 +651,7 @@ pub fn solve_constraint(
                             },
                             &mut type_inference_state.kind_inference_state,
                             &mut type_inference_state.type_solutions,
+                            pos,
                             &core::Type::RowNil,
                             current_row,
                         )

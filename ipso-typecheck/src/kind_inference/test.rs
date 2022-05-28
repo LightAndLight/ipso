@@ -26,8 +26,8 @@ fn infer_1() {
     with_empty_env_and_state(&|env, state| {
         let expected = Ok((core::Type::Bool, Kind::Type));
         let actual = {
-            let ty = &syntax::Type::Bool;
-            infer(env, state, ty)
+            let ty = syntax::Type::Bool;
+            infer(env, state, 0, &ty)
                 .map_err(|error| error.with_hint(ErrorHint::WhileInferring { ty: ty.clone() }))
         };
         assert_eq!(expected, actual)
@@ -39,8 +39,8 @@ fn infer_2() {
     with_empty_env_and_state(&|env, state| {
         let expected = Ok((core::Type::RowNil, Kind::Row));
         let actual = {
-            let ty = &syntax::Type::RowNil;
-            infer(env, state, ty)
+            let ty = syntax::Type::RowNil;
+            infer(env, state, 0, &ty)
                 .map_err(|error| error.with_hint(ErrorHint::WhileInferring { ty: ty.clone() }))
         };
         assert_eq!(expected, actual)
@@ -50,13 +50,14 @@ fn infer_2() {
 #[test]
 fn infer_3() {
     with_empty_env_and_state(&|env, state| {
+        let pos = 99;
         let ty =
             syntax::Type::mk_rowcons(Rc::from("x"), syntax::Type::RowNil, syntax::Type::RowNil);
-        let expected = Err(Error::mismatch(&Kind::Type, &Kind::Row)
+        let expected = Err(Error::mismatch(pos, &Kind::Type, &Kind::Row)
             .with_hint(ErrorHint::WhileInferring { ty: ty.clone() }));
         let actual = {
-            let ty: &syntax::Type<Rc<str>> = &ty;
-            infer(env, state, ty)
+            let ty: syntax::Type<Rc<str>> = ty;
+            infer(env, state, pos, &ty)
                 .map_err(|error| error.with_hint(ErrorHint::WhileInferring { ty: ty.clone() }))
         };
         assert_eq!(expected, actual)
@@ -74,11 +75,11 @@ fn infer_4() {
             Kind::Type,
         ));
         let actual = {
-            let ty: &syntax::Type<Rc<str>> = &syntax::Type::mk_app(
+            let ty: syntax::Type<Rc<str>> = syntax::Type::mk_app(
                 syntax::Type::Record,
                 syntax::Type::mk_rowcons(Rc::from("x"), syntax::Type::Bool, syntax::Type::RowNil),
             );
-            infer(env, state, ty)
+            infer(env, state, 0, &ty)
                 .map_err(|error| error.with_hint(ErrorHint::WhileInferring { ty: ty.clone() }))
         }
         .map(|(ty, kind)| (ty, state.kind_solutions.zonk(false, kind)));

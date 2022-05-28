@@ -118,13 +118,14 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             },
             &mut kind_inference_state,
             &mut type_solutions,
+            0,
             &expected,
             &actual,
         )
         .map_err(|error| {
             type_inference::Error::unification_error(
-                &source, // TODO: figure out how to give a useful position?
-                0, error,
+                // TODO: figure out how to give a useful position?
+                &source, 0, error,
             )
         })?;
     }

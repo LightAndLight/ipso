@@ -528,6 +528,7 @@ pub fn check_pattern(
         },
         &mut state.kind_inference_state,
         &mut state.type_solutions,
+        pattern.pos,
         expected,
         &actual,
     )
@@ -891,6 +892,7 @@ pub fn infer(
                         },
                         &mut state.kind_inference_state,
                         &mut state.type_solutions,
+                        expr.pos,
                         &expected,
                         actual,
                     )
@@ -1126,6 +1128,7 @@ fn infer_case(
                 },
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
+                position,
                 &expected,
                 actual,
             )
@@ -1156,6 +1159,7 @@ pub fn check(
         },
         &mut state.kind_inference_state,
         &mut state.type_solutions,
+        position,
         expected,
         &actual,
     )

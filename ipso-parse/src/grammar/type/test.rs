@@ -2,7 +2,7 @@ use super::type_;
 use crate::{keep_left, map2, Parser};
 use ipso_diagnostic::Source;
 use ipso_lex::Lexer;
-use ipso_syntax::Type;
+use ipso_syntax::{Spanned, Type};
 use std::rc::Rc;
 
 macro_rules! parse_test {
@@ -31,9 +31,15 @@ fn parse_type_2() {
     parse_test!(
         "Int -> Bool",
         type_,
-        Ok(Type::mk_app(
-            Type::mk_app(Type::Arrow, Type::Int),
-            Type::Bool
+        Ok(Type::Function(
+            Rc::new(Spanned {
+                pos: 0,
+                item: Type::Int
+            }),
+            Rc::new(Spanned {
+                pos: 7,
+                item: Type::Bool
+            })
         ))
     )
 }
@@ -43,9 +49,24 @@ fn parse_type_2_1() {
     parse_test!(
         "Int -> Bool -> Int",
         type_,
-        Ok(Type::mk_arrow(
-            Type::Int,
-            Type::mk_arrow(Type::Bool, Type::Int)
+        Ok(Type::Function(
+            Rc::new(Spanned {
+                pos: 0,
+                item: Type::Int
+            }),
+            Rc::new(Spanned {
+                pos: 7,
+                item: Type::Function(
+                    Rc::new(Spanned {
+                        pos: 7,
+                        item: Type::Bool
+                    }),
+                    Rc::new(Spanned {
+                        pos: 15,
+                        item: Type::Int
+                    })
+                )
+            })
         ))
     )
 }
@@ -57,9 +78,24 @@ fn parse_type_3() {
         type_,
         Ok(Type::mk_fatarrow(
             Type::mk_app(Type::mk_name("Eq"), Type::Var(Rc::from("a"))),
-            Type::mk_arrow(
-                Type::Var(Rc::from("a")),
-                Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool)
+            Type::Function(
+                Rc::new(Spanned {
+                    pos: 8,
+                    item: Type::Var(Rc::from("a"))
+                }),
+                Rc::new(Spanned {
+                    pos: 13,
+                    item: Type::Function(
+                        Rc::new(Spanned {
+                            pos: 13,
+                            item: Type::Var(Rc::from("a"))
+                        }),
+                        Rc::new(Spanned {
+                            pos: 18,
+                            item: Type::Bool
+                        })
+                    )
+                })
             ),
         ))
     )
@@ -86,7 +122,16 @@ fn parse_type_4() {
             Type::mk_app(Type::mk_name("Eq"), Type::Var(Rc::from("a"))),
             Type::mk_fatarrow(
                 Type::mk_name("F"),
-                Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool)
+                Type::Function(
+                    Rc::new(Spanned {
+                        pos: 13,
+                        item: Type::Var(Rc::from("a"))
+                    }),
+                    Rc::new(Spanned {
+                        pos: 18,
+                        item: Type::Bool
+                    })
+                )
             )
         ))
     )

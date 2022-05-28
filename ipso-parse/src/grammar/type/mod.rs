@@ -4,9 +4,10 @@
 mod test;
 
 use crate::{
-    between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, Parsed, Parser,
+    between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, spanned,
+    Parsed, Parser,
 };
-use ipso_syntax::Type;
+use ipso_syntax::{Spanned, Type};
 use std::rc::Rc;
 
 /// ```text
@@ -201,8 +202,8 @@ type_arrow ::=
   type_app ['->' type_arrow]
 ```
  */
-pub fn type_arrow(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
-    type_app(parser).and_then(|a| {
+pub fn type_arrow(parser: &mut Parser) -> Parsed<Spanned<Type<Rc<str>>>> {
+    spanned!(parser, type_app(parser)).and_then(|a| {
         optional!(map2!(
             |_, ty| ty,
             indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
@@ -210,7 +211,10 @@ pub fn type_arrow(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
         ))
         .map(|m_b| match m_b {
             None => a,
-            Some(b) => Type::mk_arrow(a, b),
+            Some(b) => Spanned {
+                pos: a.pos,
+                item: Type::Function(Rc::new(a), Rc::new(b)),
+            },
         })
     })
 }
@@ -222,7 +226,7 @@ type_fatarrow ::=
 ```
  */
 pub fn type_fatarrow(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
-    type_arrow(parser).and_then(|a| {
+    type_arrow(parser).and_then(|Spanned { pos: _, item: a }| {
         optional!(map2!(
             |_, ty| ty,
             indent!(parser, Relation::Gt, parser.token(&token::Data::FatArrow)),

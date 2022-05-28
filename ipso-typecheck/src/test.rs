@@ -713,10 +713,13 @@ fn check_class_1() {
             }],
             members: vec![(
                 String::from("myeq"),
-                Type::mk_arrow(
-                    Type::Var(Rc::from("a")),
-                    Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
-                ),
+                Spanned {
+                    pos: 25,
+                    item: Type::mk_arrow(
+                        Type::Var(Rc::from("a")),
+                        Type::mk_arrow(Type::Var(Rc::from("a")), Type::Bool),
+                    ),
+                },
             )],
         },
     });
@@ -812,10 +815,13 @@ fn check_class_2() {
             }],
             members: vec![(
                 String::from("wut"),
-                Type::mk_arrow(
-                    Type::Var(Rc::from("a")),
-                    Type::mk_arrow(Type::Var(Rc::from("b")), Type::Bool),
-                ),
+                Spanned {
+                    pos: 24,
+                    item: Type::mk_arrow(
+                        Type::Var(Rc::from("a")),
+                        Type::mk_arrow(Type::Var(Rc::from("b")), Type::Bool),
+                    ),
+                },
             )],
         },
     });

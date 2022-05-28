@@ -20,6 +20,7 @@ use std::{
     rc::Rc,
     todo,
 };
+use syntax::Spanned;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BoundVars<A> {
@@ -127,7 +128,6 @@ pub enum Error {
     },
     KindError {
         source: Source,
-        pos: usize,
         error: kind_inference::Error,
     },
     DuplicateClassArgument {
@@ -161,7 +161,7 @@ impl Error {
         match self {
             Error::TypeError { error } => error.position,
             Error::ConstraintError { error } => error.position.unwrap_or(0),
-            Error::KindError { pos, .. } => *pos,
+            Error::KindError { error, .. } => error.position,
             Error::DuplicateClassArgument { pos, .. } => *pos,
             Error::NoSuchClass { pos, .. } => *pos,
             Error::NotAMember { pos, .. } => *pos,
@@ -351,8 +351,7 @@ fn infer_kind(
     type_variables: &BoundVars<Kind>,
     kind_inference_state: &mut kind_inference::State,
     source: &Source,
-    pos: usize,
-    ty: &syntax::Type<Rc<str>>,
+    ty: &Spanned<syntax::Type<Rc<str>>>,
 ) -> Result<(core::Type, Kind), Error> {
     let env = kind_inference::Env {
         common_kinds,
@@ -360,10 +359,13 @@ fn infer_kind(
         type_variables,
     };
 
-    kind_inference::infer(env, kind_inference_state, ty).map_err(|error| Error::KindError {
-        source: source.clone(),
-        pos,
-        error: error.with_hint(kind_inference::ErrorHint::WhileInferring { ty: ty.clone() }),
+    kind_inference::infer(env, kind_inference_state, ty.pos, &ty.item).map_err(|error| {
+        Error::KindError {
+            source: source.clone(),
+            error: error.with_hint(kind_inference::ErrorHint::WhileInferring {
+                ty: ty.item.clone(),
+            }),
+        }
     })
 }
 
@@ -373,8 +375,7 @@ fn check_kind(
     type_variables: &BoundVars<Kind>,
     kind_inference_state: &mut kind_inference::State,
     source: &Source,
-    pos: Option<usize>,
-    ty: &syntax::Type<Rc<str>>,
+    ty: &Spanned<syntax::Type<Rc<str>>>,
     kind: &Kind,
 ) -> Result<core::Type, Error> {
     let env = kind_inference::Env {
@@ -383,13 +384,14 @@ fn check_kind(
         type_variables,
     };
 
-    kind_inference::check(env, kind_inference_state, ty, kind).map_err(|error| Error::KindError {
-        source: source.clone(),
-        pos: pos.unwrap_or(0),
-        error: error.with_hint(kind_inference::ErrorHint::WhileChecking {
-            ty: ty.clone(),
-            has_kind: kind.clone(),
-        }),
+    kind_inference::check(env, kind_inference_state, ty.pos, &ty.item, kind).map_err(|error| {
+        Error::KindError {
+            source: source.clone(),
+            error: error.with_hint(kind_inference::ErrorHint::WhileChecking {
+                ty: ty.item.clone(),
+                has_kind: kind.clone(),
+            }),
+        }
     })
 }
 
