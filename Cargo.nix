@@ -35,7 +35,7 @@ let
 in let
   inherit (rustLib) fetchCratesIo fetchCrateLocal fetchCrateGit fetchCrateAlternativeRegistry expandFeatures decideProfile genDrvsByProfile;
   profilesByName = {
-    release = builtins.fromTOML "lto = true\n";
+    release = builtins.fromTOML "codegen-units = 1\nlto = true\n";
   };
   rootFeatures' = expandFeatures rootFeatures;
   overridableMkRustCrate = f:
@@ -386,6 +386,7 @@ in
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/ipso-eval");
     dependencies = {
+      fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
       ipso_import = rustPackages."unknown".ipso-import."0.1.0" { inherit profileName; };
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
@@ -499,6 +500,9 @@ in
     version = "0.1.0";
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/ipso-util");
+    dependencies = {
+      fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
+    };
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".itertools."0.10.1" = overridableMkRustCrate (profileName: rec {
