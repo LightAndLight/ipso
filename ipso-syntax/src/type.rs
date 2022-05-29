@@ -400,12 +400,25 @@ impl<A> Type<A> {
             return s;
         }
 
-        if let Some((a, b)) = self.unwrap_fatarrow() {
+        if let Some((a, b)) = self.unwrap_arrow() {
             if a.unwrap_arrow().is_some() {
                 s.push('(')
             }
             s.push_str(a.render().as_str());
             if a.unwrap_arrow().is_some() {
+                s.push(')')
+            }
+            s.push_str(" -> ");
+            s.push_str(b.render().as_str());
+            return s;
+        }
+
+        if let Some((a, b)) = self.unwrap_fatarrow() {
+            if a.unwrap_fatarrow().is_some() {
+                s.push('(')
+            }
+            s.push_str(a.render().as_str());
+            if a.unwrap_fatarrow().is_some() {
                 s.push(')')
             }
             s.push_str(" => ");
