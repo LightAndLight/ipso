@@ -16,6 +16,7 @@ use ipso_core::{
 };
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, Spanned};
+use ipso_util::fnv_hash_multi_map::FnvHashMultimap;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -827,10 +828,10 @@ pub fn infer(
         }
 
         syntax::Expr::Record { fields, rest } => {
-            let mut field_to_expr: FnvHashMap<&str, Expr> =
-                FnvHashMap::with_capacity_and_hasher(fields.len(), Default::default());
-            let mut field_to_pos: FnvHashMap<&str, usize> =
-                FnvHashMap::with_capacity_and_hasher(fields.len(), Default::default());
+            let mut field_to_expr: FnvHashMultimap<&str, Expr> =
+                FnvHashMultimap::with_capacity(fields.len());
+            let mut field_to_pos: FnvHashMultimap<&str, usize> =
+                FnvHashMultimap::with_capacity(fields.len());
 
             let entire_row: Type = {
                 let fields = fields
@@ -850,6 +851,14 @@ pub fn infer(
                     .map(|_| fresh_type_meta(&mut state.type_solutions, Kind::Row));
                 Ok(Type::mk_rows(fields, rest))
             }?;
+
+            /*
+            FnvHashMultimap's values are last-in-first-out. To
+            preserve the actual order of fields in the record, we need to
+            reverse the order of the values.
+            */
+            field_to_expr.reverse_values();
+            field_to_pos.reverse_values();
 
             let mut expr_fields: Vec<(Expr, Expr)> = Vec::with_capacity(fields.len());
             let mut ty_fields: Vec<(Rc<str>, Type)> = Vec::with_capacity(fields.len());

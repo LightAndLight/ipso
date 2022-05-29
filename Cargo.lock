@@ -325,6 +325,9 @@ dependencies = [
 [[package]]
 name = "ipso-util"
 version = "0.1.0"
+dependencies = [
+ "fnv",
+]
 
 [[package]]
 name = "itertools"
