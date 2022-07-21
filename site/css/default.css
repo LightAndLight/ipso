@@ -1,0 +1,50 @@
+/*
+
+dark blue  - #005b96
+mid blue   - #007bb9
+light blue - #00a5e6
+
+*/
+
+html {
+  color: #222222;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+body {
+  max-width: 75em;
+  margin: auto;
+  padding: 1em;
+  line-height: 175%;
+}
+
+a {
+  color: #00a5e6;
+  /* color: #007bb9; */
+}
+
+h1, h2, h3, h4, h5 {
+  font-weight: 600;
+}
+
+pre {
+  background-color: #202028;
+  color: #f0f0f0;
+  padding: 1em;
+  border-radius: 0.5em;
+  line-height: 175%;
+}
+
+code {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.95em;
+}
+
+.nav-item {
+  color: inherit;
+  text-decoration: none;
+}
+
+.nav-item:hover {
+  border-bottom: solid 2px #00a5e6;
+}

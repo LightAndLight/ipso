@@ -1,48 +1,57 @@
-# `ipso` language reference
+---
+title: Language Reference
+---
 
+<div style="display: flex; flex-direction: row">
+<div id="contents">
 <!-- omit in toc -->
 ## Contents
 
-* [Execution](#execution)
-* [Comments](#comments)
-* [Declarations](#declarations)
-  * [Definitions](#definitions)
-  * [Imports](#imports)
-    * [Basic Imports](#basic-imports)
-    * [Renaming Imports](#renaming-imports)
-    * [Selective Imports](#selective-imports)
-    * [Wildcard Imports](#wildcard-imports)
-* [Pattern Matching](#pattern-matching)
-* [Let Bindings](#let-bindings)
-* [Computation Expressions](#computation-expressions)
-* [Command Literals](#command-literals)
-  * [Interpolation](#interpolation)
-* [Operators](#operators)
-* [Datatypes](#datatypes)
-  * [Booleans](#booleans)
-  * [Integers](#integers)
-    * [Builtins](#builtins)
-  * [Characters](#characters)
-    * [Builtins](#builtins-1)
-  * [Strings](#strings)
-    * [Builtins](#builtins-2)
-  * [Functions](#functions)
-  * [Arrays](#arrays)
-    * [Builtins](#builtins-3)
-  * [Byte Arrays](#byte-arrays)
-  * [Records](#records)
-  * [Variants](#variants)
-    * [Construction](#construction)
-    * [Extension](#extension)
-  * [IO](#io)
-    * [Builtins](#builtins-4)
-  * [Commands](#commands)
-    * [Builtins](#builtins-5)
-* [Type Classes](#type-classes)
-  * [Equality](#equality)
-  * [Comparison](#comparison)
-  * [Debugging](#debugging)
-* [Grammar](#grammar)
+- [Execution](#execution)
+- [Comments](#comments)
+- [Declarations](#declarations)
+  - [Definitions](#definitions)
+  - [Imports](#imports)
+    - [Basic Imports](#basic-imports)
+    - [Renaming Imports](#renaming-imports)
+    - [Selective Imports](#selective-imports)
+    - [Wildcard Imports](#wildcard-imports)
+- [Pattern Matching](#pattern-matching)
+- [Let Bindings](#let-bindings)
+- [Computation Expressions](#computation-expressions)
+- [Command Literals](#command-literals)
+  - [Interpolation](#interpolation)
+- [Operators](#operators)
+- [Datatypes](#datatypes)
+  - [Booleans](#booleans)
+  - [Integers](#integers)
+    - [Builtins](#builtins)
+  - [Characters](#characters)
+    - [Builtins](#builtins-1)
+  - [Strings](#strings)
+    - [Builtins](#builtins-2)
+  - [Functions](#functions)
+  - [Arrays](#arrays)
+    - [Builtins](#builtins-3)
+  - [Byte Arrays](#byte-arrays)
+  - [Records](#records)
+  - [Variants](#variants)
+    - [Construction](#construction)
+    - [Extension](#extension)
+  - [IO](#io)
+    - [Builtins](#builtins-4)
+  - [Commands](#commands)
+    - [Builtins](#builtins-5)
+- [Type Classes](#type-classes)
+  - [Equality](#equality)
+  - [Comparison](#comparison)
+  - [Debugging](#debugging)
+- [Grammar](#grammar)
+</div>
+
+<main style="margin-left: 4em">
+<!-- omit in toc -->
+# `ipso` language reference
 
 ## Execution
 
@@ -913,3 +922,5 @@ class_member ::=
 type_alias ::=
   'type' type '=' type
 ```
+</main>
+</div>
