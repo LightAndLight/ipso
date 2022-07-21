@@ -11,7 +11,7 @@
   <title>$title$ - ipso</title>
 </head>
 
-<body>
+<body style="display: flex; flex-direction: column; box-sizing: border-box;">
   <nav style="display: flex; flex-direction: row;">
     <a style="text-decoration: none; color: inherit;" href="/">
       <header style="display: flex; flex-direction: row;">
@@ -20,12 +20,21 @@
         <h1 style="font-weight: 400;">ipso</h1>
       </header>
     </a>
-    <div style="display: flex; flex-direction: row; margin-left: 3em; align-items: center;">
-      <span style="margin-top: 0.25em;"><a class="nav-item" href="/docs.html">Docs</a></span>
-      <span style="margin-top: 0.25em;"><a class ="nav-item" style="margin-left: 2em;" href="https://github.com/LightAndLight/ipso">GitHub</a></span>
+    <div style="display: flex; flex-direction: row; margin-left: 3em; align-items: center;
+    padding-top: 0.25em; flex-grow: 1;">
+      <a class="nav-item" href="/docs.html">Docs</a>
+      <a class="nav-item" style="margin-left: 2em;"
+      href="https://github.com/LightAndLight/ipso">GitHub</a>
+      $if(no-edit)$
+      $else$
+      <a style="margin-left: auto; font-size: 0.9em;" href="https://github.com/LightAndLight/ipso/edit/main/site/$path$">Edit
+      on GitHub</a>
+      $endif$
     </div>
   </nav>
-  $body$
+  <main>
+    $body$
+  </main>
 </body>
 
 </html>

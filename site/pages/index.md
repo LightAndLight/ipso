@@ -1,5 +1,6 @@
 ---
 title: Home
+no-edit: true
 ---
 
 <div style="display: flex; flex-direction: row;">

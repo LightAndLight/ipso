@@ -49,7 +49,7 @@ title: Language Reference
 - [Grammar](#grammar)
 </div>
 
-<main style="margin-left: 4em">
+<div style="margin-left: 4em; min-width: 0;">
 <!-- omit in toc -->
 # `ipso` language reference
 
@@ -922,5 +922,5 @@ class_member ::=
 type_alias ::=
   'type' type '=' type
 ```
-</main>
+</div>
 </div>

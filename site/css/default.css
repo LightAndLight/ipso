@@ -1,13 +1,14 @@
-/*
-
-dark blue  - #005b96
-mid blue   - #007bb9
-light blue - #00a5e6
-
-*/
+:root {
+  --black: #202028;
+  --grey: #5e6d7a;
+  --white: #f8f8f8;
+  --dark-blue: #005b96;
+  --mid-blue: #007bb9;
+  --light-blue: #00a5e6;
+}
 
 html {
-  color: #222222;
+  color: var(--black);
   font-family: 'Nunito Sans', sans-serif;
 }
 
@@ -16,11 +17,11 @@ body {
   margin: auto;
   padding: 1em;
   line-height: 175%;
+  min-height: 100vh;
 }
 
 a {
-  color: #00a5e6;
-  /* color: #007bb9; */
+  color: var(--light-blue);
 }
 
 h1, h2, h3, h4, h5 {
@@ -28,8 +29,8 @@ h1, h2, h3, h4, h5 {
 }
 
 pre {
-  background-color: #202028;
-  color: #f0f0f0;
+  background-color: var(--black);
+  color: var(--white);
   padding: 1em;
   border-radius: 0.5em;
   line-height: 175%;
@@ -46,5 +47,14 @@ code {
 }
 
 .nav-item:hover {
-  border-bottom: solid 2px #00a5e6;
+  margin-top: 2px;
+  border-bottom: solid 2px var(--light-blue);
+}
+
+ul {
+  padding-left: 2em;
+}
+
+#contents {
+  width: 15vw;
 }

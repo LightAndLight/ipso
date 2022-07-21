@@ -34,7 +34,7 @@ main = hakyll $ do
       pandocCompiler
         >>= loadAndApplyTemplate "templates/base.html" defaultContext
         >>= htmlizeUrls
-  
+
   match "pages/docs/index.md" $ do
     route $ customRoute (const "docs.html")
     compile $
