@@ -33,6 +33,7 @@ main = hakyll $ do
     compile $
       pandocCompiler
         >>= loadAndApplyTemplate "templates/base.html" defaultContext
+        >>= relativizeUrls
         >>= htmlizeUrls
 
   match "pages/docs/index.md" $ do
@@ -40,6 +41,7 @@ main = hakyll $ do
     compile $
       pandocCompiler
         >>= loadAndApplyTemplate "templates/base.html" defaultContext
+        >>= relativizeUrls
         >>= htmlizeUrls
 
   match ("pages/docs/*" .&&. complement "pages/docs/index.md") $ do
@@ -47,4 +49,5 @@ main = hakyll $ do
     compile $
       pandocCompiler
         >>= loadAndApplyTemplate "templates/base.html" defaultContext
+        >>= relativizeUrls
         >>= htmlizeUrls
