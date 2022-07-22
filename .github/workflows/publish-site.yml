@@ -1,0 +1,30 @@
+name: publish-site
+on:
+  push:
+    branches:
+      - site
+jobs:
+  build-and-deploy:
+    permissions:
+      id-token: write
+      contents: read
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v15
+      - run: nix build ./site -o generated-site
+      - uses: actions/upload-pages-artifact@v0
+        with:
+          path: "./generated-site"
+          retention-days: 1
+      - uses: actions/deploy-pages@v1
+        id: deployment
+        with:
+          emit_telemetry: false
+          timeout: 600000
+          error_count: 10
+          reporting_interval: 5000
