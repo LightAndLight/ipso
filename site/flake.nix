@@ -5,7 +5,7 @@
   };
   outputs = { self, nixpkgs, flake-utils, nix-filter }: 
     flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = import nixpkgs { inherit system; }; in {
+      let pkgs = import nixpkgs { inherit system; }; in rec {
         devShell =
           pkgs.mkShell {
             buildInputs = [
@@ -15,6 +15,7 @@
               pkgs.zlib
             ];
           };
+        
         packages = rec {
           generator = pkgs.haskellPackages.callPackage ./generator.nix { nix-filter = nix-filter.lib; };
           
@@ -46,6 +47,8 @@
             '';
           };
         };
+        
+        defaultPackage = packages.site;
       }
     );
 }
