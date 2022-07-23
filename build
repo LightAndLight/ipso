@@ -7,3 +7,4 @@ mkdir docs
 cp -R result/* docs/
 chmod -R +w docs
 rm result
+cp CNAME docs/
