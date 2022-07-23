@@ -5,8 +5,9 @@
   <meta charset="UTF-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Cousine&family=Roboto+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./css/default.css">
+  <link rel="stylesheet" href="./css/syntax.css">
   <title>Home - ipso</title>
 </head>
 
@@ -31,13 +32,13 @@
     <div style="display: flex; flex-direction: row;">
 <p><code>ipso</code> is a functional scripting language.</p>
 <div style="flex-grow: 1; margin-left: 2em;">
-<pre class="ipso"><code>main : IO ()
-main = println &quot;Hello world!&quot;</code></pre>
-<pre class="ipso"><code>greet : IO ()
-greet =
-  comp
-    bind you &lt;- cmd.run `whoami`
-    println &quot;Hey, $you&quot;</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>main <span class="kw">:</span> IO <span class="kw">()</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>main <span class="kw">=</span> println <span class="st">&quot;Hello world!&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>greet <span class="kw">:</span> IO <span class="kw">()</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>greet <span class="kw">=</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">comp</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">bind</span> you <span class="kw">&lt;-</span> cmd.run <span class="st">`whoami`</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    println <span class="st">&quot;Hey, </span><span class="kw">$</span>you<span class="st">&quot;</span></span></code></pre></div>
 </div>
 </div>
   </main>

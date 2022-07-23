@@ -29,6 +29,7 @@
                 (filter.inDirectory "images")
                 (filter.inDirectory "pages")
                 (filter.inDirectory "templates")
+                (filter.inDirectory "syntax")
               ];
             };
             

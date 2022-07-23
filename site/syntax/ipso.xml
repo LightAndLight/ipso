@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language name="Ipso" version="1" kateversion="5.53" extensions="*.ipso" style="ipso">
+  <highlighting>
+  <list name="keywords">
+    <item>as</item>
+    <item>bind</item>
+    <item>case</item>
+    <item>class</item>
+    <item>comp</item>
+    <item>else</item>
+    <item>from</item>
+    <item>if</item>
+    <item>import</item>
+    <item>in</item>
+    <item>instance</item>
+    <item>let</item>
+    <item>module</item>
+    <item>of</item>
+    <item>then</item>
+    <item>type</item>
+    <item>where</item>
+  </list>
+  <contexts>
+    <context attribute="Normal" lineEndContext="#stay" name="code">
+      <keyword attribute="Keyword" context="#stay" String="keywords" />
+      <RegExpr attribute="Symbol" context="#stay" String="(\(\||\|\)||=|:|->|&lt;-|\(|\)|\\|\[|\]|\.\.)" />
+      <RegExpr attribute="Operator" context="#stay" String="(==|!=|&lt;=|&lt;|&gt;=|&gt;|&amp;&amp;|\|\||\+|-|\*|/|&lt;\||\|&gt;)" />
+      <RegExpr attribute="Comment" context="#stay" String="#.*$" />
+      <Int attribute="Integer" context="#stay" />
+      <RegExpr attribute="Char" context="#stay" String="'(\\'|\\[^']+|[^\\\n])'" />
+      <DetectChar attribute="String" context="string" char="&quot;" />
+      <DetectChar attribute="String" context="command" char="`" />
+      <DetectChar attribute="Symbol" context="code" char="{" />
+      <DetectChar attribute="Symbol" context="#pop" char="}" />
+      <RegExpr attribute="Bool" context="#stay" String="(true|false)" />
+    </context>
+    <context attribute="String" lineEndContext="#stay" name="string">
+      <DetectChar attribute="String" context="#pop" char="&quot;" />
+      <Detect2Chars attribute="Symbol" context="code" char="$" char1="{" />
+      <DetectChar attribute="Symbol" context="variable" char="$" />
+    </context>
+    <context attribute="String" lineEndContext="#stay" name="command">
+      <DetectChar attribute="String" context="#pop" char="`" />
+      <Detect2Chars attribute="Symbol" context="code" char="$" char1="{" />
+      <DetectChar attribute="Symbol" context="variable" char="$" />
+    </context>
+    <context attribute="Normal" lineEndContext="#stay" name="variable">
+      <DetectChar attribute="Normal" context="#pop" char=" " />
+      <DetectChar attribute="String" context="#pop" char="&quot;" lookAhead="true"/>
+      <DetectChar attribute="String" context="#pop" char="`" lookAhead="true"/>
+    </context>
+  </contexts>
+  <itemDatas>
+    <itemData name="Normal" defStyleNum="dsNormal" spellChecking="false" />
+    <itemData name="Keyword" defStyleNum="dsKeyword" spellChecking="false" />
+    <itemData name="Symbol" defStyleNum="dsKeyword" spellChecking="false" />
+    <itemData name="Operator" defStyleNum="dsKeyword" spellChecking="false" />
+    <itemData name="Comment" defStyleNum="dsComment" />
+    <itemData name="Integer" defStyleNum="dsDecVal" spellChecking="false" />
+    <itemData name="Char" defStyleNum="dsChar" spellChecking="false" />
+    <itemData name="String" defStyleNum="dsString" />
+    <itemData name="Bool" defStyleNum="dsString" spellChecking="false" />
+  </itemDatas>
+  </highlighting>
+  <general>
+    <folding indentationsensitive="1"/>
+    <comments>
+      <comment name="singleLine" start="#" />
+    </comments>
+    <keywords casesensitive="1" />
+  </general>
+</language>
+<!-- kate: replace-tabs on; tab-width 2; indent-width 2; -->

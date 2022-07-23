@@ -7,46 +7,46 @@ title: Language Reference
 <!-- omit in toc -->
 ## Contents
 
-- [Execution](#execution)
-- [Comments](#comments)
-- [Declarations](#declarations)
-  - [Definitions](#definitions)
-  - [Imports](#imports)
-    - [Basic Imports](#basic-imports)
-    - [Renaming Imports](#renaming-imports)
-    - [Selective Imports](#selective-imports)
-    - [Wildcard Imports](#wildcard-imports)
-- [Pattern Matching](#pattern-matching)
-- [Let Bindings](#let-bindings)
-- [Computation Expressions](#computation-expressions)
-- [Command Literals](#command-literals)
-  - [Interpolation](#interpolation)
-- [Operators](#operators)
-- [Datatypes](#datatypes)
-  - [Booleans](#booleans)
-  - [Integers](#integers)
-    - [Builtins](#builtins)
-  - [Characters](#characters)
-    - [Builtins](#builtins-1)
-  - [Strings](#strings)
-    - [Builtins](#builtins-2)
-  - [Functions](#functions)
-  - [Arrays](#arrays)
-    - [Builtins](#builtins-3)
-  - [Byte Arrays](#byte-arrays)
-  - [Records](#records)
-  - [Variants](#variants)
-    - [Construction](#construction)
-    - [Extension](#extension)
-  - [IO](#io)
-    - [Builtins](#builtins-4)
-  - [Commands](#commands)
-    - [Builtins](#builtins-5)
-- [Type Classes](#type-classes)
-  - [Equality](#equality)
-  - [Comparison](#comparison)
-  - [Debugging](#debugging)
-- [Grammar](#grammar)
+* [Execution](#execution)
+* [Comments](#comments)
+* [Declarations](#declarations)
+  * [Definitions](#definitions)
+  * [Imports](#imports)
+    * [Basic Imports](#basic-imports)
+    * [Renaming Imports](#renaming-imports)
+    * [Selective Imports](#selective-imports)
+    * [Wildcard Imports](#wildcard-imports)
+* [Pattern Matching](#pattern-matching)
+* [Let Bindings](#let-bindings)
+* [Computation Expressions](#computation-expressions)
+* [Command Literals](#command-literals)
+  * [Interpolation](#interpolation)
+* [Operators](#operators)
+* [Datatypes](#datatypes)
+  * [Booleans](#booleans)
+  * [Integers](#integers)
+    * [Builtins](#builtins)
+  * [Characters](#characters)
+    * [Builtins](#builtins-1)
+  * [Strings](#strings)
+    * [Builtins](#builtins-2)
+  * [Functions](#functions)
+  * [Arrays](#arrays)
+    * [Builtins](#builtins-3)
+  * [Byte Arrays](#byte-arrays)
+  * [Records](#records)
+  * [Variants](#variants)
+    * [Construction](#construction)
+    * [Extension](#extension)
+  * [IO](#io)
+    * [Builtins](#builtins-4)
+  * [Commands](#commands)
+    * [Builtins](#builtins-5)
+* [Type Classes](#type-classes)
+  * [Equality](#equality)
+  * [Comparison](#comparison)
+  * [Debugging](#debugging)
+* [Grammar](#grammar)
 </div>
 
 <div style="margin-left: 4em; min-width: 0;">
@@ -141,7 +141,7 @@ loudly = map to_upper
 
 ## Pattern Matching
 
-```ipso-repl
+```ipsorepl
 > x = None
 x : forall r. (| None, r |)
 > case x of
@@ -151,7 +151,7 @@ x : forall r. (| None, r |)
 1
 ```
 
-```ipso-repl
+```ipsorepl
 > x = None
 x : forall r. (| None, r |)
 > case x of
@@ -161,7 +161,7 @@ x : forall r. (| None, r |)
   • _ -> ...
 ```
 
-```ipso-repl
+```ipsorepl
 > x = None : (| None |)
 x : (| None |)
 > case x of
@@ -170,7 +170,7 @@ x : (| None |)
 1
 ```
 
-```ipso-repl
+```ipsorepl
 > case 'a' of
 .   'b' -> "b"
 .   'a' -> "a"
@@ -179,7 +179,7 @@ x : (| None |)
 "a"
 ```
 
-```ipso-repl
+```ipsorepl
 > case 1 of
 .   0 -> "0"
 .   1 -> "1"
@@ -188,7 +188,7 @@ x : (| None |)
 "1"
 ```
 
-```ipso-repl
+```ipsorepl
 > case "true" of
 .   "false" -> 0
 .   "true" -> 1
@@ -199,7 +199,7 @@ x : (| None |)
 
 ## Let Bindings
 
-```ipso-repl
+```ipsorepl
 > let x = 1 in
 . let y = 2 in
 . x + y
@@ -208,7 +208,7 @@ x : (| None |)
 
 ## Computation Expressions
 
-```ipso-repl
+```ipsorepl
 > :t comp
 .   x <- getLine
 .   print x
@@ -216,7 +216,7 @@ x : (| None |)
 IO ()
 ```
 
-```ipso-repl
+```ipsorepl
 > :t comp
 .   x <- getLine
 .   return x
@@ -226,44 +226,44 @@ IO String
 
 ## Command Literals
 
-```ipso-repl
+```ipsorepl
 > :kind Cmd
 Type
 ```
 
-```ipso-repl
+```ipsorepl
 > :t `ls -laR`
 Cmd
 ```
 
-```ipso-repl
+```ipsorepl
 > :t run
 Cmd -> IO () 
 ```
 
-```ipso-repl
+```ipsorepl
 > run ``
 ```
 
-```ipso-repl
+```ipsorepl
 > run `echo "hello!"`
 hello!
 ```
 
 ### Interpolation
 
-```ipso-repl
+```ipsorepl
 > :type \x -> `echo $x`
 ToArgs a => a -> Cmd
 ```
 
-```ipso-repl
+```ipsorepl
 > let arg = "hi"
 > `echo $arg`
 `echo hi`
 ```
 
-```ipso-repl
+```ipsorepl
 > let args = ["hello", "world"]
 > `echo $arg`
 `echo hello world`
@@ -307,39 +307,39 @@ ToArgs a => a -> Cmd
 
 ### Booleans
 
-```ipso-repl
+```ipsorepl
 > :type true
 Bool
 ```
 
-```ipso-repl
+```ipsorepl
 > :type false
 Bool
 ```
 
-```ipso-repl
+```ipsorepl
 > if true then "yes" else "no"
 "yes"
 ```
 
-```ipso-repl
+```ipsorepl
 > if false then "yes" else "no"
 "no"
 ```
 
 ### Integers
 
-```ipso-repl
+```ipsorepl
 > :type 0
 Int
 ```
 
-```ipso-repl
+```ipsorepl
 > :type 1
 Int
 ```
 
-```ipso-repl
+```ipsorepl
 > :type -1
 Int
 ```
@@ -360,12 +360,12 @@ module int where
 
 The `Char` type represents a unicode code point.
 
-```ipso-repl
+```ipsorepl
 > :type 'a'
 Char
 ```
 
-```ipso-repl
+```ipsorepl
 > :type '🤩'
 Char
 ```
@@ -384,12 +384,12 @@ module char where
 
 The `String` type is a UTF-8 encoded sequence of bytes.
 
-```ipso-repl
+```ipsorepl
 > :type "hello"
 String
 ```
 
-```ipso-repl
+```ipsorepl
 > x = "hello"
 x : String
 > "${x} world"
@@ -416,48 +416,48 @@ module string where
 
 ### Functions
 
-```ipso-repl
+```ipsorepl
 > :type \x -> x
 forall t0. t0 -> t0
 ```
 
-```ipso-repl
+```ipsorepl
 > :type \x y -> x + y
 Int -> Int -> Int
 ```
 
-```ipso-repl
+```ipsorepl
 > f x = x + 1
 f : Int -> Int
 > f 2
 3
 ```
 
-```ipso-repl
+```ipsorepl
 > f { x, y } = x + y
 f : { x : Int, y : Int } -> Int
 ```
 
-```ipso-repl
+```ipsorepl
 > :t \{ x, y } -> x + y
 { x : Int, y : Int } -> Int
 ```
 
-```ipso-repl
+```ipsorepl
 > :t \{ x, ..rest } -> x + rest.y + rest.z
 { x : Int, y : Int, z : Int } -> Int
 ```
 
 ### Arrays
 
-```ipso-repl
+```ipsorepl
 > :type [1, 2, 3]
 Array Int
 ```
 
-```ipso-repl
+```ipsorepl
 > :type [1, true, 3]
-<repl>:1:5: error: expected 'Int', got 'Bool'
+(repl):1:5: error: expected 'Int', got 'Bool'
   |
 1 | [1, true, 3]
   |     ^^^^
@@ -495,19 +495,19 @@ module array where
 
 ### Byte Arrays
 
-```ipso-repl
+```ipsorepl
 > :kind Bytes
 Type
 ```
 
 ### Records
 
-```ipso-repl
+```ipsorepl
 > :t { x = 1, y = true }
 { x : Int, y : Bool }
 ```
 
-```ipso-repl
+```ipsorepl
 > x = { a = "hello", b = false }
 x : { a : String, b : Bool }
 > x.a
@@ -516,14 +516,14 @@ x : { a : String, b : Bool }
 false
 ```
 
-```ipso-repl
+```ipsorepl
 > rest = { more = false, words = ["a", "b"] }
 rest : { more : Bool, words : Array String }
 > :t { some = "some", ..rest }
 { some : String, more : Bool, words : Array String }
 ```
 
-```ipso-repl
+```ipsorepl
 > a = 1
 a : Int
 > b = true
@@ -536,26 +536,26 @@ b : Bool
 
 #### Construction
 
-```ipso-repl
+```ipsorepl
 > :t None
 forall r. (| None, r |)
 ```
 
 #### Extension
 
-```ipso-repl
+```ipsorepl
 > :t \x -> (| A, ..x |)
 (| r |) -> (| A : a, r |)
 ```
 
 ### IO
 
-```ipso-repl
+```ipsorepl
 > :kind IO
 Type -> Type
 ```
 
-```ipso-repl
+```ipsorepl
 > comp
 .   line <- getLine
 .   print line
@@ -587,13 +587,13 @@ readln : IO String
 
 ### Commands
 
-```ipso-repl
+```ipsorepl
 > :kind Cmd
 Type
 ```
 
-```ipso-repl
-> :type `echo "hello, world!"
+```ipsorepl
+> :type `echo "hello, world!"`
 Cmd
 ```
 

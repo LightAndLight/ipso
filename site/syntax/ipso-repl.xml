@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language name="IpsoRepl" version="1" kateversion="5.53" style="ipsorepl">
+  <highlighting>
+  <contexts>
+    <context attribute="Normal" lineEndContext="#stay" name="code">
+      <RegExpr attribute="Prompt" context="#stay" String="^&gt;" />
+      <RegExpr attribute="Prompt" context="#stay" String="^\." />
+      <RegExpr attribute="Command" context="#stay" String=":[a-z]+" />
+      <RegExpr attribute="Normal" context="error" String="^\(repl\)" />
+      <IncludeRules context="##Ipso"/>
+    </context>
+    <context attribute="Normal" lineEndContext="#stay" name="error">
+    </context>
+  </contexts>
+  <itemDatas>
+    <itemData name="Normal" defStyleNum="dsNormal" spellChecking="false" />
+    <itemData name="Command" defStyleNum="dsComment" spellChecking="false" />
+    <itemData name="Prompt" defStyleNum="dsComment" spellChecking="false" />
+  </itemDatas>
+  </highlighting>
+</language>
