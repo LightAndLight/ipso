@@ -1,5 +1,0 @@
-main : IO ()
-main =
-  case 'a' of
-    1 -> print "saw 1"
-    _ -> print "didn't see 1"

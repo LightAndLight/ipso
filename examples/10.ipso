@@ -1,6 +1,0 @@
-main : IO ()
-main = 
-  io.andThen readln (\x ->
-  io.andThen readln (\y ->
-  print "$x$y"
-  ))

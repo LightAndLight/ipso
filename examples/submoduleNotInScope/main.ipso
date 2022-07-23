@@ -1,4 +1,0 @@
-import a
-
-main : IO ()
-main = println a.b.c

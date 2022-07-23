@@ -1,4 +1,0 @@
-import greeting
-
-main : IO ()
-main = print greeting.value

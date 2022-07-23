@@ -1,9 +1,0 @@
-recount : Int -> Int
-recount n =
-  if int.eq n 0
-  then 0
-  else 1 + recount "hello"
-
-main : IO ()
-main =
-  println (int.toString (recount 10))

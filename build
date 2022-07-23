@@ -1,0 +1,9 @@
+#! /usr/bin/env bash
+set -e
+
+nix build ./site
+rm -rf docs
+mkdir docs
+cp -R result/* docs/
+chmod -R +w docs
+rm result

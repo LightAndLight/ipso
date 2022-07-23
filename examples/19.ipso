@@ -1,5 +1,0 @@
-class A b b where
-  x : b -> b
-
-main : IO ()
-main = pure ()

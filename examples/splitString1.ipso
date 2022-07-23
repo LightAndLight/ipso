@@ -1,5 +1,0 @@
-main : IO ()
-main = 
-  if array.eq string.eq (string.split ' ' "the quick brown fox") ["the", "quick", "brown", "fox"]
-  then println "yes"
-  else println "no"

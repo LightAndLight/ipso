@@ -1,9 +1,0 @@
-main : IO ()
-main =
-  comp
-    let a = "hello"
-    println <| cmd.show `echo $a`
-    let b = ["hello", "world"]
-    println <| cmd.show `echo $b`
-    let c = ["hello", "beautiful world"]
-    println <| cmd.show `echo $c`

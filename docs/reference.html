@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Cousine&family=Roboto+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/default.css">
+  <title>Language Reference - ipso</title>
+</head>
+
+<body style="display: flex; flex-direction: column; box-sizing: border-box;">
+  <nav style="display: flex; flex-direction: row;">
+    <a style="text-decoration: none; color: inherit;" href="./">
+      <header style="display: flex; flex-direction: row;">
+        <img src="./images/ipso.svg" width="32px" />
+        <div style="margin-left: 0.25em; margin-right: 0.25em;"></div>
+        <h1 style="font-weight: 400;">ipso</h1>
+      </header>
+    </a>
+    <div style="display: flex; flex-direction: row; margin-left: 3em; align-items: center;
+    padding-top: 0.25em; flex-grow: 1;">
+      <a class="nav-item" href="./docs.html">Docs</a>
+      <a class="nav-item" style="margin-left: 2em;" href="https://github.com/LightAndLight/ipso">GitHub</a>
+      
+      <a style="margin-left: auto; font-size: 0.9em;" href="https://github.com/LightAndLight/ipso/edit/main/site/pages/docs/reference.md">Edit
+      on GitHub</a>
+      
+    </div>
+  </nav>
+  <main>
+    <div style="display: flex; flex-direction: row">
+<div id="contents">
+<!-- omit in toc -->
+<h2 id="contents">Contents</h2>
+<ul>
+<li><a href="#execution">Execution</a></li>
+<li><a href="#comments">Comments</a></li>
+<li><a href="#declarations">Declarations</a>
+<ul>
+<li><a href="#definitions">Definitions</a></li>
+<li><a href="#imports">Imports</a>
+<ul>
+<li><a href="#basic-imports">Basic Imports</a></li>
+<li><a href="#renaming-imports">Renaming Imports</a></li>
+<li><a href="#selective-imports">Selective Imports</a></li>
+<li><a href="#wildcard-imports">Wildcard Imports</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#pattern-matching">Pattern Matching</a></li>
+<li><a href="#let-bindings">Let Bindings</a></li>
+<li><a href="#computation-expressions">Computation Expressions</a></li>
+<li><a href="#command-literals">Command Literals</a>
+<ul>
+<li><a href="#interpolation">Interpolation</a></li>
+</ul></li>
+<li><a href="#operators">Operators</a></li>
+<li><a href="#datatypes">Datatypes</a>
+<ul>
+<li><a href="#booleans">Booleans</a></li>
+<li><a href="#integers">Integers</a>
+<ul>
+<li><a href="#builtins">Builtins</a></li>
+</ul></li>
+<li><a href="#characters">Characters</a>
+<ul>
+<li><a href="#builtins-1">Builtins</a></li>
+</ul></li>
+<li><a href="#strings">Strings</a>
+<ul>
+<li><a href="#builtins-2">Builtins</a></li>
+</ul></li>
+<li><a href="#functions">Functions</a></li>
+<li><a href="#arrays">Arrays</a>
+<ul>
+<li><a href="#builtins-3">Builtins</a></li>
+</ul></li>
+<li><a href="#byte-arrays">Byte Arrays</a></li>
+<li><a href="#records">Records</a></li>
+<li><a href="#variants">Variants</a>
+<ul>
+<li><a href="#construction">Construction</a></li>
+<li><a href="#extension">Extension</a></li>
+</ul></li>
+<li><a href="#io">IO</a>
+<ul>
+<li><a href="#builtins-4">Builtins</a></li>
+</ul></li>
+<li><a href="#commands">Commands</a>
+<ul>
+<li><a href="#builtins-5">Builtins</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#type-classes">Type Classes</a>
+<ul>
+<li><a href="#equality">Equality</a></li>
+<li><a href="#comparison">Comparison</a></li>
+<li><a href="#debugging">Debugging</a></li>
+</ul></li>
+<li><a href="#grammar">Grammar</a></li>
+</ul>
+</div>
+<div style="margin-left: 4em; min-width: 0;">
+<!-- omit in toc -->
+<h1 id="ipso-language-reference"><code>ipso</code> language reference</h1>
+<h2 id="execution">Execution</h2>
+<p><code>ipso</code> will look for an IO action named <code>main</code> when called from the command line:</p>
+<pre><code>$ cat &gt; example.ipso &lt;&lt;EOF
+main : IO ()
+main = print &quot;hello&quot;
+EOF
+
+$ ipso example.ipso
+hello</code></pre>
+<p>This behaviour can be overridden with <code>-r</code>/<code>--run</code>:</p>
+<pre><code>$ cat &gt; example.ipso &lt;&lt;EOF
+sayHello : IO ()
+sayHello = print &quot;hello&quot;
+EOF
+
+$ ipso example.ipso --run sayHello
+hello</code></pre>
+<h2 id="comments">Comments</h2>
+<pre class="ipso"><code># this is a single line comment</code></pre>
+<h2 id="declarations">Declarations</h2>
+<h3 id="definitions">Definitions</h3>
+<pre class="ipso"><code>x : Int
+x = 1
+
+y : String
+y = &quot;hello&quot;</code></pre>
+<h3 id="imports">Imports</h3>
+<h4 id="basic-imports">Basic Imports</h4>
+<pre class="ipso"><code>import char
+import string
+
+loudly : String -&gt; String
+loudly = string.map char.to_upper</code></pre>
+<h4 id="renaming-imports">Renaming Imports</h4>
+<pre class="ipso"><code>import char as c
+import string as s
+
+loudly : String -&gt; String
+loudly = s.map c.to_upper</code></pre>
+<h4 id="selective-imports">Selective Imports</h4>
+<pre class="ipso"><code>from char import to_upper
+from string import map
+
+loudly : String -&gt; String
+loudly = map to_upper</code></pre>
+<h4 id="wildcard-imports">Wildcard Imports</h4>
+<pre class="ipso"><code>from char import *
+from string import *
+
+loudly : String -&gt; String
+loudly = map to_upper</code></pre>
+<h2 id="pattern-matching">Pattern Matching</h2>
+<pre class="ipso-repl"><code>&gt; x = None
+x : forall r. (| None, r |)
+&gt; case x of
+.   None -&gt; 1
+.   _ -&gt; 2
+.
+1</code></pre>
+<pre class="ipso-repl"><code>&gt; x = None
+x : forall r. (| None, r |)
+&gt; case x of
+.   None -&gt; 1
+.
+(repl):1:1 error: missing patterns
+  • _ -&gt; ...</code></pre>
+<pre class="ipso-repl"><code>&gt; x = None : (| None |)
+x : (| None |)
+&gt; case x of
+.   None -&gt; 1
+.
+1</code></pre>
+<pre class="ipso-repl"><code>&gt; case 'a' of
+.   'b' -&gt; &quot;b&quot;
+.   'a' -&gt; &quot;a&quot;
+.   _ -&gt; &quot;something else&quot;
+.
+&quot;a&quot;</code></pre>
+<pre class="ipso-repl"><code>&gt; case 1 of
+.   0 -&gt; &quot;0&quot;
+.   1 -&gt; &quot;1&quot;
+.   _ -&gt; &quot;something else&quot;
+.
+&quot;1&quot;</code></pre>
+<pre class="ipso-repl"><code>&gt; case &quot;true&quot; of
+.   &quot;false&quot; -&gt; 0
+.   &quot;true&quot; -&gt; 1
+.   _ -&gt; 2
+.
+1</code></pre>
+<h2 id="let-bindings">Let Bindings</h2>
+<pre class="ipso-repl"><code>&gt; let x = 1 in
+. let y = 2 in
+. x + y
+3</code></pre>
+<h2 id="computation-expressions">Computation Expressions</h2>
+<pre class="ipso-repl"><code>&gt; :t comp
+.   x &lt;- getLine
+.   print x
+.
+IO ()</code></pre>
+<pre class="ipso-repl"><code>&gt; :t comp
+.   x &lt;- getLine
+.   return x
+.
+IO String</code></pre>
+<h2 id="command-literals">Command Literals</h2>
+<pre class="ipso-repl"><code>&gt; :kind Cmd
+Type</code></pre>
+<pre class="ipso-repl"><code>&gt; :t `ls -laR`
+Cmd</code></pre>
+<pre class="ipso-repl"><code>&gt; :t run
+Cmd -&gt; IO () </code></pre>
+<pre class="ipso-repl"><code>&gt; run ``</code></pre>
+<pre class="ipso-repl"><code>&gt; run `echo &quot;hello!&quot;`
+hello!</code></pre>
+<h3 id="interpolation">Interpolation</h3>
+<pre class="ipso-repl"><code>&gt; :type \x -&gt; `echo $x`
+ToArgs a =&gt; a -&gt; Cmd</code></pre>
+<pre class="ipso-repl"><code>&gt; let arg = &quot;hi&quot;
+&gt; `echo $arg`
+`echo hi`</code></pre>
+<pre class="ipso-repl"><code>&gt; let args = [&quot;hello&quot;, &quot;world&quot;]
+&gt; `echo $arg`
+`echo hello world`</code></pre>
+<h2 id="operators">Operators</h2>
+<pre class="ipso"><code>== : Eq a =&gt; a -&gt; a -&gt; Bool
+
+!= : Eq a =&gt; a -&gt; a -&gt; Bool
+
+&lt;= : Ord a =&gt; a -&gt; a -&gt; Bool
+
+&lt; : Ord a =&gt; a -&gt; a -&gt; Bool
+
+&gt;= : Ord a =&gt; a -&gt; a -&gt; Bool
+
+&gt; : Ord a =&gt; a -&gt; a -&gt; Bool
+
+&amp;&amp; : Bool -&gt; Bool -&gt; Bool
+
+|| : Bool -&gt; Bool -&gt; Bool
+
++ : Int -&gt; Int -&gt; Int
+
+- : Int -&gt; Int -&gt; Int
+
+* : Int -&gt; Int -&gt; Int
+
+/ : Int -&gt; Int -&gt; Int
+
+++ : Array a -&gt; Array a -&gt; Array a
+
+&lt;| : (a -&gt; b) -&gt; a -&gt; b
+
+|&gt; : a -&gt; (a -&gt; b) -&gt; b</code></pre>
+<h2 id="datatypes">Datatypes</h2>
+<h3 id="booleans">Booleans</h3>
+<pre class="ipso-repl"><code>&gt; :type true
+Bool</code></pre>
+<pre class="ipso-repl"><code>&gt; :type false
+Bool</code></pre>
+<pre class="ipso-repl"><code>&gt; if true then &quot;yes&quot; else &quot;no&quot;
+&quot;yes&quot;</code></pre>
+<pre class="ipso-repl"><code>&gt; if false then &quot;yes&quot; else &quot;no&quot;
+&quot;no&quot;</code></pre>
+<h3 id="integers">Integers</h3>
+<pre class="ipso-repl"><code>&gt; :type 0
+Int</code></pre>
+<pre class="ipso-repl"><code>&gt; :type 1
+Int</code></pre>
+<pre class="ipso-repl"><code>&gt; :type -1
+Int</code></pre>
+<h4 id="builtins">Builtins</h4>
+<pre class="ipso"><code>module int where
+
+  eq : Int -&gt; Int -&gt; Bool
+
+  toString : Int -&gt; String
+
+  mod : Int -&gt; Int -&gt; Int</code></pre>
+<h3 id="characters">Characters</h3>
+<p>The <code>Char</code> type represents a unicode code point.</p>
+<pre class="ipso-repl"><code>&gt; :type 'a'
+Char</code></pre>
+<pre class="ipso-repl"><code>&gt; :type '🤩'
+Char</code></pre>
+<h4 id="builtins-1">Builtins</h4>
+<pre class="ipso"><code>module char where
+
+  eq : Char -&gt; Char -&gt; Bool
+
+  toString : Char -&gt; String</code></pre>
+<h3 id="strings">Strings</h3>
+<p>The <code>String</code> type is a UTF-8 encoded sequence of bytes.</p>
+<pre class="ipso-repl"><code>&gt; :type &quot;hello&quot;
+String</code></pre>
+<pre class="ipso-repl"><code>&gt; x = &quot;hello&quot;
+x : String
+&gt; &quot;${x} world&quot;
+&quot;hello world&quot;</code></pre>
+<h4 id="builtins-2">Builtins</h4>
+<pre class="ipso"><code>module string where
+
+  toUtf8 : String -&gt; Bytes
+
+  eq : String -&gt; String -&gt; Bool
+
+  filter : (Char -&gt; Bool) -&gt; String -&gt; String
+
+  split : Char -&gt; String -&gt; Array String
+
+  join : String -&gt; Array String -&gt; String
+
+  foldl : (a -&gt; Char -&gt; a) -&gt; a -&gt; String -&gt; a</code></pre>
+<h3 id="functions">Functions</h3>
+<pre class="ipso-repl"><code>&gt; :type \x -&gt; x
+forall t0. t0 -&gt; t0</code></pre>
+<pre class="ipso-repl"><code>&gt; :type \x y -&gt; x + y
+Int -&gt; Int -&gt; Int</code></pre>
+<pre class="ipso-repl"><code>&gt; f x = x + 1
+f : Int -&gt; Int
+&gt; f 2
+3</code></pre>
+<pre class="ipso-repl"><code>&gt; f { x, y } = x + y
+f : { x : Int, y : Int } -&gt; Int</code></pre>
+<pre class="ipso-repl"><code>&gt; :t \{ x, y } -&gt; x + y
+{ x : Int, y : Int } -&gt; Int</code></pre>
+<pre class="ipso-repl"><code>&gt; :t \{ x, ..rest } -&gt; x + rest.y + rest.z
+{ x : Int, y : Int, z : Int } -&gt; Int</code></pre>
+<h3 id="arrays">Arrays</h3>
+<pre class="ipso-repl"><code>&gt; :type [1, 2, 3]
+Array Int</code></pre>
+<pre class="ipso-repl"><code>&gt; :type [1, true, 3]
+&lt;repl&gt;:1:5: error: expected 'Int', got 'Bool'
+  |
+1 | [1, true, 3]
+  |     ^^^^</code></pre>
+<h4 id="builtins-3">Builtins</h4>
+<pre class="ipso"><code>module array where
+
+  eq : (a -&gt; a -&gt; Bool) -&gt; Array a -&gt; Array a -&gt; Bool
+
+  foldl : (b -&gt; a -&gt; b) -&gt; b -&gt; Array a -&gt; b
+
+  generate : Int -&gt; (Int -&gt; a) -&gt; Array a
+
+  length : Array a -&gt; Int
+
+  index : Int -&gt; Array a -&gt; a
+
+  slice : Int -&gt; Int -&gt; Array a -&gt; Array a
+
+  snoc : Array a -&gt; a -&gt; Array a
+
+  map : (a -&gt; b) -&gt; Array a -&gt; Array b
+  
+  flatMap : (a -&gt; Array b) -&gt; Array a -&gt; Array b
+
+  unfoldr : s -&gt; (s -&gt; (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -&gt; Array a
+
+  sum : Array Int -&gt; Int
+  
+  any : (a -&gt; Bool) -&gt; Array a -&gt; Bool</code></pre>
+<h3 id="byte-arrays">Byte Arrays</h3>
+<pre class="ipso-repl"><code>&gt; :kind Bytes
+Type</code></pre>
+<h3 id="records">Records</h3>
+<pre class="ipso-repl"><code>&gt; :t { x = 1, y = true }
+{ x : Int, y : Bool }</code></pre>
+<pre class="ipso-repl"><code>&gt; x = { a = &quot;hello&quot;, b = false }
+x : { a : String, b : Bool }
+&gt; x.a
+&quot;hello&quot;
+&gt; x.b
+false</code></pre>
+<pre class="ipso-repl"><code>&gt; rest = { more = false, words = [&quot;a&quot;, &quot;b&quot;] }
+rest : { more : Bool, words : Array String }
+&gt; :t { some = &quot;some&quot;, ..rest }
+{ some : String, more : Bool, words : Array String }</code></pre>
+<pre class="ipso-repl"><code>&gt; a = 1
+a : Int
+&gt; b = true
+b : Bool
+&gt; { a, b }
+{ a = 1, b = True }</code></pre>
+<h3 id="variants">Variants</h3>
+<h4 id="construction">Construction</h4>
+<pre class="ipso-repl"><code>&gt; :t None
+forall r. (| None, r |)</code></pre>
+<h4 id="extension">Extension</h4>
+<pre class="ipso-repl"><code>&gt; :t \x -&gt; (| A, ..x |)
+(| r |) -&gt; (| A : a, r |)</code></pre>
+<h3 id="io">IO</h3>
+<pre class="ipso-repl"><code>&gt; :kind IO
+Type -&gt; Type</code></pre>
+<pre class="ipso-repl"><code>&gt; comp
+.   line &lt;- getLine
+.   print line
+hello
+hello</code></pre>
+<h4 id="builtins-4">Builtins</h4>
+<pre class="ipso"><code>module io where
+  
+  pure : a -&gt; IO a
+
+  map : (a -&gt; b) -&gt; IO a -&gt; IO b
+
+  andThen : IO a -&gt; (a -&gt; IO b) -&gt; IO b</code></pre>
+<pre class="ipso"><code>println : String -&gt; IO ()
+
+print : String -&gt; IO ()</code></pre>
+<pre class="ipso"><code>readln : IO String</code></pre>
+<h3 id="commands">Commands</h3>
+<pre class="ipso-repl"><code>&gt; :kind Cmd
+Type</code></pre>
+<pre class="ipso-repl"><code>&gt; :type `echo &quot;hello, world!&quot;
+Cmd</code></pre>
+<h4 id="builtins-5">Builtins</h4>
+<pre class="ipso"><code>module cmd where
+
+  run : Cmd -&gt; IO ()
+
+  lines : Cmd -&gt; IO (Array String)
+
+  show : Cmd -&gt; String
+
+class ToArgs a where
+  toArgs : a -&gt; Array String
+
+instance ToArgs String
+
+instance ToArgs a =&gt; ToArgs (Array a) </code></pre>
+<h2 id="type-classes">Type Classes</h2>
+<h3 id="equality">Equality</h3>
+<pre class="ipso"><code>class Eq a where
+  eq : a -&gt; a -&gt; Bool
+  
+neq : Eq a =&gt; a -&gt; a -&gt; Bool</code></pre>
+<pre class="ipso"><code>instance Eq Bool
+instance Eq Char
+instance Eq String
+instance Eq Int
+instance Eq a =&gt; Eq (Array a)
+instance Fields Eq row =&gt; Eq (Record row)
+instance Fields Eq row =&gt; Eq (Variant row)</code></pre>
+<h3 id="comparison">Comparison</h3>
+<pre class="ipso"><code>class Eq a =&gt; Ord a where
+  compare : a -&gt; a -&gt; (| Less : (), Equal : (), Greater : () |)
+  
+lte : a -&gt; a -&gt; Bool
+
+lt : a -&gt; a -&gt; Bool
+
+gte : a -&gt; a -&gt; Bool
+
+gt : a -&gt; a -&gt; Bool</code></pre>
+<pre class="ipso"><code>instance Ord Bool
+instance Ord Char
+instance Ord String
+instance Ord Int
+instance Ord a =&gt; Ord (Array a)</code></pre>
+<h3 id="debugging">Debugging</h3>
+<pre class="ipso"><code>class Debug a where
+  debug : a -&gt; String
+
+instance Debug ()
+instance Debug Bool
+instance Debug Int
+instance Debug Char
+instance Debug String
+instance Debug a =&gt; Debug (Array a)
+instance DebugRecordFields a =&gt; Debug { a }
+instance DebugVariantCtor a =&gt; Debug (| a |)</code></pre>
+<pre class="ipso"><code>debugRecordFields : DebugRecordFields a =&gt; { a } -&gt; Array { field : String, value : String }
+debugVariantCtor : DebugVariantCtor a =&gt; (| a |) -&gt; { ctor : String, value : String }</code></pre>
+<h2 id="grammar">Grammar</h2>
+<pre><code>ident ::=
+  ident_start ident_continue*
+  
+ident_start ::= (lowercase ASCII alphabetic characters)
+
+ident_continue ::= 
+  (ASCII alphanumeric characters) |
+  '_'
+
+
+ctor ::=
+  ctor_start ctor_continue*
+  
+ctor_start ::= (uppercase ASCII alphabetic characters)
+
+ctor_continue ::= 
+  (ASCII alphanumeric characters) |
+  '_'
+  
+  
+type ::=
+  type_app (type_arrow type)*
+  
+type_arrow ::=
+  '-&gt;' |
+  '=&gt;'
+  
+type_app ::=
+  type_atom+
+  
+type_atom ::=
+  type_record |
+  type_variant |
+  ident |
+  ctor |
+  '(' type ')'
+  
+type_record ::=
+  '{' type_record_content '}'
+  
+type_record_content ::=
+  epsilon |
+  type_signature (',' type_signature)* [',' ident] |
+  ident
+  
+type_variant ::=
+  '(|' type_variant_content '|)'
+  
+type_variant_content ::=
+  epsilon |
+  [type_variant_item ('|' type_variant_item)* ['|' ident]] |
+  ident
+  
+type_variant_item ::=
+  ctor [':' type]
+  
+  
+pattern ::=
+  ident |
+  '{' record_pattern '}' |
+  '_'
+  
+record_pattern ::=
+  epsilon |
+  ident (',' ident)* [',' '..' ident] |
+  '..' ident |
+ 
+expr ::=
+  lambda |
+  case |
+  ifthenelse |
+  let |
+  comp |
+  binop
+  
+lambda ::=
+  '\' pattern '-&gt;' expr
+  
+case ::=
+  'case' expr 'of' case_branch*
+  
+case_branch ::=
+  ctor '-&gt;' expr
+  
+ifthenelse ::=
+  'if' expr 'then' expr 'else' expr
+
+let ::=
+  'let' ident '=' expr 'in' expr
+
+comp_line ::=
+  expr
+  'bind' ident '&lt;-' expr
+  'return' expr
+
+comp ::=
+  'comp' comp_line+
+  
+binop ::=
+  app (operator app)*
+  
+operator ::=
+  '=' (operator_symbol | '=')+
+  operator_symbol+
+  
+operator_symbol ::=
+  '+' |
+  '-' |
+  '*' |
+  '/' |
+  '&lt;' |
+  '&gt;' |
+  '^' |
+  '%' |
+  '|' |
+  '&amp;' |
+  '!'
+  
+app ::=
+  project+
+  
+project ::=
+  atom ('.' ident)*
+  
+atom ::=
+  bool |
+  int |
+  char |
+  string |
+  array |
+  record |
+  ident |
+  ctor |
+  cmd |
+  '(' expr ')'
+  
+bool ::=
+  'true' |
+  'false'
+  
+int ::=
+  (ASCII numeric character)+
+  
+char ::=
+  &quot;'&quot; (any unicode code point except single quote) &quot;'&quot; |
+  &quot;'&quot; '\' (single quote) &quot;'&quot;
+  
+string ::=
+  '&quot;' string_part* '&quot;'
+  
+string_part ::=
+  string_char+ |
+  string_interpolate
+  
+string_char ::=
+  (any unicode code point except double quote or dollar sign) |
+  '\' '&quot;' |
+  '\' '$'
+  
+string_interpolate ::=
+  '$' '{' expr '}'
+  
+array ::=
+  '[' [expr (',' expr)*] ']'
+  
+record ::=
+  '{' record_content '}'
+  
+record_content ::=
+  epsilon |
+  record_item (',' record_item)* [',' '..' atom] |
+  '..' atom
+  
+record_item ::=
+  ident '=' expr
+
+cmd_char ::=
+  (any ascii character except '`', '$', '&quot;', '\')
+  '\' '`'
+  '\' '$'
+  '\' '&quot;'
+  '\' '\'
+
+cmd_part ::=
+  cmd_char+
+  '$' ident
+  '$' '{' expr '}'
+
+cmd ::= 
+  '`' cmd_part* '`'
+
+
+decl ::=
+  import |
+  type_signature |
+  definition |
+  instance |
+  class |
+  type_alias
+
+
+import ::=
+  'import' module_name ['as' module_name] |
+  'from' module_name 'import' from_imports
+  
+module_name ::=
+  ident ('.' ident)*
+  
+from_imports ::=
+  '*' |
+  ident (',' ident)*
+
+
+type_signature ::=
+  ident ':' type
+
+
+definition ::=
+  ident [pattern] '=' expr
+  
+
+instance ::=
+  'instance' type 'where' instance_member*
+  
+instance_member ::=
+  [type_signature] definition
+  
+
+class ::=
+  'class' type 'where' class_member*
+  
+class_member ::=
+  type_signature
+  
+  
+type_alias ::=
+  'type' type '=' type</code></pre>
+</div>
+</div>
+  </main>
+</body>
+
+</html>

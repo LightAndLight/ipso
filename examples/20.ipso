@@ -1,8 +1,0 @@
-class A x where
-  a : x -> String
-
-class (A x) => B x where
-  b : x -> String
-
-instance (B a) => B (Array a) where
-  b _ = "B Array"

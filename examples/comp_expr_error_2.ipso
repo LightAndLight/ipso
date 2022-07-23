@@ -1,5 +1,0 @@
-main : IO ()
-main =
-  comp
-    bind x <- 666
-    print x

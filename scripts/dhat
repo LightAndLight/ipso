@@ -1,4 +1,0 @@
-#! /usr/bin/env bash
-
-RUSTFLAGS=-g cargo build --release
-exec valgrind --tool=dhat --dhat-out-file=dhat.out ./target/release/ipso "$@"

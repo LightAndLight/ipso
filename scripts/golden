@@ -1,5 +1,0 @@
-#! /usr/bin/env bash
-set -e
-
-cargo build
-ipso-golden --bin "$PWD/target/debug/ipso" --dir examples "$@"

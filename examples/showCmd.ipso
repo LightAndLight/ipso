@@ -1,6 +1,0 @@
-main : IO ()
-main = 
-  comp
-    println (cmd.show `echo hello`)
-    println (cmd.show `echo "hello world"`)
-    println (cmd.show `echo "hello \"world\""`)

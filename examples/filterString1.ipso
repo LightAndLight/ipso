@@ -1,4 +1,0 @@
-main : IO ()
-main = 
-  print 
-    ("${string.filter (\_ -> true) "the quick brown fox"}\n")

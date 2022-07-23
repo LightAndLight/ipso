@@ -1,5 +1,0 @@
-f : { s : Int, t : Int, x } -> String
-f = debug
-
-main : IO ()
-main = pure ()

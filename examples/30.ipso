@@ -1,5 +1,0 @@
-x : String
-x = "\t\n\$\n"
-
-main : IO ()
-main = hi

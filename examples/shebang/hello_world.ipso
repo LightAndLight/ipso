@@ -1,4 +1,0 @@
-#! /usr/bin/env ipso
-
-main : IO ()
-main = print "hello world!"

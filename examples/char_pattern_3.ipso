@@ -1,8 +1,0 @@
-main : IO ()
-main =
-  case 'c' of
-    'a' -> print "saw a"
-    'b' -> print "saw b"
-    'c' -> print "saw c 1"
-    'c' -> print "saw c 2"
-    _ -> print "saw something else"

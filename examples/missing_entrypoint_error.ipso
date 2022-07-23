@@ -1,2 +1,0 @@
-test : IO ()
-test = println "hello!"

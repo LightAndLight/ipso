@@ -1,4 +1,0 @@
-from other import *
-
-main : IO ()
-main = println "$x $y"

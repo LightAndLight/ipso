@@ -1,2 +1,0 @@
-main : IO ()
-main = print (int.toString (5 * 9))

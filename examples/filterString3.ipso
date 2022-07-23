@@ -1,6 +1,0 @@
-not : Bool -> Bool
-not x = if x then false else true
-
-main : IO ()
-main = 
-  println (string.filter (\c -> not (char.eq c ' ')) "the quick brown fox")

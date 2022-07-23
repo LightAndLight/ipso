@@ -1,6 +1,0 @@
-main : IO ()
-main =
-  case 'a' of
-    'a' -> print "saw a"
-    { x } -> print "saw { x }"
-    _ -> print "didn't see a"

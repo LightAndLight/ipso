@@ -1,5 +1,0 @@
-main : IO ()
-main = 
-  io.andThen
-    (io.andThen readln (\x -> print x))
-    (\_ -> io.andThen readln (\y -> print y))

@@ -1,5 +1,0 @@
-x : String
-x = "hello"
-
-y : String
-y = "world"

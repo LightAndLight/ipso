@@ -1,9 +1,0 @@
-#! /usr/bin/env ipso
-
-# the shebang line should be skipped, and so should this one
-
-main : IO ()
-main = # comments shouldn't interfere with indentation
-  print # really
-  # really really
-    "hello world!"

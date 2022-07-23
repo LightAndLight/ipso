@@ -1,8 +1,0 @@
-main : IO ()
-main =
-  case 99 of
-    23 -> print "saw 23"
-    42 -> print "saw 42"
-    99 -> print "saw 99 1"
-    99 -> print "saw 99 2"
-    _ -> print "saw something else"

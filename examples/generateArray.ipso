@@ -1,6 +1,0 @@
-showArray : Array Int -> String
-showArray = array.foldl (\acc el -> "$acc${int.toString el}") ""
-
-main : IO ()
-main = 
-  print (showArray (array.generate 5 (\ix -> ix)))

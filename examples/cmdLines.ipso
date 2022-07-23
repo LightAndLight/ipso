@@ -1,9 +1,0 @@
-main : IO ()
-main =
-  comp
-    bind output <- cmd.lines `echo "a\nb\nc"`
-    println
-      (if output == ["a", "b", "c"]
-       then "true"
-       else "false"
-      )

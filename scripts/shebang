@@ -1,5 +1,0 @@
-#! /usr/bin/env bash
-set -e
-
-cargo build
-env PATH="$PATH:$PWD/target/debug" ipso-shebang --dir examples/shebang "$@"

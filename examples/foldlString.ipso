@@ -1,3 +1,0 @@
-main : IO ()
-main = 
-  print (int.toString (string.foldl (\acc c -> acc + 1) 0 "hello"))
