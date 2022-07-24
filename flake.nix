@@ -1,40 +1,31 @@
 {
   description = "ipso";
   inputs = {
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-    };
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
-    cargo2nix = {
-      url = "github:cargo2nix/cargo2nix";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-        rust-overlay.follows = "rust-overlay";
-      };
-    };
+    flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    cargo2nix.url = "github:cargo2nix/cargo2nix";
   };
   outputs = { self, nixpkgs, flake-utils, cargo2nix, rust-overlay }: 
+    let
+      systemTargets = {
+        "x86_64-linux" = "x86_64-unknown-linux-musl";
+      };
+    in
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let 
         pkgs = import nixpkgs { 
           inherit system; 
           overlays = [ 
-            (import "${cargo2nix}/overlay")
-            rust-overlay.overlay 
+            cargo2nix.overlays.default
+            rust-overlay.overlays.default
           ]; 
         };
         
-        rustPkgs = { release }: pkgs.rustBuilder.makePackageSet' {
+        rustPkgs = { release }: pkgs.rustBuilder.makePackageSet {
           rustChannel = "1.56.1";
           packageFun = import "${self}/Cargo.nix";
           inherit release;
+          target = systemTargets.${system};
         };
       in rec {
         packages = {
@@ -46,7 +37,7 @@
         devShell =
           pkgs.mkShell {
             buildInputs = [
-              cargo2nix.defaultPackage.${system}
+              cargo2nix.packages.${system}.cargo2nix
               (pkgs.rust-bin.stable."1.56.1".default.override {
                 extensions = [
                   "cargo"

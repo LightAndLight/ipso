@@ -8,7 +8,6 @@ import Control.Monad (unless)
 import Data.IORef (modifyIORef, newIORef, readIORef)
 import Data.Foldable (for_)
 import Data.Maybe (fromMaybe)
-import Data.Semigroup (Option (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Vector (Vector)
@@ -47,7 +46,7 @@ runExample config example = do
       args
       (maybe "" Text.unpack $ exStdin example)
 
-  errorRef <- newIORef $ Option Nothing
+  errorRef <- newIORef Nothing
 
   mStdoutDiff <- runDiff (exStdout example) (Text.pack stdout)
   for_ mStdoutDiff $ \diff ->
@@ -70,7 +69,7 @@ runExample config example = do
   unless (eqExitCode (exExitCode example) exitCode) $ do
     modifyIORef errorRef (<> pure (displayError "exitcode" (exPath example) (exExitCode example, Text.pack . show) (exitCode, show)))
 
-  Option mError <- readIORef errorRef
+  mError <- readIORef errorRef
   pure $
     case mError of
       Just err -> Left err
