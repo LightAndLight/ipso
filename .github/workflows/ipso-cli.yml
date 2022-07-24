@@ -1,0 +1,32 @@
+name: "ipso-cli"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+env:
+  UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
+  NIX_PUBLIC_KEY: "ipso-binary-cache-1:UMRLNOKcCsb/a2dBhtcZhRZP4RN8yIDsSUwHTObu2w4="
+
+  # Note: these values are duplicated in the `UPLOAD_TO_CACHE` script.
+  BINARY_CACHE_BUCKET: "ipso-binary-cache"
+  BINARY_CACHE_ENDPOINT: "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2.4.0
+    - uses: cachix/install-nix-action@v15
+
+    # Allows `uploadToCache` to sign store paths.
+    - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
+
+    # Grants the Nix daemon access to the bucket, which allows `nix build` to 
+    # authenticate with the binary cache bucket.
+    - run: sudo mkdir /root/.aws
+    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
+
+    # Allow the Nix daemon to execute the upload script.
+    - run: "sudo chmod +x $UPLOAD_TO_CACHE"
+
+    - run: nix build --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT" --extra-trusted-public-keys "$NIX_PUBLIC_KEY" --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
