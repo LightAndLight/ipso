@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - automated-release
+    tags:
+      - "v*"
 env:
   UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
   NIX_PUBLIC_KEY: "ipso-binary-cache-1:UMRLNOKcCsb/a2dBhtcZhRZP4RN8yIDsSUwHTObu2w4="
@@ -29,4 +32,13 @@ jobs:
     # Allow the Nix daemon to execute the upload script.
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
 
-    - run: nix build --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT" --extra-trusted-public-keys "$NIX_PUBLIC_KEY" --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+    - run: nix build --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT" --extra-trusted-public-keys "$NIX_PUBLIC_KEY" --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE" -o result
+    - run: cp result-bin/bin/ipso ipso-linux-x86_64
+
+    - uses: softprops/action-gh-release@v1
+      if: ${{ (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push') || github.ref == 'refs/heads/automated-release' }}
+      with:
+        name: ${{ github.ref_name }}
+        prerelease: true
+        draft: true
+        files: ipso-linux-x86_64
