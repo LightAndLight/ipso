@@ -17,6 +17,9 @@ title: Language Reference
     * [Selective Imports](#selective-imports)
     * [Wildcard Imports](#wildcard-imports)
 * [Pattern Matching](#pattern-matching)
+  * [Records](#records)
+  * [Variants](#variants)
+  * [Literals](#literals)
 * [Let Bindings](#let-bindings)
 * [Computation Expressions](#computation-expressions)
 * [Command Literals](#command-literals)
@@ -29,15 +32,19 @@ title: Language Reference
   * [Characters](#characters)
     * [Builtins](#builtins-1)
   * [Strings](#strings)
+    * [Interpolation](#interpolation-1)
     * [Builtins](#builtins-2)
   * [Functions](#functions)
   * [Arrays](#arrays)
     * [Builtins](#builtins-3)
   * [Byte Arrays](#byte-arrays)
-  * [Records](#records)
-  * [Variants](#variants)
+  * [Records](#records-1)
     * [Construction](#construction)
+    * [Projection](#projection)
     * [Extension](#extension)
+  * [Variants](#variants-1)
+    * [Construction](#construction-1)
+    * [Extension](#extension-1)
   * [IO](#io)
     * [Builtins](#builtins-4)
   * [Commands](#commands)
@@ -55,7 +62,7 @@ title: Language Reference
 
 ## Execution
 
-`ipso` will look for an IO action named `main` when called from the command line:
+`ipso` will look for an [IO](#io) action named `main` when called from the command line:
 
 ```
 $ cat > example.ipso <<EOF
@@ -67,7 +74,7 @@ $ ipso example.ipso
 hello
 ```
 
-This behaviour can be overridden with `-r`/`--run`:
+This behaviour can be overridden with `--run`:
 
 ```
 $ cat > example.ipso <<EOF
@@ -141,6 +148,23 @@ loudly = map to_upper
 
 ## Pattern Matching
 
+### Records
+
+```ipsorepl
+> x = { a = "hi", b = true, c = 1 }
+x : { a : String, b : Bool, c : Int }
+> case x of
+.   { a, b, c } -> b
+.
+true
+> case x of
+.   { b, ..rest } -> rest
+.
+{ a = "hi", c = 1 }
+```
+
+### Variants
+
 ```ipsorepl
 > x = None
 x : forall r. (| None, r |)
@@ -169,6 +193,8 @@ x : (| None |)
 .
 1
 ```
+
+### Literals
 
 ```ipsorepl
 > case 'a' of
@@ -208,17 +234,20 @@ x : (| None |)
 
 ## Computation Expressions
 
+See also: [IO](#io)
+
 ```ipsorepl
 > :t comp
-.   x <- getLine
-.   print x
+.   bind x <- readln
+.   let twoXs = "$x $x"
+.   print twoXs
 .
 IO ()
 ```
 
 ```ipsorepl
 > :t comp
-.   x <- getLine
+.   bind x <- readln
 .   return x
 .
 IO String
@@ -226,10 +255,7 @@ IO String
 
 ## Command Literals
 
-```ipsorepl
-> :kind Cmd
-Type
-```
+See also: [Commands](#commands)
 
 ```ipsorepl
 > :t `ls -laR`
@@ -237,25 +263,15 @@ Cmd
 ```
 
 ```ipsorepl
-> :t run
-Cmd -> IO () 
-```
-
-```ipsorepl
-> run ``
-```
-
-```ipsorepl
-> run `echo "hello!"`
+> cmd.run `echo "hello!"`
 hello!
 ```
 
-### Interpolation
-
 ```ipsorepl
-> :type \x -> `echo $x`
-ToArgs a => a -> Cmd
+> cmd.run ``
 ```
+
+### Interpolation
 
 ```ipsorepl
 > let arg = "hi"
@@ -267,6 +283,11 @@ ToArgs a => a -> Cmd
 > let args = ["hello", "world"]
 > `echo $arg`
 `echo hello world`
+```
+
+```ipsorepl
+> :type \x -> `echo $x`
+ToArgs a => a -> Cmd
 ```
 
 ## Operators
@@ -389,11 +410,20 @@ The `String` type is a UTF-8 encoded sequence of bytes.
 String
 ```
 
+#### Interpolation
+
 ```ipsorepl
 > x = "hello"
 x : String
-> "${x} world"
+> "$x world"
 "hello world"
+```
+
+```ipsorepl
+> x = ["a", "b", "c"]
+x : Array String
+> "joined: ${string.join ", " x}"
+"joined: a, b, c"
 ```
 
 #### Builtins
@@ -502,10 +532,23 @@ Type
 
 ### Records
 
+#### Construction
+
 ```ipsorepl
 > :t { x = 1, y = true }
 { x : Int, y : Bool }
 ```
+
+```ipsorepl
+> a = 1
+a : Int
+> b = true
+b : Bool
+> { a, b }
+{ a = 1, b = True }
+```
+
+#### Projection
 
 ```ipsorepl
 > x = { a = "hello", b = false }
@@ -516,20 +559,13 @@ x : { a : String, b : Bool }
 false
 ```
 
+#### Extension
+
 ```ipsorepl
 > rest = { more = false, words = ["a", "b"] }
 rest : { more : Bool, words : Array String }
 > :t { some = "some", ..rest }
 { some : String, more : Bool, words : Array String }
-```
-
-```ipsorepl
-> a = 1
-a : Int
-> b = true
-b : Bool
-> { a, b }
-{ a = 1, b = True }
 ```
 
 ### Variants
@@ -557,7 +593,7 @@ Type -> Type
 
 ```ipsorepl
 > comp
-.   line <- getLine
+.   bind line <- readln
 .   print line
 hello
 hello
@@ -633,8 +669,6 @@ instance Eq Char
 instance Eq String
 instance Eq Int
 instance Eq a => Eq (Array a)
-instance Fields Eq row => Eq (Record row)
-instance Fields Eq row => Eq (Variant row)
 ```
 
 ### Comparison
