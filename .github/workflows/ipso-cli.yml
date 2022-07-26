@@ -33,10 +33,11 @@ jobs:
 
     - run: nix build --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT" --extra-trusted-public-keys "$NIX_PUBLIC_KEY" --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE" -o result
     
+    - run: cp result-bin/bin/ipso ipso-linux-x86_64
     - uses: actions/upload-artifact@v3
       with:
         name: ipso-linux-x86_64
-        path: result-bin/bin/ipso
+        path: ipso-linux-x86_64
   
   build-macos:
     runs-on: macos-latest
@@ -59,10 +60,11 @@ jobs:
 
     - run: nix build --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT" --extra-trusted-public-keys "$NIX_PUBLIC_KEY" --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE" -o result
     
+    - run: cp result-bin/bin/ipso ipso-macos-x86_64
     - uses: actions/upload-artifact@v3
       with:
         name: ipso-macos-x86_64
-        path: result-bin/bin/ipso
+        path: ipso-macos-x86_64
 
   release:
     needs: [build-linux, build-macos]
