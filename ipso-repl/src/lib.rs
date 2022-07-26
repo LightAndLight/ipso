@@ -16,7 +16,7 @@ use ipso_typecheck::{
 };
 use std::{
     collections::HashMap,
-    io::{self, BufReader, BufWriter},
+    io::{self, BufReader, Write},
     rc::Rc,
 };
 
@@ -144,7 +144,11 @@ impl Repl {
         Ok(ty)
     }
 
-    pub fn eval_show(&self, expr: Spanned<ipso_syntax::Expr>) -> Result<Option<String>, Error> {
+    pub fn eval_show(
+        &self,
+        stdout: &mut dyn Write,
+        expr: Spanned<ipso_syntax::Expr>,
+    ) -> Result<Option<String>, Error> {
         let mut expr = desugar_expr(&self.source, expr)?;
         rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
 
@@ -266,14 +270,11 @@ impl Repl {
         let stdin = io::stdin();
         let mut stdin = BufReader::new(stdin);
 
-        let stdout = io::stdout();
-        let mut stdout = BufWriter::new(stdout);
-
         let context = Default::default();
 
         let mut interpreter = Interpreter::new(
             &mut stdin,
-            &mut stdout,
+            stdout,
             &self.common_kinds,
             &self.modules,
             &context,
