@@ -1,12 +1,12 @@
 pub mod circular_buffer;
 
 use ipso_diagnostic::Source;
-use std::io::{self, Write};
+use std::io::{self, Stdout, Write};
 use termion::{
     cursor::DetectCursorPos,
     event::{Event, Key},
     input::TermRead,
-    raw::IntoRawMode,
+    raw::{IntoRawMode, RawTerminal},
 };
 
 use self::circular_buffer::CircularBuffer;
@@ -121,14 +121,55 @@ impl InputState {
     }
 }
 
+/*
+Whenever we write a '\n' to stdout, we need to update the input cursor.
+
+`Newliner`'s write instance calls `InputState::newline` for each '\n' written.
+
+Without this, the terminal UI will only render the first line of a multi-line
+string. See https://github.com/LightAndLight/ipso/issues/203 for examples of
+how it breaks.
+*/
+struct Newliner<'a> {
+    input_state: &'a mut InputState,
+    stdout: &'a mut RawTerminal<Stdout>,
+}
+
+impl<'a> Write for Newliner<'a> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut lines = buf.split(|b| *b == b'\n');
+        let mut bytes_written = 0;
+        if let Some(line) = lines.next() {
+            match self.stdout.write(line) {
+                Err(err) => return Err(err),
+                Ok(count) => {
+                    bytes_written += count;
+                }
+            }
+        }
+        lines.try_for_each(|line| {
+            self.input_state.newline(self.stdout)?;
+            bytes_written += 1;
+            let count = self.stdout.write(line)?;
+            bytes_written += count;
+            Ok::<(), io::Error>(())
+        })?;
+        Ok(bytes_written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.stdout.flush()
+    }
+}
+
 fn render_error(
-    stdout: &mut termion::raw::RawTerminal<io::Stdout>,
+    stdout: &mut Newliner,
     prompt: &str,
     error_position: usize,
     error_message: String,
 ) -> Result<(), io::Error> {
     writeln!(stdout, "{}^", " ".repeat(prompt.len() + error_position))?;
-    writeln!(stdout, "error: {}", error_message)?;
+    write!(stdout, "error: {}", error_message)?;
     Ok(())
 }
 
@@ -203,34 +244,34 @@ pub fn run() -> io::Result<()> {
 
                         let input = new_input;
 
-                        stdout.suspend_raw_mode()?;
                         let mut parser =
                             ipso_parse::Parser::new(source.clone(), ipso_lex::Lexer::new(input));
                         let parsed = ipso_parse::grammar::expr::expr(&mut parser);
-                        match parser.into_parse_error(parsed.result) {
-                            Err(err) => {
-                                render_error(
+                        let parse_result = parser.into_parse_error(parsed.result);
+
+                        {
+                            let mut stdout = Newliner {
+                                input_state: &mut input_state,
+                                stdout: &mut stdout,
+                            };
+                            match parse_result {
+                                Err(err) => render_error(
                                     &mut stdout,
                                     prompt,
                                     error_offset + err.position(),
                                     err.message(),
-                                )?;
-                            }
-                            Ok(expr) => match repl.type_of(expr) {
-                                Err(err) => {
-                                    render_error(
+                                ),
+                                Ok(expr) => match repl.type_of(expr) {
+                                    Err(err) => render_error(
                                         &mut stdout,
                                         prompt,
                                         error_offset + err.position(),
                                         err.message(),
-                                    )?;
-                                }
-                                Ok(value) => {
-                                    writeln!(stdout, "{}", value.render())?;
-                                }
-                            },
-                        }
-                        stdout.activate_raw_mode()?;
+                                    ),
+                                    Ok(value) => stdout.write_all(value.render().as_bytes()),
+                                },
+                            }
+                        }?;
 
                         input_state.newline(&mut stdout)?;
                         input_state.reset();
@@ -240,35 +281,39 @@ pub fn run() -> io::Result<()> {
 
                         input_state.newline(&mut stdout)?;
 
-                        stdout.suspend_raw_mode()?;
                         let mut parser = ipso_parse::Parser::new(
                             source.clone(),
                             ipso_lex::Lexer::new(&input_state.buffer),
                         );
                         let parsed = ipso_parse::grammar::expr::expr(&mut parser);
-                        match parser.into_parse_error(parsed.result) {
-                            Err(err) => {
-                                render_error(&mut stdout, prompt, err.position(), err.message())?;
-                            }
-                            Ok(expr) => match repl.eval_show(expr) {
+                        let parse_result = parser.into_parse_error(parsed.result);
+
+                        {
+                            let mut stdout = Newliner {
+                                input_state: &mut input_state,
+                                stdout: &mut stdout,
+                            };
+                            match parse_result {
                                 Err(err) => {
-                                    render_error(
+                                    render_error(&mut stdout, prompt, err.position(), err.message())
+                                }
+                                Ok(expr) => match repl.eval_show(&mut stdout, expr) {
+                                    Err(err) => render_error(
                                         &mut stdout,
                                         prompt,
                                         err.position(),
                                         err.message(),
-                                    )?;
-                                }
-                                Ok(value) => {
-                                    if let Some(value) = value {
-                                        writeln!(stdout, "{}", value)
-                                    } else {
-                                        Ok(())
-                                    }?
-                                }
-                            },
-                        }
-                        stdout.activate_raw_mode()?;
+                                    ),
+                                    Ok(value) => {
+                                        if let Some(value) = value {
+                                            stdout.write_all(value.as_bytes())
+                                        } else {
+                                            Ok(())
+                                        }
+                                    }
+                                },
+                            }
+                        }?;
 
                         input_state.newline(&mut stdout)?;
                         input_state.reset();
