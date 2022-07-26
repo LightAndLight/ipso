@@ -49,8 +49,6 @@ jobs:
     # Allows `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /var/run/nix-signing-key'"
 
-    - run: which nix
-
     # Grants the Nix daemon access to the bucket, which allows `nix build` to 
     # authenticate with the binary cache bucket.
     - run: sudo mkdir /var/root/.aws
