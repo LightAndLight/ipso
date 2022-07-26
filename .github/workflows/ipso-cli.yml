@@ -69,7 +69,7 @@ jobs:
     
     - uses: actions/upload-artifact@v3
       with:
-        name: ipso-macox-x86_64
+        name: ipso-macos-x86_64
         path: result-bin/bin/ipso
 
   release:
