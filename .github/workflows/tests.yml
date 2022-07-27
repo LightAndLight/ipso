@@ -28,10 +28,25 @@ jobs:
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
 
     - name: "cargo tests"
-      run: nix develop .#tests -c cargo test
+      run: >
+        nix develop .#tests
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        -c cargo test
     
     - name: "golden tests"
-      run: nix develop .#tests -c ./scripts/golden
+      run: >
+        nix develop .#tests 
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        -c ./scripts/golden
     
     - name: "shebang tests"
-      run: nix develop .#tests -c ./scripts/shebang
+      run: >
+        nix develop .#tests
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        -c ./scripts/shebang
