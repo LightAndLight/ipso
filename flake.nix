@@ -31,8 +31,8 @@
       in rec {
         packages = {
           ipso-cli = (rustPkgs { release = true; }).workspace.ipso-cli {};
-          ipso-golden = import ./tests/golden { inherit pkgs; };
-          ipso-shebang = import ./tests/shebang { inherit pkgs; };
+          ipso-golden = pkgs.haskell.lib.justStaticExecutables (import ./tests/golden { inherit pkgs; });
+          ipso-shebang = pkgs.haskell.lib.justStaticExecutables (import ./tests/shebang { inherit pkgs; });
         };
 
         defaultPackage = packages.ipso-cli;
