@@ -28,10 +28,10 @@ jobs:
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
 
     - name: "cargo tests"
-      run: nix develop -c cargo test
+      run: nix develop .#tests -c cargo test
     
     - name: "golden tests"
-      run: nix develop -c ./scripts/golden
+      run: nix develop .#tests -c ./scripts/golden
     
     - name: "shebang tests"
-      run: nix develop -c ./scripts/shebang
+      run: nix develop .#tests -c ./scripts/shebang
