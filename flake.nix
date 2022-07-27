@@ -52,6 +52,7 @@
               })
 
               # for running tests locally
+              pkgs.cabal2nix
               packages.ipso-golden
               packages.ipso-shebang
 
