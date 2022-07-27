@@ -5,7 +5,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     cargo2nix.url = "github:cargo2nix/cargo2nix";
   };
-  outputs = { self, nixpkgs, flake-utils, cargo2nix, rust-overlay }: 
+  outputs = { self, nixpkgs, flake-utils, cargo2nix, rust-overlay }:
     let
       systemTargets = {
         "x86_64-linux" = "x86_64-unknown-linux-musl";
@@ -13,15 +13,15 @@
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
-      let 
-        pkgs = import nixpkgs { 
-          inherit system; 
-          overlays = [ 
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
             cargo2nix.overlays.default
             rust-overlay.overlays.default
-          ]; 
+          ];
         };
-        
+
         rustPkgs = { release }: pkgs.rustBuilder.makePackageSet {
           rustChannel = "1.56.1";
           packageFun = import "${self}/Cargo.nix";
@@ -34,7 +34,9 @@
           ipso-golden = import ./tests/golden { inherit pkgs; };
           ipso-shebang = import ./tests/shebang { inherit pkgs; };
         };
+
         defaultPackage = packages.ipso-cli;
+
         devShell =
           pkgs.mkShell {
             buildInputs = [
@@ -56,6 +58,14 @@
               # profiling
               pkgs.kcachegrind
               pkgs.valgrind
+            ];
+          };
+
+        devShells.tests =
+          (rustPkgs { release = false; }).workspaceShell {
+            buildInputs = [
+              packages.ipso-golden
+              packages.ipso-shebang
             ];
           };
       }
