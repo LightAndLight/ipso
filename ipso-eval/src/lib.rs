@@ -16,6 +16,7 @@ use std::{
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
+    path::Path,
     process::{self, ExitStatus, Stdio},
     rc::Rc,
 };
@@ -1347,6 +1348,32 @@ where {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
                         Value::Int(a % b)
+                    }
+                )
+            }
+            Builtin::PathExists => {
+                function1!(
+                    path_exists,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn path_exists_io_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let path = env[0].unpack_string();
+                            if Path::new(&path).exists() {
+                                Value::True
+                            } else {
+                                Value::False
+                            }
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(path_exists_io_1),
+                        };
+                        interpreter.alloc(closure)
                     }
                 )
             }

@@ -1,4 +1,5 @@
 pub mod array;
+pub mod path;
 pub mod char;
 pub mod cmd;
 pub mod int;
@@ -41,6 +42,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             Declaration::Module {
                 name: String::from("cmd"),
                 decls: cmd::decls(common_kinds),
+            },
+            Declaration::Module {
+                name: String::from("path"),
+                decls: path::decls(common_kinds),
             },
             // trace : a -> b -> b
             Declaration::Definition {
