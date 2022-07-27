@@ -22,8 +22,10 @@
           ];
         };
 
+        rustVersion = "1.62.1";
+        
         rustPkgs = { release }: pkgs.rustBuilder.makePackageSet {
-          rustChannel = "1.56.1";
+          rustChannel = rustVersion;
           packageFun = import "${self}/Cargo.nix";
           inherit release;
           target = systemTargets.${system};
@@ -41,7 +43,7 @@
           pkgs.mkShell {
             buildInputs = [
               cargo2nix.packages.${system}.cargo2nix
-              (pkgs.rust-bin.stable."1.56.1".default.override {
+              (pkgs.rust-bin.stable.${rustVersion}.default.override {
                 extensions = [
                   "cargo"
                   "clippy"
