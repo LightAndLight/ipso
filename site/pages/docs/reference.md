@@ -53,6 +53,8 @@ title: Language Reference
   * [Equality](#equality)
   * [Comparison](#comparison)
   * [Debugging](#debugging)
+* [Standard Library](#standard-library)
+  * [`path`](#path)
 * [Grammar](#grammar)
 </div>
 
@@ -713,6 +715,16 @@ instance DebugVariantCtor a => Debug (| a |)
 ```ipso
 debugRecordFields : DebugRecordFields a => { a } -> Array { field : String, value : String }
 debugVariantCtor : DebugVariantCtor a => (| a |) -> { ctor : String, value : String }
+```
+
+## Standard Library
+
+### `path`
+
+```ipso
+module path where
+
+  exists : String -> IO Bool
 ```
 
 ## Grammar
