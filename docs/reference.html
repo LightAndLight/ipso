@@ -110,6 +110,10 @@
 <li><a href="#comparison">Comparison</a></li>
 <li><a href="#debugging">Debugging</a></li>
 </ul></li>
+<li><a href="#standard-library">Standard Library</a>
+<ul>
+<li><a href="#path"><code>path</code></a></li>
+</ul></li>
 <li><a href="#grammar">Grammar</a></li>
 </ul>
 </div>
@@ -509,6 +513,11 @@ hello</code></pre>
 <span id="cb69-11"><a href="#cb69-11" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> DebugVariantCtor a <span class="kw">=&gt;</span> Debug <span class="kw">(|</span> a <span class="kw">|)</span></span></code></pre></div>
 <div class="sourceCode" id="cb70"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a>debugRecordFields <span class="kw">:</span> DebugRecordFields a <span class="kw">=&gt;</span> <span class="kw">{</span> a <span class="kw">}</span> <span class="kw">-&gt;</span> Array <span class="kw">{</span> field <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span>
 <span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>debugVariantCtor <span class="kw">:</span> DebugVariantCtor a <span class="kw">=&gt;</span> <span class="kw">(|</span> a <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">{</span> ctor <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span></code></pre></div>
+<h2 id="standard-library">Standard Library</h2>
+<h3 id="path"><code>path</code></h3>
+<div class="sourceCode" id="cb71"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> path <span class="kw">where</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>  exists <span class="kw">:</span> String <span class="kw">-&gt;</span> IO Bool</span></code></pre></div>
 <h2 id="grammar">Grammar</h2>
 <pre><code>ident ::=
   ident_start ident_continue*
