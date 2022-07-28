@@ -251,7 +251,6 @@ pub fn convert_expr(expr: &ipso_core::Expr) -> ConvertResult<Expr> {
                             .iter()
                             .copied()
                             .map(|var| var + 1)
-                            .filter(|var| rest_required_vars.contains(var))
                             .chain(std::iter::once(0))
                             .collect();
                         build_rest(&env)
