@@ -912,6 +912,9 @@ pub enum Builtin {
     ArrayUnfoldr,
     IntMod,
     PathExists,
+    EnvArgs,
+    EnvGetvar,
+    EnvSetvar,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
