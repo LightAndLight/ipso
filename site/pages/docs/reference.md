@@ -518,7 +518,10 @@ module array where
   
   flatMap : (a -> Array b) -> Array a -> Array b
 
-  unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
+  unfoldr :
+    s -> 
+    (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> 
+    Array a
 
   sum : Array Int -> Int
   
