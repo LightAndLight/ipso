@@ -565,3 +565,46 @@ fn convert_12() {
 
     assert_eq!(expected, actual)
 }
+
+#[test]
+fn convert_13() {
+    let expected = {
+        use closure_conversion::{Expr, StringPart};
+
+        // let a = "a" in
+        Expr::Let {
+            value: Rc::new(Expr::String(vec![StringPart::from("a")])),
+            // let b = "b" in
+            rest: Rc::new(Expr::Let {
+                value: Rc::new(Expr::String(vec![StringPart::from("b")])),
+                // let c = b in
+                rest: Rc::new(Expr::Let {
+                    value: Rc::new(Expr::Var(0)),
+                    // a
+                    rest: Rc::new(Expr::Var(2)),
+                }),
+            }),
+        }
+    };
+
+    let actual = convert(&{
+        use ipso_core::{Expr, StringPart};
+
+        // let a = "a" in
+        Expr::Let {
+            value: Rc::new(Expr::String(vec![StringPart::from("a")])),
+            // let b = "b" in
+            rest: Rc::new(Expr::Let {
+                value: Rc::new(Expr::String(vec![StringPart::from("b")])),
+                // let c = b in
+                rest: Rc::new(Expr::Let {
+                    value: Rc::new(Expr::Var(0)),
+                    // a
+                    rest: Rc::new(Expr::Var(2)),
+                }),
+            }),
+        }
+    });
+
+    assert_eq!(expected, actual)
+}
