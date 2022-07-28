@@ -395,11 +395,14 @@ hello</code></pre>
 <span id="cb49-18"><a href="#cb49-18" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb49-19"><a href="#cb49-19" aria-hidden="true" tabindex="-1"></a>  flatMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Array b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
 <span id="cb49-20"><a href="#cb49-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb49-21"><a href="#cb49-21" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span> s <span class="kw">-&gt;</span> <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> Array a</span>
-<span id="cb49-22"><a href="#cb49-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb49-23"><a href="#cb49-23" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb49-24"><a href="#cb49-24" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb49-25"><a href="#cb49-25" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
+<span id="cb49-21"><a href="#cb49-21" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span></span>
+<span id="cb49-22"><a href="#cb49-22" aria-hidden="true" tabindex="-1"></a>    s <span class="kw">-&gt;</span> </span>
+<span id="cb49-23"><a href="#cb49-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> </span>
+<span id="cb49-24"><a href="#cb49-24" aria-hidden="true" tabindex="-1"></a>    Array a</span>
+<span id="cb49-25"><a href="#cb49-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-26"><a href="#cb49-26" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb49-27"><a href="#cb49-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb49-28"><a href="#cb49-28" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
 <h3 id="byte-arrays">Byte Arrays</h3>
 <div class="sourceCode" id="cb50"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Bytes</span>
 <span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>

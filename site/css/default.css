@@ -34,6 +34,7 @@ pre {
   padding: 1em;
   border-radius: 0.5em;
   line-height: 175%;
+  overflow: scroll;
 }
 
 code {
