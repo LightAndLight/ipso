@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  comp
+    bind args <- env.args
+    println <| debug (array.index 1 args)

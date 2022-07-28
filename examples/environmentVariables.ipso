@@ -1,0 +1,11 @@
+main : IO ()
+main =
+  comp
+    let var = "UNUSED_ENV_VAR"
+    bind value1 <- env.getvar var
+    
+    println <| debug value1
+    env.setvar var "hello"
+    
+    bind value2 <- env.getvar var
+    println <| debug value2
