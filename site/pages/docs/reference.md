@@ -54,6 +54,7 @@ title: Language Reference
   * [Comparison](#comparison)
   * [Debugging](#debugging)
 * [Standard Library](#standard-library)
+  * [`env`](#env)
   * [`path`](#path)
 * [Grammar](#grammar)
 </div>
@@ -721,6 +722,18 @@ debugVariantCtor : DebugVariantCtor a => (| a |) -> { ctor : String, value : Str
 ```
 
 ## Standard Library
+
+### `env`
+
+```ipso
+module env where
+
+  args : IO (Array String)
+  
+  getvar : String -> IO (| Some : String, None : () |)
+  
+  setvar : String -> String -> IO ()
+```
 
 ### `path`
 
