@@ -1377,6 +1377,81 @@ where {
                     }
                 )
             }
+            Builtin::EnvArgs => {
+                fn env_args_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
+                    let args = std::env::args();
+                    let args = interpreter.alloc_values(
+                        args.map(|arg| interpreter.alloc(Object::String(Rc::from(arg)))),
+                    );
+                    interpreter.alloc(Object::Array(args))
+                }
+                let closure = Object::IO {
+                    env: Rc::from([]),
+                    body: IOBody(env_args_io),
+                };
+                self.alloc(closure)
+            }
+            Builtin::EnvGetvar => {
+                function1!(
+                    env_getvar,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn env_getvar_io(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let var = env[0].unpack_string();
+                            match std::env::var(var) {
+                                Err(err) => match err {
+                                    std::env::VarError::NotPresent => {
+                                        // None () : (| None : (), Some : String |)
+                                        interpreter.alloc(Object::Variant(0, Value::Unit))
+                                    }
+                                    err => {
+                                        panic!("getvar: {}", err)
+                                    }
+                                },
+                                Ok(value) => {
+                                    let value = interpreter.alloc(Object::String(Rc::from(value)));
+                                    // Some value : (| None : (), Some : String |)
+                                    interpreter.alloc(Object::Variant(1, value))
+                                }
+                            }
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(env_getvar_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::EnvSetvar => {
+                function2!(
+                    env_setvar,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn env_setvar_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let key = env[0].unpack_string();
+                            let value = env[1].unpack_string();
+                            std::env::set_var(key, value);
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(env_setvar_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
         }
     }
 
