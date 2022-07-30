@@ -915,6 +915,9 @@ pub enum Builtin {
     EnvArgs,
     EnvGetvar,
     EnvSetvar,
+    ExitSuccess,
+    ExitFailure,
+    ExitWith,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
