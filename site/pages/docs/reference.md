@@ -55,6 +55,7 @@ title: Language Reference
   * [Debugging](#debugging)
 * [Standard Library](#standard-library)
   * [`env`](#env)
+  * [`exit`](#exit)
   * [`path`](#path)
 * [Grammar](#grammar)
 </div>
@@ -733,6 +734,18 @@ module env where
   getvar : String -> IO (| Some : String, None : () |)
   
   setvar : String -> String -> IO ()
+```
+
+### `exit`
+
+```ipso
+module exit where
+
+  success : IO a
+
+  failure : IO a
+
+  with : Int -> IO a
 ```
 
 ### `path`
