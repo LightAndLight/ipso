@@ -18,12 +18,12 @@ main = println "Hello world!"
 <div>
 <h2 style="margin-top: 0em;">Features</h2>
 
-* Extensible [records](reference.html#records-1) and [variants](reference.html#variants-1)
-* [Pattern matching](reference.html#pattern-matching)
-* [String interpolation](reference.html#strings)
-* [Command literals](reference.html#command-literals)
-* [Computation expressions](reference.html#computation-expressions)
-* [Type classes](reference.html#type-classes)
+* Extensible [records](./docs/reference.md#records-1) and [variants](./docs/reference.md#variants-1)
+* [Pattern matching](./docs/reference.md#pattern-matching)
+* [String interpolation](./docs/reference.md#strings)
+* [Command literals](./docs/reference.md#command-literals)
+* [Computation expressions](./docs/reference.md#computation-expressions)
+* [Type classes](./docs/reference.md#type-classes)
 </div>
 
 <div style="flex-grow: 1; margin-left: 2em;">
