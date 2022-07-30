@@ -114,6 +114,7 @@
 <ul>
 <li><a href="#env"><code>env</code></a></li>
 <li><a href="#exit"><code>exit</code></a></li>
+<li><a href="#file"><code>file</code></a></li>
 <li><a href="#path"><code>path</code></a></li>
 </ul></li>
 <li><a href="#grammar">Grammar</a></li>
@@ -541,10 +542,18 @@ hello</code></pre>
 <span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a>  failure <span class="kw">:</span> IO a</span>
 <span id="cb72-6"><a href="#cb72-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb72-7"><a href="#cb72-7" aria-hidden="true" tabindex="-1"></a>  with <span class="kw">:</span> Int <span class="kw">-&gt;</span> IO a</span></code></pre></div>
+<h3 id="file"><code>file</code></h3>
+<div class="sourceCode" id="cb73"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> file <span class="kw">where</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> String <span class="kw">-&gt;</span> IO String</span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a>  write <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a>  append <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <h3 id="path"><code>path</code></h3>
-<div class="sourceCode" id="cb73"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> path <span class="kw">where</span></span>
-<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>  exists <span class="kw">:</span> String <span class="kw">-&gt;</span> IO Bool</span></code></pre></div>
+<div class="sourceCode" id="cb74"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> path <span class="kw">where</span></span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a>  exists <span class="kw">:</span> String <span class="kw">-&gt;</span> IO Bool</span></code></pre></div>
 <h2 id="grammar">Grammar</h2>
 <pre><code>ident ::=
   ident_start ident_continue*
