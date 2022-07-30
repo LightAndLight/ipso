@@ -919,6 +919,9 @@ pub enum Builtin {
     ExitFailure,
     ExitWith,
     CmdRead,
+    FileRead,
+    FileWrite,
+    FileAppend,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

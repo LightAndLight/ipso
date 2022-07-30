@@ -1,4 +1,5 @@
 pub mod array;
+pub mod file;
 pub mod path;
 pub mod exit;
 pub mod env;
@@ -56,6 +57,10 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             Declaration::Module {
                 name: String::from("exit"),
                 decls: exit::decls(common_kinds),
+            },
+            Declaration::Module {
+                name: String::from("file"),
+                decls: file::decls(common_kinds),
             },
             // trace : a -> b -> b
             Declaration::Definition {
