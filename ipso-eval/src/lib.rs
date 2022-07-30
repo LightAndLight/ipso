@@ -428,7 +428,7 @@ impl PartialEq for Object {
 pub enum Value {
     True,
     False,
-    Int(u32),
+    Int(i32),
     Char(char),
     Unit,
 
@@ -479,7 +479,7 @@ impl Value {
         }
     }
 
-    pub fn unpack_int(&self) -> u32 {
+    pub fn unpack_int(&self) -> i32 {
         match self {
             Value::Int(n) => *n,
             val => panic!("expected int, got {:?}", val),
@@ -977,7 +977,7 @@ where {
                     |_: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let arr = arg.unpack_array();
 
-                        Value::Int(arr.len() as u32)
+                        Value::Int(arr.len() as i32)
                     }
                 )
             }
@@ -1517,7 +1517,7 @@ where {
                     self,
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         fn exit_with_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
-                            let code: u32 = env[0].unpack_int();
+                            let code: i32 = env[0].unpack_int();
                             std::process::exit(code as i32)
                         }
                         let env = interpreter.alloc_values({
@@ -1859,7 +1859,7 @@ where {
             }
             Expr::Record(fields) => {
                 let mut record: Vec<Value> = Vec::with_capacity(fields.len());
-                let mut fields: Vec<(u32, Value)> = fields
+                let mut fields: Vec<(i32, Value)> = fields
                     .iter()
                     .map(|(ev, field)| (self.eval(env, ev).unpack_int(), self.eval(env, field)))
                     .collect();

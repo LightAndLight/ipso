@@ -33,7 +33,7 @@ pub enum Expr {
     False,
     IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
 
-    Int(u32),
+    Int(i32),
 
     Binop(Binop, Rc<Expr>, Rc<Expr>),
 

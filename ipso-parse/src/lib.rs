@@ -9,7 +9,7 @@ use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use ipso_lex::{
-    token::{self, Relation, Token},
+    token::{self, Relation, Sign, Token},
     Lexer,
 };
 use ipso_syntax::{self as syntax, Binop, Keyword, Module, Spanned};
@@ -632,17 +632,28 @@ impl<'input> Parser<'input> {
         self.ctor().map(|s| String::from(s.as_ref()))
     }
 
-    fn int(&mut self) -> Parsed<u32> {
+    fn int(&mut self) -> Parsed<i32> {
         self.expecting.insert(token::Name::Int);
-        match self.current {
-            Some(ref token) => match token.data {
-                token::Data::Int { value, length: _ } => {
-                    map0!(value as u32, self.consume())
-                }
+        (match &self.current {
+            Some(token) => match &token.data {
+                token::Data::Int {
+                    sign,
+                    value,
+                    length: _,
+                } => Parsed::pure((*sign, *value)),
                 _ => Parsed::unexpected(false),
             },
             None => Parsed::unexpected(false),
-        }
+        })
+        .and_then(|(sign, value)| {
+            map0!(
+                match sign {
+                    Sign::Negative => -(value as i32),
+                    Sign::None => value as i32,
+                },
+                self.consume()
+            )
+        })
     }
 
     /// ```

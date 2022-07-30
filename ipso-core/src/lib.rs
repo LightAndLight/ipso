@@ -667,7 +667,7 @@ pub enum Pattern<E> {
     Record { names: Vec<E>, rest: bool },
     Variant { tag: Rc<E> },
     Char(char),
-    Int(u32),
+    Int(i32),
     String(Rc<str>),
     Wildcard,
 }
@@ -1009,7 +1009,7 @@ pub enum Expr {
     False,
     IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
 
-    Int(u32),
+    Int(i32),
 
     Binop(Binop, Rc<Expr>, Rc<Expr>),
 
@@ -1944,7 +1944,7 @@ impl ClassDeclaration {
                 };
                 let body: Rc<Expr> = Rc::new(Expr::mk_lam(
                     true,
-                    Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as u32 + ix as u32)),
+                    Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as i32 + ix as i32)),
                 ));
 
                 (member.name.clone(), (sig, body))
