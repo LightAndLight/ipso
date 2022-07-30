@@ -4,7 +4,7 @@ import Data.List (stripPrefix)
 import Data.Maybe (fromJust)
 import Hakyll
 import Skylighting.Loader (loadSyntaxesFromDir)
-import System.FilePath (splitExtension)
+import System.FilePath ((</>), splitExtension, takeDirectory)
 import Text.Pandoc.Options (writerSyntaxMap)
 
 htmlizeUrls :: Item String -> Compiler (Item String)
@@ -14,9 +14,11 @@ htmlizeUrls = pure . fmap (withUrls htmlize)
     htmlize url =
       if isExternal url
         then url
-        else case splitExtension url of
-          (name, ".md") -> name ++ ".html"
-          _ -> url
+        else
+          let (file, fragment) = break (== '#') url in
+          case splitExtension file of
+            (name, ".md") -> (name ++ ".html") <> fragment
+            _ -> url
 
 mkCustomPandocCompiler :: IO (Compiler (Item String))
 mkCustomPandocCompiler = do
@@ -44,26 +46,10 @@ main = do
 
     match "templates/*" $ compile templateBodyCompiler
 
-    match "pages/*" $ do
+    match "pages/**" $ do
       route $ setExtension "html" `composeRoutes` customRoute (fromJust . stripPrefix "pages/" . toFilePath)
-      compile $
+      compile $ do
+        pathInPages <- fromJust . stripPrefix "./pages/" <$> getResourceFilePath
         customPandocCompiler
           >>= loadAndApplyTemplate "templates/base.html" defaultContext
-          >>= relativizeUrls
-          >>= htmlizeUrls
-
-    match "pages/docs/index.md" $ do
-      route $ customRoute (const "docs.html")
-      compile $
-        customPandocCompiler
-          >>= loadAndApplyTemplate "templates/base.html" defaultContext
-          >>= relativizeUrls
-          >>= htmlizeUrls
-
-    match ("pages/docs/*" .&&. complement "pages/docs/index.md") $ do
-      route $ setExtension "html" `composeRoutes` customRoute (fromJust . stripPrefix "pages/docs/" . toFilePath)
-      compile $
-        customPandocCompiler
-          >>= loadAndApplyTemplate "templates/base.html" defaultContext
-          >>= relativizeUrls
           >>= htmlizeUrls
