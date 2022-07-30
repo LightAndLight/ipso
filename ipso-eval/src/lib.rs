@@ -15,6 +15,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fmt::Debug,
+    io::Write,
     io::{self, BufRead},
     ops::Index,
     path::Path,
@@ -1527,6 +1528,78 @@ where {
                         let closure = Object::IO {
                             env,
                             body: IOBody(exit_with_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::FileRead => function1!(
+                file_read,
+                self,
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                    fn file_read_io(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
+                        let path = env[0].unpack_string();
+                        let contents =
+                            std::fs::read_to_string(path).unwrap_or_else(|err| panic!("{}", err));
+                        interpreter.alloc(Object::String(Rc::from(contents)))
+                    }
+
+                    let env = interpreter.alloc_values([arg]);
+                    interpreter.alloc(Object::IO {
+                        env,
+                        body: IOBody(file_read_io),
+                    })
+                }
+            ),
+            Builtin::FileWrite => {
+                function2!(
+                    file_write,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn file_write_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let path = env[0].unpack_string();
+                            let content = env[1].unpack_string();
+                            std::fs::write(path, content).unwrap_or_else(|err| panic!("{}", err));
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(file_write_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::FileAppend => {
+                function2!(
+                    file_append,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn file_append_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let path = env[0].unpack_string();
+                            let content = env[1].unpack_string();
+                            let mut file = std::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open(path)
+                                .unwrap_or_else(|err| panic!("{}", err));
+                            file.write_all(content.as_bytes())
+                                .unwrap_or_else(|err| panic!("{}", err));
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(file_append_io),
                         };
                         interpreter.alloc(closure)
                     }
