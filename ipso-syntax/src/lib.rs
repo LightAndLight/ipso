@@ -262,7 +262,7 @@ pub enum Pattern {
         arg: Spanned<Rc<str>>,
     },
     Char(Spanned<char>),
-    Int(Spanned<u32>),
+    Int(Spanned<i32>),
     String(Spanned<Rc<str>>),
     Wildcard,
 }
@@ -424,7 +424,7 @@ pub enum Expr {
     False,
     IfThenElse(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
-    Int(u32),
+    Int(i32),
 
     Binop(Spanned<Binop>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 

@@ -619,7 +619,7 @@ pub fn check_instance(
             dictionary
                 .into_iter()
                 .enumerate()
-                .map(|(ix, val)| (core::Expr::Int(ix as u32), val))
+                .map(|(ix, val)| (core::Expr::Int(ix as i32), val))
                 .collect(),
             None,
         );

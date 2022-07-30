@@ -346,7 +346,7 @@ pub fn register_class(
                 consequent: superclass.clone(),
                 evidence: Rc::new(core::Expr::mk_lam(
                     true,
-                    core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as u32)),
+                    core::Expr::mk_project(core::Expr::Var(0), core::Expr::Int(pos as i32)),
                 )),
             }),
     );

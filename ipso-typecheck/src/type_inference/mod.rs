@@ -372,7 +372,7 @@ fn infer_string_pattern(s: &Spanned<Rc<str>>) -> InferredPattern {
     }
 }
 
-fn infer_int_pattern(n: &Spanned<u32>) -> InferredPattern {
+fn infer_int_pattern(n: &Spanned<i32>) -> InferredPattern {
     InferredPattern::Any {
         pattern: Pattern::Int(n.item),
         names: Vec::new(),

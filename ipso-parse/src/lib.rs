@@ -632,12 +632,12 @@ impl<'input> Parser<'input> {
         self.ctor().map(|s| String::from(s.as_ref()))
     }
 
-    fn int(&mut self) -> Parsed<u32> {
+    fn int(&mut self) -> Parsed<i32> {
         self.expecting.insert(token::Name::Int);
         match self.current {
             Some(ref token) => match token.data {
                 token::Data::Int { value, length: _ } => {
-                    map0!(value as u32, self.consume())
+                    map0!(value as i32, self.consume())
                 }
                 _ => Parsed::unexpected(false),
             },
