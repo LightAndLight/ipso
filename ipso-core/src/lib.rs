@@ -918,6 +918,7 @@ pub enum Builtin {
     ExitSuccess,
     ExitFailure,
     ExitWith,
+    CmdRead,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
