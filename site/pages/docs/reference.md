@@ -56,6 +56,7 @@ title: Language Reference
 * [Standard Library](#standard-library)
   * [`env`](#env)
   * [`exit`](#exit)
+  * [`file`](#file)
   * [`path`](#path)
 * [Grammar](#grammar)
 </div>
@@ -752,6 +753,18 @@ module exit where
   failure : IO a
 
   with : Int -> IO a
+```
+
+### `file`
+
+```ipso
+module file where
+  
+  read : String -> IO String
+  
+  write : String -> String -> IO ()
+  
+  append : String -> String -> IO ()
 ```
 
 ### `path`
