@@ -1452,6 +1452,48 @@ where {
                     }
                 )
             }
+            Builtin::ExitSuccess => {
+                fn exit_success_io(_: &mut Interpreter, _: Rc<[Value]>) -> Value {
+                    std::process::exit(0)
+                }
+                let closure = Object::IO {
+                    env: Rc::from([]),
+                    body: IOBody(exit_success_io),
+                };
+                self.alloc(closure)
+            }
+            Builtin::ExitFailure => {
+                fn exit_failure_io(_: &mut Interpreter, _: Rc<[Value]>) -> Value {
+                    std::process::exit(1)
+                }
+                let closure = Object::IO {
+                    env: Rc::from([]),
+                    body: IOBody(exit_failure_io),
+                };
+                self.alloc(closure)
+            }
+            Builtin::ExitWith => {
+                function1!(
+                    exit_with,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn exit_with_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            let code: u32 = env[0].unpack_int();
+                            std::process::exit(code as i32)
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(exit_with_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
         }
     }
 
