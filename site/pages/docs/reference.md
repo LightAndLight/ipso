@@ -647,6 +647,12 @@ module cmd where
 
   run : Cmd -> IO ()
 
+  # Run a command, capturing its `stdout` as a string.
+  read : Cmd -> IO String
+  
+  # Run a command, capturing the lines it writes to `stdout`.
+  #
+  # `lines command` is equivalent to `io.map (string.split '\n') (read command)`
   lines : Cmd -> IO (Array String)
 
   show : Cmd -> String

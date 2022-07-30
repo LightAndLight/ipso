@@ -467,16 +467,22 @@ hello</code></pre>
 <span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>  run <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
 <span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>  lines <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
-<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span>
-<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ToArgs a <span class="kw">where</span></span>
-<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a>  toArgs <span class="kw">:</span> a <span class="kw">-&gt;</span> Array String</span>
-<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs String</span>
-<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs a <span class="kw">=&gt;</span> ToArgs <span class="kw">(</span>Array a<span class="kw">)</span> </span></code></pre></div>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing its `stdout` as a string.</span></span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO String</span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing the lines it writes to `stdout`.</span></span>
+<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `lines command` is equivalent to `io.map (string.split '\n') (read command)`</span></span>
+<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a>  lines <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
+<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span>
+<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ToArgs a <span class="kw">where</span></span>
+<span id="cb64-16"><a href="#cb64-16" aria-hidden="true" tabindex="-1"></a>  toArgs <span class="kw">:</span> a <span class="kw">-&gt;</span> Array String</span>
+<span id="cb64-17"><a href="#cb64-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-18"><a href="#cb64-18" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs String</span>
+<span id="cb64-19"><a href="#cb64-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-20"><a href="#cb64-20" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs a <span class="kw">=&gt;</span> ToArgs <span class="kw">(</span>Array a<span class="kw">)</span> </span></code></pre></div>
 <h2 id="type-classes">Type Classes</h2>
 <h3 id="equality">Equality</h3>
 <div class="sourceCode" id="cb65"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">where</span></span>
