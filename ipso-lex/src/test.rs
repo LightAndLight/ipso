@@ -1,5 +1,5 @@
 use super::Lexer;
-use crate::token::{self, Token};
+use crate::token::{self, Sign, Token};
 use std::rc::Rc;
 
 #[test]
@@ -100,6 +100,7 @@ fn lex_int_1() {
         vec![
             Token {
                 data: token::Data::Int {
+                    sign: Sign::None,
                     value: 923,
                     length: 3
                 },
@@ -126,6 +127,7 @@ fn lex_int_2() {
         vec![
             Token {
                 data: token::Data::Int {
+                    sign: Sign::None,
                     value: 923,
                     length: 5
                 },
@@ -215,6 +217,7 @@ fn lex_definition_1() {
             },
             Token {
                 data: token::Data::Int {
+                    sign: Sign::None,
                     value: 1,
                     length: 1
                 },

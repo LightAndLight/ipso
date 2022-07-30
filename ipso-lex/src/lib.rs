@@ -4,7 +4,7 @@ mod test;
 pub mod token;
 
 use std::{fmt::Write, rc::Rc, str::Chars};
-use token::Token;
+use token::{Sign, Token};
 
 enum Mode {
     String,
@@ -54,6 +54,27 @@ impl<'input> Lexer<'input> {
         self.current = self.input.next();
         self.pos += 1;
         self.column = 0;
+    }
+
+    fn consume_int(&mut self, sign: Sign, c: char, pos: usize, column: usize) -> Option<Token> {
+        self.consume();
+        let mut length = 1;
+        let mut value: usize = c.to_digit(10).unwrap() as usize;
+        while let Some(n) = self.current.and_then(|cur| cur.to_digit(10)) {
+            self.consume();
+            value *= 10;
+            value += n as usize;
+            length += 1;
+        }
+        Some(Token {
+            data: token::Data::Int {
+                sign,
+                value,
+                length,
+            },
+            pos,
+            column,
+        })
     }
 }
 
@@ -519,6 +540,9 @@ impl<'input> Iterator for Lexer<'input> {
                                     column,
                                 })
                             }
+                            Some(c) if c.is_ascii_digit() => {
+                                self.consume_int(Sign::Negative, c, pos, column)
+                            }
                             _ => Some(Token {
                                 data: token::Data::Hyphen,
                                 pos,
@@ -601,22 +625,7 @@ impl<'input> Iterator for Lexer<'input> {
                             column,
                         })
                     }
-                    _ if c.is_digit(10) => {
-                        self.consume();
-                        let mut length = 1;
-                        let mut value: usize = c.to_digit(10).unwrap() as usize;
-                        while let Some(n) = self.current.and_then(|cur| cur.to_digit(10)) {
-                            self.consume();
-                            value *= 10;
-                            value += n as usize;
-                            length += 1;
-                        }
-                        Some(Token {
-                            data: token::Data::Int { value, length },
-                            pos,
-                            column,
-                        })
-                    }
+                    _ if c.is_ascii_digit() => self.consume_int(Sign::None, c, pos, column),
                     _ => {
                         self.consume();
                         Some(Token {

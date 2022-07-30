@@ -318,24 +318,42 @@ impl Name {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
+pub enum Sign {
+    None,
+    Negative,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub enum Data {
     Unexpected(char),
     Eof,
 
-    Comment { length: usize },
+    Comment {
+        length: usize,
+    },
 
     Ctor,
     Ident(Rc<str>),
-    Int { value: usize, length: usize },
+    Int {
+        sign: Sign,
+        value: usize,
+        length: usize,
+    },
 
     DoubleQuote,
     Dollar,
     DollarLBrace,
-    String { value: String, length: usize },
+    String {
+        value: String,
+        length: usize,
+    },
 
     SingleQuote,
-    Char { value: char, length: usize },
+    Char {
+        value: char,
+        length: usize,
+    },
 
     LBrace,
     RBrace,
@@ -386,7 +404,14 @@ impl Data {
             Data::Eof => 0,
             Data::Comment { length } => *length,
             Data::Ident(s) => s.len(),
-            Data::Int { value: _, length } => *length,
+            Data::Int {
+                sign,
+                value: _,
+                length,
+            } => match sign {
+                Sign::Negative => *length + 1,
+                Sign::None => *length,
+            },
             Data::LBrace => 1,
             Data::RBrace => 1,
             Data::LParen => 1,
