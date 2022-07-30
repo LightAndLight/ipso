@@ -70,15 +70,18 @@ jobs:
     needs: [build-linux, build-macos]
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
    
     steps:
     - uses: actions/checkout@v2.4.0
 
     # Nix setup
+    - uses: actions/checkout@v2.4.0
     - uses: cachix/install-nix-action@v15
-    - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /var/run/nix-signing-key'"
-    - run: sudo mkdir /var/root/.aws
-    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /var/root/.aws/credentials'"
+    - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
+    - run: sudo mkdir /root/.aws
+    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
 
     - name: Check release version
