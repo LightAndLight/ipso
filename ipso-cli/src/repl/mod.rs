@@ -9,6 +9,8 @@ use termion::{
     raw::{IntoRawMode, RawTerminal},
 };
 
+use crate::version::VERSION;
+
 use self::circular_buffer::CircularBuffer;
 
 const IPSO_BANNER: &str = r#" _
@@ -185,7 +187,11 @@ pub fn run() -> io::Result<()> {
     let mut history: CircularBuffer<String> = CircularBuffer::new(100);
     let mut history_index = 0;
 
-    writeln!(stdout, "{}\n\nType :quit<ENTER> to quit.\n", IPSO_BANNER)?;
+    writeln!(
+        stdout,
+        "{} {}\n\nType :quit<ENTER> to quit.\n",
+        IPSO_BANNER, VERSION
+    )?;
 
     let mut stdout = stdout.into_raw_mode()?;
     let (_, cursor_current_row) = stdout.cursor_pos()?;

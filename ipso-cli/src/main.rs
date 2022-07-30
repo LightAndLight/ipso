@@ -1,5 +1,8 @@
-use clap::Parser;
-use ipso_cli::run::{run_interpreter, InterpreterError};
+use clap::{AppSettings, Parser};
+use ipso_cli::{
+    run::{run_interpreter, InterpreterError},
+    version::VERSION,
+};
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use std::{io, path::PathBuf};
 
@@ -33,7 +36,7 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
 }
 
 #[derive(Parser)]
-#[clap(name = "ipso")]
+#[clap(name = "ipso", global_setting(AppSettings::NoAutoVersion))]
 struct Cli {
     /// The file to run. Starts a REPL if omitted.
     filename: Option<String>,
@@ -41,10 +44,19 @@ struct Cli {
     /// Run a specific IO action from the file. Defaults to "main".
     #[clap(long = "run")]
     entrypoint: Option<String>,
+
+    /// Print the current version.
+    #[clap(long = "version")]
+    version: bool,
 }
 
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
+
+    if cli.version {
+        println!("ipso {}", VERSION);
+        return Ok(());
+    }
 
     match cli.filename {
         Some(filename) => {
