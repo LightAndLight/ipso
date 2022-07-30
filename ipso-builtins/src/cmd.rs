@@ -18,6 +18,19 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::Run),
         }),
+        // read : Cmd -> IO String
+        Rc::new(Declaration::Definition {
+            name: String::from("read"),
+            sig: TypeSig::new(
+                vec![],
+                Type::arrow(
+                    common_kinds,
+                    Type::Cmd,
+                    Type::app(Type::mk_io(common_kinds), Type::String),
+                ),
+            ),
+            body: Rc::new(Expr::Builtin(Builtin::CmdRead)),
+        }),
         // lines : Cmd -> IO (Array String)
         Rc::new(Declaration::Definition {
             name: String::from("lines"),

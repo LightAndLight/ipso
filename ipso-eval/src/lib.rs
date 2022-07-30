@@ -13,6 +13,7 @@ use paste::paste;
 use std::{
     cmp::Ordering,
     collections::HashMap,
+    convert::TryFrom,
     fmt::Debug,
     io::{self, BufRead},
     ops::Index,
@@ -1208,6 +1209,43 @@ where {
                     interpreter.alloc(Object::IO {
                         env,
                         body: IOBody(lines_io_body),
+                    })
+                }
+            ),
+            Builtin::CmdRead => function1!(
+                cmd_read,
+                self,
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                    fn cmd_read_io(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
+                        let cmd: &[Rc<str>] = env[0].unpack_cmd();
+                        if cmd.is_empty() {
+                            interpreter.alloc(Object::String(Rc::from("")))
+                        } else {
+                            let output = process::Command::new(cmd[0].as_ref())
+                                .args(cmd[1..].iter().map(|arg| arg.as_ref()))
+                                .stdin(Stdio::inherit())
+                                .stdout(Stdio::piped())
+                                .stderr(Stdio::inherit())
+                                .output()
+                                .unwrap_or_else(|err| {
+                                    panic!("failed to start process {:?}: {}", cmd[0], err)
+                                });
+
+                            check_exit_status(&cmd[0], &output.status);
+
+                            let line: Rc<str> = Rc::from(
+                                std::str::from_utf8(&output.stdout)
+                                    .unwrap_or_else(|err| panic!("{:?}", err)),
+                            );
+
+                            interpreter.alloc(Object::String(line))
+                        }
+                    }
+
+                    let env = interpreter.alloc_values([arg]);
+                    interpreter.alloc(Object::IO {
+                        env,
+                        body: IOBody(cmd_read_io),
                     })
                 }
             ),
