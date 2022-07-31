@@ -205,7 +205,7 @@ macro_rules! map2 {
 #[macro_export]
 macro_rules! keep_right {
     ($a:expr, $b:expr) => {{
-        use crate::map2;
+        use $crate::map2;
         map2!(|_, a| a, $a, $b)
     }};
 }
@@ -221,7 +221,7 @@ macro_rules! keep_left {
 #[macro_export]
 macro_rules! between {
     ($l:expr, $r:expr, $x:expr) => {{
-        use crate::{keep_left, keep_right};
+        use $crate::{keep_left, keep_right};
         keep_right!($l, keep_left!($x, $r))
     }};
 }
@@ -344,7 +344,7 @@ pub struct Parser<'input> {
 #[macro_export]
 macro_rules! many_ {
     ($x:expr) => {{
-        use crate::ErrorName;
+        use $crate::ErrorName;
         let mut error: Option<ErrorName> = None;
         let mut consumed = false;
         loop {
@@ -375,7 +375,7 @@ macro_rules! many_ {
 #[macro_export]
 macro_rules! many_with {
     ($vec:expr, $x:expr) => {{
-        use crate::{ErrorName, Parsed};
+        use $crate::{ErrorName, Parsed};
 
         let mut error: Option<ErrorName> = None;
         let mut acc: Vec<_> = $vec;
@@ -409,7 +409,7 @@ macro_rules! many_with {
 #[macro_export]
 macro_rules! many {
     ($x:expr) => {{
-        use crate::many_with;
+        use $crate::many_with;
         many_with!(Vec::new(), $x)
     }};
 }
@@ -451,7 +451,7 @@ macro_rules! choices {
 #[macro_export]
 macro_rules! sep_by {
     ($x:expr, $sep:expr) => {{
-        use crate::many_with;
+        use $crate::many_with;
         choices!(
             $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),
             Parsed::pure(Vec::new())

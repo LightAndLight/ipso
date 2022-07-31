@@ -105,7 +105,7 @@ pub fn convert_many<A: 'static, B: 'static, F: 'static + Fn(&A) -> ConvertResult
     convert_item: F,
     items: &[A],
 ) -> ConvertResult<Vec<B>> {
-    let items: Vec<ConvertResult<_>> = items.iter().map(|item| convert_item(item)).collect();
+    let items: Vec<ConvertResult<_>> = items.iter().map(convert_item).collect();
 
     let required_by_items = {
         let mut vars = FnvHashSet::default();

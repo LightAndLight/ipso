@@ -13,7 +13,6 @@ use paste::paste;
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    convert::TryFrom,
     fmt::Debug,
     io::Write,
     io::{self, BufRead},
@@ -692,7 +691,7 @@ where {
                     trace,
                     self,
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
-                        let _ = writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
+                        writeln!(interpreter.stdout, "trace: {}", env[0].render()).unwrap();
                         arg
                     }
                 )

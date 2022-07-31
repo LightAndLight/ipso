@@ -244,10 +244,8 @@ pub fn check_definition(
 }
 
 pub fn check_class_member(
-    common_kinds: &CommonKinds,
-    type_context: &HashMap<Rc<str>, Kind>,
+    env: &Env,
     bound_tyvars: &BoundVars<Kind>,
-    source: &Source,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut type_inference::unification::Solutions,
     class_args_kinds: &[(Rc<str>, Kind)],
@@ -275,11 +273,11 @@ pub fn check_class_member(
     let mut bound_tyvars = bound_tyvars.clone();
     bound_tyvars.insert(&ty_var_kinds);
     let ty = check_kind(
-        common_kinds,
-        type_context,
+        env.common_kinds,
+        env.type_context,
         &bound_tyvars,
         kind_inference_state,
-        source,
+        env.source,
         ty,
         &Kind::Type,
     )?;
@@ -338,7 +336,7 @@ pub fn check_class(
                 &type_variables,
                 &mut kind_inference_state,
                 env.source,
-                &superclass,
+                superclass,
                 &Kind::Constraint,
             )
         })
@@ -348,10 +346,8 @@ pub fn check_class(
         .iter()
         .map(|(member_name, member_type)| {
             check_class_member(
-                env.common_kinds,
-                env.type_context,
+                &env,
                 &type_variables,
-                env.source,
                 &mut kind_inference_state,
                 &mut type_solutions,
                 &args_kinds,
@@ -455,7 +451,7 @@ pub fn check_instance(
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 env.source,
-                &arg,
+                arg,
             )?;
             Ok(res.0)
         })
@@ -470,7 +466,7 @@ pub fn check_instance(
                 &type_variables,
                 &mut type_inference_state.kind_inference_state,
                 env.source,
-                &assume,
+                assume,
                 &Kind::Constraint,
             )?;
             let evar = type_inference_state

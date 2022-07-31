@@ -301,9 +301,7 @@ pub fn unify_with_hint(
     actual: &Type,
 ) -> Result<(), Error> {
     unify_inner(
-        env.common_kinds,
-        env.types,
-        env.type_variables,
+        &env,
         kind_inference_state,
         type_solutions,
         pos,
@@ -323,9 +321,7 @@ pub fn unify(
     actual: &Type,
 ) -> Result<(), Error> {
     unify_inner(
-        env.common_kinds,
-        env.types,
-        env.type_variables,
+        &env,
         kind_inference_state,
         type_solutions,
         pos,
@@ -350,9 +346,7 @@ pub fn unify(
 }
 
 fn unify_inner(
-    common_kinds: &CommonKinds,
-    types: &HashMap<Rc<str>, Kind>,
-    type_variables: &BoundVars<Kind>,
+    env: &Env,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
     pos: usize,
@@ -433,9 +427,7 @@ fn unify_inner(
     }
 
     fn unify_meta_left(
-        common_kinds: &CommonKinds,
-        types: &HashMap<Rc<str>, Kind>,
-        type_variables: &BoundVars<Kind>,
+        env: &Env,
         kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         pos: usize,
@@ -447,15 +439,13 @@ fn unify_inner(
             actual => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_left(
                     kind_inference_state,
-                    type_variables,
+                    env.type_variables,
                     type_solutions,
                     *meta,
                     &actual,
                 ),
                 Solution::Solved(expected) => unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -467,9 +457,7 @@ fn unify_inner(
     }
 
     fn unify_meta_right(
-        common_kinds: &CommonKinds,
-        types: &HashMap<Rc<str>, Kind>,
-        type_variables: &BoundVars<Kind>,
+        env: &Env,
         kind_inference_state: &mut kind_inference::State,
         type_solutions: &mut Solutions,
         pos: usize,
@@ -481,15 +469,13 @@ fn unify_inner(
             expected => match type_solutions.get(*meta).clone() {
                 Solution::Unsolved => solve_right(
                     kind_inference_state,
-                    type_variables,
+                    env.type_variables,
                     type_solutions,
                     &expected,
                     *meta,
                 ),
                 Solution::Solved(actual) => unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -510,29 +496,20 @@ fn unify_inner(
             kind_inference::ErrorHint::WhileChecking {
                 ty: actual
                     .to_syntax()
-                    .map(&mut |ix| type_variables.lookup_index(*ix).unwrap().0.clone()),
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
                 has_kind: expected.kind(),
             },
         ),
     })?;
 
     match expected {
-        Type::Meta(_, meta) => unify_meta_left(
-            common_kinds,
-            types,
-            type_variables,
-            kind_inference_state,
-            type_solutions,
-            pos,
-            meta,
-            actual,
-        ),
+        Type::Meta(_, meta) => {
+            unify_meta_left(env, kind_inference_state, type_solutions, pos, meta, actual)
+        }
         Type::DebugRecordFields => match actual {
             Type::DebugRecordFields => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -542,7 +519,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -550,9 +527,7 @@ fn unify_inner(
         Type::DebugVariantCtor => match actual {
             Type::DebugVariantCtor => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -562,7 +537,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -570,9 +545,7 @@ fn unify_inner(
         Type::Bool => match actual {
             Type::Bool => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -582,7 +555,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -590,9 +563,7 @@ fn unify_inner(
         Type::Int => match actual {
             Type::Int => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -602,7 +573,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -610,9 +581,7 @@ fn unify_inner(
         Type::Char => match actual {
             Type::Char => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -622,7 +591,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -630,9 +599,7 @@ fn unify_inner(
         Type::String => match actual {
             Type::String => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -642,7 +609,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -650,9 +617,7 @@ fn unify_inner(
         Type::Bytes => match actual {
             Type::Bytes => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -662,7 +627,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -670,9 +635,7 @@ fn unify_inner(
         Type::RowNil => match actual {
             Type::RowNil => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -682,7 +645,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -690,9 +653,7 @@ fn unify_inner(
         Type::Unit => match actual {
             Type::Unit => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -702,7 +663,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -710,9 +671,7 @@ fn unify_inner(
         Type::Cmd => match actual {
             Type::Cmd => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -722,7 +681,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -730,9 +689,7 @@ fn unify_inner(
         Type::Name(_, expected_name) => match actual {
             Type::Name(_, actual_name) if expected_name == actual_name => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -742,7 +699,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -750,9 +707,7 @@ fn unify_inner(
         Type::Var(_, expected_index) => match actual {
             Type::Var(_, actual_index) if expected_index == actual_index => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -762,7 +717,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -770,9 +725,7 @@ fn unify_inner(
         Type::Arrow(_) => match actual {
             Type::Arrow(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -782,7 +735,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -790,9 +743,7 @@ fn unify_inner(
         Type::FatArrow(_) => match actual {
             Type::FatArrow(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -802,7 +753,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -810,9 +761,7 @@ fn unify_inner(
         Type::Array(_) => match actual {
             Type::Array(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -822,7 +771,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -830,9 +779,7 @@ fn unify_inner(
         Type::Record(_) => match actual {
             Type::Record(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -842,7 +789,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -850,9 +797,7 @@ fn unify_inner(
         Type::Variant(_) => match actual {
             Type::Variant(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -862,7 +807,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -870,9 +815,7 @@ fn unify_inner(
         Type::IO(_) => match actual {
             Type::IO(_) => Ok(()),
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -882,7 +825,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -890,9 +833,7 @@ fn unify_inner(
         Type::App(_, expected_a, expected_b) => match actual {
             Type::App(_, actual_a, actual_b) => {
                 unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -900,9 +841,7 @@ fn unify_inner(
                     actual_a,
                 )?;
                 unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -911,9 +850,7 @@ fn unify_inner(
                 )
             }
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -923,7 +860,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -931,9 +868,7 @@ fn unify_inner(
         Type::HasField(expected_field, expected_row) => match actual {
             Type::HasField(actual_field, actual_row) if expected_field == actual_field => {
                 unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -942,9 +877,7 @@ fn unify_inner(
                 )
             }
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -954,7 +887,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -968,9 +901,7 @@ fn unify_inner(
                     .zip(actual_constraints.iter())
                     .try_for_each(|(expected_constraint, actual_constraint)| {
                         unify_inner(
-                            common_kinds,
-                            types,
-                            type_variables,
+                            env,
                             kind_inference_state,
                             type_solutions,
                             pos,
@@ -980,9 +911,7 @@ fn unify_inner(
                     })
             }
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -992,7 +921,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
@@ -1064,9 +993,7 @@ fn unify_inner(
 
                 common_fields.into_iter().try_for_each(|common_field| {
                     unify_inner(
-                        common_kinds,
-                        types,
-                        type_variables,
+                        env,
                         kind_inference_state,
                         type_solutions,
                         pos,
@@ -1087,9 +1014,7 @@ fn unify_inner(
                 let actual_tail = actual_row_parts.rest.unwrap_or(&Type::RowNil);
 
                 unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -1098,9 +1023,7 @@ fn unify_inner(
                 )?;
 
                 unify_inner(
-                    common_kinds,
-                    types,
-                    type_variables,
+                    env,
                     kind_inference_state,
                     type_solutions,
                     pos,
@@ -1109,9 +1032,7 @@ fn unify_inner(
                 )
             }
             Type::Meta(_, meta) => unify_meta_right(
-                common_kinds,
-                types,
-                type_variables,
+                env,
                 kind_inference_state,
                 type_solutions,
                 pos,
@@ -1121,7 +1042,7 @@ fn unify_inner(
             _ => Err(ErrorInfo::mismatch(
                 &kind_inference_state.kind_solutions,
                 type_solutions,
-                type_variables,
+                env.type_variables,
                 expected.clone(),
                 actual.clone(),
             )),
