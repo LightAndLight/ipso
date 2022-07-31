@@ -70,7 +70,7 @@ fn main() -> io::Result<()> {
             match run_interpreter(config) {
                 Ok(()) => Ok(()),
                 Err(err) => {
-                    let () = report_interpreter_error(filename, err)?;
+                    report_interpreter_error(filename, err)?;
                     std::process::exit(1)
                 }
             }

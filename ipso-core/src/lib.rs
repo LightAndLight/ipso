@@ -414,7 +414,7 @@ impl Type {
     pub fn unwrap_constraints(&self) -> (Vec<&Type>, &Type) {
         fn flatten_constraints(ty: &Type) -> Vec<&Type> {
             match ty {
-                Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
+                Type::Constraints(cs) => cs.iter().flat_map(flatten_constraints).collect(),
                 _ => vec![ty],
             }
         }
@@ -686,7 +686,7 @@ impl Pattern<Expr> {
         match self {
             Pattern::Name => Pattern::Name,
             Pattern::Record { names, rest } => Pattern::Record {
-                names: names.iter().map(|name| f(name)).collect(),
+                names: names.iter().map(f).collect(),
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
@@ -707,15 +707,9 @@ impl Pattern<Expr> {
     ) -> Result<(), E> {
         match self {
             Pattern::Name => Ok(()),
-            Pattern::Record { names, .. } => {
-                for name in names {
-                    match name.subst_placeholder(f) {
-                        Err(err) => return Err(err),
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Pattern::Record { names, .. } => names
+                .iter_mut()
+                .try_for_each(|name| name.subst_placeholder(f)),
             Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
             Pattern::Char(_) => Ok(()),
             Pattern::Int(_) => Ok(()),
@@ -1403,44 +1397,20 @@ impl Expr {
                 Rc::make_mut(c).subst_placeholder(f)
             }
             Expr::Char(_) => Ok(()),
-            Expr::String(parts) => {
-                for part in parts {
-                    match part.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
-            Expr::Array(items) => {
-                for item in items {
-                    match item.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Expr::String(parts) => parts
+                .iter_mut()
+                .try_for_each(|part| part.subst_placeholder(f)),
+            Expr::Array(items) => items
+                .iter_mut()
+                .try_for_each(|item| item.subst_placeholder(f)),
             Expr::Extend(a, b, c) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
                 Rc::make_mut(b).subst_placeholder(f)?;
                 Rc::make_mut(c).subst_placeholder(f)
             }
-            Expr::Record(items) => {
-                for (a, b) in items {
-                    match a.subst_placeholder(f).and_then(|()| b.subst_placeholder(f)) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Expr::Record(items) => items.iter_mut().try_for_each(|(a, b)| {
+                a.subst_placeholder(f).and_then(|()| b.subst_placeholder(f))
+            }),
             Expr::Project(a, b) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
                 Rc::make_mut(b).subst_placeholder(f)
@@ -1452,15 +1422,7 @@ impl Expr {
             }
             Expr::Case(a, bs) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
-                for b in bs {
-                    match b.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
+                bs.iter_mut().try_for_each(|b| b.subst_placeholder(f))
             }
 
             Expr::Unit => Ok(()),

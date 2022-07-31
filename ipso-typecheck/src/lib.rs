@@ -227,6 +227,7 @@ impl From<constraint_solving::Error> for Error {
   will not be abstracted.
 
 */
+#[allow(clippy::too_many_arguments)]
 pub fn abstract_evidence(
     common_kinds: &CommonKinds,
     implications: &[Implication],
@@ -293,6 +294,7 @@ pub fn abstract_evidence(
   the resulting type signature.
 
 */
+#[allow(clippy::too_many_arguments)]
 pub fn generalise(
     common_kinds: &CommonKinds,
     implications: &[Implication],

@@ -110,7 +110,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         );
         let actual = target_sig.body;
 
-        let _ = type_inference::unification::unify(
+        type_inference::unification::unify(
             type_inference::unification::Env {
                 common_kinds: &common_kinds,
                 types: &HashMap::new(),

@@ -131,18 +131,18 @@ caller.
 fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Error> {
     match &mut expr.item {
         Expr::App(func, arg) => {
-            desugar_expr_mut(source, &mut Rc::make_mut(func))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(arg))
+            desugar_expr_mut(source, Rc::make_mut(func))?;
+            desugar_expr_mut(source, Rc::make_mut(arg))
         }
-        Expr::Lam { body, .. } => desugar_expr_mut(source, &mut Rc::make_mut(body)),
+        Expr::Lam { body, .. } => desugar_expr_mut(source, Rc::make_mut(body)),
         Expr::Let { value, rest, .. } => {
-            desugar_expr_mut(source, &mut Rc::make_mut(value))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(rest))
+            desugar_expr_mut(source, Rc::make_mut(value))?;
+            desugar_expr_mut(source, Rc::make_mut(rest))
         }
         Expr::IfThenElse(cond, a, b) => {
-            desugar_expr_mut(source, &mut Rc::make_mut(cond))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(a))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(b))
+            desugar_expr_mut(source, Rc::make_mut(cond))?;
+            desugar_expr_mut(source, Rc::make_mut(a))?;
+            desugar_expr_mut(source, Rc::make_mut(b))
         }
         Expr::Binop(op, left, right) => {
             fn mk_desugared_binop(
@@ -166,8 +166,8 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                 )
             }
 
-            desugar_expr_mut(source, &mut Rc::make_mut(left))?;
-            desugar_expr_mut(source, &mut Rc::make_mut(right))?;
+            desugar_expr_mut(source, Rc::make_mut(left))?;
+            desugar_expr_mut(source, Rc::make_mut(right))?;
 
             match &op.item {
                 Binop::Add
@@ -212,12 +212,12 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
                 .iter_mut()
                 .try_for_each(|(_, expr)| desugar_expr_mut(source, expr))?;
             rest.iter_mut()
-                .try_for_each(|expr| desugar_expr_mut(source, &mut Rc::make_mut(expr)))
+                .try_for_each(|expr| desugar_expr_mut(source, Rc::make_mut(expr)))
         }
-        Expr::Project(value, _) => desugar_expr_mut(source, &mut Rc::make_mut(value)),
-        Expr::Embed(_, value) => desugar_expr_mut(source, &mut Rc::make_mut(value)),
+        Expr::Project(value, _) => desugar_expr_mut(source, Rc::make_mut(value)),
+        Expr::Embed(_, value) => desugar_expr_mut(source, Rc::make_mut(value)),
         Expr::Case(expr, branches) => {
-            desugar_expr_mut(source, &mut Rc::make_mut(expr))?;
+            desugar_expr_mut(source, Rc::make_mut(expr))?;
             branches
                 .iter_mut()
                 .try_for_each(|branch| desugar_branch_mut(source, branch))
