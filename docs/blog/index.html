@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/default.css">
 <link rel="stylesheet" href="/css/syntax.css">
-<title>Docs - ipso</title>
+<title>Blog - ipso</title>
 </head>
 
 <body>
@@ -26,33 +26,11 @@
     <a class="nav-item" style="margin-left: 2em;" href="/blog">Blog</a>
     <a class="nav-item" style="margin-left: 2em;" href="https://github.com/LightAndLight/ipso">GitHub</a>
     
-    <a style="margin-left: auto; font-size: 0.9em;" href="https://github.com/LightAndLight/ipso/edit/gh-pages/site/pages/docs/index.md">Edit
-    on GitHub</a>
     
   </div>
 </nav>
   <main>
-    <h1 id="documentation">Documentation</h1>
-<h2 id="installation">Installation</h2>
-<p>You can download the latest release from <a href="https://github.com/LightAndLight/ipso/releases/latest">GitHub</a>.</p>
-<p>Nix users can access <code>ipso</code> via a Nix flake:</p>
-<pre><code># Use the repo's default branch
-$ nix shell github:LightAndLight/ipso
-
-# Access a specific release
-$ nix shell github:LightAndLight/ipso/v0.1-rc.2</code></pre>
-<h2 id="your-first-program">Your First Program</h2>
-<pre><code>$ cat &gt; hello.ipso &lt;&lt;EOF
-main : IO ()
-main = println &quot;Hello from ipso!&quot;
-EOF
-
-$ ipso hello.ipso
-&quot;Hello from ipso!&quot;</code></pre>
-<h2 id="further-reading">Further Reading</h2>
-<ul>
-<li><a href="/docs/reference.html">Language Reference</a></li>
-</ul>
+    <h1>Posts</h1><table style="list-style: none; padding-left: 0;"><tbody><tr><td><span class="muted">3 Aug, 2022</span></td><td style="padding-left: 1em"><a href="blog/2022-08-03-why-ipso.html">Why ipso?</a></td></tr></tbody></table>
   </main>
 </body>
 

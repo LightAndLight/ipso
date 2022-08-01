@@ -7,13 +7,20 @@
   --light-blue: #00a5e6;
 }
 
+.muted {
+  color: var(--grey)
+}
+
 html {
   color: var(--black);
   font-family: 'Nunito Sans', sans-serif;
 }
 
 body {
-  max-width: 75em;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  max-width: 65em;
   margin: auto;
   padding: 1em;
   line-height: 175%;
@@ -58,4 +65,9 @@ ul {
 
 #contents {
   width: 15vw;
+}
+
+hr {
+  border-top: 1px solid var(--grey);
+  border-bottom: none;
 }
