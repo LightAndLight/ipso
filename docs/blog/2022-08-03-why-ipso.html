@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/default.css">
+<link rel="stylesheet" href="/css/syntax.css">
+<title>Why ipso? - ipso blog</title>
+</head>
+
+<body>
+  <nav style="display: flex; flex-direction: row;">
+  <a style="text-decoration: none; color: inherit;" href="/">
+    <header style="display: flex; flex-direction: row;">
+      <img src="/images/ipso.svg" width="32px" />
+      <div style="margin-left: 0.25em; margin-right: 0.25em;"></div>
+      <h1 style="font-weight: 400;">ipso</h1>
+    </header>
+  </a>
+  <div style="display: flex; flex-direction: row; margin-left: 3em; align-items: center;
+  padding-top: 0.25em; flex-grow: 1;">
+    <a class="nav-item" href="/docs">Docs</a>
+    <a class="nav-item" style="margin-left: 2em;" href="/blog">Blog</a>
+    <a class="nav-item" style="margin-left: 2em;" href="https://github.com/LightAndLight/ipso">GitHub</a>
+    
+    <a style="margin-left: auto; font-size: 0.9em;" href="https://github.com/LightAndLight/ipso/edit/gh-pages/site/pages/blog/2022-08-03-why-ipso.md">Edit
+    on GitHub</a>
+    
+  </div>
+</nav>
+  <main style="width: 50em; margin-left: auto; margin-right: auto;">
+    <h1>Why ipso?</h1>
+    <p class="muted">3 Aug, 2022</p>
+    <p>This post is for everyone who learns about <code>ipso</code> and wonders, “Why should I use this?”</p>
+<p>The short answer? You shouldn’t, unless you want to.</p>
+<p><code>ipso</code> is very much a <em>personal</em> project. I created it because I wanted a scripting language that I’d
+enjoy using. Something that would make writing glue code and throwaway scripts feel good to <em>me</em>.</p>
+<p>It follows that any attempts by me to <em>convince</em> or <em>persuade</em> you to use this language would be in
+poor taste. Just as I wouldn’t argue that you should start liking
+<a href="https://www.youtube.com/watch?v=eX4GOltUDdA">Meshuggah</a> or <a href="https://en.wikipedia.org/wiki/Hawaiian_pizza">pinapple on
+pizza</a>, I won’t argue that you should value what
+<code>ipso</code> has to offer. To each their own.</p>
+<p>My role as the language designer is to lay out my values and preferences and how they have influenced the
+language, so that you can easily decide whether or not it’s for you.</p>
+<p>The two main forces driving my decisions in <code>ipso</code> are my senses of correctness and convenience. To
+satisfy my need for correctness, the language has <strong>static types</strong> and achieves <strong>equational
+reasoning</strong> through <strong>explicit effects</strong><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> with <strong>computation expressions</strong><a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>. In service of convenience, it has <strong>string
+interpolation</strong><a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> and <strong>command literals</strong><a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a>, and aims to have a
+<strong>comprehensive standard library</strong><a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a>. Some features exist for both ends, such as
+<strong>anonymous records</strong><a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a> <strong>and variants</strong><a href="#fn7" class="footnote-ref" id="fnref7" role="doc-noteref"><sup>7</sup></a>, and <strong>type classes</strong><a href="#fn8" class="footnote-ref" id="fnref8" role="doc-noteref"><sup>8</sup></a>.</p>
+<p>Finally, I’ll leave you with some <code>ipso</code> code for a <a href="https://github.com/LightAndLight/ipso/blob/main/.github/workflows/checkReleaseVersion">CI
+script</a> I
+wrote. Hopefully the features I’ve described together with the code below give you a sense of
+whether or not you’d like to use this language.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#! /usr/bin/env ipso</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>main <span class="kw">:</span> IO <span class="kw">()</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>main <span class="kw">=</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">comp</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> versionVar <span class="kw">=</span> <span class="st">&quot;GITHUB_REF_NAME&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> versionFile <span class="kw">=</span> <span class="st">&quot;ipso-cli/src/version.rs&quot;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">bind</span> mVersionInGit <span class="kw">&lt;-</span> env.getvar versionVar</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">case</span> mVersionInGit <span class="kw">of</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>      None x <span class="kw">-&gt;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>        <span class="kw">comp</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>          println <span class="st">&quot;error: </span><span class="kw">$</span>versionVar <span class="st">not set&quot;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>          exit.failure</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>      Some versionInGit <span class="kw">-&gt;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>        <span class="kw">comp</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>          <span class="kw">bind</span> versionLine <span class="kw">&lt;-</span> file.read versionFile</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>          <span class="co"># extract `version` from `pub const VERSION: &amp;str = &quot;version&quot;;`</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>          <span class="kw">let</span> versionInRust <span class="kw">=</span> </span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>            versionLine</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>              <span class="kw">|&gt;</span> string.split <span class="ch">' '</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>              <span class="kw">|&gt;</span> array.index <span class="dv">5</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>              <span class="kw">|&gt;</span> string.split <span class="ch">'&quot;'</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>              <span class="kw">|&gt;</span> array.index <span class="dv">1</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>          </span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>          println <span class="st">&quot;</span><span class="kw">$</span>versionVar <span class="st">version: </span><span class="kw">$</span>versionInGit<span class="st">&quot;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>          println <span class="st">&quot;</span><span class="kw">$</span>versionFile <span class="st">version: </span><span class="kw">$</span>versionInRust<span class="st">&quot;</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>          <span class="kw">if</span> versionInGit <span class="kw">==</span> versionInRust</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>            <span class="kw">then</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>              <span class="kw">comp</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>                println <span class="st">&quot;success: versions match&quot;</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>                exit.success</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>            <span class="kw">else</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>              <span class="kw">comp</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>                println <span class="st">&quot;error: version mismatch&quot;</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>                exit.failure</span></code></pre></div>
+<p><br /></p>
+<section class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#io">https://ipso.dev/docs/reference.html#io</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#computation-expressions">https://ipso.dev/docs/reference.html#computation-expressions</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#interpolation-1">https://ipso.dev/docs/reference.html#interpolation-1</a><a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#command-literals">https://ipso.dev/docs/reference.html#command-literals</a><a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#standard-library">https://ipso.dev/docs/reference.html#standard-library</a><a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#records-1">https://ipso.dev/docs/reference.html#records-1</a><a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn7" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#variants-1">https://ipso.dev/docs/reference.html#variants-1</a><a href="#fnref7" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn8" role="doc-endnote"><p><a href="https://ipso.dev/docs/reference.html#type-classes">https://ipso.dev/docs/reference.html#type-classes</a><a href="#fnref8" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </main>
+</body>
+
+</html>

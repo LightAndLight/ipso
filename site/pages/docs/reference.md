@@ -61,7 +61,7 @@ title: Language Reference
 * [Grammar](#grammar)
 </div>
 
-<div style="margin-left: 4em; min-width: 0;">
+<div style="margin-left: 3em; min-width: 0;">
 <!-- omit in toc -->
 # `ipso` language reference
 
