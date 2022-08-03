@@ -33,15 +33,13 @@ htmlizeUrls = pure . fmap (withUrls htmlize)
                 _ -> url
 
 nestUrls :: FilePath -> Item String -> Compiler (Item String)
-nestUrls parent = pure . fmap (withUrls htmlize)
+nestUrls parent = pure . fmap (withUrls nest)
   where
-    htmlize :: String -> String
-    htmlize url =
-      if isExternal url
-        then url
-        else case url of
-          '#' : _ -> url
-          _ -> normalise $ parent </> url
+    nest :: String -> String
+    nest url =
+      case url of
+        '.' : '/' : rest -> rest
+        _ -> url
 
 mkCustomPandocCompiler :: IO (Compiler (Item String))
 mkCustomPandocCompiler = do
@@ -90,7 +88,7 @@ main = do
           ( \post -> do
               title <- fromJust <$> getMetadataField post "title"
               date <- getItemUTC defaultTimeLocale post
-              let url = flip replaceExtension "html" . fromJust . stripPrefix "pages/" $ toFilePath post
+              let url = flip replaceExtension "html" . fromJust . stripPrefix "pages/blog/" $ toFilePath post
               pure (title, date, url)
           )
           posts
