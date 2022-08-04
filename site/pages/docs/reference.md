@@ -286,7 +286,7 @@ hello!
 
 ```ipsorepl
 > let args = ["hello", "world"]
-> `echo $arg`
+> `echo $args`
 `echo hello world`
 ```
 
