@@ -15,10 +15,10 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     io::Write,
-    io::{self, BufRead},
+    io::{self, BufRead, BufReader},
     ops::Index,
     path::Path,
-    process::{self, ExitStatus, Stdio},
+    process::{self, Command, ExitStatus, Stdio},
     rc::Rc,
 };
 
@@ -41,6 +41,7 @@ fn check_exit_status(cmd: &str, status: &ExitStatus) {
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
         paste! {
+            #[allow(non_snake_case)]
             fn [<$name _code_0>](
                 eval: &mut Interpreter<'_>,
                 env: Rc<[Value]>,
@@ -1599,6 +1600,123 @@ where {
                         let closure = Object::IO {
                             env,
                             body: IOBody(file_append_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::ArrayEach_ => {
+                function2!(
+                    array_each_,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        #[allow(non_snake_case)]
+                        fn array_each__io(
+                            interpreter: &mut Interpreter,
+                            env: Rc<[Value]>,
+                        ) -> Value {
+                            let array = env[0].unpack_array();
+                            let func = &env[1];
+                            for item in array.iter() {
+                                func.apply(interpreter, item.clone())
+                                    .perform_io(interpreter);
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(array_each__io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::CmdEachline_ => {
+                function2!(
+                    cmd_eachline_,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        #[allow(non_snake_case)]
+                        fn cmd_eachline__io(
+                            interpreter: &mut Interpreter,
+                            env: Rc<[Value]>,
+                        ) -> Value {
+                            let cmd = env[0].unpack_cmd();
+                            let func = &env[1];
+                            if let Some(command) = cmd.get(0) {
+                                let mut process = Command::new(command.as_ref())
+                                    .args(
+                                        cmd[1..].iter().map(|arg| arg.as_ref()).collect::<Vec<_>>(),
+                                    )
+                                    .stdin(Stdio::inherit())
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::inherit())
+                                    .spawn()
+                                    .unwrap_or_else(|err| {
+                                        panic!("{} failed to start: {}", command, err)
+                                    });
+
+                                match &mut process.stdout {
+                                    None => unreachable!("no handle for process stdout"),
+                                    Some(stdout) => {
+                                        let mut stdout = BufReader::new(stdout);
+                                        let mut buffer = String::new();
+                                        loop {
+                                            buffer.clear();
+                                            match stdout.read_line(&mut buffer) {
+                                                Err(err) => panic!("failed to read line: {}", err),
+                                                Ok(bytes_read) => {
+                                                    if bytes_read == 0 {
+                                                        break;
+                                                    } else {
+                                                        let stripped = buffer
+                                                            .strip_suffix('\n')
+                                                            .unwrap_or(&buffer);
+                                                        let line = interpreter.alloc(
+                                                            Object::String(Rc::from(stripped)),
+                                                        );
+                                                        func.apply(interpreter, line)
+                                                            .perform_io(interpreter);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                match process.wait() {
+                                    Err(err) => {
+                                        panic!("waiting on child failed: {}", err)
+                                    }
+                                    Ok(status) => {
+                                        if !status.success() {
+                                            match status.code() {
+                                                None => {
+                                                    panic!("{} failed due to a signal", command)
+                                                }
+                                                Some(n) => {
+                                                    panic!("{} failed with status {}", command, n)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(cmd_eachline__io),
                         };
                         interpreter.alloc(closure)
                     }

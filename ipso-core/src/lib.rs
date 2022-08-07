@@ -916,6 +916,8 @@ pub enum Builtin {
     FileRead,
     FileWrite,
     FileAppend,
+    ArrayEach_,
+    CmdEachline_,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

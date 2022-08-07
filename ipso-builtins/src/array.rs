@@ -328,5 +328,32 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
                 ),
             )),
         }),
+        // each_ : Array a -> (a -> IO ()) -> IO ()
+        Rc::new(Declaration::Definition {
+            name: String::from("each_"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        // Array a
+                        Type::app(Type::mk_array(common_kinds), a.clone()),
+                        Type::arrow(
+                            common_kinds,
+                            // a -> IO ()
+                            Type::arrow(
+                                common_kinds,
+                                a,
+                                Type::app(Type::mk_io(common_kinds), Type::Unit),
+                            ),
+                            // IO ()
+                            Type::app(Type::mk_io(common_kinds), Type::Unit),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayEach_),
+        }),
     ]
 }
