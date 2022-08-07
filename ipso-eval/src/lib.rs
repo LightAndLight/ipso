@@ -41,6 +41,7 @@ fn check_exit_status(cmd: &str, status: &ExitStatus) {
 macro_rules! function1 {
     ($name:ident, $self:expr, $body:expr) => {{
         paste! {
+            #[allow(non_snake_case)]
             fn [<$name _code_0>](
                 eval: &mut Interpreter<'_>,
                 env: Rc<[Value]>,
@@ -1599,6 +1600,37 @@ where {
                         let closure = Object::IO {
                             env,
                             body: IOBody(file_append_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::ArrayEach_ => {
+                function2!(
+                    array_each_,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        #[allow(non_snake_case)]
+                        fn array_each__io(
+                            interpreter: &mut Interpreter,
+                            env: Rc<[Value]>,
+                        ) -> Value {
+                            let array = env[0].unpack_array();
+                            let func = &env[1];
+                            for item in array.iter() {
+                                func.apply(interpreter, item.clone())
+                                    .perform_io(interpreter);
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(array_each__io),
                         };
                         interpreter.alloc(closure)
                     }
