@@ -1,0 +1,2 @@
+main : IO ()
+main = cmd.eachline_ `echo -en "a\nb\nc\n"` (\line -> println "${line}x")

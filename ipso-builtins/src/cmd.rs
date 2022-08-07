@@ -53,5 +53,31 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
             body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
         }),
+        // eachline_ : Cmd -> (String -> IO ()) -> IO ()
+        Rc::new(Declaration::Definition {
+            name: String::from("eachline_"),
+            sig: {
+                TypeSig {
+                    ty_vars: vec![],
+                    body: Type::arrow(
+                        common_kinds,
+                        // Cmd
+                        Type::Cmd,
+                        Type::arrow(
+                            common_kinds,
+                            // String -> IO ()
+                            Type::arrow(
+                                common_kinds,
+                                Type::String,
+                                Type::app(Type::mk_io(common_kinds), Type::Unit),
+                            ),
+                            // IO ()
+                            Type::app(Type::mk_io(common_kinds), Type::Unit),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::CmdEachline_),
+        }),
     ]
 }
