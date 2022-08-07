@@ -529,6 +529,8 @@ module array where
   sum : Array Int -> Int
   
   any : (a -> Bool) -> Array a -> Bool
+
+  each_ : Array a -> (a -> IO ()) -> IO ()
 ```
 
 ### Byte Arrays
@@ -653,8 +655,13 @@ module cmd where
   
   # Run a command, capturing the lines it writes to `stdout`.
   #
-  # `lines command` is equivalent to `io.map (string.split '\n') (read command)`
+  # `lines command` is equivalent to `io.map (string.split '\n') (cmd.read command)`
   lines : Cmd -> IO (Array String)
+ 
+  # Run a command and execute an `IO` action for each line written to `stdout`.
+  #
+  # `eachline_ cmd f` is equivalent to `io.andThen (cmd.lines cmd) (\lines -> array.each_ lines f)`
+  eachline_ : Cmd -> (String -> IO ()) -> IO ()
 
   show : Cmd -> String
 
