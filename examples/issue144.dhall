@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    issue144.ipso:7:53: error: expected one of: '"', '$', '${"\${"}', string
+    issue144.ipso:8:1: error: expected one of: '"', '$', '${"\${"}', string
       |
-    7 |     println <| showBool (toArgs "hello" == ["hello])
-      |                                                     ^
+    8 | 
+      | ^
     '',
   exitcode = 1
 }
