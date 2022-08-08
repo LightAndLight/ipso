@@ -99,6 +99,14 @@ pub fn check_definition(
 ) -> Result<Checked, Error> {
     let position = ty.pos;
 
+    match env.context.get(name.item.as_ref()) {
+        None => Ok(()),
+        Some(_signature) => Err(Error::AlreadyDefined {
+            source: env.source.clone(),
+            pos: name.pos,
+        }),
+    }?;
+
     let mut type_signatures = env.context.clone();
     let mut type_variables = BoundVars::new();
     let mut type_inference_state = type_inference::State::new();
