@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // args : IO (Array String)
         Rc::new(Declaration::Definition {
-            name: String::from("args"),
+            name: Rc::from("args"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
@@ -19,7 +19,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // getvar : String -> IO (| Some : String, None : () |)
         Rc::new(Declaration::Definition {
-            name: String::from("getvar"),
+            name: Rc::from("getvar"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
@@ -44,7 +44,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // setvar : String -> String -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("setvar"),
+            name: Rc::from("setvar"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],

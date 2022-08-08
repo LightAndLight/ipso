@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // exists : String -> IO Bool
         Rc::new(Declaration::Definition {
-            name: String::from("exists"),
+            name: Rc::from("exists"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],

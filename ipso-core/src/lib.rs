@@ -951,11 +951,11 @@ pub enum CmdPart<E> {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Name {
     Evidence(Rc<str>),
-    Definition(String),
+    Definition(Rc<str>),
 }
 
 impl Name {
-    pub fn definition<T: Into<String>>(name: T) -> Self {
+    pub fn definition<T: Into<Rc<str>>>(name: T) -> Self {
         Self::Definition(name.into())
     }
 
@@ -1742,7 +1742,7 @@ pub enum Declaration {
         kind: Kind,
     },
     Definition {
-        name: String,
+        name: Rc<str>,
         sig: TypeSig,
         body: Rc<Expr>,
     },
@@ -1798,11 +1798,11 @@ impl Declaration {
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (Name::Definition(a), Binding::Expr(b.1)))
+                .map(|(a, b)| (Name::Definition(Rc::from(a.as_str())), Binding::Expr(b.1)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
             Declaration::Module { name, decls } => HashMap::from([(
-                Name::Definition(name.clone()),
+                Name::Definition(Rc::from(name.as_ref())),
                 Binding::Module(
                     decls
                         .iter()
@@ -1818,7 +1818,7 @@ impl Declaration {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig, body: _ } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), Signature::TypeSig(sig.clone()));
+                map.insert(String::from(name.as_ref()), Signature::TypeSig(sig.clone()));
                 map
             }
             Declaration::Evidence { .. } => HashMap::new(),

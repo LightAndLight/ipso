@@ -20,7 +20,7 @@ use std::{
 #[derive(Debug, PartialEq, Eq)]
 pub enum Checked {
     Definition {
-        name: String,
+        name: Rc<str>,
         sig: TypeSig,
         body: Rc<core::Expr>,
     },
@@ -92,7 +92,7 @@ pub fn check(env: Env, decl: &syntax::Spanned<syntax::Declaration>) -> Result<Ch
 
 pub fn check_definition(
     env: Env,
-    name: &str,
+    name: &Spanned<Rc<str>>,
     ty: &Spanned<syntax::Type<Rc<str>>>,
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
@@ -135,7 +135,7 @@ pub fn check_definition(
     )?;
 
     let _ = type_signatures.insert(
-        name.to_string(),
+        String::from(name.item.as_ref()),
         core::Signature::TypeSig(core::TypeSig::new(ty_var_kinds.clone(), ty.clone())),
     );
 
@@ -237,7 +237,7 @@ pub fn check_definition(
     type_variables.delete(ty_var_kinds.len());
 
     Ok(Checked::Definition {
-        name: name.to_string(),
+        name: name.item.clone(),
         sig,
         body: Rc::new(body),
     })

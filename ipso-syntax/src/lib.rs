@@ -533,7 +533,7 @@ pub struct InstanceMember {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     Definition {
-        name: String,
+        name: Spanned<Rc<str>>,
         ty: Spanned<Type<Rc<str>>>,
         args: Vec<Spanned<Pattern>>,
         body: Spanned<Expr>,

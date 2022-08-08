@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // eq : Int -> Int -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("eq"),
+            name: Rc::from("eq"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -18,7 +18,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // toString : Int -> String
         Rc::new(Declaration::Definition {
-            name: String::from("toString"),
+            name: Rc::from("toString"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(common_kinds, Type::Int, Type::String),
@@ -27,7 +27,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // mod : Int -> Int -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("mod"),
+            name: Rc::from("mod"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(

@@ -6,7 +6,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // toUtf8 : String -> Bytes
         Rc::new(Declaration::Definition {
-            name: String::from("toUtf8"),
+            name: Rc::from("toUtf8"),
             sig: TypeSig {
                 ty_vars: vec![],
                 body: Type::arrow(common_kinds, Type::String, Type::Bytes),
@@ -15,7 +15,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // eq : String -> String -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("eq"),
+            name: Rc::from("eq"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -28,7 +28,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // filter : (Char -> Bool) -> String -> String
         Rc::new(Declaration::Definition {
-            name: String::from("filter"),
+            name: Rc::from("filter"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -41,7 +41,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // split : Char -> String -> Array String
         Rc::new(Declaration::Definition {
-            name: String::from("split"),
+            name: Rc::from("split"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -58,7 +58,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // join : String -> Array String -> String
         Rc::new(Declaration::Definition {
-            name: String::from("join"),
+            name: Rc::from("join"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -75,7 +75,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // foldl : (a -> Char -> a) -> a -> String -> a
         Rc::new(Declaration::Definition {
-            name: String::from("foldl"),
+            name: Rc::from("foldl"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {

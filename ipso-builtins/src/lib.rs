@@ -64,7 +64,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             // trace : a -> b -> b
             Declaration::Definition {
-                name: String::from("trace"),
+                name: Rc::from("trace"),
                 sig: {
                     let a = Type::unsafe_mk_var(1, Kind::Type);
                     let b = Type::unsafe_mk_var(0, Kind::Type);
@@ -82,7 +82,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             // println : String -> IO ()
             Declaration::Definition {
-                name: String::from("println"),
+                name: Rc::from("println"),
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::arrow(
@@ -95,7 +95,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             // print : String -> IO ()
             Declaration::Definition {
-                name: String::from("print"),
+                name: Rc::from("print"),
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::arrow(
@@ -108,7 +108,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             // readln : IO String
             Declaration::Definition {
-                name: String::from("readln"),
+                name: Rc::from("readln"),
                 sig: TypeSig {
                     ty_vars: vec![],
                     body: Type::app(io_ty, Type::String),
@@ -548,7 +548,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             {
                 let a = Type::Var(Kind::Type, 0);
                 Declaration::Definition {
-                    name: String::from("neq"),
+                    name: Rc::from("neq"),
                     sig: TypeSig::new(
                         vec![(Rc::from("a"), Kind::Type)],
                         Type::mk_fatarrow(
@@ -596,7 +596,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             {
                 let a = Type::Var(Kind::Type, 0);
                 Declaration::Definition {
-                    name: String::from("lt"),
+                    name: Rc::from("lt"),
                     // Ord a => a -> a -> Bool
                     sig: TypeSig::new(
                         vec![(Rc::from("a"), Kind::Type)],
@@ -661,7 +661,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             {
                 let a = Type::Var(Kind::Type, 0);
                 Declaration::Definition {
-                    name: String::from("lte"),
+                    name: Rc::from("lte"),
                     // Ord a => a -> a -> Bool
                     sig: TypeSig::new(
                         vec![(Rc::from("a"), Kind::Type)],
@@ -726,7 +726,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             {
                 let a = Type::Var(Kind::Type, 0);
                 Declaration::Definition {
-                    name: String::from("gt"),
+                    name: Rc::from("gt"),
                     // Ord a => a -> a -> Bool
                     sig: TypeSig::new(
                         vec![(Rc::from("a"), Kind::Type)],
@@ -791,7 +791,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             {
                 let a = Type::Var(Kind::Type, 0);
                 Declaration::Definition {
-                    name: String::from("gte"),
+                    name: Rc::from("gte"),
                     // Ord a => a -> a -> Bool
                     sig: TypeSig::new(
                         vec![(Rc::from("a"), Kind::Type)],
@@ -1117,7 +1117,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
               Array { field : String, value : String }
             */
             Declaration::Definition {
-                name: String::from("debugRecordFields"),
+                name: Rc::from("debugRecordFields"),
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Row);
                     TypeSig {
@@ -1278,7 +1278,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
               { ctor : String, value : String }
             */
             Declaration::Definition {
-                name: String::from("debugVariantCtor"),
+                name: Rc::from("debugVariantCtor"),
                 sig: {
                     let a = Type::unsafe_mk_var(0, Kind::Row);
                     TypeSig {

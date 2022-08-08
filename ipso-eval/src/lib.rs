@@ -1743,7 +1743,7 @@ where {
             if path.is_empty() {
                 bindings
             } else {
-                match bindings.get(&Name::definition(&path[0])) {
+                match bindings.get(&Name::definition(path[0].as_str())) {
                     None => panic!("submodule {:?} not found", path[0]),
                     Some(binding) => match binding {
                         Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
