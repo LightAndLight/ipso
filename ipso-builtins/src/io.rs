@@ -6,7 +6,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // map : (a -> b) -> IO a -> IO b
         Rc::new(Declaration::Definition {
-            name: String::from("map"),
+            name: Rc::from("map"),
             sig: {
                 let a = Type::unsafe_mk_var(1, Kind::Type);
                 let b = Type::unsafe_mk_var(0, Kind::Type);
@@ -32,7 +32,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // pure : a -> IO a
         Rc::new(Declaration::Definition {
-            name: String::from("pure"),
+            name: Rc::from("pure"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -51,7 +51,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // andThen : IO a -> (a -> IO b) -> IO b
         Rc::new(Declaration::Definition {
-            name: String::from("andThen"),
+            name: Rc::from("andThen"),
             sig: {
                 let a = Type::unsafe_mk_var(1, Kind::Type);
                 let b = Type::unsafe_mk_var(0, Kind::Type);

@@ -327,7 +327,7 @@ pub fn resolve_from_import_all(
             .into_keys()
             .filter_map(|name| match name {
                 core::Name::Definition(name) => Some((
-                    name,
+                    String::from(name.as_ref()),
                     ImportedItemInfo::DefinitionImportedFrom {
                         id: imported_module_id,
                         path: vec![],
@@ -387,7 +387,7 @@ fn resolve_imports(
                     .into_keys()
                     .filter_map(|name| match name {
                         core::Name::Evidence(_) => None,
-                        core::Name::Definition(name) => Some(name),
+                        core::Name::Definition(name) => Some(String::from(name.as_ref())),
                     })
                     .collect();
 
@@ -487,7 +487,7 @@ fn resolve_imports(
                     args,
                     body,
                 } => {
-                    exclude.insert(Rc::from(name.as_str()));
+                    exclude.insert(name.item.clone());
 
                     let arg_names: Vec<Rc<str>> = args
                         .iter()

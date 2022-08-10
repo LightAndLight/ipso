@@ -143,6 +143,10 @@ pub enum Error {
         pos: usize,
         cls: Rc<str>,
     },
+    AlreadyDefined {
+        source: Source,
+        pos: usize,
+    },
 }
 
 impl Error {
@@ -154,6 +158,7 @@ impl Error {
             Error::DuplicateClassArgument { source, .. } => source.clone(),
             Error::NoSuchClass { source, .. } => source.clone(),
             Error::NotAMember { source, .. } => source.clone(),
+            Error::AlreadyDefined { source, .. } => source.clone(),
         }
     }
 
@@ -165,6 +170,7 @@ impl Error {
             Error::DuplicateClassArgument { pos, .. } => *pos,
             Error::NoSuchClass { pos, .. } => *pos,
             Error::NotAMember { pos, .. } => *pos,
+            Error::AlreadyDefined { pos, .. } => *pos,
         }
     }
 
@@ -178,6 +184,7 @@ impl Error {
             Error::NotAMember { cls, .. } => {
                 format!("not a member of the {:?} type class", cls)
             }
+            Error::AlreadyDefined { .. } => String::from("already defined"),
         }
     }
 
@@ -189,6 +196,7 @@ impl Error {
             Error::DuplicateClassArgument { .. } => None,
             Error::NoSuchClass { .. } => None,
             Error::NotAMember { .. } => None,
+            Error::AlreadyDefined { .. } => None,
         }
     }
 

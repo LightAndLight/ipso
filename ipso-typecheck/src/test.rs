@@ -398,7 +398,10 @@ fn check_definition_1() {
     let decl = syntax::Spanned {
         pos: 0,
         item: syntax::Declaration::Definition {
-            name: String::from("id"),
+            name: Spanned {
+                item: Rc::from("id"),
+                pos: 12,
+            },
             ty: Spanned {
                 pos: 5,
                 item: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
@@ -419,7 +422,7 @@ fn check_definition_1() {
 
     let a = core::Type::unsafe_mk_var(0, Kind::Type);
     let expected = Ok(declaration::Checked::Definition {
-        name: String::from("id"),
+        name: Rc::from("id"),
         sig: core::TypeSig {
             ty_vars: vec![(Rc::from("a"), a.kind())],
             body: core::Type::arrow(&common_kinds, a.clone(), a),
@@ -441,7 +444,10 @@ fn check_definition_2() {
     let decl = syntax::Spanned {
         pos: 0,
         item: syntax::Declaration::Definition {
-            name: String::from("thing"),
+            name: Spanned {
+                item: Rc::from("thing"),
+                pos: 31,
+            },
             ty: Spanned {
                 pos: 8,
                 item: Type::mk_arrow(
@@ -480,7 +486,7 @@ fn check_definition_2() {
 
     let r = core::Type::unsafe_mk_var(0, Kind::Row);
     let expected = Ok(declaration::Checked::Definition {
-        name: String::from("thing"),
+        name: Rc::from("thing"),
         sig: core::TypeSig {
             ty_vars: vec![(Rc::from("r"), r.kind())],
             body: core::Type::mk_fatarrow(
@@ -520,7 +526,10 @@ fn check_definition_3() {
     let decl = syntax::Spanned {
         pos: 0,
         item: syntax::Declaration::Definition {
-            name: String::from("thing"),
+            name: Spanned {
+                item: Rc::from("thing"),
+                pos: 41,
+            },
             ty: Spanned {
                 pos: 8,
                 item: Type::mk_record(
@@ -565,7 +574,7 @@ fn check_definition_3() {
         },
     };
     let expected = Ok(declaration::Checked::Definition {
-        name: String::from("thing"),
+        name: Rc::from("thing"),
         sig: core::TypeSig {
             ty_vars: Vec::new(),
             body: core::Type::mk_record(
@@ -602,7 +611,10 @@ fn check_definition_4() {
     let decl = syntax::Spanned {
         pos: 0,
         item: syntax::Declaration::Definition {
-            name: String::from("getx"),
+            name: Spanned {
+                item: Rc::from("getx"),
+                pos: 29,
+            },
             ty: Spanned {
                 pos: 7,
                 item: Type::mk_arrow(
@@ -633,7 +645,7 @@ fn check_definition_4() {
         },
     };
     let expected = Ok(declaration::Checked::Definition {
-        name: String::from("getx"),
+        name: Rc::from("getx"),
         sig: {
             let r = core::Type::unsafe_mk_var(0, Kind::Row);
             core::TypeSig {

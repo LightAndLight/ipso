@@ -6,7 +6,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // success : IO a
         Rc::new(Declaration::Definition {
-            name: String::from("success"),
+            name: Rc::from("success"),
             sig: {
                 TypeSig {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
@@ -17,7 +17,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // failure : IO a
         Rc::new(Declaration::Definition {
-            name: String::from("failure"),
+            name: Rc::from("failure"),
             sig: {
                 TypeSig {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
@@ -28,7 +28,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // with : Int -> IO a
         Rc::new(Declaration::Definition {
-            name: String::from("with"),
+            name: Rc::from("with"),
             sig: {
                 TypeSig {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],

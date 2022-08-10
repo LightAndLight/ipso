@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // run : Cmd -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("run"),
+            name: Rc::from("run"),
             sig: {
                 TypeSig {
                     ty_vars: Vec::new(),
@@ -20,7 +20,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // read : Cmd -> IO String
         Rc::new(Declaration::Definition {
-            name: String::from("read"),
+            name: Rc::from("read"),
             sig: TypeSig::new(
                 vec![],
                 Type::arrow(
@@ -33,7 +33,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // lines : Cmd -> IO (Array String)
         Rc::new(Declaration::Definition {
-            name: String::from("lines"),
+            name: Rc::from("lines"),
             sig: TypeSig::new(
                 vec![],
                 Type::arrow(
@@ -49,13 +49,13 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // show : Cmd -> String
         Rc::new(Declaration::Definition {
-            name: String::from("show"),
+            name: Rc::from("show"),
             sig: TypeSig::new(vec![], Type::arrow(common_kinds, Type::Cmd, Type::String)),
             body: Rc::new(Expr::Builtin(Builtin::ShowCmd)),
         }),
         // eachline_ : Cmd -> (String -> IO ()) -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("eachline_"),
+            name: Rc::from("eachline_"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],

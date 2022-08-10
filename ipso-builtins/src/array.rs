@@ -6,7 +6,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // eq : (a -> a -> Bool) -> Array a -> Array a -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("eq"),
+            name: Rc::from("eq"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -34,7 +34,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // foldl : (b -> a -> b) -> b -> Array a -> b
         Rc::new(Declaration::Definition {
-            name: String::from("foldl"),
+            name: Rc::from("foldl"),
             sig: {
                 let b = Type::unsafe_mk_var(1, Kind::Type);
                 let a = Type::unsafe_mk_var(0, Kind::Type);
@@ -63,7 +63,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // generate : Int -> (Int -> a) -> Array a
         Rc::new(Declaration::Definition {
-            name: String::from("generate"),
+            name: Rc::from("generate"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -83,7 +83,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // length : Array a -> Int
         Rc::new(Declaration::Definition {
-            name: String::from("length"),
+            name: Rc::from("length"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -99,7 +99,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // index : Int -> Array a -> a
         Rc::new(Declaration::Definition {
-            name: String::from("index"),
+            name: Rc::from("index"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -119,7 +119,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // slice : Int -> Int -> Array a -> Array a
         Rc::new(Declaration::Definition {
-            name: String::from("slice"),
+            name: Rc::from("slice"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -143,7 +143,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // snoc : Array a -> a -> Array a
         Rc::new(Declaration::Definition {
-            name: String::from("snoc"),
+            name: Rc::from("snoc"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -163,7 +163,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // map : (a -> b) -> Array a -> Array b
         Rc::new(Declaration::Definition {
-            name: String::from("map"),
+            name: Rc::from("map"),
             sig: TypeSig::new(
                 vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
                 Type::arrow(
@@ -184,7 +184,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // flatMap : (a -> Array b) -> Array a -> Array b
         Rc::new(Declaration::Definition {
-            name: String::from("flatMap"),
+            name: Rc::from("flatMap"),
             sig: TypeSig::new(
                 vec![(Rc::from("a"), Kind::Type), (Rc::from("b"), Kind::Type)],
                 Type::arrow(
@@ -208,7 +208,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             let a = Type::Var(Kind::Type, 0);
             // unfoldr : s -> (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> Array a
             Rc::new(Declaration::Definition {
-                name: String::from("unfoldr"),
+                name: Rc::from("unfoldr"),
                 sig: TypeSig {
                     ty_vars: vec![(Rc::from("s"), a.kind()), (Rc::from("a"), a.kind())],
                     body: Type::arrow(
@@ -255,7 +255,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         },
         // sum : Array Int -> Int
         Rc::new(Declaration::Definition {
-            name: String::from("sum"),
+            name: Rc::from("sum"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
@@ -286,7 +286,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // any : (a -> Bool) -> Array a -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("any"),
+            name: Rc::from("any"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -330,7 +330,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // each_ : Array a -> (a -> IO ()) -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("each_"),
+            name: Rc::from("each_"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {

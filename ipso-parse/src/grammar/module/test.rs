@@ -113,7 +113,10 @@ fn parse_definition_1() {
         "x : Int\nx = 1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
             ty: Spanned {
                 pos: 4,
                 item: Type::Int
@@ -133,7 +136,10 @@ fn parse_definition_2() {
         "x : Int\nx =\n  1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
             ty: Spanned {
                 pos: 4,
                 item: Type::Int
@@ -175,7 +181,10 @@ fn parse_definition_4() {
         "x : Int\nx y _ = 1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
             ty: Spanned {
                 pos: 4,
                 item: Type::Int
@@ -207,7 +216,10 @@ fn parse_definition_5() {
         "main : IO ()\nmain = pure ()",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("main"),
+            name: Spanned {
+                item: Rc::from("main"),
+                pos: 13
+            },
             ty: Spanned {
                 pos: 7,
                 item: Type::mk_app(Type::IO, Type::Unit)

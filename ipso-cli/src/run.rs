@@ -60,7 +60,7 @@ fn find_entrypoint_signature(
     match module.decls.iter().find_map(|decl| match decl {
         core::Declaration::Definition {
             name, sig, body, ..
-        } if name == entrypoint => Some((body.clone(), sig.clone())),
+        } if name.as_ref() == entrypoint => Some((body.clone(), sig.clone())),
         _ => None,
     }) {
         None => Err(InterpreterError::MissingEntrypoint(entrypoint.to_string())),
@@ -95,7 +95,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
     )?;
     let module = modules.lookup(module_id);
 
-    let entrypoint: &String = match &config.entrypoint {
+    let entrypoint: &str = match &config.entrypoint {
         None => &main,
         Some(value) => value,
     };

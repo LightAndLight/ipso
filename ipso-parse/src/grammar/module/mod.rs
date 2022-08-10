@@ -25,35 +25,38 @@ definition ::=
 pub fn definition(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_left!(
-            indent!(parser, Relation::Eq, parser.ident_owned()),
+            indent!(parser, Relation::Eq, parser.ident()),
             indent!(parser, Relation::Gt, parser.token(&token::Data::Colon))
         )
         .and_then(|name| {
             spanned!(parser, type_(parser)).and_then(|ty| {
-                keep_right!(
-                    indent!(
-                        parser,
-                        Relation::Eq,
-                        parser.token(&token::Data::Ident(Rc::from(name.as_ref())))
-                    ),
+                indent!(
+                    parser,
+                    Relation::Eq,
+                    spanned!(parser, parser.token(&token::Data::Ident(name.clone())))
+                )
+                .and_then(|spanned_name| {
                     many!(indent!(
                         parser,
                         Relation::Gt,
                         spanned!(parser, pattern(parser))
                     ))
-                )
-                .and_then(|args| {
-                    keep_right!(
-                        indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
-                        indent!(parser, Relation::Gt, expr(parser)).map(|body| {
-                            Declaration::Definition {
-                                name,
-                                ty,
-                                args,
-                                body,
-                            }
-                        })
-                    )
+                    .and_then(|args| {
+                        keep_right!(
+                            indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
+                            indent!(parser, Relation::Gt, expr(parser)).map(|body| {
+                                Declaration::Definition {
+                                    name: Spanned {
+                                        item: name,
+                                        pos: spanned_name.pos,
+                                    },
+                                    ty,
+                                    args,
+                                    body,
+                                }
+                            })
+                        )
+                    })
                 })
             })
         })

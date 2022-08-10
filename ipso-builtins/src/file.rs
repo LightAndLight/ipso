@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // read : String -> IO String
         Rc::new(Declaration::Definition {
-            name: String::from("read"),
+            name: Rc::from("read"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
@@ -20,7 +20,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // write : String -> String -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("write"),
+            name: Rc::from("write"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
@@ -39,7 +39,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
         }),
         // append : String -> String -> IO ()
         Rc::new(Declaration::Definition {
-            name: String::from("append"),
+            name: Rc::from("append"),
             sig: {
                 TypeSig {
                     ty_vars: vec![],
