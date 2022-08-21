@@ -6,6 +6,7 @@ pub mod token;
 use std::{fmt::Write, rc::Rc, str::Chars};
 use token::{Sign, Token};
 
+#[derive(Clone, Copy)]
 enum Mode {
     String,
     Char,
@@ -14,12 +15,40 @@ enum Mode {
     Cmd,
 }
 
+struct Context {
+    current: Mode,
+    saved: Vec<Mode>,
+}
+
+impl Context {
+    fn new(mode: Mode) -> Self {
+        Context {
+            current: mode,
+            saved: vec![],
+        }
+    }
+
+    fn current(&self) -> Mode {
+        self.current
+    }
+
+    fn push(&mut self, mode: Mode) {
+        let top = std::mem::replace(&mut self.current, mode);
+        self.saved.push(top);
+    }
+
+    fn pop(&mut self) -> Mode {
+        let top = self.saved.pop().expect("no more saved items");
+        std::mem::replace(&mut self.current, top)
+    }
+}
+
 pub struct Lexer<'input> {
     pos: usize,
     column: usize,
     current: Option<char>,
     input: Chars<'input>,
-    mode: Vec<Mode>,
+    context: Context,
     is_eof: bool,
 }
 
@@ -39,7 +68,7 @@ impl<'input> Lexer<'input> {
             column: 0,
             current: input.next(),
             input,
-            mode: vec![Mode::Normal],
+            context: Context::new(Mode::Normal),
             is_eof: false,
         }
     }
@@ -98,12 +127,14 @@ impl<'input> Iterator for Lexer<'input> {
                     })
                 }
             }
-            Some(c) => match &self.mode[self.mode.len() - 1] {
+            Some(c) => match self.context.current() {
                 Mode::Ident => {
                     if is_ident_start(c) {
                         self.consume();
+
                         let mut ident = String::new();
                         ident.push(c);
+
                         loop {
                             match self.current {
                                 Some(c) if is_ident_continue(c) => {
@@ -113,7 +144,9 @@ impl<'input> Iterator for Lexer<'input> {
                                 _ => break,
                             }
                         }
-                        let _ = self.mode.pop().unwrap();
+
+                        let _ = self.context.pop();
+
                         Some(Token {
                             data: token::Data::Ident(Rc::from(ident)),
                             pos,
@@ -130,7 +163,9 @@ impl<'input> Iterator for Lexer<'input> {
                 Mode::String => match c {
                     '"' => {
                         self.consume();
-                        let _ = self.mode.pop().unwrap();
+
+                        let _ = self.context.pop();
+
                         Some(Token {
                             data: token::Data::DoubleQuote,
                             pos,
@@ -143,7 +178,7 @@ impl<'input> Iterator for Lexer<'input> {
                         match self.current {
                             Some(c) if c == '{' => {
                                 self.consume();
-                                self.mode.push(Mode::Normal);
+                                self.context.push(Mode::Normal);
                                 Some(Token {
                                     data: token::Data::DollarLBrace,
                                     pos,
@@ -151,7 +186,7 @@ impl<'input> Iterator for Lexer<'input> {
                                 })
                             }
                             _ => {
-                                self.mode.push(Mode::Ident);
+                                self.context.push(Mode::Ident);
                                 Some(Token {
                                     data: token::Data::Dollar,
                                     pos,
@@ -232,7 +267,9 @@ impl<'input> Iterator for Lexer<'input> {
                 Mode::Char => match c {
                     '\'' => {
                         self.consume();
-                        let _ = self.mode.pop().unwrap();
+
+                        let _ = self.context.pop();
+
                         Some(Token {
                             data: token::Data::SingleQuote,
                             pos,
@@ -339,7 +376,7 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '"' => {
                         self.consume();
-                        self.mode.push(Mode::String);
+                        self.context.push(Mode::String);
                         Some(Token {
                             data: token::Data::DoubleQuote,
                             pos,
@@ -348,7 +385,7 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '\'' => {
                         self.consume();
-                        self.mode.push(Mode::Char);
+                        self.context.push(Mode::Char);
                         Some(Token {
                             data: token::Data::SingleQuote,
                             pos,
@@ -357,7 +394,7 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '`' => {
                         self.consume();
-                        self.mode.push(Mode::Cmd);
+                        self.context.push(Mode::Cmd);
 
                         Some(Token {
                             data: token::Data::Backtick,
@@ -371,7 +408,7 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '{' => {
                         self.consume();
-                        self.mode.push(Mode::Normal);
+                        self.context.push(Mode::Normal);
                         Some(Token {
                             data: token::Data::LBrace,
                             pos,
@@ -380,7 +417,9 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                     '}' => {
                         self.consume();
-                        let _ = self.mode.pop().unwrap();
+
+                        let _ = self.context.pop();
+
                         Some(Token {
                             data: token::Data::RBrace,
                             pos,
@@ -651,7 +690,9 @@ impl<'input> Iterator for Lexer<'input> {
                     match c {
                         '`' => {
                             self.consume();
-                            self.mode.pop().unwrap();
+
+                            self.context.pop();
+
                             Some(Token {
                                 data: token::Data::Backtick,
                                 pos,
@@ -660,7 +701,7 @@ impl<'input> Iterator for Lexer<'input> {
                         }
                         '"' => {
                             self.consume();
-                            self.mode.push(Mode::String);
+                            self.context.push(Mode::String);
 
                             Some(Token {
                                 data: token::Data::DoubleQuote,
@@ -670,7 +711,7 @@ impl<'input> Iterator for Lexer<'input> {
                         }
                         '$' => {
                             self.consume();
-                            self.mode.push(Mode::Ident);
+                            self.context.push(Mode::Ident);
 
                             Some(Token {
                                 data: token::Data::Dollar,
