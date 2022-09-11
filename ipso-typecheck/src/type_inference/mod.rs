@@ -223,6 +223,16 @@ pub struct Env<'a> {
     pub source: &'a Source,
 }
 
+impl<'a> Env<'a> {
+    pub fn as_unification_env(&self) -> unification::Env {
+        unification::Env {
+            common_kinds: self.common_kinds,
+            types: self.types,
+            type_variables: self.type_variables,
+        }
+    }
+}
+
 /**
 Type inference state.
 */
@@ -522,11 +532,7 @@ pub fn check_pattern(
 
     let actual = result.ty(env.common_kinds);
     unification::unify(
-        unification::Env {
-            common_kinds: env.common_kinds,
-            types: env.types,
-            type_variables: env.type_variables,
-        },
+        env.as_unification_env(),
         &mut state.kind_inference_state,
         &mut state.type_solutions,
         pattern.pos,
@@ -919,11 +925,7 @@ pub fn infer(
                     let actual = row;
 
                     unification::unify(
-                        unification::Env {
-                            common_kinds: env.common_kinds,
-                            types: env.types,
-                            type_variables: env.type_variables,
-                        },
+                        env.as_unification_env(),
                         &mut state.kind_inference_state,
                         &mut state.type_solutions,
                         expr.pos,
@@ -1155,11 +1157,7 @@ fn infer_case(
             let actual = rest;
 
             unification::unify(
-                unification::Env {
-                    common_kinds: env.common_kinds,
-                    types: env.types,
-                    type_variables: env.type_variables,
-                },
+                env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
                 position,
@@ -1186,11 +1184,7 @@ pub fn check(
 
     let actual = expr_ty;
     unification::unify(
-        unification::Env {
-            common_kinds: env.common_kinds,
-            types: env.types,
-            type_variables: env.type_variables,
-        },
+        env.as_unification_env(),
         &mut state.kind_inference_state,
         &mut state.type_solutions,
         position,
