@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  comp
+    bind string <- io.pure "hello"
+    if string then io.pure () else io.pure ()
