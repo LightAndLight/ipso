@@ -1,5 +1,6 @@
 use super::Lexer;
 use crate::token::{self, Sign, Token};
+use pretty_assertions::assert_eq;
 use std::rc::Rc;
 
 #[test]
@@ -817,6 +818,51 @@ fn lex_cmd_3() {
             data: token::Data::Eof,
             pos: 9,
             column: 9,
+        },
+    ];
+    let actual = lexer.collect::<Vec<Token>>();
+    assert_eq!(expected, actual)
+}
+
+#[test]
+fn lex_cmd_4() {
+    let input = Rc::from("`echo $a/b`");
+    let lexer = Lexer::new(&input);
+    let expected = vec![
+        Token {
+            data: token::Data::Backtick,
+            pos: 0,
+            column: 0,
+        },
+        Token {
+            data: token::Data::Cmd(Rc::from("echo")),
+            pos: 1,
+            column: 1,
+        },
+        Token {
+            data: token::Data::Dollar,
+            pos: 6,
+            column: 6,
+        },
+        Token {
+            data: token::Data::Ident(Rc::from("a")),
+            pos: 7,
+            column: 7,
+        },
+        Token {
+            data: token::Data::Cmd(Rc::from("/b")),
+            pos: 8,
+            column: 8,
+        },
+        Token {
+            data: token::Data::Backtick,
+            pos: 10,
+            column: 10,
+        },
+        Token {
+            data: token::Data::Eof,
+            pos: 11,
+            column: 11,
         },
     ];
     let actual = lexer.collect::<Vec<Token>>();
