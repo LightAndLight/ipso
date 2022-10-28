@@ -2,7 +2,7 @@
 mod test;
 
 use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
-use ipso_util::iter::Step;
+use ipso_util::iter::{Stack, Step};
 use std::{
     cmp,
     collections::{HashMap, HashSet},
@@ -344,24 +344,13 @@ impl Type {
     }
 
     pub fn iter_metas(&self) -> impl Iterator<Item = usize> + '_ {
-        enum State<'a> {
-            Finished,
-            InProgress {
-                stack: Vec<&'a Type>,
-                current: &'a Type,
-            },
-        }
-
-        let mut state = State::InProgress {
-            stack: Vec::new(),
-            current: self,
-        };
+        let mut stack = Stack::one(self);
         std::iter::from_fn(move || loop {
-            match &mut state {
-                State::Finished => {
+            match stack.pop() {
+                None => {
                     return None;
                 }
-                State::InProgress { stack, current } => match current {
+                Some(current) => match current {
                     Type::Name(_, _)
                     | Type::Var(_, _)
                     | Type::Bool
@@ -379,56 +368,28 @@ impl Type {
                     | Type::Unit
                     | Type::Cmd
                     | Type::DebugRecordFields
-                    | Type::DebugVariantCtor => match stack.pop() {
-                        Some(next) => {
-                            *current = next;
-                            continue;
-                        }
-                        None => {
-                            state = State::Finished;
-                            return None;
-                        }
-                    },
-                    Type::HasField(_, a) => {
-                        *current = a;
+                    | Type::DebugVariantCtor => {
                         continue;
                     }
-                    Type::Constraints(cs) => match cs.first() {
-                        Some(c) => {
-                            *current = c;
-                            stack.extend(cs[1..].iter().rev());
-                            continue;
-                        }
-                        None => match stack.pop() {
-                            Some(next) => {
-                                *current = next;
-                                continue;
-                            }
-                            None => {
-                                state = State::Finished;
-                                return None;
-                            }
-                        },
-                    },
+                    Type::HasField(_, a) => {
+                        stack.push(a);
+                        continue;
+                    }
+                    Type::Constraints(cs) => {
+                        stack.extend(cs);
+                        continue;
+                    }
                     Type::App(_, a, b) => {
-                        *current = a;
                         stack.push(b);
+                        stack.push(a);
                         continue;
                     }
                     Type::RowCons(_, a, b) => {
-                        *current = a;
                         stack.push(b);
+                        stack.push(a);
                         continue;
                     }
                     Type::Meta(_, n) => {
-                        match stack.pop() {
-                            Some(next) => {
-                                *current = next;
-                            }
-                            None => {
-                                state = State::Finished;
-                            }
-                        }
                         return Some(*n);
                     }
                 },
