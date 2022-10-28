@@ -2,7 +2,7 @@
 mod test;
 
 use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
-use ipso_util::iter::{Stack, Step};
+use ipso_util::iter::Stack;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
@@ -1457,118 +1457,102 @@ impl Expr {
     /// );
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0)]);
     /// ```
-    pub fn iter_evars(&self) -> IterEVars {
-        IterEVars { next: vec![self] }
-    }
-}
-
-pub struct IterEVars<'a> {
-    next: Vec<&'a Expr>,
-}
-
-impl<'a> Iterator for IterEVars<'a> {
-    type Item = &'a EVar;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_expr<'a>(expr: &'a Expr) -> Step<'a, Expr, &'a EVar> {
-            match expr {
-                Expr::Var(_) => Step::Skip,
-                Expr::EVar(a) => Step::Yield(a),
-                Expr::Placeholder(_) => Step::Skip,
-                Expr::Name(_) => Step::Skip,
-                Expr::Module { .. } => Step::Skip,
-                Expr::Builtin(_) => Step::Skip,
-                Expr::App(a, b) => Step::Continue2(a, b),
-                Expr::Lam { arg: _, body } => Step::Continue1(body),
-                Expr::Let { value, rest, .. } => Step::Continue2(value, rest),
-                Expr::True => Step::Skip,
-                Expr::False => Step::Skip,
-                Expr::IfThenElse(a, b, c) => Step::Continue3(a, b, c),
-                Expr::Int(_) => Step::Skip,
-                Expr::Binop(_, a, b) => Step::Continue2(a, b),
-                Expr::Char(_) => Step::Skip,
-                Expr::String(a) => Step::Continue(
-                    a.iter()
-                        .flat_map(|x| match x {
-                            StringPart::String(_) => Vec::new().into_iter(),
-                            StringPart::Expr(e) => vec![e].into_iter(),
-                        })
-                        .collect(),
-                ),
-                Expr::Array(xs) => Step::Continue(xs.iter().collect()),
-                Expr::Extend(a, b, c) => Step::Continue3(a, b, c),
-                Expr::Record(xs) => Step::Continue(
-                    xs.iter()
-                        .flat_map(|(a, b)| vec![a, b].into_iter())
-                        .collect(),
-                ),
-                Expr::Project(a, b) => Step::Continue2(a, b),
-                Expr::Variant(a) => Step::Continue1(a),
-                Expr::Embed(a, b) => Step::Continue2(a, b),
-                Expr::Case(a, b) => Step::Continue({
-                    let mut xs: Vec<&'a Expr> = vec![a];
-                    xs.extend(b.iter().flat_map(|b| {
-                        let mut vals: Vec<&'a Expr> = match &b.pattern {
-                            Pattern::Name => Vec::new(),
-                            Pattern::Record { names, .. } => names.iter().collect(),
-                            Pattern::Variant { tag } => vec![tag],
-                            Pattern::Char(_) => Vec::new(),
-                            Pattern::Int(_) => Vec::new(),
-                            Pattern::String(_) => Vec::new(),
-                            Pattern::Wildcard => Vec::new(),
-                        };
-                        vals.push(&b.body);
-                        vals.into_iter()
-                    }));
-                    xs
-                }),
-                Expr::Unit => Step::Skip,
-                Expr::Cmd(parts) => Step::Continue(
-                    parts
-                        .iter()
-                        .filter_map(|part| match part {
-                            CmdPart::Literal(_) => None,
-                            CmdPart::Expr(expr) => Some(expr),
-                        })
-                        .collect(),
-                ),
-            }
-        }
-
-        loop {
-            match self.next.pop() {
+    pub fn iter_evars(&self) -> impl Iterator<Item = &EVar> {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
                 None => {
                     return None;
                 }
-                Some(expr) => match step_expr(expr) {
-                    Step::Yield(x) => {
-                        return Some(x);
-                    }
-                    Step::Skip => {
+                Some(current) => match current {
+                    Expr::Var(_)
+                    | Expr::Placeholder(_)
+                    | Expr::Name(_)
+                    | Expr::Module { .. }
+                    | Expr::True
+                    | Expr::False
+                    | Expr::Int(_)
+                    | Expr::Char(_)
+                    | Expr::Unit
+                    | Expr::Builtin(_) => {
                         continue;
                     }
-                    Step::Continue1(item) => {
-                        self.next.push(item);
+
+                    Expr::Lam { arg: _, body: a } | Expr::Variant(a) => {
+                        stack.push(a);
                         continue;
                     }
-                    Step::Continue2(item1, item2) => {
-                        self.next.push(item2);
-                        self.next.push(item1);
+
+                    Expr::App(a, b)
+                    | Expr::Let {
+                        value: a, rest: b, ..
+                    }
+                    | Expr::Binop(_, a, b)
+                    | Expr::Project(a, b)
+                    | Expr::Embed(a, b) => {
+                        stack.push(b);
+                        stack.push(a);
                         continue;
                     }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.next.push(item3);
-                        self.next.push(item2);
-                        self.next.push(item1);
+
+                    Expr::IfThenElse(a, b, c) | Expr::Extend(a, b, c) => {
+                        stack.push(c);
+                        stack.push(b);
+                        stack.push(a);
                         continue;
                     }
-                    Step::Continue(xs) => {
-                        self.next.extend(xs.into_iter().rev());
+
+                    Expr::String(a) => {
+                        stack.extend(a.iter().rev().filter_map(|string_part| match string_part {
+                            StringPart::String(_) => None,
+                            StringPart::Expr(e) => Some(e),
+                        }));
                         continue;
+                    }
+                    Expr::Array(xs) => {
+                        stack.extend(xs);
+                        continue;
+                    }
+                    Expr::Record(xs) => {
+                        xs.iter().rev().for_each(|(a, b)| {
+                            stack.push(b);
+                            stack.push(a);
+                        });
+                        continue;
+                    }
+                    Expr::Case(a, b) => {
+                        b.iter().rev().for_each(|branch| {
+                            stack.push(&branch.body);
+                            match &branch.pattern {
+                                Pattern::Name
+                                | Pattern::Char(_)
+                                | Pattern::Int(_)
+                                | Pattern::String(_)
+                                | Pattern::Wildcard => {}
+                                Pattern::Variant { tag } => {
+                                    stack.push(tag);
+                                }
+                                Pattern::Record { names, .. } => {
+                                    stack.extend(names.iter().rev());
+                                }
+                            };
+                        });
+                        stack.push(a);
+                        continue;
+                    }
+                    Expr::Cmd(parts) => {
+                        stack.extend(parts.iter().filter_map(|part| match part {
+                            CmdPart::Literal(_) => None,
+                            CmdPart::Expr(expr) => Some(expr),
+                        }));
+                        continue;
+                    }
+                    Expr::EVar(a) => {
+                        return Some(a);
                     }
                 },
             }
-        }
+        })
     }
 }
 
