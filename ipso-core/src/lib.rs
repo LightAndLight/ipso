@@ -368,26 +368,20 @@ impl Type {
                     | Type::Unit
                     | Type::Cmd
                     | Type::DebugRecordFields
-                    | Type::DebugVariantCtor => {
-                        continue;
-                    }
+                    | Type::DebugVariantCtor => {}
                     Type::HasField(_, a) => {
                         stack.push(a);
-                        continue;
                     }
                     Type::App(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::RowCons(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::Constraints(cs) => {
                         stack.extend(cs.iter().rev());
-                        continue;
                     }
                     Type::Meta(_, n) => {
                         return Some(*n);
@@ -422,26 +416,20 @@ impl Type {
                     | Type::Cmd
                     | Type::DebugRecordFields
                     | Type::DebugVariantCtor
-                    | Type::Name(_, _) => {
-                        continue;
-                    }
+                    | Type::Name(_, _) => {}
                     Type::HasField(_, a) => {
                         stack.push(a);
-                        continue;
                     }
                     Type::App(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::RowCons(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::Constraints(cs) => {
                         stack.extend(cs.iter().rev());
-                        continue;
                     }
                     Type::Var(_, v) => {
                         return Some(*v);
@@ -1474,13 +1462,10 @@ impl Expr {
                     | Expr::Int(_)
                     | Expr::Char(_)
                     | Expr::Unit
-                    | Expr::Builtin(_) => {
-                        continue;
-                    }
+                    | Expr::Builtin(_) => {}
 
                     Expr::Lam { arg: _, body: a } | Expr::Variant(a) => {
                         stack.push(a);
-                        continue;
                     }
 
                     Expr::App(a, b)
@@ -1492,14 +1477,12 @@ impl Expr {
                     | Expr::Embed(a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
 
                     Expr::IfThenElse(a, b, c) | Expr::Extend(a, b, c) => {
                         stack.push(c);
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
 
                     Expr::String(a) => {
@@ -1507,18 +1490,15 @@ impl Expr {
                             StringPart::String(_) => None,
                             StringPart::Expr(e) => Some(e),
                         }));
-                        continue;
                     }
                     Expr::Array(xs) => {
                         stack.extend(xs);
-                        continue;
                     }
                     Expr::Record(xs) => {
                         xs.iter().rev().for_each(|(a, b)| {
                             stack.push(b);
                             stack.push(a);
                         });
-                        continue;
                     }
                     Expr::Case(a, b) => {
                         b.iter().rev().for_each(|branch| {
@@ -1538,14 +1518,12 @@ impl Expr {
                             };
                         });
                         stack.push(a);
-                        continue;
                     }
                     Expr::Cmd(parts) => {
                         stack.extend(parts.iter().filter_map(|part| match part {
                             CmdPart::Literal(_) => None,
                             CmdPart::Expr(expr) => Some(expr),
                         }));
-                        continue;
                     }
                     Expr::EVar(a) => {
                         return Some(a);

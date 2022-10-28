@@ -57,14 +57,11 @@ impl Kind {
                     return None;
                 }
                 Some(current) => match current {
-                    Kind::Type | Kind::Row | Kind::Constraint => {
-                        continue;
-                    }
+                    Kind::Type | Kind::Row | Kind::Constraint => {}
                     Kind::Ref(kind) => match kind.as_ref() {
                         KindCompound::Arrow(a, b) => {
                             stack.push(b);
                             stack.push(a);
-                            continue;
                         }
                     },
                     Kind::Meta(n) => {

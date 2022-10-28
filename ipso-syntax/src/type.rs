@@ -230,26 +230,20 @@ impl<A> Type<A> {
                     | Type::RowNil
                     | Type::Unit
                     | Type::Meta(_)
-                    | Type::Cmd => {
-                        continue;
-                    }
+                    | Type::Cmd => {}
                     Type::HasField(_, a) => {
                         stack.push(a);
-                        continue;
                     }
                     Type::App(a, b) | Type::RowCons(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::Function(a, b) => {
                         stack.push(&b.item);
                         stack.push(&a.item);
-                        continue;
                     }
                     Type::Constraints(cs) => {
                         stack.extend(cs.iter().rev());
-                        continue;
                     }
                     Type::Var(n) => {
                         return Some(n);
@@ -282,26 +276,20 @@ impl<A> Type<A> {
                     | Type::IO
                     | Type::RowNil
                     | Type::Unit
-                    | Type::Cmd => {
-                        continue;
-                    }
+                    | Type::Cmd => {}
                     Type::HasField(_, a) => {
                         stack.push(a);
-                        continue;
                     }
                     Type::App(a, b) | Type::RowCons(_, a, b) => {
                         stack.push(b);
                         stack.push(a);
-                        continue;
                     }
                     Type::Function(a, b) => {
                         stack.push(&b.item);
                         stack.push(&a.item);
-                        continue;
                     }
                     Type::Constraints(cs) => {
                         stack.extend(cs.iter().rev());
-                        continue;
                     }
                     Type::Meta(n) => {
                         return Some(*n);
