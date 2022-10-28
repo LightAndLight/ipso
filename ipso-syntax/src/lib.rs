@@ -365,6 +365,39 @@ pub enum CompLine {
     Let(Spanned<Rc<str>>, Spanned<Expr>),
 }
 
+/**
+Part of a command.
+
+## Examples
+
+This command has 3 parts:
+
+```bash
+ls -l /a/b
+^^ ^^ ^^^^
+```
+
+So does this command:
+
+```bash
+echo $a $b
+^^^^ ^^ ^^
+```
+
+This command has 2 parts:
+
+```bash
+echo "$a $b"
+^^^^  ^^^^^
+```
+
+This command also has 2 parts:
+
+```bash
+echo $a/$b
+^^^^ ^^^^^
+```
+*/
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CmdPart {
     Literal(Rc<str>),
