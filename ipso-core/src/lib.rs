@@ -809,6 +809,11 @@ pub enum Binop {
 pub enum CmdPart<E> {
     Literal(Rc<str>),
     Expr(E),
+    MultiPart {
+        first: StringPart<E>,
+        second: StringPart<E>,
+        rest: Vec<StringPart<E>>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -1099,6 +1104,18 @@ impl Expr {
                         .map(|part| match part {
                             CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                             CmdPart::Expr(expr) => CmdPart::Expr(go(expr, f)),
+                            CmdPart::MultiPart {
+                                first,
+                                second,
+                                rest,
+                            } => CmdPart::MultiPart {
+                                first: first.map_expr(|expr| go(expr, f)),
+                                second: second.map_expr(|expr| go(expr, f)),
+                                rest: rest
+                                    .iter()
+                                    .map(|string_part| string_part.map_expr(|e| go(e, f)))
+                                    .collect(),
+                            },
                         })
                         .collect(),
                 ),
@@ -1219,6 +1236,18 @@ impl Expr {
                     .map(|part| match part {
                         CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                         CmdPart::Expr(expr) => CmdPart::Expr(expr.__instantiate(depth, val)),
+                        CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        } => CmdPart::MultiPart {
+                            first: first.__instantiate(depth, val),
+                            second: second.__instantiate(depth, val),
+                            rest: rest
+                                .iter()
+                                .map(|part| part.__instantiate(depth, val))
+                                .collect(),
+                        },
                     })
                     .collect(),
             ),
@@ -1295,6 +1324,17 @@ impl Expr {
             Expr::Cmd(parts) => parts.iter_mut().try_for_each(|part| match part {
                 CmdPart::Literal(_) => Ok(()),
                 CmdPart::Expr(expr) => expr.subst_placeholder(f),
+                CmdPart::MultiPart {
+                    first,
+                    second,
+                    rest,
+                } => {
+                    first.subst_placeholder(f)?;
+                    second.subst_placeholder(f)?;
+                    rest.iter_mut()
+                        .try_for_each(|string_part| string_part.subst_placeholder(f))?;
+                    Ok(())
+                }
             }),
         }
     }
@@ -1383,6 +1423,18 @@ impl Expr {
                     .map(|part| match part {
                         CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                         CmdPart::Expr(expr) => CmdPart::Expr(expr.__abstract_evar(depth, ev)),
+                        CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        } => CmdPart::MultiPart {
+                            first: first.__abstract_evar(depth, ev),
+                            second: second.__abstract_evar(depth, ev),
+                            rest: rest
+                                .iter()
+                                .map(|string_part| string_part.__abstract_evar(depth, ev))
+                                .collect(),
+                        },
                     })
                     .collect(),
             ),
@@ -1520,10 +1572,38 @@ impl Expr {
                         stack.push(a);
                     }
                     Expr::Cmd(parts) => {
-                        stack.extend(parts.iter().filter_map(|part| match part {
-                            CmdPart::Literal(_) => None,
-                            CmdPart::Expr(expr) => Some(expr),
-                        }));
+                        parts.iter().rev().for_each(|cmd_part| match cmd_part {
+                            CmdPart::Literal(_) => {}
+                            CmdPart::Expr(expr) => {
+                                stack.push(expr);
+                            }
+                            CmdPart::MultiPart {
+                                first,
+                                second,
+                                rest,
+                            } => {
+                                rest.iter().rev().for_each(|string_part| match string_part {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                });
+
+                                match second {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                }
+
+                                match first {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                }
+                            }
+                        });
                     }
                     Expr::EVar(a) => {
                         return Some(a);

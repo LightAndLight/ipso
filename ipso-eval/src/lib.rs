@@ -2210,6 +2210,36 @@ where {
                             new_parts
                                 .extend(args.iter().map(|value| Rc::from(value.unpack_string())));
                         }
+                        CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        } => {
+                            fn add_string_part(
+                                interpreter: &mut Interpreter,
+                                env: &mut Env,
+                                buffer: &mut String,
+                                string_part: &StringPart<Expr>,
+                            ) {
+                                match string_part {
+                                    StringPart::String(value) => buffer.push_str(value),
+                                    StringPart::Expr(expr) => {
+                                        let value = interpreter.eval(env, expr);
+                                        buffer.push_str(value.unpack_string())
+                                    }
+                                };
+                            }
+
+                            let mut part = String::from("");
+
+                            add_string_part(self, env, &mut part, first);
+                            add_string_part(self, env, &mut part, second);
+                            rest.iter().for_each(|string_part| {
+                                add_string_part(self, env, &mut part, string_part)
+                            });
+
+                            new_parts.push(Rc::from(part));
+                        }
                     }
                 }
                 self.alloc(Object::Cmd(new_parts))

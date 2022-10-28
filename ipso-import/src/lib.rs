@@ -114,6 +114,19 @@ pub enum ImportedItemInfo {
     ModuleImportedAs { id: ModuleId },
 }
 
+fn rewrite_module_accessors_string_part(
+    exclude: &mut HashMultiset<Rc<str>>,
+    imported_items: &HashMap<String, ImportedItemInfo>,
+    part: &mut syntax::StringPart,
+) {
+    match part {
+        syntax::StringPart::String(_) => {}
+        syntax::StringPart::Expr(expr) => {
+            rewrite_module_accessors_expr(exclude, imported_items, expr);
+        }
+    }
+}
+
 pub fn rewrite_module_accessors_expr(
     exclude: &mut HashMultiset<Rc<str>>,
     imported_items: &HashMap<String, ImportedItemInfo>,
@@ -220,14 +233,9 @@ pub fn rewrite_module_accessors_expr(
             rewrite_module_accessors_expr(exclude, imported_items, Rc::make_mut(b));
         }
         syntax::Expr::String(parts) => {
-            for part in parts {
-                match part {
-                    syntax::StringPart::String(_) => {}
-                    syntax::StringPart::Expr(expr) => {
-                        rewrite_module_accessors_expr(exclude, imported_items, expr);
-                    }
-                }
-            }
+            parts.iter_mut().for_each(|part| {
+                rewrite_module_accessors_string_part(exclude, imported_items, part)
+            });
         }
         syntax::Expr::Array(exprs) => {
             for expr in exprs {
@@ -296,6 +304,17 @@ pub fn rewrite_module_accessors_expr(
             syntax::CmdPart::Literal(_) => {}
             syntax::CmdPart::Expr(expr) => {
                 rewrite_module_accessors_expr(exclude, imported_items, expr)
+            }
+            syntax::CmdPart::MultiPart {
+                first,
+                second,
+                rest,
+            } => {
+                rewrite_module_accessors_string_part(exclude, imported_items, first);
+                rewrite_module_accessors_string_part(exclude, imported_items, second);
+                rest.iter_mut().for_each(|string_part| {
+                    rewrite_module_accessors_string_part(exclude, imported_items, string_part)
+                });
             }
         }),
         syntax::Expr::Comp(_) => {

@@ -551,6 +551,19 @@ pub fn check_pattern(
     })
 }
 
+fn check_string_part(
+    env: Env,
+    state: &mut State,
+    string_part: &syntax::StringPart,
+) -> Result<StringPart<Expr>, Error> {
+    match string_part {
+        syntax::StringPart::String(string) => Ok(StringPart::String(string.clone())),
+        syntax::StringPart::Expr(expr) => {
+            check(env, state, expr, &Type::String).map(StringPart::Expr)
+        }
+    }
+}
+
 /// Infer an expression's type.
 pub fn infer(
     env: Env,
@@ -661,6 +674,23 @@ pub fn infer(
                         ),
                     )
                     .map(CmdPart::Expr),
+                    syntax::CmdPart::MultiPart {
+                        first,
+                        second,
+                        rest,
+                    } => {
+                        let first = check_string_part(env, state, first)?;
+                        let second = check_string_part(env, state, second)?;
+                        let rest = rest
+                            .iter()
+                            .map(|string_part| check_string_part(env, state, string_part))
+                            .collect::<Result<_, Error>>()?;
+                        Ok(CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        })
+                    }
                 })
                 .collect::<Result<Vec<CmdPart<Expr>>, _>>()?;
             Ok((Expr::Cmd(cmd_parts), Type::Cmd))
@@ -668,12 +698,7 @@ pub fn infer(
         syntax::Expr::String(string_parts) => {
             let string_parts: Vec<StringPart<Expr>> = string_parts
                 .iter()
-                .map(|string_part| match string_part {
-                    syntax::StringPart::String(string) => Ok(StringPart::String(string.clone())),
-                    syntax::StringPart::Expr(expr) => {
-                        check(env, state, expr, &Type::String).map(StringPart::Expr)
-                    }
-                })
+                .map(|string_part| check_string_part(env, state, string_part))
                 .collect::<Result<_, _>>()?;
             Ok((Expr::String(string_parts), Type::String))
         }
