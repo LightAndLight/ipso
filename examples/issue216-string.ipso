@@ -1,0 +1,3 @@
+main : IO ()
+main = println "hello
+  world"
