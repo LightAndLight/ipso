@@ -9,7 +9,7 @@ use crate::{
 };
 use ipso_lex::token;
 use ipso_syntax::{Binop, Branch, CmdPart, CompLine, Expr, Keyword, Spanned, StringPart};
-use std::rc::Rc;
+use std::{ops::ControlFlow, rc::Rc};
 
 /**
 ```text
@@ -323,17 +323,34 @@ cmd_parts ::=
 */
 pub fn expr_cmd(parser: &mut Parser) -> Parsed<Vec<CmdPart>> {
     fn cmd_parts(parser: &mut Parser, buffer: &mut Vec<CmdPart>) -> Parsed<()> {
-        optional!(cmd_part(parser).and_then(|part| {
-            buffer.push(part);
+        let mut result = Parsed::pure(ControlFlow::Continue(()));
 
-            optional!(keep_left!(
-                parser.token(&token::Data::Space),
-                many!(parser.token(&token::Data::Space))
-            )
-            .and_then(|()| cmd_parts(parser, buffer)))
-            .map(|_: Option<()>| ())
-        }))
-        .map(|_: Option<()>| ())
+        loop {
+            result = result.and_then(|_| {
+                optional!(cmd_part(parser).and_then(|part| {
+                    buffer.push(part);
+
+                    optional!(keep_left!(
+                        parser.token(&token::Data::Space),
+                        many!(parser.token(&token::Data::Space))
+                    )
+                    .map(|()| { ControlFlow::Continue(()) }))
+                    .map(|result| result.unwrap_or(ControlFlow::Break(())))
+                }))
+                .map(|result| result.unwrap_or(ControlFlow::Break(())))
+            });
+
+            match result.result {
+                Ok(ControlFlow::Continue(())) => {
+                    continue;
+                }
+                Ok(ControlFlow::Break(())) | Err(_) => {
+                    break;
+                }
+            }
+        }
+
+        result.map(|_| ())
     }
 
     between!(
