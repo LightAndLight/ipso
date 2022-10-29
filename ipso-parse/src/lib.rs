@@ -550,17 +550,6 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn comment(&mut self) -> Parsed<()> {
-        self.expecting.insert(token::Name::Comment);
-        match &self.current {
-            None => Parsed::unexpected(false),
-            Some(token) => match token.data {
-                token::Data::Comment { .. } => map0!((), self.consume()),
-                _ => Parsed::unexpected(false),
-            },
-        }
-    }
-
     fn keyword(&mut self, expected: &Keyword) -> Parsed<()> {
         self.expecting.insert(token::Name::Keyword(*expected));
         match &self.current {
@@ -581,14 +570,12 @@ impl<'input> Parser<'input> {
     fn token(&mut self, expected: &token::Data) -> Parsed<()> {
         self.expecting.insert(expected.name());
         match &self.current {
-            Some(actual) if actual.data == *expected => self
-                .consume()
-                .and_then(|_| map0!((), many_!(self.comment()))),
+            Some(actual) if actual.data == *expected => self.consume(),
             _ => Parsed::unexpected(false),
         }
     }
 
-    fn ident_only(&mut self) -> Parsed<Rc<str>> {
+    fn ident(&mut self) -> Parsed<Rc<str>> {
         self.expecting.insert(token::Name::Ident);
         match &self.current {
             Some(token) => match &token.data {
@@ -605,10 +592,6 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn ident(&mut self) -> Parsed<Rc<str>> {
-        keep_left!(self.ident_only(), many_!(self.comment()))
-    }
-
     fn ident_owned(&mut self) -> Parsed<String> {
         self.ident().map(|i| String::from(i.as_ref()))
     }
@@ -620,8 +603,7 @@ impl<'input> Parser<'input> {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_uppercase() => {
                         let s = s.clone();
-                        self.consume()
-                            .and_then(|_| map0!(s, many_!(self.comment())))
+                        self.consume().map(|_| s)
                     }
                     _ => Parsed::unexpected(false),
                 },
@@ -674,7 +656,7 @@ impl<'input> Parser<'input> {
     /// assert_eq!(parse_str!(char, "'"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\\'"), Err(Error::Unexpected {
@@ -686,13 +668,13 @@ impl<'input> Parser<'input> {
     /// assert_eq!(parse_str!(char, "\'\\"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     ///
     /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 2,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     /// ```
     pub fn char(&mut self) -> Parsed<char> {

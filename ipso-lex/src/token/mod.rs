@@ -24,7 +24,6 @@ pub const INDENT_TAG: usize = 52;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
-    Comment,
     Ctor,
     Ident,
     Keyword(Keyword),
@@ -74,7 +73,6 @@ impl Arbitrary for Name {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let vals = &[
             Name::Unexpected,
-            Name::Comment,
             Name::Ctor,
             Name::Ident,
             Name::Keyword(Keyword::arbitrary(g)),
@@ -129,7 +127,6 @@ impl Name {
     pub fn from_int(ix: usize) -> Option<Self> {
         match ix {
             0 => Some(Self::Unexpected),
-            1 => Some(Self::Comment),
             2 => Some(Self::Ctor),
             3 => Some(Self::Ident),
             4 => Some(Self::Keyword(Keyword::Case)),
@@ -197,7 +194,6 @@ impl Name {
     pub fn to_int(&self) -> usize {
         match self {
             Self::Unexpected => 0,
-            Self::Comment => 1,
             Self::Ctor => 2,
             Self::Ident => 3,
             Self::Keyword(Keyword::Case) => 4,
@@ -267,7 +263,6 @@ impl Name {
             Name::Ident => String::from("identifier"),
             Name::Keyword(keyword) => String::from(keyword.to_string()),
             Name::Int => String::from("integer"),
-            Name::Comment => String::from("comment"),
             Name::DoubleQuote => String::from("'\"'"),
             Name::Dollar => String::from("'$'"),
             Name::DollarLBrace => String::from("'${'"),
@@ -332,10 +327,6 @@ pub enum Sign {
 pub enum Data {
     Unexpected(char),
     Eof,
-
-    Comment {
-        length: usize,
-    },
 
     Ctor,
     Ident(Rc<str>),
@@ -408,7 +399,6 @@ impl Data {
         match self {
             Data::Unexpected(_) => 1,
             Data::Eof => 0,
-            Data::Comment { length } => *length,
             Data::Ident(s) => s.len(),
             Data::Int {
                 sign,
@@ -463,7 +453,6 @@ impl Data {
         match self {
             Data::Unexpected(_) => Name::Unexpected,
             Data::Eof => Name::Eof,
-            Data::Comment { .. } => Name::Comment,
             Data::Ctor => Name::Ctor,
             Data::Ident(_) => Name::Ident,
             Data::Int { .. } => Name::Int,

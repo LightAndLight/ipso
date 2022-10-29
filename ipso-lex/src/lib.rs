@@ -354,34 +354,22 @@ impl<'input> Iterator for Lexer<'input> {
                         self.consume_newline();
                         self.next()
                     }
+                    ' ' => {
+                        self.consume();
+                        self.next()
+                    }
                     '#' => {
                         self.consume();
-                        let mut textual_length = 1;
 
-                        match self.current {
-                            None => return None,
-                            Some(c) => {
-                                let mut c = c;
-                                while c != '\n' {
-                                    self.consume();
-                                    textual_length += 1;
-                                    match self.current {
-                                        None => return None,
-                                        Some(new_c) => {
-                                            c = new_c;
-                                        }
-                                    }
-                                }
+                        while let Some(c) = self.current {
+                            if c != '\n' {
+                                self.consume();
+                            } else {
+                                break;
                             }
                         }
 
-                        Some(Token {
-                            data: token::Data::Comment {
-                                length: textual_length,
-                            },
-                            pos,
-                            column,
-                        })
+                        self.next()
                     }
                     '"' => {
                         self.consume();
@@ -410,10 +398,6 @@ impl<'input> Iterator for Lexer<'input> {
                             pos,
                             column,
                         })
-                    }
-                    ' ' => {
-                        self.consume();
-                        self.next()
                     }
                     '{' => {
                         self.consume();
