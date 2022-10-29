@@ -719,13 +719,22 @@ impl<'input> Iterator for Lexer<'input> {
                                 column,
                             })
                         }
+                        '\n' => {
+                            self.consume();
+
+                            Some(Token {
+                                data: token::Data::Unexpected(c),
+                                pos,
+                                column,
+                            })
+                        }
                         _ => {
                             let mut textual_length = 0;
                             let mut value = String::new();
 
                             while let Some(c) = self.current {
                                 match c {
-                                    '`' | ' ' | '"' | '$' => {
+                                    '`' | ' ' | '"' | '$' | '\n' => {
                                         break;
                                     }
                                     '\\' => {
