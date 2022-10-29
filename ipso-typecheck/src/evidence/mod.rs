@@ -44,6 +44,22 @@ impl Evidence {
         ev
     }
 
+    pub fn define(&mut self, pos: usize, constraint: Constraint, evidence: Expr) -> usize {
+        let index = self.environment.len();
+
+        self.environment.push(Item {
+            pos,
+            constraint,
+            expr: Some(Rc::new(evidence)),
+        });
+
+        index
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        self.environment.remove(index);
+    }
+
     pub fn find(
         &self,
         type_solutions: &type_inference::unification::Solutions,
