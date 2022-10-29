@@ -543,6 +543,39 @@ pub fn check_instance(
         &Kind::Constraint,
     )?;
 
+    /*
+    An instance's members should have access to the instances's implementation, to allow for
+    recursive member definitions.
+
+    For example:
+
+    ```
+    class X a where
+      x : a -> String
+
+    instance X Int where
+      x n = if n == 0 then "" else "x${x (n - 1)}"
+    ```
+
+    The call to `x (n - 1)` will get a dictionary placeholder for `X Int`, i.e.
+
+    ```
+    x n = if n == 0 then "" else "x${x (_ : X Int) (n - 1)}"
+    ```
+
+    But that placeholder can't be resolved unless `X Int` has some evidence associated with it.
+
+    Followed by a call to `Evidence::remove` once the instance has been fully checked.
+    */
+    let current_constraint_definition = type_inference_state.evidence.define(
+        name.pos,
+        evidence::Constraint::from_type(&head),
+        assumes.iter().fold(
+            core::Expr::Name(core::Name::Evidence(evidence_name.clone())),
+            |expr, (evar, _)| core::Expr::mk_app(expr, core::Expr::EVar(*evar)),
+        ),
+    );
+
     // type check members
     let mut checked_members = Vec::with_capacity(members.len());
     for member in members {
@@ -650,6 +683,10 @@ pub fn check_instance(
 
         Rc::new(evidence)
     };
+
+    type_inference_state
+        .evidence
+        .remove(current_constraint_definition);
 
     Ok(Checked::Instance {
         evidence_name: evidence_name.clone(),
