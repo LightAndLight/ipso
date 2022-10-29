@@ -675,15 +675,6 @@ impl<'input> Iterator for Lexer<'input> {
                     }
                 },
                 Mode::Cmd => {
-                    // Spaces are ignored in commands
-                    while let Some(c) = self.current {
-                        if c == ' ' {
-                            self.consume();
-                        } else {
-                            break;
-                        }
-                    }
-
                     let pos = self.pos;
                     let column = self.column;
 
@@ -695,6 +686,15 @@ impl<'input> Iterator for Lexer<'input> {
 
                             Some(Token {
                                 data: token::Data::Backtick,
+                                pos,
+                                column,
+                            })
+                        }
+                        ' ' => {
+                            self.consume();
+
+                            Some(Token {
+                                data: token::Data::Space,
                                 pos,
                                 column,
                             })

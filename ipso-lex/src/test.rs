@@ -712,14 +712,49 @@ fn lex_cmd_1() {
             column: 0,
         },
         Token {
+            data: token::Data::Space,
+            pos: 1,
+            column: 1,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 2,
+            column: 2,
+        },
+        Token {
             data: token::Data::Cmd(Rc::from("ls")),
             pos: 3,
             column: 3,
         },
         Token {
+            data: token::Data::Space,
+            pos: 5,
+            column: 5,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 6,
+            column: 6,
+        },
+        Token {
             data: token::Data::Cmd(Rc::from("-laR")),
             pos: 7,
             column: 7,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 11,
+            column: 11,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 12,
+            column: 12,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 13,
+            column: 13,
         },
         Token {
             data: token::Data::Backtick,
@@ -750,6 +785,11 @@ fn lex_cmd_2() {
             data: token::Data::Cmd(Rc::from("echo")),
             pos: 1,
             column: 1,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 5,
+            column: 5,
         },
         Token {
             data: token::Data::DoubleQuote,
@@ -800,6 +840,11 @@ fn lex_cmd_3() {
             column: 1,
         },
         Token {
+            data: token::Data::Space,
+            pos: 5,
+            column: 5,
+        },
+        Token {
             data: token::Data::Dollar,
             pos: 6,
             column: 6,
@@ -838,6 +883,11 @@ fn lex_cmd_4() {
             data: token::Data::Cmd(Rc::from("echo")),
             pos: 1,
             column: 1,
+        },
+        Token {
+            data: token::Data::Space,
+            pos: 5,
+            column: 5,
         },
         Token {
             data: token::Data::Dollar,
