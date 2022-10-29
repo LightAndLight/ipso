@@ -276,7 +276,7 @@ pub fn cmd_part(parser: &mut Parser) -> Parsed<CmdPart> {
                 .map(|string| StringPart::String(String::from(string.as_ref()))),
             keep_right!(
                 parser.token(&token::Data::Dollar),
-                spanned!(parser, parser.ident_only())
+                spanned!(parser, parser.ident())
             )
             .map(|value| StringPart::Expr(Spanned {
                 pos: value.pos,

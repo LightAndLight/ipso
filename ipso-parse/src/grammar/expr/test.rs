@@ -226,7 +226,6 @@ fn parse_case_4() {
                 token::Name::SingleQuote,
                 token::Name::Int,
                 token::Name::Indent(Relation::Eq, 2),
-                token::Name::Comment,
                 token::Name::Backtick,
                 token::Name::Asterisk,
                 token::Name::Equals,
@@ -265,7 +264,6 @@ fn parse_case_5() {
             expecting: vec![
                 token::Name::Indent(Relation::Eq, 2),
                 token::Name::Indent(Relation::Gt, 2),
-                token::Name::Comment,
                 token::Name::Eof
             ]
             .into_iter()

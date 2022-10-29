@@ -10,8 +10,8 @@ use crate::{
         pattern::pattern,
         r#type::{type_, type_atom},
     },
-    indent, indent_scope, keep_left, keep_right, many, many_, map0, optional, sep_by, spanned,
-    Parsed, Parser,
+    indent, indent_scope, keep_left, keep_right, many, map0, optional, sep_by, spanned, Parsed,
+    Parser,
 };
 use ipso_syntax::{Declaration, InstanceMember, Keyword, Module, Names, Spanned, Type};
 use std::rc::Rc;
@@ -318,16 +318,13 @@ declaration ::=
 ```
 */
 pub fn declaration(parser: &mut Parser) -> Parsed<Declaration> {
-    keep_right!(
-        many_!(parser.comment()),
-        choices!(
-            definition(parser),
-            type_alias(parser),
-            import(parser),
-            from_import(parser),
-            class(parser),
-            instance(parser)
-        )
+    choices!(
+        definition(parser),
+        type_alias(parser),
+        import(parser),
+        from_import(parser),
+        class(parser),
+        instance(parser)
     )
 }
 

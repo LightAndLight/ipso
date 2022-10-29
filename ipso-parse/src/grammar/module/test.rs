@@ -92,13 +92,9 @@ fn parse_import_as_3() {
                 label: String::from("(parser)"),
             },
             pos: 11,
-            expecting: vec![
-                token::Name::Indent(Relation::Gt, 0),
-                token::Name::Comment,
-                token::Name::Eof
-            ]
-            .into_iter()
-            .collect()
+            expecting: vec![token::Name::Indent(Relation::Gt, 0), token::Name::Eof]
+                .into_iter()
+                .collect()
         })
     )
 }
@@ -168,7 +164,7 @@ fn parse_definition_3() {
                 label: String::from("(parser)"),
             },
             pos: 12,
-            expecting: vec![token::Name::Indent(Relation::Gt, 0), token::Name::Comment]
+            expecting: vec![token::Name::Indent(Relation::Gt, 0)]
                 .into_iter()
                 .collect()
         })
