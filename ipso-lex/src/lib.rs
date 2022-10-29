@@ -195,6 +195,15 @@ impl<'input> Iterator for Lexer<'input> {
                             }
                         }
                     }
+                    '\n' => {
+                        self.consume();
+
+                        Some(Token {
+                            data: token::Data::Unexpected(c),
+                            pos,
+                            column,
+                        })
+                    }
                     _ => {
                         let mut str = String::new();
                         let mut textual_len: usize = 0;
@@ -205,7 +214,7 @@ impl<'input> Iterator for Lexer<'input> {
                                     break;
                                 }
                                 Some(c) => match c {
-                                    '$' | '"' => {
+                                    '$' | '"' | '\n' => {
                                         break;
                                     }
                                     '\\' => {
