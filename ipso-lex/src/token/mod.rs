@@ -317,7 +317,7 @@ impl Name {
             Name::Ampersand => String::from('&'),
             Name::LParenPipe => String::from("(|"),
             Name::PipeRParen => String::from("|)"),
-            Name::Space => String::from(" "),
+            Name::Space => String::from("space"),
         }
     }
 }
