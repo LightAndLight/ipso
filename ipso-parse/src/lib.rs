@@ -588,15 +588,14 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn ident(&mut self) -> Parsed<Rc<str>> {
+    fn ident_only(&mut self) -> Parsed<Rc<str>> {
         self.expecting.insert(token::Name::Ident);
         match &self.current {
             Some(token) => match &token.data {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_lowercase() => {
                         let s = s.clone();
-                        self.consume()
-                            .and_then(|_| map0!(s, many_!(self.comment())))
+                        map0!(s, self.consume())
                     }
                     _ => Parsed::unexpected(false),
                 },
@@ -604,6 +603,10 @@ impl<'input> Parser<'input> {
             },
             None => Parsed::unexpected(false),
         }
+    }
+
+    fn ident(&mut self) -> Parsed<Rc<str>> {
+        keep_left!(self.ident_only(), many_!(self.comment()))
     }
 
     fn ident_owned(&mut self) -> Parsed<String> {
@@ -724,5 +727,19 @@ impl<'input> Parser<'input> {
         self.consume();
 
         Parsed::pure(str)
+    }
+
+    pub fn cmd_part_literal(&mut self) -> Parsed<Rc<str>> {
+        self.expecting.insert(token::Name::Cmd);
+        match &self.current {
+            None => Parsed::unexpected(false),
+            Some(token) => match &token.data {
+                token::Data::Cmd(value) => {
+                    let value = value.clone();
+                    map0!(value, self.consume())
+                }
+                _ => Parsed::unexpected(false),
+            },
+        }
     }
 }

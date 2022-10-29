@@ -365,10 +365,80 @@ pub enum CompLine {
     Let(Spanned<Rc<str>>, Spanned<Expr>),
 }
 
+/**
+Part of a command.
+
+## Examples
+
+This command has 3 parts:
+
+```bash
+ls -l /a/b
+^^ ^^ ^^^^
+```
+
+So does this command:
+
+```bash
+echo $a $b
+^^^^ ^^ ^^
+```
+
+This command has 2 parts:
+
+```bash
+echo "$a $b"
+^^^^ ^^^^^
+```
+
+This command also has 2 parts:
+
+```bash
+echo $a/$b
+^^^^ ^^^^^
+```
+*/
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CmdPart {
+    /**
+    A sequence of letters, interpreted literally.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+    ^^^^
+    ```
+    */
     Literal(Rc<str>),
+
+    /**
+    A lone variable substitution.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+         ^^
+    ```
+    */
     Expr(Spanned<Expr>),
+
+    /**
+    Literal characters and variable substitution combined into a single part.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+            ^^^^^
+    ```
+    */
+    MultiPart {
+        first: StringPart,
+        second: StringPart,
+        rest: Vec<StringPart>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

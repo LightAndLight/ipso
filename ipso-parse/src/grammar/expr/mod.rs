@@ -9,7 +9,7 @@ use crate::{
 };
 use ipso_lex::token;
 use ipso_syntax::{Binop, Branch, CmdPart, CompLine, Expr, Keyword, Spanned, StringPart};
-use std::rc::Rc;
+use std::{ops::ControlFlow, rc::Rc};
 
 /**
 ```text
@@ -255,9 +255,8 @@ pub fn expr_array(parser: &mut Parser) -> Parsed<Expr> {
 /**
 ```text
 cmd_part ::=
-  cmd_char*
   '"' string_char* '"'
-  '$' ident
+  (cmd_char* | '$' ident)+
 ```
 
 ```text
@@ -270,48 +269,100 @@ cmd_char ::=
 ```
 */
 pub fn cmd_part(parser: &mut Parser) -> Parsed<CmdPart> {
-    choices!(
-        {
-            parser.expecting.insert(token::Name::Cmd);
-            match &parser.current {
-                None => Parsed::unexpected(false),
-                Some(token) => match &token.data {
-                    token::Data::Cmd(value) => {
-                        let value = value.clone();
-                        map0!(CmdPart::Literal(value), parser.consume())
-                    }
-                    _ => Parsed::unexpected(false),
+    fn literal_or_expr(parser: &mut Parser) -> Parsed<StringPart> {
+        choices!(
+            parser
+                .cmd_part_literal()
+                .map(|string| StringPart::String(String::from(string.as_ref()))),
+            keep_right!(
+                parser.token(&token::Data::Dollar),
+                spanned!(parser, parser.ident_only())
+            )
+            .map(|value| StringPart::Expr(Spanned {
+                pos: value.pos,
+                item: Expr::Var(String::from(value.item.as_ref()))
+            }))
+        )
+    }
+
+    fn multipart(parser: &mut Parser) -> Parsed<CmdPart> {
+        literal_or_expr(parser)
+            .and_then(|first| many!(literal_or_expr(parser)).map(|rest| (first, rest)))
+            .map(|(first, rest)| match rest.split_first() {
+                Some((second, rest)) => CmdPart::MultiPart {
+                    first,
+                    second: second.clone(),
+                    rest: Vec::from(rest),
                 },
-            }
-        },
+                None => match first {
+                    StringPart::String(string) => CmdPart::Literal(Rc::from(string)),
+                    StringPart::Expr(expr) => CmdPart::Expr(expr),
+                },
+            })
+    }
+
+    choices!(
         between!(
             parser.token(&token::Data::DoubleQuote),
             parser.token(&token::Data::DoubleQuote),
             parser.string().map(Rc::from)
         )
         .map(CmdPart::Literal),
-        keep_right!(
-            parser.token(&token::Data::Dollar),
-            spanned!(parser, parser.ident_owned())
-        )
-        .map(|value| CmdPart::Expr(Spanned {
-            pos: value.pos,
-            item: Expr::Var(value.item)
-        }))
+        multipart(parser)
     )
 }
 
 /**
 ```text
 expr_cmd ::=
-  '`' cmd_part* '`'
+  '`' ' '* cmd_parts '`'
+
+cmd_parts ::=
+  [cmd_part [' '+ cmd_parts]]
 ```
 */
 pub fn expr_cmd(parser: &mut Parser) -> Parsed<Vec<CmdPart>> {
+    fn cmd_parts(parser: &mut Parser, buffer: &mut Vec<CmdPart>) -> Parsed<()> {
+        let mut result = Parsed::pure(ControlFlow::Continue(()));
+
+        loop {
+            result = result.and_then(|_| {
+                optional!(cmd_part(parser).and_then(|part| {
+                    buffer.push(part);
+
+                    optional!(keep_left!(
+                        parser.token(&token::Data::Space),
+                        many!(parser.token(&token::Data::Space))
+                    )
+                    .map(|()| { ControlFlow::Continue(()) }))
+                    .map(|result| result.unwrap_or(ControlFlow::Break(())))
+                }))
+                .map(|result| result.unwrap_or(ControlFlow::Break(())))
+            });
+
+            match result.result {
+                Ok(ControlFlow::Continue(())) => {
+                    continue;
+                }
+                Ok(ControlFlow::Break(())) | Err(_) => {
+                    break;
+                }
+            }
+        }
+
+        result.map(|_| ())
+    }
+
     between!(
+        keep_left!(
+            parser.token(&token::Data::Backtick),
+            many!(parser.token(&token::Data::Space))
+        ),
         parser.token(&token::Data::Backtick),
-        parser.token(&token::Data::Backtick),
-        many!(cmd_part(parser))
+        {
+            let mut buffer = Vec::new();
+            cmd_parts(parser, &mut buffer).map(|()| buffer)
+        }
     )
 }
 

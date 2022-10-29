@@ -109,6 +109,17 @@ fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), E
             );
             Ok(())
         }
+        CmdPart::MultiPart {
+            first,
+            second,
+            rest,
+        } => {
+            desugar_string_part_mut(source, first)?;
+            desugar_string_part_mut(source, second)?;
+            rest.iter_mut()
+                .try_for_each(|string_part| desugar_string_part_mut(source, string_part))?;
+            Ok(())
+        }
     }
 }
 

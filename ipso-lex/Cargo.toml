@@ -10,4 +10,5 @@ ipso-syntax = { path = "../ipso-syntax" }
 quickcheck = { version = "1.0.3", default-features = false }
 
 [dev-dependencies]
+pretty_assertions = "1.3.0"
 quickcheck_macros = "1"
