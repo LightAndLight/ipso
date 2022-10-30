@@ -4,8 +4,7 @@
 mod test;
 
 use crate::{
-    between, choices, indent, indent_scope, keep_right, map0, optional, spanned, ParseResult,
-    Parser,
+    between, choices, indent, indent_scope, keep_right, map0, optional, spanned, Parsed, Parser,
 };
 use ipso_lex::token;
 use ipso_syntax::{Pattern, Spanned};
@@ -21,7 +20,7 @@ pattern_record_fields ::=
 pub fn pattern_record_fields(
     parser: &mut Parser,
     names: &mut Vec<Spanned<Rc<str>>>,
-) -> ParseResult<Option<Spanned<Rc<str>>>> {
+) -> Parsed<Option<Spanned<Rc<str>>>> {
     choices!(
         // ident [',' pattern_record_fields]
         spanned!(parser, indent!(parser, Relation::Gte, parser.ident())).and_then(|name| {
@@ -49,7 +48,7 @@ pattern_record ::=
   '{' [pattern_record_fields] '}'
 ```
 */
-pub fn pattern_record(parser: &mut Parser) -> ParseResult<Pattern> {
+pub fn pattern_record(parser: &mut Parser) -> Parsed<Pattern> {
     indent_scope!(parser, {
         between!(
             indent!(parser, Relation::Eq, parser.token(&token::Data::LBrace)),
@@ -70,7 +69,7 @@ pattern_variant ::=
   ctor ident
 ```
 */
-pub fn pattern_variant(parser: &mut Parser) -> ParseResult<Pattern> {
+pub fn pattern_variant(parser: &mut Parser) -> Parsed<Pattern> {
     parser.ctor().and_then(|name| {
         spanned!(parser, indent!(parser, Relation::Gt, parser.ident()))
             .map(|arg| Pattern::Variant { name, arg })
@@ -89,7 +88,7 @@ pattern ::=
   '_'
 ```
 */
-pub fn pattern(parser: &mut Parser) -> ParseResult<Pattern> {
+pub fn pattern(parser: &mut Parser) -> Parsed<Pattern> {
     choices!(
         spanned!(parser, parser.ident()).map(Pattern::Name),
         pattern_record(parser),

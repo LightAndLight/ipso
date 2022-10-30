@@ -1,0 +1,7 @@
+main : IO ()
+main =
+  comp
+    println <| debug -100
+    println <| debug (0 - -100)
+    println <| debug (-50 - -100)
+    println <| debug (-1 * 100)

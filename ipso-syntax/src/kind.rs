@@ -1,4 +1,4 @@
-use ipso_util::iter::Step;
+use ipso_util::iter::Stack;
 use std::rc::Rc;
 
 /**
@@ -49,8 +49,27 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub fn iter_metas(&self) -> KindIterMetas {
-        KindIterMetas::One(self)
+    pub fn iter_metas(&self) -> impl Iterator<Item = usize> + '_ {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
+                None => {
+                    return None;
+                }
+                Some(current) => match current {
+                    Kind::Type | Kind::Row | Kind::Constraint => {}
+                    Kind::Ref(kind) => match kind.as_ref() {
+                        KindCompound::Arrow(a, b) => {
+                            stack.push(b);
+                            stack.push(a);
+                        }
+                    },
+                    Kind::Meta(n) => {
+                        return Some(*n);
+                    }
+                },
+            }
+        })
     }
 
     pub fn mk_arrow(a: &Kind, b: &Kind) -> Self {
@@ -86,98 +105,5 @@ impl Kind {
             Kind::Ref(kind) => matches!(kind.as_ref(), KindCompound::Arrow(_, _)),
             _ => false,
         }
-    }
-}
-
-pub enum KindIterMetas<'a> {
-    Zero,
-    One(&'a Kind),
-    Many { items: Vec<&'a Kind> },
-}
-
-impl<'a> KindIterMetas<'a> {
-    fn push(&mut self, item: &'a Kind) {
-        match self {
-            KindIterMetas::Zero => {
-                *self = KindIterMetas::One(item);
-            }
-            KindIterMetas::One(other_item) => {
-                let items: Vec<&'a Kind> = vec![other_item, item];
-                *self = KindIterMetas::Many { items };
-            }
-            KindIterMetas::Many { items } => {
-                items.push(item);
-            }
-        }
-    }
-
-    fn pop(&mut self) -> Option<&'a Kind> {
-        let (result, m_new_self): (Option<&'a Kind>, Option<KindIterMetas>) = match self {
-            KindIterMetas::Zero => (None, None),
-            KindIterMetas::One(item) => (Some(item), Some(KindIterMetas::Zero)),
-            KindIterMetas::Many { items } => (items.pop(), None),
-        };
-        if let Some(new_self) = m_new_self {
-            *self = new_self;
-        }
-        result
-    }
-}
-
-impl<'a> Iterator for KindIterMetas<'a> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_kind(kind: &Kind) -> Step<Kind, usize> {
-            match kind {
-                Kind::Ref(kind) => match kind.as_ref() {
-                    KindCompound::Arrow(a, b) => Step::Continue2(a, b),
-                },
-                Kind::Type => Step::Skip,
-                Kind::Row => Step::Skip,
-                Kind::Constraint => Step::Skip,
-                Kind::Meta(n) => Step::Yield(*n),
-            }
-        }
-
-        let mut res = None;
-        loop {
-            match self.pop() {
-                None => {
-                    break;
-                }
-                Some(kind) => match step_kind(kind) {
-                    Step::Yield(n) => {
-                        res = Some(n);
-                        break;
-                    }
-                    Step::Skip => {
-                        continue;
-                    }
-                    Step::Continue1(item) => {
-                        self.push(item);
-                        continue;
-                    }
-                    Step::Continue2(item1, item2) => {
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.push(item3);
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue(items) => {
-                        for item in items.iter().rev() {
-                            self.push(item);
-                        }
-                        continue;
-                    }
-                },
-            }
-        }
-        res
     }
 }

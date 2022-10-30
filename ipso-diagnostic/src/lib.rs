@@ -129,6 +129,7 @@ impl Diagnostic {
             line: usize,
             offset: usize,
         }
+
         enum LocationEntry {
             InteractiveEntry { label: String },
             FileEntry(FileEntry),
@@ -195,25 +196,29 @@ impl Diagnostic {
                             }
                         },
                         Some(offset) => {
-                            let mut pos = offset;
-                            while offset >= file_entry.offset {
-                                pos -= file_entry.line_str.len();
+                            while !(file_entry.offset
+                                ..file_entry.offset + file_entry.line_str.len())
+                                .contains(&offset)
+                            {
+                                let line_size = file_entry.line_str.len();
                                 file_entry.line_str.clear();
                                 match file_entry.file.read_line(&mut file_entry.line_str) {
                                     Err(err) => return Err(err),
                                     Ok(bytes_read) => {
+                                        file_entry.offset += line_size;
+                                        file_entry.line += 1;
+
                                         if bytes_read == 0 {
-                                            return Ok(());
-                                        } else {
-                                            file_entry.offset += bytes_read;
-                                            file_entry.line += 1;
+                                            break;
                                         }
                                     }
                                 }
                             }
                             let col: usize = {
-                                let item_bytes = &(file_entry.line_str.as_bytes())[0..pos];
-                                from_utf8(item_bytes).unwrap().chars().count() + 1
+                                let offset_in_line_str = offset - file_entry.offset;
+                                let bytes_before_col =
+                                    &(file_entry.line_str.as_bytes())[0..offset_in_line_str];
+                                from_utf8(bytes_before_col).unwrap().chars().count() + 1
                             };
                             Diagnostic::report_located_message(
                                 file_entry.line,

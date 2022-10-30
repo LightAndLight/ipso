@@ -1,0 +1,2 @@
+main : IO ()
+main = println <| debug { a = 1, a = true }

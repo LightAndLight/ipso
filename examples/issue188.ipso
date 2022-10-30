@@ -1,0 +1,39 @@
+test1 : IO ()
+test1 =
+  comp
+    # hi
+    println "hi"
+
+test2 : IO ()
+test2 =
+  comp
+   # hi
+    println "hi"
+
+test3 : IO ()
+test3 =
+  comp
+  # hi
+    println "hi"
+
+test4 : IO ()
+test4 =
+  comp
+ # hi
+    println "hi"
+
+test5 : IO ()
+test5 =
+  comp
+# hi
+    println "hi"
+
+test6 : IO ()
+test6 =
+  comp # hi
+    println "hi"
+
+main : IO ()
+main =
+  println "hi"
+  # println "bye"

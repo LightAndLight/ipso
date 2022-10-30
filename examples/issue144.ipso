@@ -1,0 +1,7 @@
+showBool : Bool -> String
+showBool b = if b then "true" else "false"
+
+main : IO ()
+main =
+  comp
+    println <| showBool (toArgs "hello" == ["hello])

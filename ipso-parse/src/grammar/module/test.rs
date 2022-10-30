@@ -1,5 +1,5 @@
 use super::{definition, from_import, import, type_alias};
-use crate::{keep_left, map2, ParseError, Parser};
+use crate::{keep_left, map2, Error, Parser};
 use ipso_diagnostic::Source;
 use ipso_lex::{
     token::{self, Relation},
@@ -87,18 +87,14 @@ fn parse_import_as_3() {
          */
         "import yes\nas no",
         import,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 11,
-            expecting: vec![
-                token::Name::Indent(Relation::Gt, 0),
-                token::Name::Comment,
-                token::Name::Eof
-            ]
-            .into_iter()
-            .collect()
+            expecting: vec![token::Name::Indent(Relation::Gt, 0), token::Name::Eof]
+                .into_iter()
+                .collect()
         })
     )
 }
@@ -113,8 +109,14 @@ fn parse_definition_1() {
         "x : Int\nx = 1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
-            ty: Type::Int,
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: Vec::new(),
             body: Spanned {
                 pos: 12,
@@ -130,8 +132,14 @@ fn parse_definition_2() {
         "x : Int\nx =\n  1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
-            ty: Type::Int,
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: Vec::new(),
             body: Spanned {
                 pos: 14,
@@ -151,12 +159,12 @@ fn parse_definition_3() {
          */
         "x : Int\nx =\n1",
         definition,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
             pos: 12,
-            expecting: vec![token::Name::Indent(Relation::Gt, 0), token::Name::Comment]
+            expecting: vec![token::Name::Indent(Relation::Gt, 0)]
                 .into_iter()
                 .collect()
         })
@@ -169,8 +177,14 @@ fn parse_definition_4() {
         "x : Int\nx y _ = 1",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("x"),
-            ty: Type::Int,
+            name: Spanned {
+                item: Rc::from("x"),
+                pos: 8
+            },
+            ty: Spanned {
+                pos: 4,
+                item: Type::Int
+            },
             args: vec![
                 Spanned {
                     pos: 10,
@@ -198,8 +212,14 @@ fn parse_definition_5() {
         "main : IO ()\nmain = pure ()",
         definition,
         Ok(Declaration::Definition {
-            name: String::from("main"),
-            ty: Type::mk_app(Type::IO, Type::Unit),
+            name: Spanned {
+                item: Rc::from("main"),
+                pos: 13
+            },
+            ty: Spanned {
+                pos: 7,
+                item: Type::mk_app(Type::IO, Type::Unit)
+            },
             args: vec![],
             body: Expr::mk_app(
                 Spanned {

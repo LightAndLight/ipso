@@ -19,12 +19,19 @@ ipso-eval = { path = "../ipso-eval" }
 ipso-import = { path = "../ipso-import" }
 ipso-lex = { path = "../ipso-lex" }
 ipso-parse = { path = "../ipso-parse" }
+ipso-repl = { path = "../ipso-repl" }
 ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
 ipso-util = { path = "../ipso-util" }
 lazy_static = "1.4.0"
+termion = "^1.5"
 typed-arena = "2.0.1"
+
+[dependencies.clap]
+version = "^3.1"
+default-features = false
+features = ["std", "derive"]
 
 [dev-dependencies]
 # Development build of v0.4, which has fewer dependencies.

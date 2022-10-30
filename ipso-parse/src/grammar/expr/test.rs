@@ -1,5 +1,5 @@
 use super::{expr_app, expr_case, string};
-use crate::ParseError;
+use crate::Error;
 use crate::{keep_left, map2, Parser};
 use ipso_diagnostic::Source;
 use ipso_lex::{
@@ -207,7 +207,7 @@ fn parse_case_4() {
          */
         "case x of\n  a -> b\n   c -> d",
         expr_case,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
@@ -226,7 +226,6 @@ fn parse_case_4() {
                 token::Name::SingleQuote,
                 token::Name::Int,
                 token::Name::Indent(Relation::Eq, 2),
-                token::Name::Comment,
                 token::Name::Backtick,
                 token::Name::Asterisk,
                 token::Name::Equals,
@@ -257,7 +256,7 @@ fn parse_case_5() {
          */
         "case x of\n  a -> b\n c -> d",
         expr_case,
-        Err(ParseError::Unexpected {
+        Err(Error::Unexpected {
             source: Source::Interactive {
                 label: String::from("(parser)"),
             },
@@ -265,7 +264,6 @@ fn parse_case_5() {
             expecting: vec![
                 token::Name::Indent(Relation::Eq, 2),
                 token::Name::Indent(Relation::Gt, 2),
-                token::Name::Comment,
                 token::Name::Eof
             ]
             .into_iter()

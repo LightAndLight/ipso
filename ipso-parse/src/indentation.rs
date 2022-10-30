@@ -50,6 +50,7 @@ macro_rules! indent_scope {
 macro_rules! indent {
     ($parser:expr, $relation:expr, $body:expr) => {{
         use ipso_lex::token::{self, Relation};
+        use $crate::Parsed;
 
         let current_indentation: Option<usize> = $parser.indentation.last().copied();
         $parser.expecting.insert(match current_indentation {
@@ -57,7 +58,7 @@ macro_rules! indent {
             Some(current_indentation) => token::Name::Indent($relation, current_indentation),
         });
         match &$parser.current {
-            None => ParseResult::unexpected(false),
+            None => Parsed::unexpected(false),
             Some(token) => {
                 let current_indentation_matches = match current_indentation {
                     None => match $relation {
@@ -75,7 +76,7 @@ macro_rules! indent {
                     $parser.expecting.clear_indents();
                     $body
                 } else {
-                    ParseResult::unexpected(false)
+                    Parsed::unexpected(false)
                 }
             }
         }

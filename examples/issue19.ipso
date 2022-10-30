@@ -1,0 +1,11 @@
+class X a where
+  x : a -> String
+
+instance X Int where
+  x n =
+    if n == 0
+    then ""
+    else "x${x (n - 1)}"
+
+main : IO ()
+main = println (x 5)

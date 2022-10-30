@@ -10,8 +10,8 @@ use crate::{
         pattern::pattern,
         r#type::{type_, type_atom},
     },
-    indent, indent_scope, keep_left, keep_right, many, many_, map0, optional, sep_by, spanned,
-    ParseResult, Parser,
+    indent, indent_scope, keep_left, keep_right, many, map0, optional, sep_by, spanned, Parsed,
+    Parser,
 };
 use ipso_syntax::{Declaration, InstanceMember, Keyword, Module, Names, Spanned, Type};
 use std::rc::Rc;
@@ -22,38 +22,41 @@ definition ::=
   ident ':' type ident pattern* '=' expr
 ```
 */
-pub fn definition(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn definition(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_left!(
-            indent!(parser, Relation::Eq, parser.ident_owned()),
+            indent!(parser, Relation::Eq, parser.ident()),
             indent!(parser, Relation::Gt, parser.token(&token::Data::Colon))
         )
         .and_then(|name| {
-            type_(parser).and_then(|ty| {
-                keep_right!(
-                    indent!(
-                        parser,
-                        Relation::Eq,
-                        parser.token(&token::Data::Ident(Rc::from(name.as_ref())))
-                    ),
+            spanned!(parser, type_(parser)).and_then(|ty| {
+                indent!(
+                    parser,
+                    Relation::Eq,
+                    spanned!(parser, parser.token(&token::Data::Ident(name.clone())))
+                )
+                .and_then(|spanned_name| {
                     many!(indent!(
                         parser,
                         Relation::Gt,
                         spanned!(parser, pattern(parser))
                     ))
-                )
-                .and_then(|args| {
-                    keep_right!(
-                        indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
-                        indent!(parser, Relation::Gt, expr(parser)).map(|body| {
-                            Declaration::Definition {
-                                name,
-                                ty,
-                                args,
-                                body,
-                            }
-                        })
-                    )
+                    .and_then(|args| {
+                        keep_right!(
+                            indent!(parser, Relation::Gt, parser.token(&token::Data::Equals)),
+                            indent!(parser, Relation::Gt, expr(parser)).map(|body| {
+                                Declaration::Definition {
+                                    name: Spanned {
+                                        item: name,
+                                        pos: spanned_name.pos,
+                                    },
+                                    ty,
+                                    args,
+                                    body,
+                                }
+                            })
+                        )
+                    })
                 })
             })
         })
@@ -66,7 +69,7 @@ type_alias ::=
   'type' ctor '=' type
 ```
 */
-pub fn type_alias(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn type_alias(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_right!(
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Type)),
@@ -91,7 +94,7 @@ import ::=
   'import' ident ['as' ident]
 ```
 */
-pub fn import(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn import(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_right!(
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Import)),
@@ -122,7 +125,7 @@ from_import ::=
   'from' ident 'import'
 ```
 */
-pub fn from_import(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn from_import(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_right!(
             parser.keyword(&Keyword::From),
@@ -158,7 +161,7 @@ assumptions ::=
   '(' type* ')' '=>'
 ```
 */
-pub fn assumptions(parser: &mut Parser) -> ParseResult<Vec<Spanned<Type<Rc<str>>>>> {
+pub fn assumptions(parser: &mut Parser) -> Parsed<Vec<Spanned<Type<Rc<str>>>>> {
     indent_scope!(parser, {
         optional!(between!(
             indent!(parser, Relation::Eq, parser.token(&token::Data::LParen)),
@@ -169,7 +172,7 @@ pub fn assumptions(parser: &mut Parser) -> ParseResult<Vec<Spanned<Type<Rc<str>>
             ))
         ))
         .and_then(|m_tys| match m_tys {
-            None => ParseResult::pure(Vec::new()),
+            None => Parsed::pure(Vec::new()),
             Some(tys) => {
                 indent!(parser, Relation::Gte, parser.token(&token::Data::FatArrow)).map(|_| tys)
             }
@@ -183,11 +186,12 @@ class_member ::=
   ident ':' type
 ```
 */
-pub fn class_member(parser: &mut Parser) -> ParseResult<(String, Type<Rc<str>>)> {
+pub fn class_member(parser: &mut Parser) -> Parsed<(String, Spanned<Type<Rc<str>>>)> {
     parser.ident_owned().and_then(|name| {
         keep_right!(
             indent!(parser, Relation::Gt, parser.token(&token::Data::Colon)),
-            indent!(parser, Relation::Gt, type_(parser)).map(|type_| (name, type_))
+            indent!(parser, Relation::Gt, spanned!(parser, type_(parser)))
+                .map(|type_| (name, type_))
         )
     })
 }
@@ -198,7 +202,7 @@ class ::=
   'class' assumptions ctor ident* 'where' class_member*
 ```
 */
-pub fn class(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn class(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_right!(
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Class)),
@@ -242,7 +246,7 @@ instance_member ::=
   ident pattern* '=' expr
 ```
 */
-pub fn instance_member(parser: &mut Parser) -> ParseResult<InstanceMember> {
+pub fn instance_member(parser: &mut Parser) -> Parsed<InstanceMember> {
     spanned!(parser, parser.ident_owned()).and_then(|name| {
         many!(indent!(
             parser,
@@ -264,7 +268,7 @@ instance ::=
   'instance' assumptions ctor type_atom* 'where' instance_member*
 ```
 */
-pub fn instance(parser: &mut Parser) -> ParseResult<Declaration> {
+pub fn instance(parser: &mut Parser) -> Parsed<Declaration> {
     indent_scope!(parser, {
         keep_right!(
             indent!(parser, Relation::Eq, parser.keyword(&Keyword::Instance)),
@@ -313,17 +317,14 @@ declaration ::=
   instance
 ```
 */
-pub fn declaration(parser: &mut Parser) -> ParseResult<Declaration> {
-    keep_right!(
-        many_!(parser.comment()),
-        choices!(
-            definition(parser),
-            type_alias(parser),
-            import(parser),
-            from_import(parser),
-            class(parser),
-            instance(parser)
-        )
+pub fn declaration(parser: &mut Parser) -> Parsed<Declaration> {
+    choices!(
+        definition(parser),
+        type_alias(parser),
+        import(parser),
+        from_import(parser),
+        class(parser),
+        instance(parser)
     )
 }
 
@@ -333,7 +334,7 @@ module ::=
   declaration*
 ```
 */
-pub fn module(parser: &mut Parser) -> ParseResult<Module> {
+pub fn module(parser: &mut Parser) -> Parsed<Module> {
     indent_scope!(
         parser,
         many!(spanned!(

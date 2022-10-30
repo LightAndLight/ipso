@@ -9,7 +9,7 @@ use fixedbitset::FixedBitSet;
 use fnv::FnvHashSet;
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
 use ipso_lex::{
-    token::{self, Relation, Token},
+    token::{self, Relation, Sign, Token},
     Lexer,
 };
 use ipso_syntax::{self as syntax, Binop, Keyword, Module, Spanned};
@@ -25,7 +25,7 @@ use std::{
 use crate::grammar::module::module;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParseError {
+pub enum Error {
     Unexpected {
         source: Source,
         pos: usize,
@@ -38,24 +38,24 @@ pub enum ParseError {
     },
 }
 
-impl ParseError {
+impl Error {
     fn source(&self) -> Source {
         match self {
-            ParseError::Unexpected { source, .. } => source.clone(),
-            ParseError::AmbiguousUseOf { source, .. } => source.clone(),
+            Error::Unexpected { source, .. } => source.clone(),
+            Error::AmbiguousUseOf { source, .. } => source.clone(),
         }
     }
 
-    fn position(&self) -> usize {
+    pub fn position(&self) -> usize {
         match self {
-            ParseError::Unexpected { pos, .. } => *pos,
-            ParseError::AmbiguousUseOf { pos, .. } => *pos,
+            Error::Unexpected { pos, .. } => *pos,
+            Error::AmbiguousUseOf { pos, .. } => *pos,
         }
     }
 
-    fn message(&self) -> String {
+    pub fn message(&self) -> String {
         match self {
-            ParseError::Unexpected { expecting, .. } => {
+            Error::Unexpected { expecting, .. } => {
                 let mut str = String::from("expected one of: ");
                 let mut iter = expecting.iter();
                 match iter.next() {
@@ -70,7 +70,7 @@ impl ParseError {
                     }
                 }
             }
-            ParseError::AmbiguousUseOf { operator, .. } => {
+            Error::AmbiguousUseOf { operator, .. } => {
                 let mut str = String::from("ambiguous use of ");
                 str.push_str(operator.render());
                 str
@@ -93,24 +93,24 @@ impl ParseError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParseErrorName {
+pub enum ErrorName {
     Unexpected,
     AmbiguousUseOf(Spanned<Binop>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ParseResult<A> {
+pub struct Parsed<A> {
     pub consumed: bool,
-    pub result: Result<A, ParseErrorName>,
+    pub result: Result<A, ErrorName>,
 }
 
-impl<A> ParseResult<A> {
-    pub fn and_then<B, F>(self, f: F) -> ParseResult<B>
+impl<A> Parsed<A> {
+    pub fn and_then<B, F>(self, f: F) -> Parsed<B>
     where
-        F: FnOnce(A) -> ParseResult<B>,
+        F: FnOnce(A) -> Parsed<B>,
     {
         match self.result {
-            Err(err) => ParseResult {
+            Err(err) => Parsed {
                 consumed: self.consumed,
                 result: Err(err),
             },
@@ -122,34 +122,34 @@ impl<A> ParseResult<A> {
         }
     }
 
-    pub fn map<B, F>(self, f: F) -> ParseResult<B>
+    pub fn map<B, F>(self, f: F) -> Parsed<B>
     where
         F: FnOnce(A) -> B,
     {
-        ParseResult {
+        Parsed {
             consumed: self.consumed,
             result: self.result.map(f),
         }
     }
 
     fn pure(x: A) -> Self {
-        ParseResult {
+        Parsed {
             consumed: false,
             result: Ok(x),
         }
     }
 
     fn ambiguous_use_of(operator: Spanned<Binop>) -> Self {
-        ParseResult {
+        Parsed {
             consumed: false,
-            result: Err(ParseErrorName::AmbiguousUseOf(operator)),
+            result: Err(ErrorName::AmbiguousUseOf(operator)),
         }
     }
 
     fn unexpected(consumed: bool) -> Self {
-        ParseResult {
+        Parsed {
             consumed,
-            result: Err(ParseErrorName::Unexpected),
+            result: Err(ErrorName::Unexpected),
         }
     }
 }
@@ -170,8 +170,10 @@ macro_rules! apply {
 #[macro_export]
 macro_rules! map0 {
     ($a:expr, $b:expr) => {{
+        use $crate::Parsed;
+
         let b = $b;
-        ParseResult {
+        Parsed {
             consumed: b.consumed,
             result: b.result.map(|_| $a),
         }
@@ -181,17 +183,17 @@ macro_rules! map0 {
 #[macro_export]
 macro_rules! map2 {
     ($f:expr, $a:expr, $b:expr) => {{
-        use $crate::ParseResult;
+        use $crate::Parsed;
 
         let a = $a;
         match a.result {
-            Err(err) => ParseResult {
+            Err(err) => Parsed {
                 consumed: a.consumed,
                 result: Err(err),
             },
             Ok(val1) => {
                 let b = $b;
-                ParseResult {
+                Parsed {
                     consumed: a.consumed || b.consumed,
                     result: b.result.map(|val2| $f(val1, val2)),
                 }
@@ -203,7 +205,7 @@ macro_rules! map2 {
 #[macro_export]
 macro_rules! keep_right {
     ($a:expr, $b:expr) => {{
-        use crate::map2;
+        use $crate::map2;
         map2!(|_, a| a, $a, $b)
     }};
 }
@@ -219,7 +221,7 @@ macro_rules! keep_left {
 #[macro_export]
 macro_rules! between {
     ($l:expr, $r:expr, $x:expr) => {{
-        use crate::{keep_left, keep_right};
+        use $crate::{keep_left, keep_right};
         keep_right!($l, keep_left!($x, $r))
     }};
 }
@@ -251,20 +253,20 @@ macro_rules! parse_str {
     }};
 }
 
-pub fn parse_string_at(source: Source, input: String) -> Result<Module, ParseError> {
+pub fn parse_string_at(source: Source, input: String) -> Result<Module, Error> {
     let mut parser: Parser = Parser::new(source, Lexer::new(&input));
     let result = keep_left!(module(&mut parser), parser.eof());
     parser.into_parse_error(result.result)
 }
 
-pub fn parse_string(input: String) -> Result<Module, ParseError> {
+pub fn parse_string(input: String) -> Result<Module, Error> {
     let source = Source::Interactive {
         label: String::from("(string)"),
     };
     parse_string_at(source, input)
 }
 
-pub fn parse_file(filename: &Path) -> Result<Module, ParseError> {
+pub fn parse_file(filename: &Path) -> Result<Module, Error> {
     let input: String = {
         let mut content = String::new();
         let mut file: File = File::open(filename).unwrap();
@@ -342,8 +344,8 @@ pub struct Parser<'input> {
 #[macro_export]
 macro_rules! many_ {
     ($x:expr) => {{
-        use crate::ParseErrorName;
-        let mut error: Option<ParseErrorName> = None;
+        use $crate::ErrorName;
+        let mut error: Option<ErrorName> = None;
         let mut consumed = false;
         loop {
             let next = $x;
@@ -359,7 +361,8 @@ macro_rules! many_ {
                 }
             }
         }
-        ParseResult {
+
+        Parsed {
             consumed,
             result: match error {
                 None => Ok(()),
@@ -372,8 +375,9 @@ macro_rules! many_ {
 #[macro_export]
 macro_rules! many_with {
     ($vec:expr, $x:expr) => {{
-        use crate::ParseErrorName;
-        let mut error: Option<ParseErrorName> = None;
+        use $crate::{ErrorName, Parsed};
+
+        let mut error: Option<ErrorName> = None;
         let mut acc: Vec<_> = $vec;
         let mut consumed = false;
         loop {
@@ -391,7 +395,8 @@ macro_rules! many_with {
                 }
             }
         }
-        ParseResult {
+
+        Parsed {
             consumed,
             result: match error {
                 None => Ok(acc),
@@ -404,7 +409,7 @@ macro_rules! many_with {
 #[macro_export]
 macro_rules! many {
     ($x:expr) => {{
-        use crate::many_with;
+        use $crate::many_with;
         many_with!(Vec::new(), $x)
     }};
 }
@@ -412,29 +417,33 @@ macro_rules! many {
 #[macro_export]
 macro_rules! choices {
     ($x:expr, $y:expr) => {{
+        use $crate::Parsed;
+
         let first = $x;
         match first.result {
             Err(err) => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: Err(err) }
+                    Parsed{ consumed: true, result: Err(err) }
                 } else {
                     $y
                 }
             }
-            Ok(val) => ParseResult{consumed: first.consumed, result: Ok(val)},
+            Ok(val) => Parsed{consumed: first.consumed, result: Ok(val)},
         }
     }};
     ($x:expr, $y:expr $(, $ys:expr)*) => {{
+        use $crate::Parsed;
+
         let first = $x;
         match first.result {
             Err(err) => {
                 if first.consumed {
-                    ParseResult{ consumed: true, result: Err(err) }
+                    Parsed{ consumed: true, result: Err(err) }
                 } else {
                     choices!($y $(, $ys)*)
                 }
             }
-            Ok(val) => ParseResult{consumed: first.consumed, result: Ok(val)},
+            Ok(val) => Parsed{consumed: first.consumed, result: Ok(val)},
         }
     }};
 }
@@ -442,10 +451,10 @@ macro_rules! choices {
 #[macro_export]
 macro_rules! sep_by {
     ($x:expr, $sep:expr) => {{
-        use crate::many_with;
+        use $crate::many_with;
         choices!(
             $x.and_then(|first| { many_with!(vec![first], keep_right!($sep, $x)) }),
-            ParseResult::pure(Vec::new())
+            Parsed::pure(Vec::new())
         )
     }};
 }
@@ -453,19 +462,21 @@ macro_rules! sep_by {
 #[macro_export]
 macro_rules! optional {
     ($a:expr) => {{
+        use $crate::Parsed;
+
         let first = $a;
         match first.result {
             Err(err) => {
                 if first.consumed {
-                    ParseResult {
+                    Parsed {
                         consumed: true,
                         result: Err(err),
                     }
                 } else {
-                    ParseResult::pure(None)
+                    Parsed::pure(None)
                 }
             }
-            Ok(val) => ParseResult {
+            Ok(val) => Parsed {
                 consumed: first.consumed,
                 result: Ok(Some(val)),
             },
@@ -496,16 +507,16 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn into_parse_error<A>(self, result: Result<A, ParseErrorName>) -> Result<A, ParseError> {
+    pub fn into_parse_error<A>(self, result: Result<A, ErrorName>) -> Result<A, Error> {
         match result {
             Ok(a) => Ok(a),
             Err(err) => Err(match err {
-                ParseErrorName::Unexpected => ParseError::Unexpected {
+                ErrorName::Unexpected => Error::Unexpected {
                     source: self.source,
                     pos: self.pos,
                     expecting: self.expecting.into_btreeset(),
                 },
-                ParseErrorName::AmbiguousUseOf(operator) => ParseError::AmbiguousUseOf {
+                ErrorName::AmbiguousUseOf(operator) => Error::AmbiguousUseOf {
                     source: self.source,
                     pos: operator.pos,
                     operator: operator.item,
@@ -514,13 +525,13 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn eof(&mut self) -> ParseResult<()> {
+    pub fn eof(&mut self) -> Parsed<()> {
         self.token(&token::Data::Eof)
     }
 
-    fn consume(&mut self) -> ParseResult<()> {
+    fn consume(&mut self) -> Parsed<()> {
         match &self.current {
-            None => ParseResult::unexpected(false),
+            None => Parsed::unexpected(false),
             Some(_) => {
                 self.current = self.input.next();
                 match &self.current {
@@ -531,7 +542,7 @@ impl<'input> Parser<'input> {
                     }
                 };
                 self.expecting.clear();
-                ParseResult {
+                Parsed {
                     consumed: true,
                     result: Ok(()),
                 }
@@ -539,106 +550,102 @@ impl<'input> Parser<'input> {
         }
     }
 
-    fn comment(&mut self) -> ParseResult<()> {
-        self.expecting.insert(token::Name::Comment);
-        match &self.current {
-            None => ParseResult::unexpected(false),
-            Some(token) => match token.data {
-                token::Data::Comment { .. } => map0!((), self.consume()),
-                _ => ParseResult::unexpected(false),
-            },
-        }
-    }
-
-    fn keyword(&mut self, expected: &Keyword) -> ParseResult<()> {
+    fn keyword(&mut self, expected: &Keyword) -> Parsed<()> {
         self.expecting.insert(token::Name::Keyword(*expected));
         match &self.current {
-            None => ParseResult::unexpected(false),
+            None => Parsed::unexpected(false),
             Some(actual) => match &actual.data {
                 token::Data::Ident(id) => {
                     if expected.matches(id) {
                         map0!((), self.consume())
                     } else {
-                        ParseResult::unexpected(false)
+                        Parsed::unexpected(false)
                     }
                 }
-                _ => ParseResult::unexpected(false),
+                _ => Parsed::unexpected(false),
             },
         }
     }
 
-    fn token(&mut self, expected: &token::Data) -> ParseResult<()> {
+    fn token(&mut self, expected: &token::Data) -> Parsed<()> {
         self.expecting.insert(expected.name());
         match &self.current {
-            Some(actual) if actual.data == *expected => self
-                .consume()
-                .and_then(|_| map0!((), many_!(self.comment()))),
-            _ => ParseResult::unexpected(false),
+            Some(actual) if actual.data == *expected => self.consume(),
+            _ => Parsed::unexpected(false),
         }
     }
 
-    fn ident(&mut self) -> ParseResult<Rc<str>> {
+    fn ident(&mut self) -> Parsed<Rc<str>> {
         self.expecting.insert(token::Name::Ident);
         match &self.current {
             Some(token) => match &token.data {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_lowercase() => {
                         let s = s.clone();
-                        self.consume()
-                            .and_then(|_| map0!(s, many_!(self.comment())))
+                        map0!(s, self.consume())
                     }
-                    _ => ParseResult::unexpected(false),
+                    _ => Parsed::unexpected(false),
                 },
-                _ => ParseResult::unexpected(false),
+                _ => Parsed::unexpected(false),
             },
-            None => ParseResult::unexpected(false),
+            None => Parsed::unexpected(false),
         }
     }
 
-    fn ident_owned(&mut self) -> ParseResult<String> {
+    fn ident_owned(&mut self) -> Parsed<String> {
         self.ident().map(|i| String::from(i.as_ref()))
     }
 
-    fn ctor(&mut self) -> ParseResult<Rc<str>> {
+    fn ctor(&mut self) -> Parsed<Rc<str>> {
         self.expecting.insert(token::Name::Ctor);
         match &self.current {
             Some(token) => match &token.data {
                 token::Data::Ident(s) if !syntax::is_keyword(s) => match s.chars().next() {
                     Some(c) if c.is_uppercase() => {
                         let s = s.clone();
-                        self.consume()
-                            .and_then(|_| map0!(s, many_!(self.comment())))
+                        self.consume().map(|_| s)
                     }
-                    _ => ParseResult::unexpected(false),
+                    _ => Parsed::unexpected(false),
                 },
-                _ => ParseResult::unexpected(false),
+                _ => Parsed::unexpected(false),
             },
-            None => ParseResult::unexpected(false),
+            None => Parsed::unexpected(false),
         }
     }
 
-    fn ctor_owned(&mut self) -> ParseResult<String> {
+    fn ctor_owned(&mut self) -> Parsed<String> {
         self.ctor().map(|s| String::from(s.as_ref()))
     }
 
-    fn int(&mut self) -> ParseResult<u32> {
+    fn int(&mut self) -> Parsed<i32> {
         self.expecting.insert(token::Name::Int);
-        match self.current {
-            Some(ref token) => match token.data {
-                token::Data::Int { value, length: _ } => {
-                    map0!(value as u32, self.consume())
-                }
-                _ => ParseResult::unexpected(false),
+        (match &self.current {
+            Some(token) => match &token.data {
+                token::Data::Int {
+                    sign,
+                    value,
+                    length: _,
+                } => Parsed::pure((*sign, *value)),
+                _ => Parsed::unexpected(false),
             },
-            None => ParseResult::unexpected(false),
-        }
+            None => Parsed::unexpected(false),
+        })
+        .and_then(|(sign, value)| {
+            map0!(
+                match sign {
+                    Sign::Negative => -(value as i32),
+                    Sign::None => value as i32,
+                },
+                self.consume()
+            )
+        })
     }
 
     /// ```
     /// use std::rc::Rc;
     /// use ipso_diagnostic::Source;
     /// use ipso_lex::{self, token};
-    /// use ipso_parse::{ParseError, parse_str};
+    /// use ipso_parse::{Error, parse_str};
     ///
     /// assert_eq!(parse_str!(char, "\'a\'"), Ok('a'));
     ///
@@ -646,31 +653,31 @@ impl<'input> Parser<'input> {
     ///
     /// assert_eq!(parse_str!(char, "\'\\n\'"), Ok('\n'));
     ///
-    /// assert_eq!(parse_str!(char, "'"), Err(ParseError::Unexpected {
+    /// assert_eq!(parse_str!(char, "'"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     ///
-    /// assert_eq!(parse_str!(char, "\'\\\'"), Err(ParseError::Unexpected {
+    /// assert_eq!(parse_str!(char, "\'\\\'"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 3,
     ///     expecting: vec![token::Name::SingleQuote].into_iter().collect(),
     /// }));
     ///
-    /// assert_eq!(parse_str!(char, "\'\\"), Err(ParseError::Unexpected {
+    /// assert_eq!(parse_str!(char, "\'\\"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 1,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     ///
-    /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(ParseError::Unexpected {
+    /// assert_eq!(parse_str!(char, "\'\\~\'"), Err(Error::Unexpected {
     ///     source: Source::Interactive{label: String::from("(string)")},
     ///     pos: 2,
-    ///     expecting: vec![token::Name::Char, token::Name::Comment].into_iter().collect(),
+    ///     expecting: vec![token::Name::Char].into_iter().collect(),
     /// }));
     /// ```
-    pub fn char(&mut self) -> ParseResult<char> {
+    pub fn char(&mut self) -> Parsed<char> {
         between!(
             self.token(&token::Data::SingleQuote),
             self.token(&token::Data::SingleQuote),
@@ -681,26 +688,40 @@ impl<'input> Parser<'input> {
                         token::Data::Char { value, length: _ } => {
                             map0!(value, self.consume())
                         }
-                        _ => ParseResult::unexpected(false),
+                        _ => Parsed::unexpected(false),
                     },
-                    None => ParseResult::unexpected(false),
+                    None => Parsed::unexpected(false),
                 }
             }
         )
     }
 
-    pub fn string(&mut self) -> ParseResult<String> {
+    pub fn string(&mut self) -> Parsed<String> {
         self.expecting.insert(token::Name::String);
 
         let str = match &self.current {
             Some(current) => match &current.data {
                 token::Data::String { value, .. } => value.clone(),
-                _ => return ParseResult::unexpected(false),
+                _ => return Parsed::unexpected(false),
             },
-            None => return ParseResult::unexpected(false),
+            None => return Parsed::unexpected(false),
         };
         self.consume();
 
-        ParseResult::pure(str)
+        Parsed::pure(str)
+    }
+
+    pub fn cmd_part_literal(&mut self) -> Parsed<Rc<str>> {
+        self.expecting.insert(token::Name::Cmd);
+        match &self.current {
+            None => Parsed::unexpected(false),
+            Some(token) => match &token.data {
+                token::Data::Cmd(value) => {
+                    let value = value.clone();
+                    map0!(value, self.consume())
+                }
+                _ => Parsed::unexpected(false),
+            },
+        }
     }
 }

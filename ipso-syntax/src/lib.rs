@@ -21,6 +21,15 @@ pub struct Spanned<A> {
     pub item: A,
 }
 
+impl<A> Spanned<A> {
+    pub fn map<B>(&self, f: impl FnOnce(&A) -> B) -> Spanned<B> {
+        Spanned {
+            pos: self.pos,
+            item: f(&self.item),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
 pub enum Keyword {
     Case,
@@ -253,7 +262,7 @@ pub enum Pattern {
         arg: Spanned<Rc<str>>,
     },
     Char(Spanned<char>),
-    Int(Spanned<u32>),
+    Int(Spanned<i32>),
     String(Spanned<Rc<str>>),
     Wildcard,
 }
@@ -356,10 +365,80 @@ pub enum CompLine {
     Let(Spanned<Rc<str>>, Spanned<Expr>),
 }
 
+/**
+Part of a command.
+
+## Examples
+
+This command has 3 parts:
+
+```bash
+ls -l /a/b
+^^ ^^ ^^^^
+```
+
+So does this command:
+
+```bash
+echo $a $b
+^^^^ ^^ ^^
+```
+
+This command has 2 parts:
+
+```bash
+echo "$a $b"
+^^^^ ^^^^^
+```
+
+This command also has 2 parts:
+
+```bash
+echo $a/$b
+^^^^ ^^^^^
+```
+*/
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CmdPart {
+    /**
+    A sequence of letters, interpreted literally.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+    ^^^^
+    ```
+    */
     Literal(Rc<str>),
+
+    /**
+    A lone variable substitution.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+         ^^
+    ```
+    */
     Expr(Spanned<Expr>),
+
+    /**
+    Literal characters and variable substitution combined into a single part.
+
+    e.g.
+
+    ```bash
+    echo $a $b/$c
+            ^^^^^
+    ```
+    */
+    MultiPart {
+        first: StringPart,
+        second: StringPart,
+        rest: Vec<StringPart>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -415,7 +494,7 @@ pub enum Expr {
     False,
     IfThenElse(Rc<Spanned<Expr>>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
-    Int(u32),
+    Int(i32),
 
     Binop(Spanned<Binop>, Rc<Spanned<Expr>>, Rc<Spanned<Expr>>),
 
@@ -524,8 +603,8 @@ pub struct InstanceMember {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     Definition {
-        name: String,
-        ty: Type<Rc<str>>,
+        name: Spanned<Rc<str>>,
+        ty: Spanned<Type<Rc<str>>>,
         args: Vec<Spanned<Pattern>>,
         body: Spanned<Expr>,
     },
@@ -533,7 +612,7 @@ pub enum Declaration {
         supers: Vec<Spanned<Type<Rc<str>>>>,
         name: Rc<str>,
         args: Vec<Spanned<Rc<str>>>,
-        members: Vec<(String, Type<Rc<str>>)>,
+        members: Vec<(String, Spanned<Type<Rc<str>>>)>,
     },
     Instance {
         assumes: Vec<Spanned<Type<Rc<str>>>>,

@@ -9,7 +9,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::ParseResult;
+use crate::Parsed;
 use ipso_syntax::{Binop, Expr, Spanned};
 use std::cmp::Ordering;
 
@@ -22,7 +22,7 @@ pub struct State<'a> {
     /// The current (operator, expression) pair
     pub current_pair: Option<(Spanned<Binop>, Spanned<Expr>)>,
     /// The (operator, expression) pair parser
-    pub rest: &'a mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
+    pub rest: &'a mut dyn Iterator<Item = Parsed<(Spanned<Binop>, Spanned<Expr>)>>,
 }
 
 impl<'a> State<'a> {
@@ -32,12 +32,12 @@ impl<'a> State<'a> {
     /// * `rest` - An iterator that parses subsequent (operator, expression) pairs
     pub fn new(
         first: Spanned<Expr>,
-        rest: &'a mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
-    ) -> ParseResult<Self> {
+        rest: &'a mut dyn Iterator<Item = Parsed<(Spanned<Binop>, Spanned<Expr>)>>,
+    ) -> Parsed<Self> {
         let exprs = vec![first];
         let operators = Vec::with_capacity(1);
         match rest.next() {
-            None => ParseResult::pure(State {
+            None => Parsed::pure(State {
                 exprs,
                 operators,
                 rest,
@@ -69,7 +69,7 @@ impl<'a> State<'a> {
     /// on top of the stack. It's called when the current operator has a higher precedence
     /// than the operator on top of the stack, and when parsing a sequence of
     /// right-associative operators of the same precedence.
-    pub fn shift(&mut self) -> ParseResult<()> {
+    pub fn shift(&mut self) -> Parsed<()> {
         match &self.current_pair {
             None => {
                 panic!("shift called on empty input")
@@ -80,7 +80,7 @@ impl<'a> State<'a> {
                 match self.rest.next() {
                     None => {
                         self.current_pair = None;
-                        ParseResult::pure(())
+                        Parsed::pure(())
                     }
                     Some(result) => {
                         result.map(|current_pair| self.current_pair = Some(current_pair))
@@ -115,10 +115,10 @@ impl<'a> State<'a> {
 /// * `rest` - An iterator that parses subsequent (operator, expression) pairs
 pub fn operator(
     first: Spanned<Expr>,
-    rest: &mut dyn Iterator<Item = ParseResult<(Spanned<Binop>, Spanned<Expr>)>>,
-) -> ParseResult<Spanned<Expr>> {
+    rest: &mut dyn Iterator<Item = Parsed<(Spanned<Binop>, Spanned<Expr>)>>,
+) -> Parsed<Spanned<Expr>> {
     State::new(first, rest).and_then(|mut state| {
-        let mut loop_result = ParseResult::pure(());
+        let mut loop_result = Parsed::pure(());
         while loop_result.result.is_ok() {
             match state.peek_current() {
                 None => match state.peek_operator() {
@@ -146,7 +146,7 @@ pub fn operator(
                             }
                             _ => {
                                 loop_result =
-                                    loop_result.and_then(|()| ParseResult::ambiguous_use_of(*binop))
+                                    loop_result.and_then(|()| Parsed::ambiguous_use_of(*binop))
                             }
                         },
                         Ordering::Greater => {

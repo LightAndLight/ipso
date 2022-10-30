@@ -5,7 +5,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
         // eq : Int -> Int -> Bool
         Rc::new(Declaration::Definition {
-            name: String::from("eq"),
+            name: Rc::from("eq"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -16,14 +16,27 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::EqInt),
         }),
-        // show : Int -> String
+        // toString : Int -> String
         Rc::new(Declaration::Definition {
-            name: String::from("show"),
+            name: Rc::from("toString"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(common_kinds, Type::Int, Type::String),
             },
-            body: Expr::alloc_builtin(Builtin::ShowInt),
+            body: Expr::alloc_builtin(Builtin::IntToString),
+        }),
+        // mod : Int -> Int -> Bool
+        Rc::new(Declaration::Definition {
+            name: Rc::from("mod"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::Int,
+                    Type::arrow(common_kinds, Type::Int, Type::Int),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::IntMod),
         }),
     ]
 }

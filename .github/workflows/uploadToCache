@@ -1,0 +1,11 @@
+#! /bin/sh
+
+set -eu
+set -f # disable globbing
+export IFS=' '
+  
+BINARY_CACHE_BUCKET="ipso-binary-cache"
+BINARY_CACHE_ENDPOINT="7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+
+echo "Uploading paths" $OUT_PATHS
+exec /nix/var/nix/profiles/default/bin/nix copy --to "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT&secret-key=/run/nix-signing-key" $OUT_PATHS

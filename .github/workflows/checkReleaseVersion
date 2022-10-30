@@ -1,0 +1,36 @@
+#! /usr/bin/env ipso
+
+main : IO ()
+main =
+  comp
+    let versionVar = "GITHUB_REF_NAME"
+    let versionFile = "ipso-cli/src/version.rs"
+
+    bind mVersionInGit <- env.getvar versionVar
+    case mVersionInGit of
+      None x ->
+        comp
+          println "error: $versionVar not set"
+          exit.failure
+      Some versionInGit ->
+        comp
+          bind versionLine <- file.read versionFile
+          # extract `version` from `pub const VERSION: &str = "version";`
+          let versionInRust = 
+            versionLine 
+            |> string.split ' '
+            |> array.index 5
+            |> string.split '"'
+            |> array.index 1
+          
+          println "$versionVar version: $versionInGit"
+          println "$versionFile version: $versionInRust"
+          if versionInGit == versionInRust
+            then
+              comp
+                println "success: versions match"
+                exit.success
+            else
+              comp
+                println "error: version mismatch"
+                exit.failure

@@ -1,0 +1,8 @@
+a : Int
+a = 1
+
+a : String
+a = "hi"
+
+main : IO ()
+main = println (debug a)

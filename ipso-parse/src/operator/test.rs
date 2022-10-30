@@ -1,4 +1,4 @@
-use crate::{operator::operator, ParseResult};
+use crate::{operator::operator, Parsed};
 use ipso_syntax::{Binop, Expr, Spanned};
 
 #[test]
@@ -20,7 +20,7 @@ fn all_left_associative() {
         pos: 12,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 10,
             item: Binop::Add,
@@ -68,7 +68,7 @@ fn all_left_associative() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -92,7 +92,7 @@ fn all_right_associative() {
         pos: 15,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 2,
             item: Binop::Or,
@@ -140,7 +140,7 @@ fn all_right_associative() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -160,7 +160,7 @@ fn precedence_higher_lower() {
         pos: 8,
         item: Expr::Int(3),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 6,
             item: Binop::Add,
@@ -194,7 +194,7 @@ fn precedence_higher_lower() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -218,7 +218,7 @@ fn precedence_higher_lower_lower() {
         pos: 13,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 10,
             item: Binop::Eq,
@@ -266,7 +266,7 @@ fn precedence_higher_lower_lower() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -290,7 +290,7 @@ fn precedence_higher_lower_equal() {
         pos: 12,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 10,
             item: Binop::Add,
@@ -338,7 +338,7 @@ fn precedence_higher_lower_equal() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -362,7 +362,7 @@ fn precedence_higher_lower_higher() {
         pos: 12,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 6,
             item: Binop::Add,
@@ -410,7 +410,7 @@ fn precedence_higher_lower_higher() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -430,7 +430,7 @@ fn precedence_lower_higher() {
         pos: 8,
         item: Expr::Int(3),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 2,
             item: Binop::Add,
@@ -464,7 +464,7 @@ fn precedence_lower_higher() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -488,7 +488,7 @@ fn precedence_lower_higher_lower() {
         pos: 12,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 10,
             item: Binop::Add,
@@ -536,7 +536,7 @@ fn precedence_lower_higher_lower() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -560,7 +560,7 @@ fn precedence_lower_higher_equal() {
         pos: 12,
         item: Expr::Int(4),
     };
-    let expected = ParseResult::pure(Expr::mk_binop(
+    let expected = Parsed::pure(Expr::mk_binop(
         Spanned {
             pos: 2,
             item: Binop::Add,
@@ -608,7 +608,7 @@ fn precedence_lower_higher_equal() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }
@@ -628,7 +628,7 @@ fn ambiguous() {
         pos: 10,
         item: Expr::Int(3),
     };
-    let expected = ParseResult::ambiguous_use_of(Spanned {
+    let expected = Parsed::ambiguous_use_of(Spanned {
         pos: 7,
         item: Binop::Eq,
     });
@@ -651,7 +651,7 @@ fn ambiguous() {
             ),
         ]
         .into_iter()
-        .map(ParseResult::pure),
+        .map(Parsed::pure),
     );
     assert_eq!(expected, actual)
 }

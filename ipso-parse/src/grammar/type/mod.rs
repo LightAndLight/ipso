@@ -4,10 +4,10 @@
 mod test;
 
 use crate::{
-    between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, ParseResult,
-    Parser,
+    between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, spanned,
+    Parsed, Parser,
 };
-use ipso_syntax::Type;
+use ipso_syntax::{Spanned, Type};
 use std::rc::Rc;
 
 /// ```text
@@ -17,19 +17,19 @@ use std::rc::Rc;
 pub fn type_record_fields(
     parser: &mut Parser,
     fields: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
-) -> ParseResult<Option<Type<Rc<str>>>> {
+) -> Parsed<Option<Type<Rc<str>>>> {
     /*
     `indent_gte` allows the record type's contents to be in any column
     greater than or equal to the record type's opening brace.
     */
     optional!(indent!(parser, Relation::Gte, parser.ident())).and_then(|m_ident| match m_ident {
-        None => ParseResult::pure(None),
+        None => Parsed::pure(None),
         Some(ident) => optional!(keep_right!(
             indent!(parser, Relation::Gte, parser.token(&token::Data::Colon)),
             indent!(parser, Relation::Gte, type_(parser))
         ))
         .and_then(|m_ty| match m_ty {
-            None => ParseResult::pure(Some(Type::Var(ident))),
+            None => Parsed::pure(Some(Type::Var(ident))),
             Some(ty) => {
                 fields.push((ident, ty));
                 optional!(keep_right!(
@@ -51,7 +51,7 @@ type_record ::=
   '{' type_record_fields '}'
 ```
  */
-pub fn type_record(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
+pub fn type_record(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
     indent_scope!(parser, {
         between!(
             indent!(parser, Relation::Eq, parser.token(&token::Data::LBrace)),
@@ -74,7 +74,7 @@ type_variant_ctors ::=
 pub fn type_variant_ctors(
     parser: &mut Parser,
     ctors: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
-) -> ParseResult<Option<Type<Rc<str>>>> {
+) -> Parsed<Option<Type<Rc<str>>>> {
     choices!(
         indent!(parser, Relation::Gte, parser.ident()).map(|x| Some(Type::Var(x))),
         indent!(parser, Relation::Gte, parser.ctor())
@@ -103,7 +103,7 @@ type_variant ::=
   '(|' [type_variant_ctors] '|)'
 ```
  */
-pub fn type_variant(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
+pub fn type_variant(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
     indent_scope!(parser, {
         between!(
             indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
@@ -140,7 +140,7 @@ type_atom ::=
   '(' type ')'
 ```
 */
-pub fn type_atom(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
+pub fn type_atom(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
     indent!(
         parser,
         Relation::Gt,
@@ -190,7 +190,7 @@ type_app ::=
   type_atom+
 ```
  */
-pub fn type_app(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
+pub fn type_app(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
     type_atom(parser).and_then(|first| {
         many!(type_atom(parser)).map(|rest| rest.into_iter().fold(first, Type::mk_app))
     })
@@ -202,8 +202,8 @@ type_arrow ::=
   type_app ['->' type_arrow]
 ```
  */
-pub fn type_arrow(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
-    type_app(parser).and_then(|a| {
+pub fn type_arrow(parser: &mut Parser) -> Parsed<Spanned<Type<Rc<str>>>> {
+    spanned!(parser, type_app(parser)).and_then(|a| {
         optional!(map2!(
             |_, ty| ty,
             indent!(parser, Relation::Gt, parser.token(&token::Data::Arrow)),
@@ -211,7 +211,10 @@ pub fn type_arrow(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
         ))
         .map(|m_b| match m_b {
             None => a,
-            Some(b) => Type::mk_arrow(a, b),
+            Some(b) => Spanned {
+                pos: a.pos,
+                item: Type::Function(Rc::new(a), Rc::new(b)),
+            },
         })
     })
 }
@@ -222,8 +225,8 @@ type_fatarrow ::=
   type_arrow ['=>' type_fatarrow]
 ```
  */
-pub fn type_fatarrow(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
-    type_arrow(parser).and_then(|a| {
+pub fn type_fatarrow(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
+    type_arrow(parser).and_then(|Spanned { pos: _, item: a }| {
         optional!(map2!(
             |_, ty| ty,
             indent!(parser, Relation::Gt, parser.token(&token::Data::FatArrow)),
@@ -242,6 +245,6 @@ type ::=
   type_fatarrow
 ```
 */
-pub fn type_(parser: &mut Parser) -> ParseResult<Type<Rc<str>>> {
+pub fn type_(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
     type_fatarrow(parser)
 }

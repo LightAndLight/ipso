@@ -1,0 +1,2 @@
+main : IO ()
+main = array.each_ ["a", "b", "c"] println

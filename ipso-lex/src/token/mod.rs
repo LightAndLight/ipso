@@ -24,7 +24,6 @@ pub const INDENT_TAG: usize = 52;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum Name {
     Unexpected,
-    Comment,
     Ctor,
     Ident,
     Keyword(Keyword),
@@ -67,13 +66,13 @@ pub enum Name {
     Ampersand,
     LParenPipe,
     PipeRParen,
+    Space,
 }
 
 impl Arbitrary for Name {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let vals = &[
             Name::Unexpected,
-            Name::Comment,
             Name::Ctor,
             Name::Ident,
             Name::Keyword(Keyword::arbitrary(g)),
@@ -128,7 +127,6 @@ impl Name {
     pub fn from_int(ix: usize) -> Option<Self> {
         match ix {
             0 => Some(Self::Unexpected),
-            1 => Some(Self::Comment),
             2 => Some(Self::Ctor),
             3 => Some(Self::Ident),
             4 => Some(Self::Keyword(Keyword::Case)),
@@ -188,6 +186,7 @@ impl Name {
             58 => Some(Self::Ampersand),
             59 => Some(Self::LParenPipe),
             60 => Some(Self::PipeRParen),
+            61 => Some(Self::Space),
             _ => None,
         }
     }
@@ -195,7 +194,6 @@ impl Name {
     pub fn to_int(&self) -> usize {
         match self {
             Self::Unexpected => 0,
-            Self::Comment => 1,
             Self::Ctor => 2,
             Self::Ident => 3,
             Self::Keyword(Keyword::Case) => 4,
@@ -255,6 +253,7 @@ impl Name {
             Self::Ampersand => 58,
             Self::LParenPipe => 59,
             Self::PipeRParen => 60,
+            Self::Space => 61,
         }
     }
 
@@ -264,7 +263,6 @@ impl Name {
             Name::Ident => String::from("identifier"),
             Name::Keyword(keyword) => String::from(keyword.to_string()),
             Name::Int => String::from("integer"),
-            Name::Comment => String::from("comment"),
             Name::DoubleQuote => String::from("'\"'"),
             Name::Dollar => String::from("'$'"),
             Name::DollarLBrace => String::from("'${'"),
@@ -314,8 +312,15 @@ impl Name {
             Name::Ampersand => String::from('&'),
             Name::LParenPipe => String::from("(|"),
             Name::PipeRParen => String::from("|)"),
+            Name::Space => String::from("space"),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
+pub enum Sign {
+    None,
+    Negative,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
@@ -323,19 +328,27 @@ pub enum Data {
     Unexpected(char),
     Eof,
 
-    Comment { length: usize },
-
     Ctor,
     Ident(Rc<str>),
-    Int { value: usize, length: usize },
+    Int {
+        sign: Sign,
+        value: usize,
+        length: usize,
+    },
 
     DoubleQuote,
     Dollar,
     DollarLBrace,
-    String { value: String, length: usize },
+    String {
+        value: String,
+        length: usize,
+    },
 
     SingleQuote,
-    Char { value: char, length: usize },
+    Char {
+        value: char,
+        length: usize,
+    },
 
     LBrace,
     RBrace,
@@ -376,6 +389,8 @@ pub enum Data {
 
     LParenPipe,
     PipeRParen,
+
+    Space,
 }
 
 impl Data {
@@ -384,9 +399,15 @@ impl Data {
         match self {
             Data::Unexpected(_) => 1,
             Data::Eof => 0,
-            Data::Comment { length } => *length,
             Data::Ident(s) => s.len(),
-            Data::Int { value: _, length } => *length,
+            Data::Int {
+                sign,
+                value: _,
+                length,
+            } => match sign {
+                Sign::Negative => *length + 1,
+                Sign::None => *length,
+            },
             Data::LBrace => 1,
             Data::RBrace => 1,
             Data::LParen => 1,
@@ -422,6 +443,7 @@ impl Data {
             Data::Ampersand => 1,
             Data::LParenPipe => 2,
             Data::PipeRParen => 2,
+            Data::Space => 1,
 
             Data::Ctor => panic!("Data::Ctor.len()"),
         }
@@ -431,7 +453,6 @@ impl Data {
         match self {
             Data::Unexpected(_) => Name::Unexpected,
             Data::Eof => Name::Eof,
-            Data::Comment { .. } => Name::Comment,
             Data::Ctor => Name::Ctor,
             Data::Ident(_) => Name::Ident,
             Data::Int { .. } => Name::Int,
@@ -470,6 +491,7 @@ impl Data {
             Data::Ampersand => Name::Ampersand,
             Data::LParenPipe => Name::LParenPipe,
             Data::PipeRParen => Name::PipeRParen,
+            Data::Space => Name::Space,
         }
     }
 }

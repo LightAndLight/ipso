@@ -2,7 +2,7 @@
 mod test;
 
 use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
-use ipso_util::iter::Step;
+use ipso_util::iter::Stack;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
@@ -41,6 +41,8 @@ pub enum Type {
     App(Kind, Rc<Type>, Rc<Type>),
     Meta(Kind, usize),
     Cmd,
+    DebugRecordFields,
+    DebugVariantCtor,
 }
 
 pub struct CommonKinds {
@@ -95,6 +97,8 @@ impl Type {
             Type::HasField(field, ty) => r#type::Type::mk_hasfield(field.clone(), ty.to_syntax()),
             Type::Meta(_, m) => r#type::Type::Meta(*m),
             Type::Cmd => r#type::Type::Cmd,
+            Type::DebugRecordFields => r#type::Type::Name(Rc::from("DebugRecordFields")),
+            Type::DebugVariantCtor => r#type::Type::Name(Rc::from("DebugVariantCtor")),
         }
     }
 
@@ -121,6 +125,8 @@ impl Type {
             Type::Var(k, _) => k.clone(),
             Type::App(k, _, _) => k.clone(),
             Type::Meta(k, _) => k.clone(),
+            Type::DebugRecordFields => Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
+            Type::DebugVariantCtor => Kind::mk_arrow(&Kind::Row, &Kind::Constraint),
         }
     }
 
@@ -259,6 +265,8 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => f(k, *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -287,6 +295,8 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
@@ -328,11 +338,105 @@ impl Type {
             Type::Unit => Type::Unit,
             Type::Meta(k, n) => Type::Meta(k.clone(), *n),
             Type::Cmd => Type::Cmd,
+            Type::DebugRecordFields => Type::DebugRecordFields,
+            Type::DebugVariantCtor => Type::DebugVariantCtor,
         }
     }
 
-    pub fn iter_metas(&self) -> TypeIterMetas {
-        TypeIterMetas::One(self)
+    pub fn iter_metas(&self) -> impl Iterator<Item = usize> + '_ {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
+                None => {
+                    return None;
+                }
+                Some(current) => match current {
+                    Type::Name(_, _)
+                    | Type::Var(_, _)
+                    | Type::Bool
+                    | Type::Int
+                    | Type::Char
+                    | Type::String
+                    | Type::Bytes
+                    | Type::Arrow(_)
+                    | Type::Array(_)
+                    | Type::Record(_)
+                    | Type::Variant(_)
+                    | Type::IO(_)
+                    | Type::FatArrow(_)
+                    | Type::RowNil
+                    | Type::Unit
+                    | Type::Cmd
+                    | Type::DebugRecordFields
+                    | Type::DebugVariantCtor => {}
+                    Type::HasField(_, a) => {
+                        stack.push(a);
+                    }
+                    Type::App(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::RowCons(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::Constraints(cs) => {
+                        stack.extend(cs.iter().rev());
+                    }
+                    Type::Meta(_, n) => {
+                        return Some(*n);
+                    }
+                },
+            }
+        })
+    }
+
+    pub fn iter_vars(&self) -> impl Iterator<Item = usize> + '_ {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
+                None => {
+                    return None;
+                }
+                Some(current) => match current {
+                    Type::Bool
+                    | Type::Int
+                    | Type::Char
+                    | Type::String
+                    | Type::Bytes
+                    | Type::Arrow(_)
+                    | Type::FatArrow(_)
+                    | Type::Array(_)
+                    | Type::Record(_)
+                    | Type::Variant(_)
+                    | Type::IO(_)
+                    | Type::RowNil
+                    | Type::Unit
+                    | Type::Meta(_, _)
+                    | Type::Cmd
+                    | Type::DebugRecordFields
+                    | Type::DebugVariantCtor
+                    | Type::Name(_, _) => {}
+                    Type::HasField(_, a) => {
+                        stack.push(a);
+                    }
+                    Type::App(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::RowCons(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::Constraints(cs) => {
+                        stack.extend(cs.iter().rev());
+                    }
+                    Type::Var(_, v) => {
+                        return Some(*v);
+                    }
+                },
+            }
+        })
     }
 
     pub fn unwrap_variant(&self) -> Option<RowParts> {
@@ -398,7 +502,7 @@ impl Type {
     pub fn unwrap_constraints(&self) -> (Vec<&Type>, &Type) {
         fn flatten_constraints(ty: &Type) -> Vec<&Type> {
             match ty {
-                Type::Constraints(cs) => cs.iter().flat_map(|c| flatten_constraints(c)).collect(),
+                Type::Constraints(cs) => cs.iter().flat_map(flatten_constraints).collect(),
                 _ => vec![ty],
             }
         }
@@ -419,134 +523,33 @@ impl Type {
         (constraints, ty)
     }
 }
-pub enum TypeIterMetas<'a> {
-    Zero,
-    One(&'a Type),
-    Many { items: Vec<&'a Type> },
-}
-
-impl<'a> TypeIterMetas<'a> {
-    fn pop(&mut self) -> Option<&'a Type> {
-        let (m_new_self, result) = match self {
-            TypeIterMetas::Zero => (None, None),
-            TypeIterMetas::One(a) => (Some(TypeIterMetas::Zero), Some(*a)),
-            TypeIterMetas::Many { items } => {
-                let result = items.pop();
-                (None, result)
-            }
-        };
-        if let Some(new_self) = m_new_self {
-            *self = new_self
-        }
-        result
-    }
-
-    fn push(&mut self, item: &'a Type) {
-        let m_new_self = match self {
-            TypeIterMetas::Zero => Some(TypeIterMetas::One(item)),
-            TypeIterMetas::One(a) => Some(TypeIterMetas::Many {
-                items: vec![a, item],
-            }),
-            TypeIterMetas::Many { items } => {
-                items.push(item);
-                None
-            }
-        };
-        if let Some(new_self) = m_new_self {
-            *self = new_self;
-        }
-    }
-}
-
-impl<'a> Iterator for TypeIterMetas<'a> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_kind(ty: &Type) -> Step<Type, usize> {
-            match ty {
-                Type::Name(_, _) => Step::Skip,
-                Type::Var(_, _) => Step::Skip,
-                Type::Bool => Step::Skip,
-                Type::Int => Step::Skip,
-                Type::Char => Step::Skip,
-                Type::String => Step::Skip,
-                Type::Bytes => Step::Skip,
-                Type::Arrow(_) => Step::Skip,
-                Type::FatArrow(_) => Step::Skip,
-                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
-                Type::Array(_) => Step::Skip,
-                Type::Record(_) => Step::Skip,
-                Type::Variant(_) => Step::Skip,
-                Type::IO(_) => Step::Skip,
-                Type::App(_, a, b) => Step::Continue2(a, b),
-                Type::RowNil => Step::Skip,
-                Type::RowCons(_, a, b) => Step::Continue2(a, b),
-                Type::HasField(_, a) => Step::Continue1(a),
-                Type::Unit => Step::Skip,
-                Type::Meta(_, n) => Step::Yield(*n),
-                Type::Cmd => Step::Skip,
-            }
-        }
-
-        let mut res = None;
-        loop {
-            match self.pop() {
-                None => {
-                    break;
-                }
-                Some(kind) => match step_kind(kind) {
-                    Step::Yield(n) => {
-                        res = Some(n);
-                        break;
-                    }
-                    Step::Skip => {
-                        continue;
-                    }
-                    Step::Continue1(item) => {
-                        self.push(item);
-                        continue;
-                    }
-                    Step::Continue2(item1, item2) => {
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.push(item3);
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue(items) => {
-                        for item in items.iter().rev() {
-                            self.push(item)
-                        }
-                        continue;
-                    }
-                },
-            }
-        }
-        res
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Pattern {
+pub enum Pattern<E> {
     Name,
-    Record { names: Vec<Expr>, rest: bool },
-    Variant { tag: Rc<Expr> },
+    Record { names: Vec<E>, rest: bool },
+    Variant { tag: Rc<E> },
     Char(char),
-    Int(u32),
+    Int(i32),
     String(Rc<str>),
     Wildcard,
 }
 
-impl Pattern {
+impl Pattern<Expr> {
+    pub fn bound_vars(&self) -> usize {
+        match self {
+            Pattern::Name => 1,
+            Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
+            Pattern::Variant { tag: _ } => 1,
+            Pattern::Char(_) | Pattern::Int(_) | Pattern::String(_) | Pattern::Wildcard => 0,
+        }
+    }
+
     pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
         match self {
             Pattern::Name => Pattern::Name,
             Pattern::Record { names, rest } => Pattern::Record {
-                names: names.iter().map(|name| f(name)).collect(),
+                names: names.iter().map(f).collect(),
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
@@ -557,7 +560,7 @@ impl Pattern {
         }
     }
 
-    pub fn mk_variant(tag: Expr) -> Pattern {
+    pub fn mk_variant(tag: Expr) -> Pattern<Expr> {
         Pattern::Variant { tag: Rc::new(tag) }
     }
 
@@ -567,15 +570,9 @@ impl Pattern {
     ) -> Result<(), E> {
         match self {
             Pattern::Name => Ok(()),
-            Pattern::Record { names, .. } => {
-                for name in names {
-                    match name.subst_placeholder(f) {
-                        Err(err) => return Err(err),
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Pattern::Record { names, .. } => names
+                .iter_mut()
+                .try_for_each(|name| name.subst_placeholder(f)),
             Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
             Pattern::Char(_) => Ok(()),
             Pattern::Int(_) => Ok(()),
@@ -622,19 +619,18 @@ impl Pattern {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Branch {
-    pub pattern: Pattern,
-    pub body: Expr,
+pub struct Branch<E> {
+    pub pattern: Pattern<E>,
+    pub body: E,
 }
 
-impl Branch {
-    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch {
+impl Branch<Expr> {
+    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch<Expr> {
         Branch {
             pattern: self.pattern.map_expr(&f),
             body: f(&self.body),
         }
     }
-
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &mut self,
         f: &mut F,
@@ -684,19 +680,12 @@ impl Branch {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum StringPart {
+pub enum StringPart<E> {
     String(String),
-    Expr(Expr),
+    Expr(E),
 }
 
-impl StringPart {
-    pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Self {
-        match self {
-            StringPart::String(s) => StringPart::String(s.clone()),
-            StringPart::Expr(e) => StringPart::Expr(f(e)),
-        }
-    }
-
+impl StringPart<Expr> {
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &mut self,
         f: &mut F,
@@ -722,6 +711,24 @@ impl StringPart {
     }
 }
 
+impl<A> StringPart<A> {
+    pub fn map_expr<F: Fn(&A) -> A>(&self, f: F) -> Self {
+        match self {
+            StringPart::String(s) => StringPart::String(s.clone()),
+            StringPart::Expr(e) => StringPart::Expr(f(e)),
+        }
+    }
+}
+
+impl<A, B> From<A> for StringPart<B>
+where
+    String: From<A>,
+{
+    fn from(s: A) -> Self {
+        StringPart::String(String::from(s))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Builtin {
     MapIO,
@@ -734,7 +741,7 @@ pub enum Builtin {
     Readln,
     EqInt,
     CompareInt,
-    ShowInt,
+    IntToString,
     FoldlArray,
     EqArray,
     CompareArray,
@@ -748,6 +755,7 @@ pub enum Builtin {
     EqChar,
     CompareChar,
     SplitString,
+    JoinString,
     FoldlString,
     SnocArray,
     Run,
@@ -755,6 +763,24 @@ pub enum Builtin {
     Lines,
     ShowCmd,
     FlatMap,
+    MapArray,
+    CharToString,
+    DebugString,
+    ArrayUnfoldr,
+    IntMod,
+    PathExists,
+    EnvArgs,
+    EnvGetvar,
+    EnvSetvar,
+    ExitSuccess,
+    ExitFailure,
+    ExitWith,
+    CmdRead,
+    FileRead,
+    FileWrite,
+    FileAppend,
+    ArrayEach_,
+    CmdEachline_,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -780,19 +806,24 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CmdPart {
+pub enum CmdPart<E> {
     Literal(Rc<str>),
-    Expr(Expr),
+    Expr(E),
+    MultiPart {
+        first: StringPart<E>,
+        second: StringPart<E>,
+        rest: Vec<StringPart<E>>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Name {
     Evidence(Rc<str>),
-    Definition(String),
+    Definition(Rc<str>),
 }
 
 impl Name {
-    pub fn definition<T: Into<String>>(name: T) -> Self {
+    pub fn definition<T: Into<Rc<str>>>(name: T) -> Self {
         Self::Definition(name.into())
     }
 
@@ -842,26 +873,30 @@ pub enum Expr {
     False,
     IfThenElse(Rc<Expr>, Rc<Expr>, Rc<Expr>),
 
-    Int(u32),
+    Int(i32),
 
     Binop(Binop, Rc<Expr>, Rc<Expr>),
 
     Char(char),
 
-    String(Vec<StringPart>),
+    String(Vec<StringPart<Expr>>),
 
     Array(Vec<Expr>),
 
+    // TODO: use struct arguments - { index, value, record }
     Extend(Rc<Expr>, Rc<Expr>, Rc<Expr>),
     Record(Vec<(Expr, Expr)>),
+    // TODO: use struct arguments - { record, index }
     Project(Rc<Expr>, Rc<Expr>),
 
+    // TODO: use struct arguments - { tag }
     Variant(Rc<Expr>),
+    // TODO: use struct arguments - { tag, variant }
     Embed(Rc<Expr>, Rc<Expr>),
-    Case(Rc<Expr>, Vec<Branch>),
+    Case(Rc<Expr>, Vec<Branch<Expr>>),
     Unit,
 
-    Cmd(Vec<CmdPart>),
+    Cmd(Vec<CmdPart<Expr>>),
 }
 
 impl Expr {
@@ -973,7 +1008,7 @@ impl Expr {
         Expr::Binop(op, Rc::new(a), b)
     }
 
-    pub fn mk_case(expr: Expr, branches: Vec<Branch>) -> Expr {
+    pub fn mk_case(expr: Expr, branches: Vec<Branch<Expr>>) -> Expr {
         Expr::Case(Rc::new(expr), branches)
     }
 
@@ -1069,6 +1104,18 @@ impl Expr {
                         .map(|part| match part {
                             CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                             CmdPart::Expr(expr) => CmdPart::Expr(go(expr, f)),
+                            CmdPart::MultiPart {
+                                first,
+                                second,
+                                rest,
+                            } => CmdPart::MultiPart {
+                                first: first.map_expr(|expr| go(expr, f)),
+                                second: second.map_expr(|expr| go(expr, f)),
+                                rest: rest
+                                    .iter()
+                                    .map(|string_part| string_part.map_expr(|e| go(e, f)))
+                                    .collect(),
+                            },
                         })
                         .collect(),
                 ),
@@ -1189,6 +1236,18 @@ impl Expr {
                     .map(|part| match part {
                         CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                         CmdPart::Expr(expr) => CmdPart::Expr(expr.__instantiate(depth, val)),
+                        CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        } => CmdPart::MultiPart {
+                            first: first.__instantiate(depth, val),
+                            second: second.__instantiate(depth, val),
+                            rest: rest
+                                .iter()
+                                .map(|part| part.__instantiate(depth, val))
+                                .collect(),
+                        },
                     })
                     .collect(),
             ),
@@ -1232,44 +1291,20 @@ impl Expr {
                 Rc::make_mut(c).subst_placeholder(f)
             }
             Expr::Char(_) => Ok(()),
-            Expr::String(parts) => {
-                for part in parts {
-                    match part.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
-            Expr::Array(items) => {
-                for item in items {
-                    match item.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Expr::String(parts) => parts
+                .iter_mut()
+                .try_for_each(|part| part.subst_placeholder(f)),
+            Expr::Array(items) => items
+                .iter_mut()
+                .try_for_each(|item| item.subst_placeholder(f)),
             Expr::Extend(a, b, c) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
                 Rc::make_mut(b).subst_placeholder(f)?;
                 Rc::make_mut(c).subst_placeholder(f)
             }
-            Expr::Record(items) => {
-                for (a, b) in items {
-                    match a.subst_placeholder(f).and_then(|()| b.subst_placeholder(f)) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
-            }
+            Expr::Record(items) => items.iter_mut().try_for_each(|(a, b)| {
+                a.subst_placeholder(f).and_then(|()| b.subst_placeholder(f))
+            }),
             Expr::Project(a, b) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
                 Rc::make_mut(b).subst_placeholder(f)
@@ -1281,15 +1316,7 @@ impl Expr {
             }
             Expr::Case(a, bs) => {
                 Rc::make_mut(a).subst_placeholder(f)?;
-                for b in bs {
-                    match b.subst_placeholder(f) {
-                        Err(err) => {
-                            return Err(err);
-                        }
-                        Ok(()) => {}
-                    }
-                }
-                Ok(())
+                bs.iter_mut().try_for_each(|b| b.subst_placeholder(f))
             }
 
             Expr::Unit => Ok(()),
@@ -1297,6 +1324,17 @@ impl Expr {
             Expr::Cmd(parts) => parts.iter_mut().try_for_each(|part| match part {
                 CmdPart::Literal(_) => Ok(()),
                 CmdPart::Expr(expr) => expr.subst_placeholder(f),
+                CmdPart::MultiPart {
+                    first,
+                    second,
+                    rest,
+                } => {
+                    first.subst_placeholder(f)?;
+                    second.subst_placeholder(f)?;
+                    rest.iter_mut()
+                        .try_for_each(|string_part| string_part.subst_placeholder(f))?;
+                    Ok(())
+                }
             }),
         }
     }
@@ -1385,6 +1423,18 @@ impl Expr {
                     .map(|part| match part {
                         CmdPart::Literal(value) => CmdPart::Literal(value.clone()),
                         CmdPart::Expr(expr) => CmdPart::Expr(expr.__abstract_evar(depth, ev)),
+                        CmdPart::MultiPart {
+                            first,
+                            second,
+                            rest,
+                        } => CmdPart::MultiPart {
+                            first: first.__abstract_evar(depth, ev),
+                            second: second.__abstract_evar(depth, ev),
+                            rest: rest
+                                .iter()
+                                .map(|string_part| string_part.__abstract_evar(depth, ev))
+                                .collect(),
+                        },
                     })
                     .collect(),
             ),
@@ -1447,118 +1497,120 @@ impl Expr {
     /// );
     /// assert_eq!(expr.iter_evars().collect::<Vec<&EVar>>(), vec![&EVar(0)]);
     /// ```
-    pub fn iter_evars(&self) -> IterEVars {
-        IterEVars { next: vec![self] }
-    }
-}
-
-pub struct IterEVars<'a> {
-    next: Vec<&'a Expr>,
-}
-
-impl<'a> Iterator for IterEVars<'a> {
-    type Item = &'a EVar;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_expr<'a>(expr: &'a Expr) -> Step<'a, Expr, &'a EVar> {
-            match expr {
-                Expr::Var(_) => Step::Skip,
-                Expr::EVar(a) => Step::Yield(a),
-                Expr::Placeholder(_) => Step::Skip,
-                Expr::Name(_) => Step::Skip,
-                Expr::Module { .. } => Step::Skip,
-                Expr::Builtin(_) => Step::Skip,
-                Expr::App(a, b) => Step::Continue2(a, b),
-                Expr::Lam { arg: _, body } => Step::Continue1(body),
-                Expr::Let { value, rest, .. } => Step::Continue2(value, rest),
-                Expr::True => Step::Skip,
-                Expr::False => Step::Skip,
-                Expr::IfThenElse(a, b, c) => Step::Continue3(a, b, c),
-                Expr::Int(_) => Step::Skip,
-                Expr::Binop(_, a, b) => Step::Continue2(a, b),
-                Expr::Char(_) => Step::Skip,
-                Expr::String(a) => Step::Continue(
-                    a.iter()
-                        .flat_map(|x| match x {
-                            StringPart::String(_) => Vec::new().into_iter(),
-                            StringPart::Expr(e) => vec![e].into_iter(),
-                        })
-                        .collect(),
-                ),
-                Expr::Array(xs) => Step::Continue(xs.iter().collect()),
-                Expr::Extend(a, b, c) => Step::Continue3(a, b, c),
-                Expr::Record(xs) => Step::Continue(
-                    xs.iter()
-                        .flat_map(|(a, b)| vec![a, b].into_iter())
-                        .collect(),
-                ),
-                Expr::Project(a, b) => Step::Continue2(a, b),
-                Expr::Variant(a) => Step::Continue1(a),
-                Expr::Embed(a, b) => Step::Continue2(a, b),
-                Expr::Case(a, b) => Step::Continue({
-                    let mut xs: Vec<&'a Expr> = vec![a];
-                    xs.extend(b.iter().flat_map(|b| {
-                        let mut vals: Vec<&'a Expr> = match &b.pattern {
-                            Pattern::Name => Vec::new(),
-                            Pattern::Record { names, .. } => names.iter().collect(),
-                            Pattern::Variant { tag } => vec![tag],
-                            Pattern::Char(_) => Vec::new(),
-                            Pattern::Int(_) => Vec::new(),
-                            Pattern::String(_) => Vec::new(),
-                            Pattern::Wildcard => Vec::new(),
-                        };
-                        vals.push(&b.body);
-                        vals.into_iter()
-                    }));
-                    xs
-                }),
-                Expr::Unit => Step::Skip,
-                Expr::Cmd(parts) => Step::Continue(
-                    parts
-                        .iter()
-                        .filter_map(|part| match part {
-                            CmdPart::Literal(_) => None,
-                            CmdPart::Expr(expr) => Some(expr),
-                        })
-                        .collect(),
-                ),
-            }
-        }
-
-        loop {
-            match self.next.pop() {
+    pub fn iter_evars(&self) -> impl Iterator<Item = &EVar> {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
                 None => {
                     return None;
                 }
-                Some(expr) => match step_expr(expr) {
-                    Step::Yield(x) => {
-                        return Some(x);
+                Some(current) => match current {
+                    Expr::Var(_)
+                    | Expr::Placeholder(_)
+                    | Expr::Name(_)
+                    | Expr::Module { .. }
+                    | Expr::True
+                    | Expr::False
+                    | Expr::Int(_)
+                    | Expr::Char(_)
+                    | Expr::Unit
+                    | Expr::Builtin(_) => {}
+
+                    Expr::Lam { arg: _, body: a } | Expr::Variant(a) => {
+                        stack.push(a);
                     }
-                    Step::Skip => {
-                        continue;
+
+                    Expr::App(a, b)
+                    | Expr::Let {
+                        value: a, rest: b, ..
                     }
-                    Step::Continue1(item) => {
-                        self.next.push(item);
-                        continue;
+                    | Expr::Binop(_, a, b)
+                    | Expr::Project(a, b)
+                    | Expr::Embed(a, b) => {
+                        stack.push(b);
+                        stack.push(a);
                     }
-                    Step::Continue2(item1, item2) => {
-                        self.next.push(item2);
-                        self.next.push(item1);
-                        continue;
+
+                    Expr::IfThenElse(a, b, c) | Expr::Extend(a, b, c) => {
+                        stack.push(c);
+                        stack.push(b);
+                        stack.push(a);
                     }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.next.push(item3);
-                        self.next.push(item2);
-                        self.next.push(item1);
-                        continue;
+
+                    Expr::String(a) => {
+                        stack.extend(a.iter().rev().filter_map(|string_part| match string_part {
+                            StringPart::String(_) => None,
+                            StringPart::Expr(e) => Some(e),
+                        }));
                     }
-                    Step::Continue(xs) => {
-                        self.next.extend(xs.into_iter().rev());
-                        continue;
+                    Expr::Array(xs) => {
+                        stack.extend(xs);
+                    }
+                    Expr::Record(xs) => {
+                        xs.iter().rev().for_each(|(a, b)| {
+                            stack.push(b);
+                            stack.push(a);
+                        });
+                    }
+                    Expr::Case(a, b) => {
+                        b.iter().rev().for_each(|branch| {
+                            stack.push(&branch.body);
+                            match &branch.pattern {
+                                Pattern::Name
+                                | Pattern::Char(_)
+                                | Pattern::Int(_)
+                                | Pattern::String(_)
+                                | Pattern::Wildcard => {}
+                                Pattern::Variant { tag } => {
+                                    stack.push(tag);
+                                }
+                                Pattern::Record { names, .. } => {
+                                    stack.extend(names.iter().rev());
+                                }
+                            };
+                        });
+                        stack.push(a);
+                    }
+                    Expr::Cmd(parts) => {
+                        parts.iter().rev().for_each(|cmd_part| match cmd_part {
+                            CmdPart::Literal(_) => {}
+                            CmdPart::Expr(expr) => {
+                                stack.push(expr);
+                            }
+                            CmdPart::MultiPart {
+                                first,
+                                second,
+                                rest,
+                            } => {
+                                rest.iter().rev().for_each(|string_part| match string_part {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                });
+
+                                match second {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                }
+
+                                match first {
+                                    StringPart::String(_) => {}
+                                    StringPart::Expr(expr) => {
+                                        stack.push(expr);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    Expr::EVar(a) => {
+                        return Some(a);
                     }
                 },
             }
-        }
+        })
     }
 }
 
@@ -1600,14 +1652,14 @@ pub struct ClassMember {
     pub sig: TypeSig,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Declaration {
     BuiltinType {
         name: String,
         kind: Kind,
     },
     Definition {
-        name: String,
+        name: Rc<str>,
         sig: TypeSig,
         body: Rc<Expr>,
     },
@@ -1663,11 +1715,11 @@ impl Declaration {
             Declaration::Class(decl) => decl
                 .get_bindings(common_kinds)
                 .into_iter()
-                .map(|(a, b)| (Name::Definition(a), Binding::Expr(b.1)))
+                .map(|(a, b)| (Name::Definition(Rc::from(a.as_str())), Binding::Expr(b.1)))
                 .collect(),
             Declaration::Instance { .. } => HashMap::new(),
             Declaration::Module { name, decls } => HashMap::from([(
-                Name::Definition(name.clone()),
+                Name::Definition(Rc::from(name.as_ref())),
                 Binding::Module(
                     decls
                         .iter()
@@ -1683,7 +1735,7 @@ impl Declaration {
             Declaration::BuiltinType { .. } => HashMap::new(),
             Declaration::Definition { name, sig, body: _ } => {
                 let mut map = HashMap::new();
-                map.insert(name.clone(), Signature::TypeSig(sig.clone()));
+                map.insert(String::from(name.as_ref()), Signature::TypeSig(sig.clone()));
                 map
             }
             Declaration::Evidence { .. } => HashMap::new(),
@@ -1773,7 +1825,7 @@ impl ClassDeclaration {
                 };
                 let body: Rc<Expr> = Rc::new(Expr::mk_lam(
                     true,
-                    Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as u32 + ix as u32)),
+                    Expr::mk_project(Expr::Var(0), Expr::Int(supers_len as i32 + ix as i32)),
                 ));
 
                 (member.name.clone(), (sig, body))
@@ -1782,7 +1834,7 @@ impl ClassDeclaration {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Module {
     pub decls: Vec<Declaration>,
 }

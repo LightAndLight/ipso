@@ -1,0 +1,6 @@
+main : IO ()
+main =
+  comp
+    let directory = "dir"
+    println <| cmd.show `cat $directory/file`
+    println <| cmd.show `cat $directory   /   file`

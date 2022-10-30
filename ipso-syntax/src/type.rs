@@ -1,4 +1,5 @@
-use ipso_util::iter::Step;
+use crate::Spanned;
+use ipso_util::iter::Stack;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::{collections::HashMap, rc::Rc};
@@ -13,6 +14,7 @@ pub enum Type<A> {
     String,
     Bytes,
     Arrow,
+    Function(Rc<Spanned<Type<A>>>, Rc<Spanned<Type<A>>>),
     FatArrow,
     Constraints(Vec<Type<A>>),
     Array,
@@ -151,6 +153,10 @@ impl<A> Type<A> {
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
             Type::Arrow => Type::Arrow,
+            Type::Function(a, b) => Type::Function(
+                Rc::new(a.as_ref().map(|ty| ty.map(f))),
+                Rc::new(b.as_ref().map(|ty| ty.map(f))),
+            ),
             Type::FatArrow => Type::FatArrow,
             Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.map(f)).collect()),
             Type::Array => Type::Array,
@@ -179,6 +185,10 @@ impl<A> Type<A> {
             Type::String => Type::String,
             Type::Bytes => Type::Bytes,
             Type::Arrow => Type::Arrow,
+            Type::Function(a, b) => Type::Function(
+                Rc::new(a.as_ref().map(|ty| ty.subst(f))),
+                Rc::new(b.as_ref().map(|ty| ty.subst(f))),
+            ),
             Type::FatArrow => Type::FatArrow,
             Type::Constraints(cs) => Type::Constraints(cs.iter().map(|c| c.subst(f)).collect()),
             Type::Array => Type::Array,
@@ -197,12 +207,96 @@ impl<A> Type<A> {
         }
     }
 
-    pub fn iter_vars(&self) -> IterVars<A> {
-        IterVars { items: vec![self] }
+    pub fn iter_vars(&self) -> impl Iterator<Item = &A> {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
+                None => {
+                    return None;
+                }
+                Some(current) => match current {
+                    Type::Name(_)
+                    | Type::Bool
+                    | Type::Int
+                    | Type::Char
+                    | Type::String
+                    | Type::Bytes
+                    | Type::Arrow
+                    | Type::FatArrow
+                    | Type::Array
+                    | Type::Record
+                    | Type::Variant
+                    | Type::IO
+                    | Type::RowNil
+                    | Type::Unit
+                    | Type::Meta(_)
+                    | Type::Cmd => {}
+                    Type::HasField(_, a) => {
+                        stack.push(a);
+                    }
+                    Type::App(a, b) | Type::RowCons(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::Function(a, b) => {
+                        stack.push(&b.item);
+                        stack.push(&a.item);
+                    }
+                    Type::Constraints(cs) => {
+                        stack.extend(cs.iter().rev());
+                    }
+                    Type::Var(n) => {
+                        return Some(n);
+                    }
+                },
+            }
+        })
     }
 
-    pub fn iter_metas(&self) -> TypeIterMetas<A> {
-        TypeIterMetas::One(self)
+    pub fn iter_metas(&self) -> impl Iterator<Item = usize> + '_ {
+        let mut stack = Stack::one(self);
+        std::iter::from_fn(move || loop {
+            match stack.pop() {
+                None => {
+                    return None;
+                }
+                Some(current) => match current {
+                    Type::Name(_)
+                    | Type::Var(_)
+                    | Type::Bool
+                    | Type::Int
+                    | Type::Char
+                    | Type::String
+                    | Type::Bytes
+                    | Type::Arrow
+                    | Type::FatArrow
+                    | Type::Array
+                    | Type::Record
+                    | Type::Variant
+                    | Type::IO
+                    | Type::RowNil
+                    | Type::Unit
+                    | Type::Cmd => {}
+                    Type::HasField(_, a) => {
+                        stack.push(a);
+                    }
+                    Type::App(a, b) | Type::RowCons(_, a, b) => {
+                        stack.push(b);
+                        stack.push(a);
+                    }
+                    Type::Function(a, b) => {
+                        stack.push(&b.item);
+                        stack.push(&a.item);
+                    }
+                    Type::Constraints(cs) => {
+                        stack.extend(cs.iter().rev());
+                    }
+                    Type::Meta(n) => {
+                        return Some(*n);
+                    }
+                },
+            }
+        })
     }
 
     fn unwrap_arrow(&self) -> Option<(&Type<A>, &Type<A>)> {
@@ -404,11 +498,11 @@ impl<A> Type<A> {
         }
 
         if let Some((a, b)) = self.unwrap_fatarrow() {
-            if a.unwrap_arrow().is_some() {
+            if a.unwrap_fatarrow().is_some() {
                 s.push('(')
             }
             s.push_str(a.render().as_str());
-            if a.unwrap_arrow().is_some() {
+            if a.unwrap_fatarrow().is_some() {
                 s.push(')')
             }
             s.push_str(" => ");
@@ -425,6 +519,17 @@ impl<A> Type<A> {
             Type::String => s.push_str("String"),
             Type::Bytes => s.push_str("Bytes"),
             Type::Arrow => s.push_str("(->)"),
+            Type::Function(a, b) => {
+                if matches!(a.as_ref().item, Type::Function(_, _)) {
+                    s.push('(');
+                }
+                s.push_str(&a.as_ref().item.render());
+                if matches!(a.as_ref().item, Type::Function(_, _)) {
+                    s.push(')');
+                }
+                s.push_str(" -> ");
+                s.push_str(&b.as_ref().item.render());
+            }
             Type::FatArrow => s.push_str("(=>)"),
             Type::Constraints(cs) => {
                 s.push('(');
@@ -499,192 +604,5 @@ impl<A> Type<A> {
             Type::Cmd => s.push_str("Cmd"),
         }
         s
-    }
-}
-
-pub enum TypeIterMetas<'a, A> {
-    Zero,
-    One(&'a Type<A>),
-    Many { items: Vec<&'a Type<A>> },
-}
-
-impl<'a, A> TypeIterMetas<'a, A> {
-    fn pop(&mut self) -> Option<&'a Type<A>> {
-        let (m_new_self, result) = match self {
-            TypeIterMetas::Zero => (None, None),
-            TypeIterMetas::One(a) => (Some(TypeIterMetas::Zero), Some(*a)),
-            TypeIterMetas::Many { items } => {
-                let result = items.pop();
-                (None, result)
-            }
-        };
-        if let Some(new_self) = m_new_self {
-            *self = new_self
-        }
-        result
-    }
-
-    fn push(&mut self, item: &'a Type<A>) {
-        let m_new_self = match self {
-            TypeIterMetas::Zero => Some(TypeIterMetas::One(item)),
-            TypeIterMetas::One(a) => Some(TypeIterMetas::Many {
-                items: vec![a, item],
-            }),
-            TypeIterMetas::Many { items } => {
-                items.push(item);
-                None
-            }
-        };
-        if let Some(new_self) = m_new_self {
-            *self = new_self;
-        }
-    }
-}
-
-impl<'a, A> Iterator for TypeIterMetas<'a, A> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_kind<A>(ty: &Type<A>) -> Step<Type<A>, usize> {
-            match ty {
-                Type::Name(_) => Step::Skip,
-                Type::Var(_) => Step::Skip,
-                Type::Bool => Step::Skip,
-                Type::Int => Step::Skip,
-                Type::Char => Step::Skip,
-                Type::String => Step::Skip,
-                Type::Bytes => Step::Skip,
-                Type::Arrow => Step::Skip,
-                Type::FatArrow => Step::Skip,
-                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
-                Type::Array => Step::Skip,
-                Type::Record => Step::Skip,
-                Type::Variant => Step::Skip,
-                Type::IO => Step::Skip,
-                Type::App(a, b) => Step::Continue2(a, b),
-                Type::RowNil => Step::Skip,
-                Type::RowCons(_, a, b) => Step::Continue2(a, b),
-                Type::HasField(_, a) => Step::Continue1(a),
-                Type::Unit => Step::Skip,
-                Type::Meta(n) => Step::Yield(*n),
-                Type::Cmd => Step::Skip,
-            }
-        }
-
-        let mut res = None;
-        loop {
-            match self.pop() {
-                None => {
-                    break;
-                }
-                Some(kind) => match step_kind(kind) {
-                    Step::Yield(n) => {
-                        res = Some(n);
-                        break;
-                    }
-                    Step::Skip => {
-                        continue;
-                    }
-                    Step::Continue1(item) => {
-                        self.push(item);
-                        continue;
-                    }
-                    Step::Continue2(item1, item2) => {
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.push(item3);
-                        self.push(item2);
-                        self.push(item1);
-                        continue;
-                    }
-                    Step::Continue(items) => {
-                        for item in items.iter().rev() {
-                            self.push(item)
-                        }
-                        continue;
-                    }
-                },
-            }
-        }
-        res
-    }
-}
-
-#[derive(Debug)]
-pub struct IterVars<'a, A> {
-    items: Vec<&'a Type<A>>,
-}
-
-impl<'a, A> Iterator for IterVars<'a, A> {
-    type Item = &'a A;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        fn step_type<A>(ty: &Type<A>) -> Step<Type<A>, &A> {
-            match ty {
-                Type::Name(_) => Step::Skip,
-                Type::Var(n) => Step::Yield(n),
-                Type::Bool => Step::Skip,
-                Type::Int => Step::Skip,
-                Type::Char => Step::Skip,
-                Type::String => Step::Skip,
-                Type::Bytes => Step::Skip,
-                Type::Arrow => Step::Skip,
-                Type::FatArrow => Step::Skip,
-                Type::Constraints(cs) => Step::Continue(cs.iter().collect()),
-                Type::Array => Step::Skip,
-                Type::Record => Step::Skip,
-                Type::Variant => Step::Skip,
-                Type::IO => Step::Skip,
-                Type::App(a, b) => Step::Continue2(a, b),
-                Type::RowNil => Step::Skip,
-                Type::RowCons(_, a, b) => Step::Continue2(a, b),
-                Type::HasField(_, a) => Step::Continue1(a),
-                Type::Unit => Step::Skip,
-                Type::Meta(_) => Step::Skip,
-                Type::Cmd => Step::Skip,
-            }
-        }
-
-        let result;
-        loop {
-            match self.items.pop() {
-                None => {
-                    result = None;
-                    break;
-                }
-                Some(current) => match step_type(current) {
-                    Step::Skip => {
-                        continue;
-                    }
-                    Step::Continue1(item) => {
-                        self.items.push(item);
-                        continue;
-                    }
-                    Step::Continue2(item1, item2) => {
-                        self.items.push(item2);
-                        self.items.push(item1);
-                        continue;
-                    }
-                    Step::Continue3(item1, item2, item3) => {
-                        self.items.push(item3);
-                        self.items.push(item2);
-                        self.items.push(item1);
-                        continue;
-                    }
-                    Step::Continue(tys) => {
-                        self.items.extend(tys.iter().rev());
-                        continue;
-                    }
-                    Step::Yield(n) => {
-                        result = Some(n);
-                        break;
-                    }
-                },
-            }
-        }
-        result
     }
 }
