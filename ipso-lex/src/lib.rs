@@ -704,13 +704,31 @@ impl<'input> Iterator for Lexer<'input> {
                         }
                         '$' => {
                             self.consume();
-                            self.context.push(Mode::Ident);
 
-                            Some(Token {
-                                data: token::Data::Dollar,
-                                pos,
-                                column,
-                            })
+                            match self.current {
+                                Some(c) if c == '{' => {
+                                    let pos = self.pos;
+                                    let column = self.column;
+                                    self.consume();
+
+                                    self.context.push(Mode::Normal);
+
+                                    Some(Token {
+                                        data: token::Data::DollarLBrace,
+                                        pos,
+                                        column,
+                                    })
+                                }
+                                _ => {
+                                    self.context.push(Mode::Ident);
+
+                                    Some(Token {
+                                        data: token::Data::Dollar,
+                                        pos,
+                                        column,
+                                    })
+                                }
+                            }
                         }
                         '\n' => {
                             self.consume();
