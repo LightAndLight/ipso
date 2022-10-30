@@ -177,8 +177,6 @@ fn infer_record_1() {
     let modules = Default::default();
     let types = Default::default();
     let type_variables = Default::default();
-    let kind_inference_state = kind_inference::State::new();
-    let type_solutions = Default::default();
     let implications = Default::default();
     let type_signatures = Default::default();
     let source = Source::Interactive {
@@ -294,8 +292,8 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_state.kind_solutions,
-                &type_solutions,
+                &type_inference_state.kind_inference_state.kind_solutions,
+                &type_inference_state.type_solutions,
                 &constraint
             )
         ))
@@ -323,8 +321,8 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_state.kind_solutions,
-                &type_solutions,
+                &type_inference_state.kind_inference_state.kind_solutions,
+                &type_inference_state.type_solutions,
                 &constraint
             )
         ))
@@ -352,8 +350,8 @@ fn infer_record_1() {
         .map(|(expr, constraint)| (
             expr,
             zonk_constraint(
-                &kind_inference_state.kind_solutions,
-                &type_solutions,
+                &type_inference_state.kind_inference_state.kind_solutions,
+                &type_inference_state.type_solutions,
                 &constraint
             )
         ))
