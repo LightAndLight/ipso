@@ -291,6 +291,11 @@ hello!
 ```
 
 ```ipsorepl
+> `echo ${ string.join " " ["hello", "world"] }`
+`echo "hello world"`
+```
+
+```ipsorepl
 > :type \x -> `echo $x`
 ToArgs a => a -> Cmd
 ```
