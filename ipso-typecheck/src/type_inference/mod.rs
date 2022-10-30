@@ -471,10 +471,10 @@ fn check_record_pattern(
                 names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
                 evidence::Constraint::HasField {
                     field: field.clone(),
-                    rest: (**rest).clone(),
+                    rest: rest.as_ref().clone(),
                 },
             )));
-            names_tys.push((field.clone(), (**ty).clone()));
+            names_tys.push((field.clone(), ty.as_ref().clone()));
             row = rest.as_ref();
         }
         if let Some(rest) = rest {
