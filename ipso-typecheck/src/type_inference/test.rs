@@ -6,6 +6,7 @@ use crate::{
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
+use pretty_assertions::assert_eq;
 use std::{collections::HashMap, rc::Rc};
 
 const SOURCE_LABEL: &str = "test";

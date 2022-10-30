@@ -337,6 +337,7 @@ dependencies = [
  "ipso-rope",
  "ipso-syntax",
  "ipso-util",
+ "pretty_assertions",
 ]
 
 [[package]]

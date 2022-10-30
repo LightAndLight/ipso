@@ -5,6 +5,7 @@ use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, 
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, Spanned};
 use ipso_util::void::Void;
+use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::rc::Rc;
 
