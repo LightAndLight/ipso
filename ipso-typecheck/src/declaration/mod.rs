@@ -175,7 +175,7 @@ pub fn check_definition(
                 arg,
             )
         })
-        .collect();
+        .collect::<Result<_, type_inference::Error>>()?;
     let out_ty = type_inference_state.fresh_type_meta(Kind::Type);
 
     type_inference::unification::unify(
