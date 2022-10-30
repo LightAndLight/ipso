@@ -20,6 +20,7 @@ impl<T> Solution<T> {
 }
 
 /// A mapping from metavariables to their solutions.
+#[derive(Debug)]
 pub struct Solutions<T> {
     solutions: Vec<Solution<T>>,
 }
