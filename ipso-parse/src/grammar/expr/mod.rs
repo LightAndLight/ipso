@@ -256,7 +256,7 @@ pub fn expr_array(parser: &mut Parser) -> Parsed<Expr> {
 ```text
 cmd_part ::=
   '"' string_char* '"'
-  (cmd_char* | '$' ident)+
+  ( cmd_char* | '$' ident | '${' expr '}' )+
 ```
 
 ```text
@@ -281,7 +281,12 @@ pub fn cmd_part(parser: &mut Parser) -> Parsed<CmdPart> {
             .map(|value| StringPart::Expr(Spanned {
                 pos: value.pos,
                 item: Expr::Var(String::from(value.item.as_ref()))
-            }))
+            })),
+            between!(
+                parser.token(&token::Data::DollarLBrace),
+                parser.token(&token::Data::RBrace),
+                expr(parser).map(StringPart::Expr)
+            )
         )
     }
 

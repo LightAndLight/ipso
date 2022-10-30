@@ -4,8 +4,9 @@
   stdin = None Text,
   stdout = "",
   stderr =
+    let dollarCurly = "\${" in
     ''
-    issue216-cmd.ipso:2:21: error: expected one of: '$', '`', command fragment, space
+    issue216-cmd.ipso:2:21: error: expected one of: '$', '${dollarCurly}', '`', command fragment, space
       |
     2 | main = cmd.run `echo
       |                     ^
