@@ -6,6 +6,7 @@ use crate::{
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
+use pretty_assertions::assert_eq;
 use std::{collections::HashMap, rc::Rc};
 
 const SOURCE_LABEL: &str = "test";
@@ -87,13 +88,39 @@ fn infer_pattern_1() {
         };
         assert_eq!(
             infer_pattern(env, state, &pattern),
-            InferredPattern::Any {
+            Ok(InferredPattern::Any {
                 pattern: Pattern::Name,
                 names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
                 ty: Type::Meta(Kind::Type, 0),
-            }
+            })
         )
     })
+}
+
+fn zonk_inferred_pattern(state: &mut State, pattern: InferredPattern) -> InferredPattern {
+    match pattern {
+        InferredPattern::Any { pattern, names, ty } => InferredPattern::Any {
+            pattern,
+            names: names
+                .into_iter()
+                .map(|(name, ty)| (name, state.zonk_type(ty)))
+                .collect(),
+            ty: state.zonk_type(ty),
+        },
+        InferredPattern::Variant {
+            tag,
+            ctor,
+            arg_name,
+            arg_ty,
+            rest,
+        } => InferredPattern::Variant {
+            tag,
+            ctor,
+            arg_name,
+            arg_ty: state.zonk_type(arg_ty),
+            rest: state.zonk_type(rest),
+        },
+    }
 }
 
 #[test]
@@ -119,7 +146,7 @@ fn infer_pattern_2() {
                 rest: None,
             },
         };
-        let expected = InferredPattern::Any {
+        let expected = Ok(InferredPattern::Any {
             pattern: Pattern::Record {
                 names: vec![
                     Expr::mk_placeholder(0),
@@ -131,19 +158,21 @@ fn infer_pattern_2() {
             ty: Type::mk_record(
                 env.common_kinds,
                 vec![
-                    (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                    (Rc::from("y"), Type::Meta(Kind::Type, 1)),
-                    (Rc::from("z"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                    (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("z"), Type::Meta(Kind::Type, 3)),
                 ],
                 None,
             ),
             names: vec![
-                (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                (Rc::from("y"), Type::Meta(Kind::Type, 1)),
-                (Rc::from("z"), Type::Meta(Kind::Type, 2)),
+                (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                (Rc::from("z"), Type::Meta(Kind::Type, 3)),
             ],
-        };
-        let actual = infer_pattern(env, state, &pat);
+        });
+        let actual =
+            infer_pattern(env, state, &pat).map(|pattern| zonk_inferred_pattern(state, pattern));
+
         assert_eq!(expected, actual)
     })
 }
@@ -174,7 +203,7 @@ fn infer_pattern_3() {
                 }),
             },
         };
-        let expected = InferredPattern::Any {
+        let expected = Ok(InferredPattern::Any {
             pattern: Pattern::Record {
                 names: vec![
                     Expr::mk_placeholder(0),
@@ -186,23 +215,24 @@ fn infer_pattern_3() {
             ty: Type::mk_record(
                 env.common_kinds,
                 vec![
-                    (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                    (Rc::from("y"), Type::Meta(Kind::Type, 1)),
-                    (Rc::from("z"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                    (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("z"), Type::Meta(Kind::Type, 3)),
                 ],
-                Some(Type::Meta(Kind::Row, 3)),
+                Some(Type::Meta(Kind::Row, 4)),
             ),
             names: vec![
-                (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                (Rc::from("y"), Type::Meta(Kind::Type, 1)),
-                (Rc::from("z"), Type::Meta(Kind::Type, 2)),
+                (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                (Rc::from("z"), Type::Meta(Kind::Type, 3)),
                 (
                     Rc::from("w"),
-                    Type::mk_record(env.common_kinds, Vec::new(), Some(Type::Meta(Kind::Row, 3))),
+                    Type::mk_record(env.common_kinds, Vec::new(), Some(Type::Meta(Kind::Row, 4))),
                 ),
             ],
-        };
-        let actual = infer_pattern(env, state, &pat);
+        });
+        let actual =
+            infer_pattern(env, state, &pat).map(|pattern| zonk_inferred_pattern(state, pattern));
         assert_eq!(expected, actual)
     })
 }
@@ -220,13 +250,13 @@ fn infer_pattern_4() {
                 },
             },
         };
-        let expected = InferredPattern::Variant {
+        let expected = Ok(InferredPattern::Variant {
             tag: Rc::new(Expr::mk_placeholder(0)),
             ctor: Rc::from("just"),
             arg_name: Rc::from("x"),
-            arg_ty: Type::Meta(Kind::Type, 0),
-            rest: Type::Meta(Kind::Row, 1),
-        };
+            arg_ty: Type::Meta(Kind::Type, 1),
+            rest: Type::Meta(Kind::Row, 2),
+        });
         let actual = infer_pattern(env, state, &pat);
         assert_eq!(expected, actual)
     })
@@ -256,8 +286,8 @@ fn infer_lam_1() {
             Expr::mk_lam(true, Expr::Var(0)),
             Type::arrow(
                 env.common_kinds,
-                Type::Meta(Kind::Type, 0),
-                Type::Meta(Kind::Type, 0),
+                Type::Meta(Kind::Type, 1),
+                Type::Meta(Kind::Type, 1),
             ),
         ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
@@ -314,12 +344,12 @@ fn infer_lam_2() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 0),
+                Type::Meta(Kind::Type, 3),
             ),
         ));
         assert_eq!(expected, actual)
@@ -375,12 +405,12 @@ fn infer_lam_3() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 1),
+                Type::Meta(Kind::Type, 4),
             ),
         ));
         assert_eq!(expected, actual)
@@ -438,12 +468,12 @@ fn infer_lam_4() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 0)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 1)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
                     ],
-                    Some(Type::Meta(Kind::Row, 2)),
+                    Some(Type::Meta(Kind::Row, 5)),
                 ),
-                Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 2))),
+                Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 5))),
             ),
         ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
@@ -496,13 +526,13 @@ fn infer_lam_5() {
                 env.common_kinds,
                 Type::arrow(
                     env.common_kinds,
-                    Type::Meta(Kind::Type, 1),
-                    Type::Meta(Kind::Type, 3),
+                    Type::Meta(Kind::Type, 2),
+                    Type::Meta(Kind::Type, 5),
                 ),
                 Type::arrow(
                     env.common_kinds,
-                    Type::Meta(Kind::Type, 1),
-                    Type::Meta(Kind::Type, 3),
+                    Type::Meta(Kind::Type, 2),
+                    Type::Meta(Kind::Type, 5),
                 ),
             ),
         ));
@@ -925,11 +955,11 @@ fn infer_record_4() {
             },
             22,
             unification::Error::mismatch(
-                syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(1))),
                 syntax::Type::Int,
             )
             .with_hint(unification::ErrorHint::WhileUnifying {
-                expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(0))),
+                expected: syntax::Type::mk_record(Vec::new(), Some(syntax::Type::Meta(1))),
                 actual: syntax::Type::Int,
             }),
         ));
@@ -998,10 +1028,10 @@ fn infer_case_1() {
                 env.common_kinds,
                 &Type::mk_variant(
                     env.common_kinds,
-                    vec![(Rc::from("X"), Type::Meta(Kind::Type, 2))],
+                    vec![(Rc::from("X"), Type::Meta(Kind::Type, 4))],
                     None,
                 ),
-                &Type::Meta(Kind::Type, 2),
+                &Type::Meta(Kind::Type, 4),
             ),
         ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
@@ -1094,12 +1124,12 @@ fn infer_case_2() {
                 &Type::mk_variant(
                     env.common_kinds,
                     vec![
-                        (Rc::from("Left"), Type::Meta(Kind::Type, 4)),
-                        (Rc::from("Right"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("Left"), Type::Meta(Kind::Type, 6)),
+                        (Rc::from("Right"), Type::Meta(Kind::Type, 6)),
                     ],
                     None,
                 ),
-                &Type::Meta(Kind::Type, 4),
+                &Type::Meta(Kind::Type, 6),
             ),
         ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
@@ -1210,7 +1240,7 @@ fn infer_case_3() {
                         (Rc::from("Left"), Type::Int),
                         (Rc::from("Right"), Type::Int),
                     ],
-                    Some(Type::Meta(Kind::Row, 5)),
+                    Some(Type::Meta(Kind::Row, 7)),
                 ),
                 &Type::Int,
             ),

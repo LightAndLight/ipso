@@ -12,7 +12,7 @@ use ipso_syntax::{self as syntax, kind::Kind};
 use std::{collections::HashMap, rc::Rc};
 
 /// A mapping from type metavariables to their solutions.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Solutions(pub metavariables::Solutions<Type>);
 
 /**
