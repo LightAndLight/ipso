@@ -11,12 +11,10 @@ use crate::{
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use ipso_core::{
-    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, RowParts, Signature, StringPart,
-    Type, TypeSig,
+    Binop, Branch, CmdPart, CommonKinds, Expr, Name, Pattern, Signature, StringPart, Type, TypeSig,
 };
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, Spanned};
-use ipso_util::fnv_hash_multi_map::FnvHashMultimap;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -178,6 +176,9 @@ pub enum CheckedPattern {
         /// Evidence for the variant's tag.
         tag: Rc<Expr>,
 
+        /// The variant's constructor name.
+        ctor: Rc<str>,
+
         /// The variant's argument name.
         arg_name: Rc<str>,
 
@@ -332,18 +333,6 @@ impl Default for State {
     }
 }
 
-fn pattern_is_redundant(
-    seen_ctors: &FnvHashSet<&str>,
-    saw_catchall: bool,
-    pattern: &syntax::Pattern,
-) -> bool {
-    saw_catchall
-        || match pattern {
-            syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_ref()),
-            _ => false,
-        }
-}
-
 fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: Kind) -> Type {
     Type::Meta(kind, type_solutions.fresh_meta())
 }
@@ -362,51 +351,90 @@ fn check_duplicate_args(source: &Source, args: &[Spanned<syntax::Pattern>]) -> R
         })
 }
 
-fn infer_name_pattern(
-    type_solutions: &mut unification::Solutions,
-    name: &Spanned<Rc<str>>,
-) -> InferredPattern {
-    let name_ty = fresh_type_meta(type_solutions, Kind::Type);
-    InferredPattern::Any {
+fn check_name_pattern(name: &Spanned<Rc<str>>, expected: &Type) -> Result<CheckedPattern, Error> {
+    Ok(CheckedPattern::Any {
         pattern: Pattern::Name,
-        names: vec![(Rc::from(name.item.as_ref()), name_ty.clone())],
-        ty: name_ty,
-    }
+        names: vec![(Rc::from(name.item.as_ref()), expected.clone())],
+    })
 }
 
-fn infer_string_pattern(s: &Spanned<Rc<str>>) -> InferredPattern {
-    InferredPattern::Any {
+fn check_string_pattern(
+    env: Env,
+    state: &mut State,
+    s: &Spanned<Rc<str>>,
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        s.pos,
+        expected,
+        &Type::String,
+    )
+    .map_err(|error| Error::unification_error(env.source, s.pos, error))?;
+
+    Ok(CheckedPattern::Any {
         pattern: Pattern::String(s.item.clone()),
         names: Vec::new(),
-        ty: Type::String,
-    }
+    })
 }
 
-fn infer_int_pattern(n: &Spanned<i32>) -> InferredPattern {
-    InferredPattern::Any {
+fn check_int_pattern(
+    env: Env,
+    state: &mut State,
+    n: &Spanned<i32>,
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        n.pos,
+        expected,
+        &Type::Int,
+    )
+    .map_err(|error| Error::unification_error(env.source, n.pos, error))?;
+
+    Ok(CheckedPattern::Any {
         pattern: Pattern::Int(n.item),
         names: Vec::new(),
-        ty: Type::Int,
-    }
+    })
 }
 
-fn infer_char_pattern(c: &Spanned<char>) -> InferredPattern {
-    InferredPattern::Any {
+fn check_char_pattern(
+    env: Env,
+    state: &mut State,
+    c: &Spanned<char>,
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        c.pos,
+        expected,
+        &Type::Char,
+    )
+    .map_err(|error| Error::unification_error(env.source, c.pos, error))?;
+
+    Ok(CheckedPattern::Any {
         pattern: Pattern::Char(c.item),
         names: Vec::new(),
-        ty: Type::Char,
-    }
+    })
 }
 
-fn infer_record_pattern(
-    common_kinds: &CommonKinds,
-    type_solutions: &mut unification::Solutions,
-    evidence: &mut Evidence,
+fn check_record_pattern(
+    env: Env,
+    state: &mut State,
+    pos: usize,
     names: &[Spanned<Rc<str>>],
     rest: Option<&Spanned<Rc<str>>>,
-) -> InferredPattern {
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
     let mut names_to_positions: FnvHashMap<&str, usize> =
         FnvHashMap::with_capacity_and_hasher(names.len(), Default::default());
+
     let entire_row = {
         let fields = names
             .iter()
@@ -415,13 +443,23 @@ fn infer_record_pattern(
                 names_to_positions.insert(name_item_ref, name.pos);
                 (
                     Rc::from(name_item_ref),
-                    fresh_type_meta(type_solutions, Kind::Type),
+                    fresh_type_meta(&mut state.type_solutions, Kind::Type),
                 )
             })
             .collect();
-        let rest = rest.map(|_| fresh_type_meta(type_solutions, Kind::Row));
+        let rest = rest.map(|_| fresh_type_meta(&mut state.type_solutions, Kind::Row));
         Type::mk_rows(fields, rest)
     };
+
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        pos,
+        expected,
+        &Type::mk_app(&Type::mk_record_ctor(env.common_kinds), &entire_row),
+    )
+    .map_err(|error| Error::unification_error(env.source, pos, error))?;
 
     let (names, names_tys): (Vec<Expr>, Vec<(Rc<str>, Type)>) = {
         let mut names: Vec<Expr> = Vec::with_capacity(names.len());
@@ -429,7 +467,7 @@ fn infer_record_pattern(
 
         let mut row: &Type = &entire_row;
         while let Type::RowCons(field, ty, rest) = row {
-            names.push(Expr::Placeholder(evidence.placeholder(
+            names.push(Expr::Placeholder(state.evidence.placeholder(
                 names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
                 evidence::Constraint::HasField {
                     field: field.clone(),
@@ -442,84 +480,71 @@ fn infer_record_pattern(
         if let Some(rest) = rest {
             names_tys.push((
                 Rc::from(rest.item.as_ref()),
-                Type::app(Type::mk_record_ctor(common_kinds), row.clone()),
+                Type::app(Type::mk_record_ctor(env.common_kinds), row.clone()),
             ));
         }
 
         (names, names_tys)
     };
 
-    InferredPattern::Any {
+    Ok(CheckedPattern::Any {
         pattern: Pattern::Record {
             names,
             rest: rest.is_some(),
         },
         names: names_tys,
-        ty: Type::app(Type::mk_record_ctor(common_kinds), entire_row),
-    }
+    })
 }
 
-fn infer_variant_pattern(
-    type_solutions: &mut unification::Solutions,
-    evidence: &mut Evidence,
+fn check_variant_pattern(
+    env: Env,
+    state: &mut State,
     pos: usize,
     ctor: &str,
     arg: &Spanned<Rc<str>>,
-) -> InferredPattern {
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
     let ctor: Rc<str> = Rc::from(ctor);
-    let arg_ty = fresh_type_meta(type_solutions, Kind::Type);
-    let rest_row = fresh_type_meta(type_solutions, Kind::Row);
-    let tag = Expr::Placeholder(evidence.placeholder(
+
+    let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+    let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        pos,
+        expected,
+        &Type::mk_variant(
+            env.common_kinds,
+            vec![(ctor.clone(), arg_ty.clone())],
+            Some(rest_row.clone()),
+        ),
+    )
+    .map_err(|error| Error::unification_error(env.source, pos, error))?;
+
+    let tag = Expr::Placeholder(state.evidence.placeholder(
         pos,
         evidence::Constraint::HasField {
             field: ctor.clone(),
             rest: rest_row.clone(),
         },
     ));
-    InferredPattern::Variant {
+
+    Ok(CheckedPattern::Variant {
         tag: Rc::new(tag),
         ctor,
         arg_name: Rc::from(arg.item.as_ref()),
         arg_ty,
         rest: rest_row,
-    }
+    })
 }
 
-fn infer_wildcard_pattern(type_solutions: &mut unification::Solutions) -> InferredPattern {
-    InferredPattern::Any {
+fn check_wildcard_pattern(_expected: &Type) -> Result<CheckedPattern, Error> {
+    Ok(CheckedPattern::Any {
         pattern: Pattern::Wildcard,
         names: Vec::new(),
-        ty: fresh_type_meta(type_solutions, Kind::Type),
-    }
-}
-
-/// Infer a pattern's type.
-pub fn infer_pattern(
-    env: Env,
-    state: &mut State,
-    pattern: &Spanned<syntax::Pattern>,
-) -> InferredPattern {
-    match &pattern.item {
-        syntax::Pattern::Name(name) => infer_name_pattern(&mut state.type_solutions, name),
-        syntax::Pattern::Record { names, rest } => infer_record_pattern(
-            env.common_kinds,
-            &mut state.type_solutions,
-            &mut state.evidence,
-            names,
-            rest.as_ref(),
-        ),
-        syntax::Pattern::Variant { name, arg } => infer_variant_pattern(
-            &mut state.type_solutions,
-            &mut state.evidence,
-            pattern.pos,
-            name,
-            arg,
-        ),
-        syntax::Pattern::Char(c) => infer_char_pattern(c),
-        syntax::Pattern::Int(n) => infer_int_pattern(n),
-        syntax::Pattern::String(s) => infer_string_pattern(s),
-        syntax::Pattern::Wildcard => infer_wildcard_pattern(&mut state.type_solutions),
-    }
+    })
 }
 
 pub fn check_pattern(
@@ -528,33 +553,49 @@ pub fn check_pattern(
     pattern: &Spanned<syntax::Pattern>,
     expected: &Type,
 ) -> Result<CheckedPattern, Error> {
-    let result = infer_pattern(env, state, pattern);
+    match &pattern.item {
+        syntax::Pattern::Name(name) => check_name_pattern(name, expected),
+        syntax::Pattern::Char(c) => check_char_pattern(env, state, c, expected),
+        syntax::Pattern::Int(n) => check_int_pattern(env, state, n, expected),
+        syntax::Pattern::String(s) => check_string_pattern(env, state, s, expected),
+        syntax::Pattern::Wildcard => check_wildcard_pattern(expected),
+        syntax::Pattern::Record { names, rest } => {
+            check_record_pattern(env, state, pattern.pos, names, rest.as_ref(), expected)
+        }
+        syntax::Pattern::Variant { name, arg } => {
+            check_variant_pattern(env, state, pattern.pos, name, arg, expected)
+        }
+    }
+}
 
-    let actual = result.ty(env.common_kinds);
-    unification::unify(
-        env.as_unification_env(),
-        &mut state.kind_inference_state,
-        &mut state.type_solutions,
-        pattern.pos,
-        expected,
-        &actual,
-    )
-    .map_err(|error| Error::unification_error(env.source, pattern.pos, error))?;
-    Ok(match result {
-        InferredPattern::Any { pattern, names, .. } => CheckedPattern::Any { pattern, names },
-        InferredPattern::Variant {
+/// Infer a pattern's type.
+pub fn infer_pattern(
+    env: Env,
+    state: &mut State,
+    pattern: &Spanned<syntax::Pattern>,
+) -> Result<InferredPattern, Error> {
+    let expected = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+    let pattern = check_pattern(env, state, pattern, &expected)?;
+    match pattern {
+        CheckedPattern::Any { pattern, names } => Ok(InferredPattern::Any {
+            pattern,
+            names,
+            ty: expected,
+        }),
+        CheckedPattern::Variant {
             tag,
+            ctor,
             arg_name,
             arg_ty,
             rest,
-            ..
-        } => CheckedPattern::Variant {
+        } => Ok(InferredPattern::Variant {
             tag,
+            ctor,
             arg_name,
             arg_ty,
             rest,
-        },
-    })
+        }),
+    }
 }
 
 fn check_string_part(
@@ -570,22 +611,51 @@ fn check_string_part(
     }
 }
 
-/// Infer an expression's type.
-pub fn infer(
+/// Check an expression's type.
+pub fn check(
     env: Env,
     state: &mut State,
     expr: &Spanned<syntax::Expr>,
-) -> Result<(Expr, Type), Error> {
+    expected: &Type,
+) -> Result<Expr, Error> {
+    let position = expr.pos;
+
     match &expr.item {
         syntax::Expr::Var(name) => match state.variables.lookup_name(name) {
-            Some((index, ty)) => Ok((Expr::Var(index), ty.clone())),
+            Some((index, ty)) => {
+                unification::unify(
+                    env.as_unification_env(),
+                    &mut state.kind_inference_state,
+                    &mut state.type_solutions,
+                    position,
+                    expected,
+                    ty,
+                )
+                .map_err(|error| Error::unification_error(env.source, position, error))?;
+
+                Ok(Expr::Var(index))
+            }
             None => match env.type_signatures.get(name) {
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(state.instantiate(
-                        expr.pos,
-                        Expr::Name(Name::definition(name.clone())),
-                        type_signature,
-                    )),
+                    Signature::TypeSig(type_signature) => {
+                        let (expr, ty) = state.instantiate(
+                            expr.pos,
+                            Expr::Name(Name::definition(name.clone())),
+                            type_signature,
+                        );
+
+                        unification::unify(
+                            env.as_unification_env(),
+                            &mut state.kind_inference_state,
+                            &mut state.type_solutions,
+                            position,
+                            expected,
+                            &ty,
+                        )
+                        .map_err(|error| Error::unification_error(env.source, position, error))?;
+
+                        Ok(expr)
+                    }
                     Signature::Module(_) => Err(Error::not_a_value(env.source, expr.pos, name)),
                 },
                 None => Err(Error::not_in_scope(env.source, expr.pos, name)),
@@ -634,42 +704,223 @@ pub fn infer(
             match definitions.get(&item.item) {
                 None => Err(Error::not_in_scope(env.source, item.pos, &item.item)),
                 Some(signature) => match signature {
-                    Signature::TypeSig(type_signature) => Ok(state.instantiate(
-                        expr.pos,
-                        Expr::Module {
-                            id: *id,
-                            path: path.iter().map(|x| x.item.clone()).collect(),
-                            item: Name::definition(item.item.clone()),
-                        },
-                        type_signature,
-                    )),
+                    Signature::TypeSig(type_signature) => {
+                        let (expr, ty) = state.instantiate(
+                            expr.pos,
+                            Expr::Module {
+                                id: *id,
+                                path: path.iter().map(|x| x.item.clone()).collect(),
+                                item: Name::definition(item.item.clone()),
+                            },
+                            type_signature,
+                        );
+
+                        unification::unify(
+                            env.as_unification_env(),
+                            &mut state.kind_inference_state,
+                            &mut state.type_solutions,
+                            position,
+                            expected,
+                            &ty,
+                        )
+                        .map_err(|error| Error::unification_error(env.source, position, error))?;
+
+                        Ok(expr)
+                    }
                     Signature::Module(_) => {
                         Err(Error::not_a_value(env.source, item.pos, &item.item))
                     }
                 },
             }
         }
+        syntax::Expr::App(fun, arg) => {
+            let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
 
-        syntax::Expr::True => Ok((Expr::True, Type::Bool)),
-        syntax::Expr::False => Ok((Expr::False, Type::Bool)),
-        syntax::Expr::IfThenElse(condition, then_expr, else_expr) => {
-            let condition = check(env, state, condition, &Type::Bool)?;
-            let (then_expr, then_ty) = infer(env, state, then_expr)?;
-            let else_expr = check(env, state, else_expr, &then_ty)?;
-            Ok((
-                Expr::mk_ifthenelse(condition, then_expr, else_expr),
-                then_ty,
-            ))
+            let fun = check(
+                env,
+                state,
+                fun,
+                &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
+            )?;
+
+            let arg = check(env, state, arg, &in_ty)?;
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                position,
+                expected,
+                &out_ty,
+            )
+            .map_err(|error| Error::unification_error(env.source, position, error))?;
+
+            Ok(Expr::mk_app(fun, arg))
         }
+        syntax::Expr::Lam { args, body } => {
+            check_duplicate_args(env.source, args)?;
 
-        syntax::Expr::Int(n) => Ok((Expr::Int(*n), Type::Int)),
-        syntax::Expr::Char(c) => Ok((Expr::Char(*c), Type::Char)),
-        syntax::Expr::Unit => Ok((Expr::Unit, Type::Unit)),
+            let in_tys: Vec<Type> = args
+                .iter()
+                .map(|_| state.fresh_type_meta(Kind::Type))
+                .collect();
+            let out_ty = state.fresh_type_meta(Kind::Type);
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                position,
+                expected,
+                &in_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
+                    Type::arrow(env.common_kinds, el.clone(), acc)
+                }),
+            )
+            .map_err(|error| Error::unification_error(env.source, position, error))?;
+
+            let mut inferred_args: Vec<(Pattern<Expr>, Type)> = Vec::with_capacity(args.len());
+            let mut bound_variables: Vec<(Rc<str>, Type)> = Vec::new();
+
+            debug_assert!(
+                args.len() == in_tys.len(),
+                "args should be the same length as in_tys"
+            );
+            args.iter()
+                .zip(in_tys.iter())
+                .try_for_each(|(arg, arg_ty)| {
+                    let result = check_pattern(env, state, arg, arg_ty)?;
+                    inferred_args.push((result.pattern(), arg_ty.clone()));
+                    bound_variables.extend(result.names());
+                    Ok(())
+                })?;
+
+            state.variables.insert(&bound_variables);
+            let body = check(env, state, body, &out_ty)?;
+            state.variables.delete(bound_variables.len());
+
+            let expr = inferred_args
+                .into_iter()
+                .rev()
+                .fold(body, |body, (arg_pattern, _)| match arg_pattern {
+                    Pattern::Name => Expr::mk_lam(true, body),
+                    Pattern::Char(_)
+                    | Pattern::Int(_)
+                    | Pattern::String(_)
+                    | Pattern::Record { .. }
+                    | Pattern::Variant { .. } => Expr::mk_lam(
+                        true,
+                        Expr::mk_case(
+                            Expr::Var(0),
+                            vec![Branch {
+                                pattern: arg_pattern,
+                                body,
+                            }],
+                        ),
+                    ),
+                    Pattern::Wildcard => Expr::mk_lam(false, body),
+                });
+
+            Ok(expr)
+        }
+        syntax::Expr::True => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Bool,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::True)
+        }
+        syntax::Expr::False => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Bool,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::False)
+        }
+        syntax::Expr::Int(n) => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Int,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::Int(*n))
+        }
+        syntax::Expr::Char(c) => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Char,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::Char(*c))
+        }
+        syntax::Expr::Unit => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Unit,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::Unit)
+        }
+        syntax::Expr::String(string_parts) => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::String,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            let string_parts = string_parts
+                .iter()
+                .map(|string_part| check_string_part(env, state, string_part))
+                .collect::<Result<_, Error>>()?;
+
+            Ok(Expr::String(string_parts))
+        }
         syntax::Expr::Cmd(cmd_parts) => {
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::Cmd,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
             let cmd_parts = cmd_parts
                 .iter()
                 .map(|cmd_part| match cmd_part {
-                    syntax::CmdPart::Literal(value) => Ok(CmdPart::Literal(value.clone())),
+                    syntax::CmdPart::Literal(string) => Ok(CmdPart::Literal(string.clone())),
                     syntax::CmdPart::Expr(expr) => check(
                         env,
                         state,
@@ -698,500 +949,413 @@ pub fn infer(
                         })
                     }
                 })
-                .collect::<Result<Vec<CmdPart<Expr>>, _>>()?;
-            Ok((Expr::Cmd(cmd_parts), Type::Cmd))
-        }
-        syntax::Expr::String(string_parts) => {
-            let string_parts: Vec<StringPart<Expr>> = string_parts
-                .iter()
-                .map(|string_part| check_string_part(env, state, string_part))
-                .collect::<Result<_, _>>()?;
-            Ok((Expr::String(string_parts), Type::String))
+                .collect::<Result<_, Error>>()?;
+
+            Ok(Expr::Cmd(cmd_parts))
         }
         syntax::Expr::Array(items) => {
-            let item_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-            let items: Vec<Expr> = items
-                .iter()
-                .map(|item| check(env, state, item, &item_ty))
-                .collect::<Result<_, _>>()?;
-            Ok((
-                Expr::Array(items),
-                Type::app(Type::mk_array(env.common_kinds), item_ty),
-            ))
-        }
-
-        syntax::Expr::Binop(op, left, right) => match op.item {
-            syntax::Binop::Add => {
-                let left = check(env, state, left, &Type::Int)?;
-                let right = check(env, state, right, &Type::Int)?;
-                Ok((Expr::mk_binop(Binop::Add, left, right), Type::Int))
-            }
-            syntax::Binop::Multiply => {
-                let left = check(env, state, left, &Type::Int)?;
-                let right = check(env, state, right, &Type::Int)?;
-                Ok((Expr::mk_binop(Binop::Multiply, left, right), Type::Int))
-            }
-            syntax::Binop::Subtract => {
-                let left = check(env, state, left, &Type::Int)?;
-                let right = check(env, state, right, &Type::Int)?;
-                Ok((Expr::mk_binop(Binop::Subtract, left, right), Type::Int))
-            }
-            syntax::Binop::Divide => {
-                let left = check(env, state, left, &Type::Int)?;
-                let right = check(env, state, right, &Type::Int)?;
-                Ok((Expr::mk_binop(Binop::Divide, left, right), Type::Int))
-            }
-            syntax::Binop::Append => {
-                let item_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                let array_ty = Type::app(Type::mk_array(env.common_kinds), item_ty);
-                let left = check(env, state, left, &array_ty)?;
-                let right = check(env, state, right, &array_ty)?;
-                Ok((Expr::mk_binop(Binop::Append, left, right), array_ty))
-            }
-            syntax::Binop::Or => {
-                let left = check(env, state, left, &Type::Bool)?;
-                let right = check(env, state, right, &Type::Bool)?;
-                Ok((Expr::mk_binop(Binop::Or, left, right), Type::Bool))
-            }
-            syntax::Binop::And => {
-                let left = check(env, state, left, &Type::Bool)?;
-                let right = check(env, state, right, &Type::Bool)?;
-                Ok((Expr::mk_binop(Binop::And, left, right), Type::Bool))
-            }
-            syntax::Binop::LApply => {
-                let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                let left = check(
-                    env,
-                    state,
-                    left,
-                    &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
-                )?;
-                let right = check(env, state, right, &in_ty)?;
-                Ok((Expr::mk_binop(Binop::LApply, left, right), out_ty))
-            }
-            syntax::Binop::RApply => {
-                let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                let left = check(env, state, left, &in_ty)?;
-                let right = check(
-                    env,
-                    state,
-                    right,
-                    &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
-                )?;
-                Ok((Expr::mk_binop(Binop::RApply, left, right), out_ty))
-            }
-            syntax::Binop::Eq
-            | syntax::Binop::Neq
-            | syntax::Binop::Gt
-            | syntax::Binop::Gte
-            | syntax::Binop::Lt
-            | syntax::Binop::Lte => panic!("overloaded binop not desugared: {:?}", op.item),
-        },
-
-        syntax::Expr::App(fun, arg) => {
-            let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-            let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-            let fun = check(
-                env,
-                state,
-                fun,
-                &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
-            )?;
-            let arg = check(env, state, arg, &in_ty)?;
-            Ok((Expr::mk_app(fun, arg), out_ty))
-        }
-        syntax::Expr::Lam { args, body } => {
-            check_duplicate_args(env.source, args)?;
-
-            let mut inferred_args: Vec<(Pattern<Expr>, Type)> = Vec::with_capacity(args.len());
-            let bound_variables: Vec<(Rc<str>, Type)> = args
-                .iter()
-                .flat_map(|arg| {
-                    let result = infer_pattern(env, state, arg);
-                    inferred_args.push((result.pattern(), result.ty(env.common_kinds)));
-                    result.names().into_iter()
-                })
-                .collect();
-
-            state.variables.insert(&bound_variables);
-            let (body, body_ty) = infer(env, state, body)?;
-            state.variables.delete(bound_variables.len());
-
-            let (expr, ty) = inferred_args.into_iter().rev().fold(
-                (body, body_ty),
-                |(body, body_ty), (arg_pattern, arg_ty)| {
-                    let body = match arg_pattern {
-                        Pattern::Name => Expr::mk_lam(true, body),
-                        Pattern::Char(_)
-                        | Pattern::Int(_)
-                        | Pattern::String(_)
-                        | Pattern::Record { .. }
-                        | Pattern::Variant { .. } => Expr::mk_lam(
-                            true,
-                            Expr::mk_case(
-                                Expr::Var(0),
-                                vec![Branch {
-                                    pattern: arg_pattern,
-                                    body,
-                                }],
-                            ),
-                        ),
-                        Pattern::Wildcard => Expr::mk_lam(false, body),
-                    };
-                    let body_ty = Type::arrow(env.common_kinds, arg_ty, body_ty);
-
-                    (body, body_ty)
-                },
-            );
-
-            Ok((expr, ty))
-        }
-        syntax::Expr::Let { name, value, rest } => {
-            let (value, value_ty) = infer(env, state, value)?;
-
-            state.variables.insert(&[(name.clone(), value_ty)]);
-            let (rest, rest_ty) = infer(env, state, rest)?;
-            state.variables.delete(1);
-
-            Ok((Expr::mk_let(value, rest), rest_ty))
-        }
-
-        syntax::Expr::Record { fields, rest } => {
-            let mut field_to_expr: FnvHashMultimap<&str, Expr> =
-                FnvHashMultimap::with_capacity(fields.len());
-            let mut field_to_pos: FnvHashMultimap<&str, usize> =
-                FnvHashMultimap::with_capacity(fields.len());
-
-            let entire_row: Type = {
-                let fields = fields
-                    .iter()
-                    .map(|(field_name, field_expr)| {
-                        let field_pos = field_expr.pos;
-                        infer(env, state, field_expr).map(|(field_expr, field_ty)| {
-                            let field_name_str = field_name.as_str();
-                            field_to_expr.insert(field_name_str, field_expr);
-                            field_to_pos.insert(field_name_str, field_pos);
-                            (Rc::from(field_name_str), field_ty)
-                        })
-                    })
-                    .collect::<Result<_, _>>()?;
-                let rest = rest
-                    .as_ref()
-                    .map(|_| fresh_type_meta(&mut state.type_solutions, Kind::Row));
-                Ok(Type::mk_rows(fields, rest))
-            }?;
-
-            /*
-            FnvHashMultimap's values are last-in-first-out. To
-            preserve the actual order of fields in the record, we need to
-            reverse the order of the values.
-            */
-            field_to_expr.reverse_values();
-            field_to_pos.reverse_values();
-
-            let mut expr_fields: Vec<(Expr, Expr)> = Vec::with_capacity(fields.len());
-            let mut ty_fields: Vec<(Rc<str>, Type)> = Vec::with_capacity(fields.len());
-
-            let mut row = &entire_row;
-            while let Type::RowCons(field, ty, rest) = row {
-                let field_index = Expr::Placeholder(state.evidence.placeholder(
-                    field_to_pos.get(field.as_ref()).copied().unwrap_or(0),
-                    evidence::Constraint::HasField {
-                        field: field.clone(),
-                        rest: (**rest).clone(),
-                    },
-                ));
-                let field_expr = field_to_expr.remove(field.as_ref()).unwrap();
-                expr_fields.push((field_index, field_expr));
-                ty_fields.push((field.clone(), (**ty).clone()));
-
-                row = rest.as_ref()
-            }
-
-            let (expr_rest, ty_rest) = match rest {
-                Some(rest) => {
-                    let rest = check(
-                        env,
-                        state,
-                        rest,
-                        &Type::mk_app(&Type::mk_record_ctor(env.common_kinds), row),
-                    )?;
-                    Ok((Some(rest), Some(row.clone())))
-                }
-                None => {
-                    let expected = Type::RowNil;
-                    let actual = row;
-
-                    unification::unify(
-                        env.as_unification_env(),
-                        &mut state.kind_inference_state,
-                        &mut state.type_solutions,
-                        expr.pos,
-                        &expected,
-                        actual,
-                    )
-                    .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
-
-                    Ok((None, None))
-                }
-            }?;
-
-            Ok((
-                Expr::mk_record(expr_fields, expr_rest),
-                Type::mk_record(env.common_kinds, ty_fields, ty_rest),
-            ))
-        }
-        syntax::Expr::Project(expr, field) => {
-            let field_name: Rc<str> = Rc::from(field.item.as_str());
-            let field_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-
-            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
-
-            let pos = expr.pos;
-            let expr = check(
-                env,
-                state,
-                expr,
-                &Type::mk_record(
-                    env.common_kinds,
-                    vec![(field_name.clone(), field_ty.clone())],
-                    Some(rest_row.clone()),
-                ),
-            )?;
-
-            let placeholder = Expr::Placeholder(state.evidence.placeholder(
-                pos,
-                evidence::Constraint::HasField {
-                    field: field_name,
-                    rest: rest_row,
-                },
-            ));
-            Ok((Expr::mk_project(expr, placeholder), field_ty))
-        }
-
-        syntax::Expr::Variant(constructor) => {
-            let pos = constructor.pos;
-            let constructor: Rc<str> = Rc::from(constructor.item.as_str());
-
-            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
-            let placeholder = Expr::Placeholder(state.evidence.placeholder(
-                pos,
-                evidence::Constraint::HasField {
-                    field: constructor.clone(),
-                    rest: rest_row.clone(),
-                },
-            ));
-
-            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-            Ok((
-                Expr::mk_variant(placeholder),
-                Type::arrow(
-                    env.common_kinds,
-                    arg_ty.clone(),
-                    Type::mk_variant(
-                        env.common_kinds,
-                        vec![(constructor, arg_ty)],
-                        Some(rest_row),
-                    ),
-                ),
-            ))
-        }
-        syntax::Expr::Embed(constructor, expr) => {
-            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
-            let expr = check(
-                env,
-                state,
-                expr,
-                &Type::app(Type::mk_variant_ctor(env.common_kinds), rest_row.clone()),
-            )?;
-
-            let constructor_pos = constructor.pos;
-            let constructor: Rc<str> = Rc::from(constructor.item.as_str());
-            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-            let placeholder = Expr::Placeholder(state.evidence.placeholder(
-                constructor_pos,
-                evidence::Constraint::HasField {
-                    field: constructor.clone(),
-                    rest: rest_row.clone(),
-                },
-            ));
-            Ok((
-                Expr::mk_embed(placeholder, expr),
-                Type::mk_variant(
-                    env.common_kinds,
-                    vec![(constructor, arg_ty)],
-                    Some(rest_row),
-                ),
-            ))
-        }
-        syntax::Expr::Case(expr, branches) => infer_case(env, state, expr, branches),
-
-        syntax::Expr::Comp(_) => {
-            panic!("computation expression was not desugared")
-        }
-    }
-}
-
-fn infer_case(
-    env: Env,
-    state: &mut State,
-    expr: &Spanned<syntax::Expr>,
-    branches: &[syntax::Branch],
-) -> Result<(Expr, Type), Error> {
-    let position = expr.pos;
-    let (expr, mut expr_ty) = infer(env, state, expr)?;
-
-    /*
-    [note: peeling constructors when matching on variants]
-
-    As each variant constructor is checked, the constructor needs to be 'peeled'
-    off the original expression type before checking the next branch.
-
-    When a catch-all pattern is reached, it can be assigned a variant type that's
-    missing all the constructors that have already been matched.
-
-    e.g.
-
-    ```
-    # expr : (| A : a, B : b, c : C, d : D |)
-    case expr of
-      # check that `A x` has type `(| A : a, B : b, c : C, d : D |)`
-      A x -> ...
-
-      # check that `B y` has type `(| B : b, c : C, d : D |)`
-      B y -> ...
-
-      # check that `c` has type `(| c : C, d : D |)`
-      c -> ...
-    ```
-
-    A consequence of this is that the tags associated with each variant pattern
-    aren't unique. The above example gives:
-
-    ```
-    case expr of
-      # A's tag is 0
-      A x -> ...
-
-      # B's tag is also 0 (because `B` is lexicographically the first constructor
-      # in `(| B : b, c : C, d : D |)`)
-      B y -> ...
-
-      c -> ...
-    ```
-
-    But if we change the example to
-
-    ```
-    # expr : (| A : a, B : b, c : C, d : D |)
-    case expr of
-      # check that `B x` has type `(| A : a, B : b, c : C, d : D |)`
-      B y -> ...
-
-      # check that `A y` has type `(| A : a, c : C, d : D |)`
-      A x -> ...
-
-      # check that `c` has type `(| c : C, d : D |)`
-      c -> ...
-    ```
-
-    then we get
-
-    ```
-    case expr of
-      # B's tag is 1
-      B x -> ...
-
-      # A's tag is 0 (because `A` is lexicographically the first constructor
-      # in `(| A : a, c : C, d : D |)`)
-      A y -> ...
-
-      c -> ...
-    ```
-
-    The interpreter needs to account for this when checking pattern matches.
-    */
-
-    let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-    let mut seen_ctors = FnvHashSet::default();
-    let mut saw_catchall = false;
-    let branches: Vec<Branch<Expr>> = branches
-        .iter()
-        .map(|branch| {
-            if pattern_is_redundant(&seen_ctors, saw_catchall, &branch.pattern.item) {
-                return Err(Error::redundant_pattern(env.source, branch.pattern.pos));
-            }
-
-            if let syntax::Pattern::Variant { name, .. } = &branch.pattern.item {
-                seen_ctors.insert(name.as_ref());
-            }
-
-            let result = check_pattern(env, state, &branch.pattern, &expr_ty)?;
-
-            if let CheckedPattern::Variant { rest, .. } = &result {
-                expr_ty = Type::app(Type::mk_variant_ctor(env.common_kinds), rest.clone())
-            }
-
-            let names = result.names();
-            state.variables.insert(&names);
-            let body = check(env, state, &branch.body, &out_ty)?;
-            state.variables.delete(names.len());
-
-            let pattern = result.pattern();
-            if let Pattern::Wildcard | Pattern::Name = pattern {
-                saw_catchall = true;
-            }
-
-            Ok(Branch { pattern, body })
-        })
-        .collect::<Result<_, _>>()?;
-
-    state.zonk_type_mut(&mut expr_ty);
-    match expr_ty.unwrap_variant() {
-        Some(RowParts {
-            rest: Some(rest), ..
-        }) if !saw_catchall => {
-            let expected = Type::RowNil;
-            let actual = rest;
+            let item_type = fresh_type_meta(&mut state.type_solutions, Kind::Type);
 
             unification::unify(
                 env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
-                position,
-                &expected,
-                actual,
+                expr.pos,
+                expected,
+                &Type::app(Type::mk_array(env.common_kinds), item_type.clone()),
             )
-            .map_err(|error| Error::unification_error(env.source, position, error))
-        }
-        _ => Ok(()),
-    }?;
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
-    Ok((Expr::mk_case(expr, branches), out_ty))
+            let items = items
+                .iter()
+                .map(|item| check(env, state, item, &item_type))
+                .collect::<Result<_, Error>>()?;
+
+            Ok(Expr::Array(items))
+        }
+        syntax::Expr::IfThenElse(condition, a, b) => {
+            let condition = check(env, state, condition, &Type::Bool)?;
+            let a = check(env, state, a, expected)?;
+            let b = check(env, state, b, expected)?;
+            Ok(Expr::mk_ifthenelse(condition, a, b))
+        }
+        syntax::Expr::Let { name, value, rest } => {
+            let (value, value_type) = infer(env, state, value)?;
+
+            state.variables.insert(&[(name.clone(), value_type)]);
+            let rest = check(env, state, rest, expected)?;
+            state.variables.delete(1);
+
+            Ok(Expr::mk_let(value, rest))
+        }
+        syntax::Expr::Binop(op, left, right) => {
+            let (op, expected_left_ty, expected_right_ty, actual_out_ty) = match op.item {
+                syntax::Binop::Add => (Binop::Add, Type::Int, Type::Int, Type::Int),
+                syntax::Binop::Multiply => (Binop::Multiply, Type::Int, Type::Int, Type::Int),
+                syntax::Binop::Subtract => (Binop::Subtract, Type::Int, Type::Int, Type::Int),
+                syntax::Binop::Divide => (Binop::Divide, Type::Int, Type::Int, Type::Int),
+                syntax::Binop::Append => {
+                    let item_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    let array_ty = Type::app(Type::mk_array(env.common_kinds), item_ty);
+                    (Binop::Append, array_ty.clone(), array_ty.clone(), array_ty)
+                }
+                syntax::Binop::Or => (Binop::Or, Type::Bool, Type::Bool, Type::Bool),
+                syntax::Binop::And => (Binop::And, Type::Bool, Type::Bool, Type::Bool),
+                syntax::Binop::LApply => {
+                    let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    (
+                        Binop::LApply,
+                        Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
+                        in_ty,
+                        out_ty,
+                    )
+                }
+                syntax::Binop::RApply => {
+                    let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    (
+                        Binop::RApply,
+                        in_ty.clone(),
+                        Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
+                        out_ty,
+                    )
+                }
+                syntax::Binop::Eq
+                | syntax::Binop::Neq
+                | syntax::Binop::Gt
+                | syntax::Binop::Gte
+                | syntax::Binop::Lt
+                | syntax::Binop::Lte => panic!("overloaded binop not desugared: {:?}", op.item),
+            };
+
+            let left = check(env, state, left, &expected_left_ty)?;
+            let right = check(env, state, right, &expected_right_ty)?;
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &actual_out_ty,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            Ok(Expr::mk_binop(op, left, right))
+        }
+        syntax::Expr::Project(record, field) => {
+            let field_name: Rc<str> = Rc::from(field.item.as_str());
+
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+            let expected = Type::mk_record(
+                env.common_kinds,
+                vec![(field_name.clone(), expected.clone())],
+                Some(rest_row.clone()),
+            );
+
+            let record = check(env, state, record, &expected)?;
+
+            let field = Expr::Placeholder(state.evidence.placeholder(
+                expr.pos,
+                evidence::Constraint::HasField {
+                    field: field_name,
+                    rest: rest_row,
+                },
+            ));
+
+            Ok(Expr::mk_project(record, field))
+        }
+        syntax::Expr::Variant(constructor) => {
+            let constructor_name: Rc<str> = Rc::from(constructor.item.as_str());
+
+            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+            let actual = Type::mk_arrow(
+                env.common_kinds,
+                &arg_ty,
+                &Type::mk_variant(
+                    env.common_kinds,
+                    vec![(constructor_name.clone(), arg_ty.clone())],
+                    Some(rest_row.clone()),
+                ),
+            );
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &actual,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            let tag = Expr::Placeholder(state.evidence.placeholder(
+                expr.pos,
+                evidence::Constraint::HasField {
+                    field: constructor_name,
+                    rest: rest_row,
+                },
+            ));
+
+            Ok(Expr::mk_variant(tag))
+        }
+        syntax::Expr::Embed(constructor, rest) => {
+            let constructor_name: Rc<str> = Rc::from(constructor.item.as_str());
+
+            let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &Type::mk_variant(
+                    env.common_kinds,
+                    vec![(constructor_name.clone(), arg_ty)],
+                    Some(rest_row.clone()),
+                ),
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            let rest = check(
+                env,
+                state,
+                rest,
+                &Type::app(Type::mk_variant_ctor(env.common_kinds), rest_row.clone()),
+            )?;
+
+            let tag = Expr::Placeholder(state.evidence.placeholder(
+                expr.pos,
+                evidence::Constraint::HasField {
+                    field: constructor_name,
+                    rest: rest_row,
+                },
+            ));
+
+            Ok(Expr::mk_embed(tag, rest))
+        }
+        syntax::Expr::Record { fields, rest } => {
+            let rest_row = match rest {
+                Some(_) => fresh_type_meta(&mut state.type_solutions, Kind::Row),
+                None => Type::RowNil,
+            };
+
+            // let mut field_to_type: FnvHashMap<&str, Type> = FnvHashMap::default();
+            let typed_fields = fields
+                .iter()
+                .map(|(field_name, _)| {
+                    let field_type = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+                    // let _ = field_to_type
+                    // .entry(field_name)
+                    // .or_insert_with(|| field_type.clone());
+                    (Rc::from(field_name.as_str()), field_type)
+                })
+                .collect::<Vec<_>>();
+
+            let actual_row = Type::mk_rows(typed_fields, Some(rest_row.clone()));
+            let actual = Type::app(Type::mk_record_ctor(env.common_kinds), actual_row.clone());
+
+            unification::unify(
+                env.as_unification_env(),
+                &mut state.kind_inference_state,
+                &mut state.type_solutions,
+                expr.pos,
+                expected,
+                &actual,
+            )
+            .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
+
+            let mut current_row = actual_row;
+            let fields = fields
+                .iter()
+                .map(|(field_name, field_value)| {
+                    debug_assert!(matches!(current_row, Type::RowCons(_, _, _)));
+
+                    let (_field_name, field_type, remaining_row) = match &current_row {
+                        Type::RowCons(a, b, c) => (a.clone(), b.clone(), c.clone()),
+                        _ => unreachable!(),
+                    };
+
+                    let field_name: Rc<str> = Rc::from(field_name.as_str());
+                    debug_assert!(_field_name == field_name);
+
+                    // let field_type = field_to_type.get(field_name.as_ref()).unwrap_or_else(|| {
+                    // panic!(
+                    // "internal error: {:?} missing from `field_to_type`",
+                    // field_name,
+                    // )
+                    // });
+                    // if cfg!(debug_assertions) {
+                    // let _field_type = state.zonk_type(_field_type.as_ref().clone());
+                    // let field_type = state.zonk_type(field_type.clone());
+                    // assert!(_field_type == field_type);
+                    // }
+
+                    let field_value = check(env, state, field_value, &field_type)?;
+
+                    let field = Expr::Placeholder(state.evidence.placeholder(
+                        expr.pos,
+                        evidence::Constraint::HasField {
+                            field: field_name,
+                            rest: remaining_row.as_ref().clone(),
+                        },
+                    ));
+
+                    current_row = remaining_row.as_ref().clone();
+
+                    Ok((field, field_value))
+                })
+                .collect::<Result<_, Error>>()?;
+
+            let rest = match rest {
+                Some(rest) => {
+                    let rest = check(
+                        env,
+                        state,
+                        rest,
+                        &Type::app(Type::mk_record_ctor(env.common_kinds), rest_row),
+                    )?;
+                    Ok(Some(rest))
+                }
+                None => Ok(None),
+            }?;
+
+            Ok(Expr::mk_record(fields, rest))
+        }
+        syntax::Expr::Case(value, branches) => {
+            fn pattern_is_redundant(
+                seen_ctors: &FnvHashSet<Rc<str>>,
+                saw_catchall: bool,
+                pattern: &syntax::Pattern,
+            ) -> bool {
+                saw_catchall
+                    || match pattern {
+                        syntax::Pattern::Variant { name, .. } => seen_ctors.contains(name.as_ref()),
+                        _ => false,
+                    }
+            }
+
+            let mut seen_ctors: FnvHashSet<Rc<str>> = FnvHashSet::default();
+
+            let (value, value_ty) = infer(env, state, value)?;
+
+            let mut current_value_ty = value_ty;
+            let mut has_catchall = false;
+
+            let branches = branches
+                .iter()
+                .map(|branch| {
+                    if pattern_is_redundant(&seen_ctors, has_catchall, &branch.pattern.item) {
+                        Err(Error::redundant_pattern(env.source, branch.pattern.pos))
+                    } else {
+                        Ok(())
+                    }?;
+
+                    let pattern = check_pattern(env, state, &branch.pattern, &current_value_ty)?;
+
+                    if let CheckedPattern::Variant { ctor, rest, .. } = &pattern {
+                        current_value_ty =
+                            Type::app(Type::mk_variant_ctor(env.common_kinds), rest.clone());
+
+                        seen_ctors.insert(ctor.clone());
+                    }
+
+                    has_catchall = has_catchall
+                        || match &pattern {
+                            CheckedPattern::Any { pattern, .. } => match pattern {
+                                Pattern::Record { .. }
+                                | Pattern::Variant { .. }
+                                | Pattern::Char(_)
+                                | Pattern::Int(_)
+                                | Pattern::String(_) => false,
+                                Pattern::Name | Pattern::Wildcard => true,
+                            },
+                            CheckedPattern::Variant { .. } => false,
+                        };
+
+                    let body = state.with_bound_vars(&pattern.names(), |state| {
+                        check(env, state, &branch.body, expected)
+                    })?;
+
+                    Ok(Branch {
+                        pattern: pattern.pattern(),
+                        body,
+                    })
+                })
+                .collect::<Result<_, Error>>()?;
+
+            /*
+            When a `case` expression on variants has no catch-all patterns (i.e. names or wildcards),
+            its scrutinee should be treated as a closed variant.
+
+            ## Example (no catch-alls)
+
+            This expression:
+
+            ```
+            \x ->
+              case x of
+                A a -> 0
+                B b -> 1
+            ```
+
+            has type `(| A : a, B : b |) -> Int`
+
+            ## Example (catch-all)
+
+            This expression:
+
+            ```
+            \x ->
+              case x of
+                A a -> 0
+                B b -> 1
+                _ -> 2
+            ```
+
+            has type `(| A : a, B : b, r |) -> Int`
+            */
+            state
+                .zonk_type(current_value_ty)
+                .unwrap_variant()
+                .iter()
+                .try_for_each(|row_parts| {
+                    if !has_catchall {
+                        row_parts.rest.iter().try_for_each(|rest| {
+                            unification::unify(
+                                env.as_unification_env(),
+                                &mut state.kind_inference_state,
+                                &mut state.type_solutions,
+                                expr.pos,
+                                &Type::RowNil,
+                                rest,
+                            )
+                            .map_err(|error| Error::unification_error(env.source, expr.pos, error))
+                        })
+                    } else {
+                        Ok(())
+                    }
+                })?;
+
+            Ok(Expr::mk_case(value, branches))
+        }
+        syntax::Expr::Comp(_comp_lines) => {
+            panic!("computation expression was not desugared")
+        }
+    }
 }
 
-/// Check an expression's type.
-pub fn check(
+/// Infer an expression's type.
+pub fn infer(
     env: Env,
     state: &mut State,
     expr: &Spanned<syntax::Expr>,
-    expected: &Type,
-) -> Result<Expr, Error> {
-    let position = expr.pos;
-    let (expr, expr_ty) = infer(env, state, expr)?;
-
-    let actual = expr_ty;
-    unification::unify(
-        env.as_unification_env(),
-        &mut state.kind_inference_state,
-        &mut state.type_solutions,
-        position,
-        expected,
-        &actual,
-    )
-    .map_err(|error| Error::unification_error(env.source, position, error))?;
-
-    Ok(expr)
+) -> Result<(Expr, Type), Error> {
+    let ty = state.fresh_type_meta(Kind::Type);
+    let expr = check(env, state, expr, &ty)?;
+    Ok((expr, state.zonk_type(ty)))
 }
