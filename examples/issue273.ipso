@@ -1,0 +1,7 @@
+f : (| A : a, r |) -> a
+f x =
+  case x of
+    A a -> a
+
+main : IO ()
+main = io.pure ()
