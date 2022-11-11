@@ -1241,6 +1241,7 @@ pub fn check(
 
             let mut seen_ctors: FnvHashSet<Rc<str>> = FnvHashSet::default();
 
+            let value_pos = value.pos;
             let (value, value_ty) = infer(env, state, value)?;
 
             let mut current_value_ty = value_ty;
@@ -1330,11 +1331,11 @@ pub fn check(
                                 env.as_unification_env(),
                                 &mut state.kind_inference_state,
                                 &mut state.type_solutions,
-                                expr.pos,
+                                value_pos,
                                 &Type::RowNil,
                                 rest,
                             )
-                            .map_err(|error| Error::unification_error(env.source, expr.pos, error))
+                            .map_err(|error| Error::unification_error(env.source, value_pos, error))
                         })
                     } else {
                         Ok(())
