@@ -18,9 +18,9 @@ main =
           # extract `version` from `pub const VERSION: &str = "version";`
           let versionInRust = 
             versionLine 
-            |> string.split ' '
+            |> string.splitc ' '
             |> array.index 5
-            |> string.split '"'
+            |> string.splitc '"'
             |> array.index 1
           
           println "$versionVar version: $versionInGit"

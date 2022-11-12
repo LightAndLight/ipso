@@ -1051,9 +1051,24 @@ where {
                     }
                 )
             }
-            Builtin::SplitString => {
+            Builtin::StringSplit => {
                 function2!(
-                    split_string,
+                    string_split,
+                    self,
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let sep = env[0].unpack_string();
+                        let s = arg.unpack_string();
+                        let a = eval.alloc_values(
+                            s.split(sep)
+                                .map(|s| eval.alloc(Object::String(Rc::from(s)))),
+                        );
+                        eval.alloc(Object::Array(a))
+                    }
+                )
+            }
+            Builtin::StringSplitc => {
+                function2!(
+                    string_splitc,
                     self,
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();
