@@ -447,7 +447,9 @@ module string where
 
   filter : (Char -> Bool) -> String -> String
 
-  split : Char -> String -> Array String
+  split : String -> String -> Array String
+  
+  splitc : Char -> String -> Array String
 
   join : String -> Array String -> String
 
@@ -660,7 +662,7 @@ module cmd where
   
   # Run a command, capturing the lines it writes to `stdout`.
   #
-  # `lines command` is equivalent to `io.map (string.split '\n') (cmd.read command)`
+  # `lines command` is equivalent to `io.map (string.splitc '\n') (cmd.read command)`
   lines : Cmd -> IO (Array String)
  
   # Run a command and execute an `IO` action for each line written to `stdout`.
