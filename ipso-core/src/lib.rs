@@ -754,6 +754,7 @@ pub enum Builtin {
     FilterString,
     EqChar,
     CompareChar,
+    StringSplit,
     StringSplitc,
     JoinString,
     FoldlString,
