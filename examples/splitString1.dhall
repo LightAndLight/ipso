@@ -1,5 +1,5 @@
 {
-  description = "split ' ' \"the quick brown fox\"",
+  description = "splitc ' ' \"the quick brown fox\"",
   args = ["splitString1.ipso"],
   stdin = None Text,
   stdout = "yes\n",

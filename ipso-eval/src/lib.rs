@@ -1051,9 +1051,9 @@ where {
                     }
                 )
             }
-            Builtin::SplitString => {
+            Builtin::StringSplitc => {
                 function2!(
-                    split_string,
+                    string_splitc,
                     self,
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();

@@ -39,9 +39,9 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::FilterString),
         }),
-        // split : Char -> String -> Array String
+        // splitc : Char -> String -> Array String
         Rc::new(Declaration::Definition {
-            name: Rc::from("split"),
+            name: Rc::from("splitc"),
             sig: TypeSig {
                 ty_vars: Vec::new(),
                 body: Type::arrow(
@@ -54,7 +54,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
                     ),
                 ),
             },
-            body: Expr::alloc_builtin(Builtin::SplitString),
+            body: Expr::alloc_builtin(Builtin::StringSplitc),
         }),
         // join : String -> Array String -> String
         Rc::new(Declaration::Definition {
