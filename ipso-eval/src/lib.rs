@@ -1295,6 +1295,50 @@ where {
                     interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
                 }
             ),
+            Builtin::DebugCmd => function1!(
+                debug_cmd,
+                self,
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                    fn add_part(buffer: &mut String, value: &str) {
+                        if value.contains(' ') {
+                            buffer.reserve(2 + value.len());
+
+                            buffer.push('"');
+                            value.chars().for_each(|c| {
+                                if c == '"' {
+                                    buffer.push('\\');
+                                }
+                                buffer.push(c);
+                            });
+                            buffer.push('"');
+                        } else {
+                            buffer.reserve(value.len());
+
+                            value.chars().for_each(|c| {
+                                if c == '`' {
+                                    buffer.push('\\');
+                                }
+                                buffer.push(c);
+                            });
+                        }
+                    }
+
+                    let mut buffer = String::from("`");
+
+                    let mut cmd_parts = arg.unpack_cmd().iter();
+                    if let Some(part) = cmd_parts.next() {
+                        add_part(&mut buffer, part)
+                    }
+                    cmd_parts.for_each(|value| {
+                        buffer.push(' ');
+                        add_part(&mut buffer, value);
+                    });
+
+                    buffer.push('`');
+
+                    interpreter.alloc(Object::String(interpreter.alloc_str(&buffer)))
+                }
+            ),
             Builtin::FlatMap => function2!(
                 flat_map,
                 self,
