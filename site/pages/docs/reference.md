@@ -9,6 +9,10 @@ title: Language Reference
 
 * [Execution](#execution)
 * [Comments](#comments)
+* [Indentation](#indentation)
+  * [Line Joining](#line-joining)
+  * [Blocks](#blocks)
+  * [Examples](#examples)
 * [Declarations](#declarations)
   * [Definitions](#definitions)
   * [Imports](#imports)
@@ -95,6 +99,98 @@ hello
 
 ```ipso
 # this is a single line comment
+```
+
+## Indentation
+
+`ipso` uses spaces (U+0020) for indentation.
+
+### Line Joining
+
+An indented line is considered a continuation of the preceding line.
+
+### Blocks
+
+The first line of a block must be indented further than the block's opening keyword.
+Subsequent lines of a block must have indentation equal to its first line.
+
+Keywords that open blocks:
+
+* [`case ... of`](#pattern-matching)
+* [`comp`](#computation-expressions)
+
+### Examples
+
+Correct:
+
+```ipso
+main : IO ()
+main = comp
+         println "hello"
+         println "world"
+```
+
+```ipso
+main : IO ()
+main =
+  comp
+    println "hello"
+    println "world"
+```
+
+```ipso
+main : IO ()
+main =
+  comp
+    println "hello"
+    println
+      "world"
+```
+
+```ipso
+main : IO ()
+main = case x of
+         A a -> 0
+         B b -> 1
+```
+
+```ipso
+main : IO ()
+main =
+  case x of
+    A a -> 0
+    B b -> 1
+```
+
+```ipso
+case x of
+  A a ->
+    0
+  B b ->
+    1
+```
+
+Incorrect:
+
+```
+main : IO ()
+main = comp
+  println "hello"
+  println "world"
+```
+
+```
+main : IO ()
+main =
+  comp
+      println "hello"
+    println "world"
+```
+
+```ipso
+case x of
+  A a -> 0
+    B b -> 1
 ```
 
 ## Declarations
