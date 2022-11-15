@@ -11,6 +11,13 @@
     Never 2
     'x'
     "hello\nworld\n"
+    ``
+    `echo`
+    `echo hello`
+    `echo hello world`
+    `echo "hello world"`
+    `echo hello \` world`
+    `echo "hello ` world"`
     '',
   stderr = "",
   exitcode = 0

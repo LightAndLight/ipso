@@ -763,6 +763,7 @@ pub enum Builtin {
     EqBool,
     Lines,
     ShowCmd,
+    DebugCmd,
     FlatMap,
     MapArray,
     CharToString,

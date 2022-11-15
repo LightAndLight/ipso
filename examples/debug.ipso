@@ -8,3 +8,10 @@ main =
     println <| debug (Never 2)
     println <| debug 'x'
     println <| debug "hello\nworld\n"
+    println <| debug ``
+    println <| debug `echo`
+    println <| debug `echo hello`
+    println <| debug `echo hello world`
+    println <| debug `echo "hello world"`
+    println <| debug `echo hello \` world`
+    println <| debug `echo "hello ` world"`
