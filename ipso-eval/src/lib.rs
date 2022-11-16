@@ -1101,6 +1101,97 @@ where {
                     }
                 )
             }
+            Builtin::StringParts => {
+                struct Parts<'a> {
+                    delimiter: &'a str,
+                    string: &'a str,
+                }
+
+                impl<'a> Iterator for Parts<'a> {
+                    type Item = &'a str;
+
+                    fn next(&mut self) -> Option<&'a str> {
+                        let trimmed = self.string.trim_start_matches(self.delimiter);
+
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            match trimmed.split_once(self.delimiter) {
+                                Some((prefix, suffix)) => {
+                                    self.string = suffix;
+                                    Some(prefix)
+                                }
+                                None => {
+                                    self.string = "";
+                                    Some(trimmed)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                function2!(
+                    string_parts,
+                    self,
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let sep = env[0].unpack_string();
+                        let s = arg.unpack_string();
+                        let a = eval.alloc_values(
+                            Parts {
+                                delimiter: sep,
+                                string: s,
+                            }
+                            .map(|part| eval.alloc(Object::String(Rc::from(part)))),
+                        );
+                        eval.alloc(Object::Array(a))
+                    }
+                )
+            }
+            Builtin::StringPartsc => {
+                struct Partsc<'a> {
+                    delimiter: char,
+                    string: &'a str,
+                }
+
+                impl<'a> Iterator for Partsc<'a> {
+                    type Item = &'a str;
+
+                    fn next(&mut self) -> Option<&'a str> {
+                        let trimmed = self.string.trim_start_matches(self.delimiter);
+
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            match trimmed.split_once(self.delimiter) {
+                                Some((prefix, suffix)) => {
+                                    self.string = suffix;
+                                    Some(prefix)
+                                }
+                                None => {
+                                    self.string = "";
+                                    Some(trimmed)
+                                }
+                            }
+                        }
+                    }
+                }
+                function2!(
+                    string_partsc,
+                    self,
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let c = env[0].unpack_char();
+                        let s = arg.unpack_string();
+                        let a = eval.alloc_values(
+                            Partsc {
+                                delimiter: c,
+                                string: s,
+                            }
+                            .map(|part| eval.alloc(Object::String(Rc::from(part)))),
+                        );
+                        eval.alloc(Object::Array(a))
+                    }
+                )
+            }
             Builtin::FoldlString => {
                 function3!(
                     foldl_string,
