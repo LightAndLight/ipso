@@ -420,7 +420,30 @@ main =
 <span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a>  join <span class="kw">:</span> String <span class="kw">-&gt;</span> Array String <span class="kw">-&gt;</span> String</span>
 <span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
+<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb50-16"><a href="#cb50-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
+<span id="cb50-17"><a href="#cb50-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb50-18"><a href="#cb50-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb50-19"><a href="#cb50-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb50-20"><a href="#cb50-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
+<span id="cb50-21"><a href="#cb50-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
+<span id="cb50-22"><a href="#cb50-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb50-23"><a href="#cb50-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb50-24"><a href="#cb50-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
+<span id="cb50-25"><a href="#cb50-25" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb50-26"><a href="#cb50-26" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb50-27"><a href="#cb50-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb50-28"><a href="#cb50-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
+<span id="cb50-29"><a href="#cb50-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb50-30"><a href="#cb50-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb50-31"><a href="#cb50-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb50-32"><a href="#cb50-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
+<span id="cb50-33"><a href="#cb50-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
+<span id="cb50-34"><a href="#cb50-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb50-35"><a href="#cb50-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb50-36"><a href="#cb50-36" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb50-37"><a href="#cb50-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-38"><a href="#cb50-38" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
 <h3 id="functions">Functions</h3>
 <div class="sourceCode" id="cb51"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> x</span>
 <span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>forall t0. t0 <span class="kw">-&gt;</span> t0</span></code></pre></div>

@@ -549,6 +549,29 @@ module string where
 
   join : String -> Array String -> String
 
+  # `parts delimiter value` returns the sections of `value` that don't contain
+  # the string `delimiter`.
+  #
+  # # Examples
+  #
+  # * `parts "::" "" == []`
+  # * `parts "::" "a" == ["a"]`
+  # * `parts "::" "a::b" == ["a", "b"]`
+  # * `parts "::" "a::b::" == ["a", "b"]`
+  # * `parts "!=" "a != b" == ["a ", " b"]`
+  parts : String -> String -> Array String
+  
+  # `partsc delimiter value` returns the sections of `value` that don't contain
+  # the character `delimiter`.
+  #
+  # # Examples
+  #
+  # * `partsc ' ' "" == []`
+  # * `partsc ' ' "hello" == ["hello"]`
+  # * `partsc ' ' "hello world" == ["hello", "world"]`
+  # * `partsc ' ' "   hello    world   " == ["hello", "world"]`
+  partsc : Char -> String -> Array String
+
   foldl : (a -> Char -> a) -> a -> String -> a
 ```
 
