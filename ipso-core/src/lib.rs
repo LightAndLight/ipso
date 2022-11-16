@@ -757,6 +757,8 @@ pub enum Builtin {
     StringSplit,
     StringSplitc,
     JoinString,
+    StringParts,
+    StringPartsc,
     FoldlString,
     SnocArray,
     Run,

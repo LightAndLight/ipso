@@ -1,0 +1,20 @@
+main : IO ()
+main =
+  comp
+    println <| debug (string.parts " " "")
+    println <| debug (string.partsc ' ' "")
+    
+    println <| debug (string.parts " " "  ")
+    println <| debug (string.partsc ' ' "  ")
+    
+    println <| debug (string.parts " " "a")
+    println <| debug (string.partsc ' ' "a")
+    
+    println <| debug (string.parts " " " a ")
+    println <| debug (string.partsc ' ' " a ")
+    
+    println <| debug (string.parts " " " a b ")
+    println <| debug (string.partsc ' ' " a b ")
+    
+    println <| debug (string.parts " " " a  b  c ")
+    println <| debug (string.partsc ' ' " a  b  c ")
