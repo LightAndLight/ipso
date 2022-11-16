@@ -18,10 +18,10 @@ main =
           # extract `version` from `pub const VERSION: &str = "version";`
           let versionInRust = 
             versionLine 
-            |> string.splitc ' '
+            |> string.partsc ' '
             |> array.index 5
-            |> string.splitc '"'
-            |> array.index 1
+            |> string.partsc '"'
+            |> array.index 0
           
           println "$versionVar version: $versionInGit"
           println "$versionFile version: $versionInRust"

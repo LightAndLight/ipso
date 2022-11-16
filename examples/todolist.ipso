@@ -58,7 +58,7 @@ parseCommand :
   |)
 parseCommand line =
   let stripped = strip line in
-  let lines = string.splitc ' ' stripped in
+  let lines = string.partsc ' ' stripped in
   if array.length lines == 1 && array.index 0 lines == "quit" then Quit ()
   else if array.length lines == 1 && array.index 0 lines == "help" then Help ()
   else if array.length lines == 1 && array.index 0 lines == "list" then List ()
