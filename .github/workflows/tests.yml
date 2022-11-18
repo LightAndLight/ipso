@@ -26,6 +26,19 @@ jobs:
 
     # Allow the Nix daemon to execute the upload script.
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
+    
+    - name: "install ipso"
+      run: >
+        nix profile install github:LightAndLight/ipso
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+
+    - name: "blah"
+      run: >
+        nix build .#blah
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
 
     - name: "cargo tests"
       run: >
