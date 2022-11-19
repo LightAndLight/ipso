@@ -24,6 +24,12 @@ jobs:
     # authenticate with the binary cache bucket.
     - run: sudo mkdir /root/.aws
     - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
+    
+    # Grants the current user access to the bucket, which allows `pueue` to 
+    # authenticate with the binary cache bucket.
+    - run: sudo mkdir ~/.aws
+    - run: sudo chmod -R +r ~/.aws
+    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID}}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > ~/.aws/credentials'"
 
     # Allow the Nix daemon to execute the upload script.
     # - run: "sudo chmod +x $UPLOAD_TO_CACHE"
