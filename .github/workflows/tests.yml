@@ -37,6 +37,7 @@ jobs:
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
     
+    - run: pueued -d
     - run: which ipso
     
     - name: "blah"
