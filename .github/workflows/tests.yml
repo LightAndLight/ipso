@@ -52,8 +52,6 @@ jobs:
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
 
-    - run: cat /var/test
-
     - name: "cargo tests"
       run: >
         nix develop .#tests

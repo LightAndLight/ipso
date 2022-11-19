@@ -1,4 +1,3 @@
 #! /bin/sh
 
-# exec /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- /var/uploadToCache $OUT_PATHS
-exec /nix/var/nix/profiles/per-user/runner/profile/bin/pueue
+su runner -c /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- /var/uploadToCache $OUT_PATHS
