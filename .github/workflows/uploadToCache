@@ -24,4 +24,6 @@ main =
     bind outPaths <- getvar "OUT_PATHS"
     println "Uploading paths $outPaths"
     let binaryCacheUrl = "s3://$binaryCacheBucket?scheme=https&endpoint=$binaryCacheEndpoint&secret-key=/run/nix-signing-key"
-    cmd.run `/nix/var/nix/profiles/default/bin/nix copy --to $binaryCacheUrl ${string.partsc ' ' outPaths}`
+    let command = `/nix/var/nix/profiles/default/bin/nix copy --to $binaryCacheUrl ${string.partsc ' ' outPaths}`
+    println <| "Running ${debug command}..."
+    cmd.run command
