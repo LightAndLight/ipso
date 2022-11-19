@@ -39,6 +39,10 @@ jobs:
     
     - run: pueued -d
     - run: which ipso
+    - run: ls -l /nix/var/nix/profiles/per-user/runner/profile/bin/pueue 
+
+    - run: /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- /run/uploadToCache "x y"
+    - run: /nix/var/nix/profiles/per-user/runner/profile/bin/pueue status
     
     - name: "blah"
       run: >
