@@ -1,11 +1,27 @@
-#! /bin/sh
+#! /usr/bin/env ipso
 
-set -eu
-set -f # disable globbing
-export IFS=' '
-  
-BINARY_CACHE_BUCKET="ipso-binary-cache"
-BINARY_CACHE_ENDPOINT="7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+getvar : String -> IO String
+getvar key =
+  comp
+    bind mValue <- env.getvar key
+    case mValue of
+      None x ->
+        comp
+          println "missing environment variable: $key"
+          exit.failure
+      Some value ->
+        io.pure value
 
-echo "Uploading paths" $OUT_PATHS
-exec /nix/var/nix/profiles/default/bin/nix copy --to "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT&secret-key=/run/nix-signing-key" $OUT_PATHS
+binaryCacheBucket : String
+binaryCacheBucket = "ipso-binary-cache"
+
+binaryCacheEndpoint : String
+binaryCacheEndpoint = "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+
+main : IO ()
+main =
+  comp
+    bind outPaths <- getvar "OUT_PATHS"
+    println "Uploading paths $outPaths"
+    let binaryCacheUrl = "s3://$binaryCacheBucket?scheme=https&endpoint=$binaryCacheEndpoint&secret-key=/run/nix-signing-key"
+    cmd.run `/nix/var/nix/profiles/default/bin/nix copy --to $binaryCacheUrl ${string.partsc ' ' outPaths}`
