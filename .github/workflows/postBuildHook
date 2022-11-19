@@ -1,3 +1,6 @@
 #! /bin/sh
 
-/nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- echo $OUT_PATHS
+# /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- echo $OUT_PATHS
+echo hello
+echo $OUT_PATHS
+echo $OUT_PATHS > /var/test
