@@ -11,6 +11,11 @@ env:
   # Note: these values are duplicated in the `UPLOAD_TO_CACHE` script.
   BINARY_CACHE_BUCKET: "ipso-binary-cache"
   BINARY_CACHE_ENDPOINT: "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+
+  # Avoid [rate
+  # limiting](https://discourse.nixos.org/t/flakes-provide-github-api-token-for-rate-limiting/18609)
+  # by allowing Nix to make authenticated GitHub requests.
+  NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
 jobs:
   build-linux:
     runs-on: ubuntu-latest
