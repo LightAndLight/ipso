@@ -31,6 +31,8 @@ jobs:
 
     - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
     - run: sudo chmod +x /run/uploadToCache
+    
+    - run: ls -l /run/uploadToCache
 
     - run: >
         nix profile install nixpkgs#pueue github:LightAndLight/ipso
@@ -52,7 +54,7 @@ jobs:
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
     
-    - run: pueue wait && pueue
+    - run: pueue wait && pueue log
 
     - name: "cargo tests"
       run: >
