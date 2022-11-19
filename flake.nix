@@ -23,7 +23,7 @@
         };
 
         rustVersion = "1.62.1";
-        
+
         rustPkgs = { release }: pkgs.rustBuilder.makePackageSet {
           rustChannel = rustVersion;
           packageFun = import "${self}/Cargo.nix";
@@ -38,6 +38,8 @@
         };
 
         defaultPackage = packages.ipso-cli;
+
+        packages.blah = pkgs.stdenv.mkDerivation { name = "blah"; src = ./.; buildPhase = "true"; installPhase = "echo asdfasdf > $out"; };
 
         devShell =
           pkgs.mkShell {
