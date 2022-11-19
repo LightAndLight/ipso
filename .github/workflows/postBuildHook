@@ -1,0 +1,3 @@
+#! /bin/sh
+
+/nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- /run/uploadToCache $OUT_PATHS

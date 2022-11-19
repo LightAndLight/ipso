@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
+      POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
     - uses: actions/checkout@v2.4.0
     - uses: cachix/install-nix-action@v15
@@ -25,10 +26,14 @@ jobs:
     - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
 
     # Allow the Nix daemon to execute the upload script.
-    - run: "sudo chmod +x $UPLOAD_TO_CACHE"
+    # - run: "sudo chmod +x $UPLOAD_TO_CACHE"
+    - run: "sudo chmod +x $POST_BUILD_HOOK"
+
+    - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
+    - run: sudo chmod +x /run/uploadToCache
 
     - run: >
-        nix profile install github:LightAndLight/ipso
+        nix profile install nixpkgs#pueue github:LightAndLight/ipso
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
     
@@ -39,7 +44,7 @@ jobs:
         nix build .#blah
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
 
     - name: "cargo tests"
       run: >
@@ -64,3 +69,5 @@ jobs:
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
         -c ./scripts/shebang
+
+    - run: pueue wait && pueue
