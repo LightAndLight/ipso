@@ -51,6 +51,8 @@ jobs:
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
+    
+    - run: pueue wait && pueue
 
     - name: "cargo tests"
       run: >

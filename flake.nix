@@ -38,7 +38,7 @@
         };
 
         defaultPackage = packages.ipso-cli;
-        packages.blah = pkgs.stdenv.mkDerivation { name = "blah"; src = ./.; buildPhase = "true"; installPhase = "echo blah > $out"; };
+        packages.blah = pkgs.stdenv.mkDerivation { name = "blah"; src = ./.; buildPhase = "true"; installPhase = "echo blhhhah > $out"; };
 
         devShell =
           pkgs.mkShell {
