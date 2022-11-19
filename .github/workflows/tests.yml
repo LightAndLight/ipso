@@ -7,46 +7,75 @@ env:
   # Note: these values are duplicated in the `UPLOAD_TO_CACHE` script.
   BINARY_CACHE_BUCKET: "ipso-binary-cache"
   BINARY_CACHE_ENDPOINT: "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
+
+  # Avoid [rate
+  # limiting](https://discourse.nixos.org/t/flakes-provide-github-api-token-for-rate-limiting/18609)
+  # by allowing Nix to make authenticated GitHub requests.
+  NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
 jobs:
   tests:
     runs-on: ubuntu-latest
     env:
-      UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
+      POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
     - uses: actions/checkout@v2.4.0
     - uses: cachix/install-nix-action@v15
 
-    # Allows `uploadToCache` to sign store paths.
+    # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
 
-    # Grants the Nix daemon access to the bucket, which allows `nix build` to 
-    # authenticate with the binary cache bucket.
+    # Grants the Nix daemon access to the bucket, which allows `nix build` to
+    # authenticate with the binary cache bucket and fetch cache items.
     - run: sudo mkdir /root/.aws
     - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
 
-    # Allow the Nix daemon to execute the upload script.
-    - run: "sudo chmod +x $UPLOAD_TO_CACHE"
+    # Grants the runner access to the bucket, which allows `pueue` to
+    # authenticate with the binary cache bucket when pushing signed cache items.
+    - run: sudo mkdir ~/.aws
+    - run: sudo chown runner ~/.aws
+    - run: "echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID}}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > ~/.aws/credentials"
+
+    # Allow the Nix daemon to execute the post-build-hook script.
+    - run: "sudo chmod +x $POST_BUILD_HOOK"
+
+    # Used in `postBuildHook`.
+    - run: sudo cp .github/workflows/uploadToCache /run/uploadToCache
+
+    - run: nix profile install nixpkgs#pueue
+    - run: pueued -d
 
     - name: "cargo tests"
       run: >
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c cargo test
-    
+
     - name: "golden tests"
       run: >
-        nix develop .#tests 
+        nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c ./scripts/golden
-    
+
     - name: "shebang tests"
       run: >
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$UPLOAD_TO_CACHE"
+        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c ./scripts/shebang
+
+    - name: wait for uploads to finish
+      if: always()
+      run: pueue wait
+
+    - name: log failed uploads
+      if: always()
+      run: pueue log --json | jq 'to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
+
+    - name: check uploads succeeded
+      if: always()
+      run: "[ \"$(pueue log --json | jq 'to_entries[] | select(.value.task.status.Done != \"Success\") | .key' -r)\" == \"\" ]"
