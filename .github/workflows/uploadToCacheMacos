@@ -5,7 +5,7 @@ getvar key =
   comp
     bind mValue <- env.getvar key
     case mValue of
-      None ->
+      None x ->
         comp
           println "missing environment variable: $key"
           exit.failure
