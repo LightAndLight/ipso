@@ -1,4 +1,4 @@
-#! /usr/bin/env ipso
+#! /nix/var/nix/profiles/per-user/runner/profile/bin/ipso
 
 getvar : String -> IO String
 getvar key =

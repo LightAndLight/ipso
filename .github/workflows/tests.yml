@@ -27,6 +27,11 @@ jobs:
     # Allow the Nix daemon to execute the upload script.
     - run: "sudo chmod +x $UPLOAD_TO_CACHE"
 
+    - run: >
+        nix profile install github:LightAndLight/ipso
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+
     - name: "cargo tests"
       run: >
         nix develop .#tests
