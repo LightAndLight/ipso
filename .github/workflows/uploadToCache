@@ -22,6 +22,11 @@ main : IO ()
 main =
   comp
     bind outPaths <- getvar "OUT_PATHS"
+    cmd.run `whoami`
+    cmd.run `ls /home/runner/.aws`
+    cmd.run `env`
+    bind home <- env.getvar "HOME"
+    println "HOME=${debug home}"
     println "Uploading paths $outPaths"
     let binaryCacheUrl = "s3://$binaryCacheBucket?scheme=https&endpoint=$binaryCacheEndpoint&secret-key=/run/nix-signing-key"
     let command = `/nix/var/nix/profiles/default/bin/nix copy --to $binaryCacheUrl ${string.partsc ' ' outPaths}`

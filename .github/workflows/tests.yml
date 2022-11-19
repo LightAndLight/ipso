@@ -28,8 +28,8 @@ jobs:
     # Grants the current user access to the bucket, which allows `pueue` to 
     # authenticate with the binary cache bucket.
     - run: sudo mkdir ~/.aws
-    - run: sudo chmod -R +r ~/.aws
-    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID}}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > ~/.aws/credentials'"
+    - run: sudo chown runner ~/.aws
+    - run: echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID}}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > ~/.aws/credentials
 
     # Allow the Nix daemon to execute the upload script.
     # - run: "sudo chmod +x $UPLOAD_TO_CACHE"
@@ -50,7 +50,7 @@ jobs:
     - run: whoami
     - run: ls -l /nix/var/nix/profiles/per-user/runner/profile/bin/pueue 
 
-    - run: /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- /run/uploadToCache "x y"
+    - run: /nix/var/nix/profiles/per-user/runner/profile/bin/pueue add -- OUT_PATHS=\"x y\" /run/uploadToCache
     - run: /nix/var/nix/profiles/per-user/runner/profile/bin/pueue status
     
     - name: "blah"
