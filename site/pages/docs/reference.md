@@ -870,6 +870,38 @@ debugVariantCtor : DebugVariantCtor a => (| a |) -> { ctor : String, value : Str
 ```ipso
 module env where
 
+  # The current program's name.
+  #
+  # Example:
+  # 
+  # ```
+  # $ cat > test.ipso <<EOF
+  # main : IO ()
+  # main =
+  #   comp
+  #     bind program <- env.program
+  #     println program
+  # EOF
+  # $ ipso test.ipso -- a b c
+  # test.ipso
+  # ```
+  program : IO String
+
+  # The arguments passed to the current program.
+  #
+  # Example:
+  # 
+  # ```
+  # $ cat > test.ipso <<EOF
+  # main : IO ()
+  # main =
+  #   comp
+  #     bind args <- env.args
+  #     println <| debug args
+  # EOF
+  # $ ipso test.ipso -- a b c
+  # ["a", "b", "c"]
+  # ```
   args : IO (Array String)
   
   getvar : String -> IO (| Some : String, None : () |)
