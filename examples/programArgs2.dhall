@@ -1,8 +1,8 @@
 {
-  description = "env.args",
+  description = "env.program and env.args",
   args = ["programArgs2.ipso"],
   stdin = None Text,
-  stdout = "[]\n",
+  stdout = "programArgs2.ipso\n[]\n",
   stderr = "",
   exitcode = 0
 }
