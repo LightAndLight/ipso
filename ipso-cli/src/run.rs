@@ -11,11 +11,13 @@ use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
     path::PathBuf,
+    rc::Rc,
 };
 
 pub struct Config {
     pub filename: String,
     pub entrypoint: Option<String>,
+    pub args: Vec<Rc<str>>,
     pub stdin: Option<Box<dyn BufRead>>,
     pub stdout: Option<Box<dyn Write>>,
 }
@@ -141,8 +143,14 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             .iter()
             .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
             .collect();
-        let mut interpreter =
-            Interpreter::new(&mut stdin, &mut stdout, &common_kinds, &modules, &context);
+        let mut interpreter = Interpreter::new(
+            &config.args,
+            &mut stdin,
+            &mut stdout,
+            &common_kinds,
+            &modules,
+            &context,
+        );
         let action = interpreter.eval_from_module(
             &mut env,
             &ModuleRef::from(module_id),

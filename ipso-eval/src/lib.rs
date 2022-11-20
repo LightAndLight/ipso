@@ -541,6 +541,7 @@ struct Context {
 }
 
 pub struct Interpreter<'io> {
+    args: &'io [Rc<str>],
     stdin: &'io mut dyn BufRead,
     stdout: &'io mut dyn io::Write,
     context: Context,
@@ -549,6 +550,7 @@ pub struct Interpreter<'io> {
 
 impl<'io> Interpreter<'io> {
     pub fn new(
+        args: &'io [Rc<str>],
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
         common_kinds: &CommonKinds,
@@ -568,6 +570,7 @@ impl<'io> Interpreter<'io> {
             .collect();
 
         Interpreter {
+            args,
             stdin,
             stdout,
             context: Context {
@@ -1568,9 +1571,10 @@ where {
             }
             Builtin::EnvArgs => {
                 fn env_args_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
-                    let args = std::env::args();
+                    let args = &interpreter.args;
                     let args = interpreter.alloc_values(
-                        args.map(|arg| interpreter.alloc(Object::String(Rc::from(arg)))),
+                        args.iter()
+                            .map(|arg| interpreter.alloc(Object::String(arg.clone()))),
                     );
                     interpreter.alloc(Object::Array(args))
                 }
