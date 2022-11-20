@@ -123,6 +123,12 @@ fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), E
     }
 }
 
+pub fn desugar_branches_mut(source: &Source, branches: &mut [Branch]) -> Result<(), Error> {
+    branches
+        .iter_mut()
+        .try_for_each(|branch| desugar_branch_mut(source, branch))
+}
+
 pub fn desugar_expr(source: &Source, mut expr: Spanned<Expr>) -> Result<Spanned<Expr>, Error> {
     desugar_expr_mut(source, &mut expr)?;
     Ok(expr)
@@ -229,9 +235,7 @@ fn desugar_expr_mut(source: &Source, expr: &mut Spanned<Expr>) -> Result<(), Err
         Expr::Embed(_, value) => desugar_expr_mut(source, Rc::make_mut(value)),
         Expr::Case(expr, branches) => {
             desugar_expr_mut(source, Rc::make_mut(expr))?;
-            branches
-                .iter_mut()
-                .try_for_each(|branch| desugar_branch_mut(source, branch))
+            desugar_branches_mut(source, branches)
         }
         Expr::Cmd(parts) => parts
             .iter_mut()
