@@ -66,14 +66,14 @@ pub fn pattern_record(parser: &mut Parser) -> Parsed<Pattern> {
 /**
 ```text
 pattern_variant ::=
-  ctor pattern
+  ctor pattern_atom
 ```
 */
 pub fn pattern_variant(parser: &mut Parser) -> Parsed<Pattern> {
     parser.ctor().and_then(|name| {
         spanned!(
             parser,
-            indent!(parser, Relation::Gt, pattern(parser).map(Box::new))
+            indent!(parser, Relation::Gt, pattern_atom(parser).map(Box::new))
         )
         .map(|arg| Pattern::Variant { name, arg })
     })
@@ -81,21 +81,20 @@ pub fn pattern_variant(parser: &mut Parser) -> Parsed<Pattern> {
 
 /**
 ```text
-pattern ::=
+pattern_atom ::=
   ident
   pattern_record
-  pattern_variant
   char
   int
   '"' string '"'
   '_'
+  '(' pattern ')'
 ```
 */
-pub fn pattern(parser: &mut Parser) -> Parsed<Pattern> {
+pub fn pattern_atom(parser: &mut Parser) -> Parsed<Pattern> {
     choices!(
         spanned!(parser, parser.ident()).map(Pattern::Name),
         pattern_record(parser),
-        pattern_variant(parser),
         spanned!(parser, parser.char()).map(Pattern::Char),
         spanned!(parser, parser.int()).map(Pattern::Int),
         spanned!(
@@ -110,6 +109,22 @@ pub fn pattern(parser: &mut Parser) -> Parsed<Pattern> {
             pos: s.pos,
             item: Rc::from(s.item)
         })),
-        map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore))
+        map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore)),
+        between!(
+            parser.token(&token::Data::LParen),
+            parser.token(&token::Data::RParen),
+            pattern(parser)
+        )
     )
+}
+
+/**
+```text
+pattern ::=
+  pattern_atom
+  pattern_variant
+```
+*/
+pub fn pattern(parser: &mut Parser) -> Parsed<Pattern> {
+    choices!(pattern_atom(parser), pattern_variant(parser))
 }
