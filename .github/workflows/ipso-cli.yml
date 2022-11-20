@@ -50,6 +50,11 @@ jobs:
     - run: pueued -d
 
     - run: >
+        nix profile install github:LightAndLight/ipso?ref=d5afc4aa234b4a191550e1be3fb0b7aabc3c5a6c
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+
+    - run: >
         nix build
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
@@ -105,6 +110,11 @@ jobs:
 
     - run: nix profile install nixpkgs#pueue
     - run: pueued -d
+
+    - run: >
+        nix profile install github:LightAndLight/ipso?ref=d5afc4aa234b4a191550e1be3fb0b7aabc3c5a6c
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
 
     - run: >
         nix build
@@ -168,6 +178,11 @@ jobs:
 
     - run: nix profile install nixpkgs#pueue
     - run: pueued -d
+
+    - run: >
+        nix profile install github:LightAndLight/ipso?ref=d5afc4aa234b4a191550e1be3fb0b7aabc3c5a6c
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
 
     - name: Check release version
       run: >
