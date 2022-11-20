@@ -271,6 +271,7 @@ fn infer_record_1() {
                 field: Rc::from("z"),
                 rest: core::Type::mk_rows(
                     vec![
+                        (Rc::from("z"), core::Type::Bool),
                         (Rc::from("y"), core::Type::String),
                         (Rc::from("x"), core::Type::Int)
                     ],
@@ -304,7 +305,14 @@ fn infer_record_1() {
             Rc::new(core::Expr::Int(1)),
             Constraint::HasField {
                 field: Rc::from("y"),
-                rest: core::Type::mk_rows(vec![(Rc::from("x"), core::Type::Int)], None)
+                rest: core::Type::mk_rows(
+                    vec![
+                        (Rc::from("z"), core::Type::Bool),
+                        (Rc::from("y"), core::Type::String),
+                        (Rc::from("x"), core::Type::Int)
+                    ],
+                    None
+                )
             }
         )),
         solve_placeholder(
@@ -333,7 +341,14 @@ fn infer_record_1() {
             Rc::new(core::Expr::Int(0)),
             Constraint::HasField {
                 field: Rc::from("x"),
-                rest: core::Type::RowNil
+                rest: core::Type::mk_rows(
+                    vec![
+                        (Rc::from("z"), core::Type::Bool),
+                        (Rc::from("y"), core::Type::String),
+                        (Rc::from("x"), core::Type::Int)
+                    ],
+                    None
+                )
             }
         )),
         solve_placeholder(

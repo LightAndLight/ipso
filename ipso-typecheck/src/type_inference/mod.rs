@@ -167,6 +167,7 @@ impl InferredPattern {
     }
 }
 
+#[derive(Debug)]
 pub enum CheckedPattern {
     Any {
         pattern: Pattern<Expr>,
@@ -471,7 +472,7 @@ fn check_record_pattern(
                 names_to_positions.get(field.as_ref()).copied().unwrap_or(0),
                 evidence::Constraint::HasField {
                     field: field.clone(),
-                    rest: rest.as_ref().clone(),
+                    rest: entire_row.clone(),
                 },
             )));
             names_tys.push((field.clone(), ty.as_ref().clone()));
@@ -1144,14 +1145,10 @@ pub fn check(
                 None => Type::RowNil,
             };
 
-            // let mut field_to_type: FnvHashMap<&str, Type> = FnvHashMap::default();
             let typed_fields = fields
                 .iter()
                 .map(|(field_name, _)| {
                     let field_type = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-                    // let _ = field_to_type
-                    // .entry(field_name)
-                    // .or_insert_with(|| field_type.clone());
                     (Rc::from(field_name.as_str()), field_type)
                 })
                 .collect::<Vec<_>>();
@@ -1169,7 +1166,7 @@ pub fn check(
             )
             .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
-            let mut current_row = actual_row;
+            let mut current_row = actual_row.clone();
             let fields = fields
                 .iter()
                 .map(|(field_name, field_value)| {
@@ -1183,25 +1180,13 @@ pub fn check(
                     let field_name: Rc<str> = Rc::from(field_name.as_str());
                     debug_assert!(_field_name == field_name);
 
-                    // let field_type = field_to_type.get(field_name.as_ref()).unwrap_or_else(|| {
-                    // panic!(
-                    // "internal error: {:?} missing from `field_to_type`",
-                    // field_name,
-                    // )
-                    // });
-                    // if cfg!(debug_assertions) {
-                    // let _field_type = state.zonk_type(_field_type.as_ref().clone());
-                    // let field_type = state.zonk_type(field_type.clone());
-                    // assert!(_field_type == field_type);
-                    // }
-
                     let field_value = check(env, state, field_value, &field_type)?;
 
                     let field = Expr::Placeholder(state.evidence.placeholder(
                         expr.pos,
                         evidence::Constraint::HasField {
                             field: field_name,
-                            rest: remaining_row.as_ref().clone(),
+                            rest: actual_row.clone(),
                         },
                     ));
 

@@ -1,0 +1,7 @@
+f : { x : String, y : String, z : String } -> String
+f record =
+  case record of
+    { x, y, z } -> "$x $y $z"
+
+main : IO ()
+main = println (f { x = "1", y = "2", z = "3" })
