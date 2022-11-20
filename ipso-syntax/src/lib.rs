@@ -313,34 +313,6 @@ impl Pattern {
             pattern: Some(self),
         }
     }
-
-    pub fn get_arg_names(&self) -> Vec<&Spanned<Rc<str>>> {
-        let mut arg_names = Vec::new();
-        match self {
-            Pattern::Name(n) => {
-                arg_names.push(n);
-            }
-            Pattern::Record { names, rest } => {
-                for name in names {
-                    arg_names.push(name);
-                }
-                match rest {
-                    None => {}
-                    Some(n) => {
-                        arg_names.push(n);
-                    }
-                }
-            }
-            Pattern::Variant { name: _, arg } => {
-                arg_names.push(arg);
-            }
-            Pattern::Char(_) => {}
-            Pattern::Int(_) => {}
-            Pattern::String(_) => {}
-            Pattern::Wildcard => {}
-        }
-        arg_names
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
