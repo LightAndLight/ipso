@@ -91,10 +91,6 @@ fn desugar_string_part_mut(source: &Source, string_part: &mut StringPart) -> Res
     }
 }
 
-fn desugar_branch_mut(source: &Source, branch: &mut Branch) -> Result<(), Error> {
-    desugar_expr_mut(source, &mut branch.body)
-}
-
 fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), Error> {
     match cmd_part {
         CmdPart::Literal(_) => Ok(()),
@@ -126,7 +122,7 @@ fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), E
 pub fn desugar_branches_mut(source: &Source, branches: &mut [Branch]) -> Result<(), Error> {
     branches
         .iter_mut()
-        .try_for_each(|branch| desugar_branch_mut(source, branch))
+        .try_for_each(|branch| desugar_expr_mut(source, &mut branch.body))
 }
 
 pub fn desugar_expr(source: &Source, mut expr: Spanned<Expr>) -> Result<Spanned<Expr>, Error> {
