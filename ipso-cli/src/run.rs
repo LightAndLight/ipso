@@ -78,7 +78,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         label: main.clone(),
     };
 
-    let target_path = PathBuf::from(config.filename);
+    let target_path = PathBuf::from(config.filename.as_str());
     if !target_path.exists() {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
@@ -144,6 +144,7 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
             .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
             .collect();
         let mut interpreter = Interpreter::new(
+            Rc::from(config.filename),
             &config.args,
             &mut stdin,
             &mut stdout,

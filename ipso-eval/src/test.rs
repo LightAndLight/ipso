@@ -20,6 +20,7 @@ fn eval_1() {
     let modules = Modules::new();
     let args = vec![];
     let mut interpreter = Interpreter::new(
+        Rc::from("test"),
         &args,
         &mut stdin,
         &mut stdout,
@@ -52,6 +53,7 @@ fn eval_2() {
     let modules = Modules::new();
     let args = vec![];
     let mut interpreter = Interpreter::new(
+        Rc::from("test"),
         &args,
         &mut stdin,
         &mut stdout,

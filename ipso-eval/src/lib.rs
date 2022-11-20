@@ -541,6 +541,7 @@ struct Context {
 }
 
 pub struct Interpreter<'io> {
+    program: Rc<str>,
     args: &'io [Rc<str>],
     stdin: &'io mut dyn BufRead,
     stdout: &'io mut dyn io::Write,
@@ -550,6 +551,7 @@ pub struct Interpreter<'io> {
 
 impl<'io> Interpreter<'io> {
     pub fn new(
+        program: Rc<str>,
         args: &'io [Rc<str>],
         stdin: &'io mut dyn BufRead,
         stdout: &'io mut dyn io::Write,
@@ -570,6 +572,7 @@ impl<'io> Interpreter<'io> {
             .collect();
 
         Interpreter {
+            program,
             args,
             stdin,
             stdout,
@@ -1568,6 +1571,16 @@ where {
                         interpreter.alloc(closure)
                     }
                 )
+            }
+            Builtin::EnvProgram => {
+                fn env_program_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
+                    interpreter.alloc(Object::String(interpreter.program.clone()))
+                }
+                let closure = Object::IO {
+                    env: Rc::from([]),
+                    body: IOBody(env_program_io),
+                };
+                self.alloc(closure)
             }
             Builtin::EnvArgs => {
                 fn env_args_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {

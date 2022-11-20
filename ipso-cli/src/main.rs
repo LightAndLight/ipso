@@ -83,7 +83,15 @@ fn main() -> io::Result<()> {
             }
         }
         None => {
-            ipso_cli::repl::run(&args)?;
+            ipso_cli::repl::run(
+                std::env::args()
+                    .take(1)
+                    .map(Rc::from)
+                    .collect::<Vec<_>>()
+                    .pop()
+                    .unwrap_or_else(|| Rc::from("ipso")),
+                &args,
+            )?;
             Ok(())
         }
     }

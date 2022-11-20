@@ -178,7 +178,7 @@ fn render_error(
     Ok(())
 }
 
-pub fn run(args: &[Rc<str>]) -> io::Result<()> {
+pub fn run(program: Rc<str>, args: &[Rc<str>]) -> io::Result<()> {
     let source = Source::Interactive {
         label: String::from("repl"),
     };
@@ -306,21 +306,23 @@ pub fn run(args: &[Rc<str>]) -> io::Result<()> {
                                 Err(err) => {
                                     render_error(&mut stdout, prompt, err.position(), err.message())
                                 }
-                                Ok(expr) => match repl.eval_show(args, &mut stdout, expr) {
-                                    Err(err) => render_error(
-                                        &mut stdout,
-                                        prompt,
-                                        err.position(),
-                                        err.message(),
-                                    ),
-                                    Ok(value) => {
-                                        if let Some(value) = value {
-                                            stdout.write_all(value.as_bytes())
-                                        } else {
-                                            Ok(())
+                                Ok(expr) => {
+                                    match repl.eval_show(program.clone(), args, &mut stdout, expr) {
+                                        Err(err) => render_error(
+                                            &mut stdout,
+                                            prompt,
+                                            err.position(),
+                                            err.message(),
+                                        ),
+                                        Ok(value) => {
+                                            if let Some(value) = value {
+                                                stdout.write_all(value.as_bytes())
+                                            } else {
+                                                Ok(())
+                                            }
                                         }
                                     }
-                                },
+                                }
                             }
                         }?;
 

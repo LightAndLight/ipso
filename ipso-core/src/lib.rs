@@ -773,6 +773,7 @@ pub enum Builtin {
     ArrayUnfoldr,
     IntMod,
     PathExists,
+    EnvProgram,
     EnvArgs,
     EnvGetvar,
     EnvSetvar,
