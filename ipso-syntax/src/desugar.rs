@@ -119,7 +119,7 @@ fn desugar_cmd_part_mut(source: &Source, cmd_part: &mut CmdPart) -> Result<(), E
     }
 }
 
-pub fn desugar_branches_mut(source: &Source, branches: &mut [Branch]) -> Result<(), Error> {
+fn desugar_branches_mut(source: &Source, branches: &mut [Branch]) -> Result<(), Error> {
     branches
         .iter_mut()
         .try_for_each(|branch| desugar_expr_mut(source, &mut branch.body))
