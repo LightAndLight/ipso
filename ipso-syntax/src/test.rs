@@ -63,3 +63,38 @@ fn unwrap_fatarrow_1() {
     let actual = ty.unwrap_fatarrow();
     assert_eq!(expected, actual)
 }
+
+#[test]
+fn pattern_iter_names_1() {
+    // C { a, b, ..c }
+    let pattern = super::Pattern::Variant {
+        name: Rc::from("C"),
+        arg: super::Spanned {
+            pos: 0,
+            item: Box::new(super::Pattern::Record {
+                names: vec![
+                    super::Spanned {
+                        pos: 4,
+                        item: Rc::from("a"),
+                    },
+                    super::Spanned {
+                        pos: 7,
+                        item: Rc::from("b"),
+                    },
+                ],
+                rest: Some(super::Spanned {
+                    pos: 12,
+                    item: Rc::from("c"),
+                }),
+            }),
+        },
+    };
+
+    let expected = vec!["a", "b", "c"];
+    let actual = pattern
+        .iter_names()
+        .map(|name| name.item.as_ref())
+        .collect::<Vec<_>>();
+
+    assert_eq!(expected, actual)
+}

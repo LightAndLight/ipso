@@ -259,7 +259,7 @@ pub enum Pattern {
     },
     Variant {
         name: Rc<str>,
-        arg: Spanned<Rc<str>>,
+        arg: Spanned<Box<Pattern>>,
     },
     Char(Spanned<char>),
     Int(Spanned<i32>),
@@ -295,7 +295,10 @@ impl<'a> Iterator for IterNames<'a> {
                         self.items.extend(names.iter().rev());
                         self.next()
                     }
-                    Pattern::Variant { name: _, arg } => Some(arg),
+                    Pattern::Variant { name: _, arg } => {
+                        self.pattern = Some(&arg.item);
+                        self.next()
+                    }
                     Pattern::Char(_) => None,
                     Pattern::Int(_) => None,
                     Pattern::String(_) => None,

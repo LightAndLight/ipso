@@ -563,9 +563,17 @@ pub fn check_pattern(
         syntax::Pattern::Record { names, rest } => {
             check_record_pattern(env, state, pattern.pos, names, rest.as_ref(), expected)
         }
-        syntax::Pattern::Variant { name, arg } => {
-            check_variant_pattern(env, state, pattern.pos, name, arg, expected)
-        }
+        syntax::Pattern::Variant { name, arg } => match arg.item.as_ref() {
+            syntax::Pattern::Name(arg) => {
+                check_variant_pattern(env, state, pattern.pos, name, arg, expected)
+            }
+            syntax::Pattern::Record { .. }
+            | syntax::Pattern::Variant { .. }
+            | syntax::Pattern::Char(_)
+            | syntax::Pattern::Int(_)
+            | syntax::Pattern::String(_)
+            | syntax::Pattern::Wildcard => panic!("un-desugared pattern: {:?}", pattern),
+        },
     }
 }
 

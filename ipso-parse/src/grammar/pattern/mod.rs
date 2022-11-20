@@ -66,13 +66,16 @@ pub fn pattern_record(parser: &mut Parser) -> Parsed<Pattern> {
 /**
 ```text
 pattern_variant ::=
-  ctor ident
+  ctor pattern
 ```
 */
 pub fn pattern_variant(parser: &mut Parser) -> Parsed<Pattern> {
     parser.ctor().and_then(|name| {
-        spanned!(parser, indent!(parser, Relation::Gt, parser.ident()))
-            .map(|arg| Pattern::Variant { name, arg })
+        spanned!(
+            parser,
+            indent!(parser, Relation::Gt, pattern(parser).map(Box::new))
+        )
+        .map(|arg| Pattern::Variant { name, arg })
     })
 }
 
