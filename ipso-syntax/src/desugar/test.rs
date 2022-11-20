@@ -11,12 +11,12 @@ fn desugar_nested_patterns_1() {
     let ok: Rc<str> = Rc::from("Ok");
     let err_ctor: Rc<str> = Rc::from("Err");
     let err: Rc<str> = Rc::from("err");
-    let fresh_1 = "fresh_1";
+    let fresh_0 = "desugar#0";
 
     /*
     case x of
-      Ok fresh_1 ->
-        case fresh_1 of
+      Ok desugar#0 ->
+        case desugar#0 of
           _ -> 1
       Err err -> 2
     */
@@ -30,7 +30,7 @@ fn desugar_nested_patterns_1() {
             },
             vec![
                 Branch {
-                    // Ok fresh_1
+                    // Ok desugar#0
                     pattern: Spanned {
                         pos: 0,
                         item: Pattern::Variant {
@@ -39,7 +39,7 @@ fn desugar_nested_patterns_1() {
                                 pos: 0,
                                 item: Box::new(Pattern::Name(Spanned {
                                     pos: 0,
-                                    item: Rc::from(fresh_1),
+                                    item: Rc::from(fresh_0),
                                 })),
                             },
                         },
@@ -47,11 +47,11 @@ fn desugar_nested_patterns_1() {
                     // ->
                     body: Spanned {
                         pos: 0,
-                        // case fresh_1 of
+                        // case desugar#0 of
                         item: Expr::mk_case(
                             Spanned {
                                 pos: 0,
-                                item: Expr::mk_var(fresh_1),
+                                item: Expr::mk_var(fresh_0),
                             },
                             // _ -> 1
                             vec![Branch {
