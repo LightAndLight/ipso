@@ -322,6 +322,7 @@ version = "0.1.0"
 dependencies = [
  "ipso-diagnostic",
  "ipso-util",
+ "pretty_assertions",
  "quickcheck",
  "quickcheck_macros",
 ]
