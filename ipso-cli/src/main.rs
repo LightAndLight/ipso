@@ -4,7 +4,7 @@ use ipso_cli::{
     version::VERSION,
 };
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
-use std::{io, path::PathBuf};
+use std::{io, path::PathBuf, rc::Rc};
 
 fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Result<()> {
     let mut diagnostic = Diagnostic::new();
@@ -48,6 +48,10 @@ struct Cli {
     /// Print the current version.
     #[clap(long = "version")]
     version: bool,
+
+    /// Arguments to pass to the ipso program.
+    #[clap(last = true)]
+    args: Vec<String>,
 }
 
 fn main() -> io::Result<()> {
@@ -58,11 +62,14 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
+    let args: Vec<Rc<str>> = cli.args.into_iter().map(Rc::from).collect();
+
     match cli.filename {
         Some(filename) => {
             let config = ipso_cli::run::Config {
                 filename: filename.clone(),
                 entrypoint: cli.entrypoint,
+                args,
                 stdin: None,
                 stdout: None,
             };
@@ -76,7 +83,15 @@ fn main() -> io::Result<()> {
             }
         }
         None => {
-            ipso_cli::repl::run()?;
+            ipso_cli::repl::run(
+                std::env::args()
+                    .take(1)
+                    .map(Rc::from)
+                    .collect::<Vec<_>>()
+                    .pop()
+                    .unwrap_or_else(|| Rc::from("ipso")),
+                &args,
+            )?;
             Ok(())
         }
     }

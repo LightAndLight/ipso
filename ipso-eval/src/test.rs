@@ -18,8 +18,16 @@ fn eval_1() {
     let common_kinds = CommonKinds::default();
     let context = HashMap::new();
     let modules = Modules::new();
-    let mut interpreter =
-        Interpreter::new(&mut stdin, &mut stdout, &common_kinds, &modules, &context);
+    let args = vec![];
+    let mut interpreter = Interpreter::new(
+        Rc::from("test"),
+        &args,
+        &mut stdin,
+        &mut stdout,
+        &common_kinds,
+        &modules,
+        &context,
+    );
     let mut env = Env::new();
 
     let expected_value = Value::Int(1);
@@ -43,8 +51,16 @@ fn eval_2() {
     let common_kinds = CommonKinds::default();
     let context = HashMap::new();
     let modules = Modules::new();
-    let mut interpreter =
-        Interpreter::new(&mut stdin, &mut stdout, &common_kinds, &modules, &context);
+    let args = vec![];
+    let mut interpreter = Interpreter::new(
+        Rc::from("test"),
+        &args,
+        &mut stdin,
+        &mut stdout,
+        &common_kinds,
+        &modules,
+        &context,
+    );
     let mut env = Env::new();
 
     let expected_value = interpreter.alloc(Object::Bytes(Rc::from(str.as_bytes())));

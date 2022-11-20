@@ -1,0 +1,8 @@
+main : IO ()
+main =
+  comp
+    bind program <- env.program
+    println program
+
+    bind args <- env.args
+    println <| debug args

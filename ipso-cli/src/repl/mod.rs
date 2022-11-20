@@ -1,7 +1,10 @@
 pub mod circular_buffer;
 
 use ipso_diagnostic::Source;
-use std::io::{self, Stdout, Write};
+use std::{
+    io::{self, Stdout, Write},
+    rc::Rc,
+};
 use termion::{
     cursor::DetectCursorPos,
     event::{Event, Key},
@@ -175,7 +178,7 @@ fn render_error(
     Ok(())
 }
 
-pub fn run() -> io::Result<()> {
+pub fn run(program: Rc<str>, args: &[Rc<str>]) -> io::Result<()> {
     let source = Source::Interactive {
         label: String::from("repl"),
     };
@@ -303,21 +306,23 @@ pub fn run() -> io::Result<()> {
                                 Err(err) => {
                                     render_error(&mut stdout, prompt, err.position(), err.message())
                                 }
-                                Ok(expr) => match repl.eval_show(&mut stdout, expr) {
-                                    Err(err) => render_error(
-                                        &mut stdout,
-                                        prompt,
-                                        err.position(),
-                                        err.message(),
-                                    ),
-                                    Ok(value) => {
-                                        if let Some(value) = value {
-                                            stdout.write_all(value.as_bytes())
-                                        } else {
-                                            Ok(())
+                                Ok(expr) => {
+                                    match repl.eval_show(program.clone(), args, &mut stdout, expr) {
+                                        Err(err) => render_error(
+                                            &mut stdout,
+                                            prompt,
+                                            err.position(),
+                                            err.message(),
+                                        ),
+                                        Ok(value) => {
+                                            if let Some(value) = value {
+                                                stdout.write_all(value.as_bytes())
+                                            } else {
+                                                Ok(())
+                                            }
                                         }
                                     }
-                                },
+                                }
                             }
                         }?;
 

@@ -16,6 +16,7 @@ fn one(c: &mut Criterion) {
                 ipso_cli::run::Config {
                     filename: String::from("../examples/todolist.ipso"),
                     entrypoint: None,
+                    args: vec![],
                     stdin: Some(Box::new(BufReader::new(Cursor::new(String::from(
                         contents.as_ref(),
                     ))))),

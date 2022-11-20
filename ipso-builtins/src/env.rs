@@ -3,6 +3,17 @@ use std::rc::Rc;
 
 pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
     vec![
+        // program : IO String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("program"),
+            sig: {
+                TypeSig {
+                    ty_vars: vec![],
+                    body: Type::app(Type::mk_io(common_kinds), Type::String),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::EnvProgram),
+        }),
         // args : IO (Array String)
         Rc::new(Declaration::Definition {
             name: Rc::from("args"),

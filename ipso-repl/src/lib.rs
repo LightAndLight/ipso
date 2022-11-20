@@ -146,6 +146,8 @@ impl Repl {
 
     pub fn eval_show(
         &self,
+        program: Rc<str>,
+        args: &[Rc<str>],
         stdout: &mut dyn Write,
         expr: Spanned<ipso_syntax::Expr>,
     ) -> Result<Option<String>, Error> {
@@ -273,6 +275,8 @@ impl Repl {
         let context = Default::default();
 
         let mut interpreter = Interpreter::new(
+            program,
+            args,
             &mut stdin,
             stdout,
             &self.common_kinds,
