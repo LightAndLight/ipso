@@ -1,0 +1,48 @@
+unwraaaaap : (| Wrap : (| Wrap : (| Wrap : (| Wrap : (| Wrap : a |) |) |) |) |) -> a
+unwraaaaap x =
+  case x of
+    Wrap (Wrap (Wrap (Wrap (Wrap a)))) -> a
+
+joinResult : (| Ok : (| Ok : a, Err : err |), Err : err |) -> (| Ok : a, Err : err |)
+joinResult x =
+  case x of
+    Ok (Ok a) -> Ok a
+    Ok (Err err) -> Err err
+    Err err -> Err err
+
+thing : (| A : Int, B : Char, C : { x : Int, y : Int } |) -> String
+thing x =
+  case x of
+    A 1 -> "A 1"
+    A 2 -> "A 2"
+    B 'c' -> "B 'c'"
+    B 'd' -> "B 'd'"
+    B _ -> "B _"
+    A 3 -> "A 3"
+    A 4 -> "A 4"
+    C { x, y } -> "C { x = ${debug x}, y = ${debug y} }"
+    A _ -> "A _"
+
+main : IO ()
+main =
+  comp
+    println <| debug (unwraaaaap (Wrap (Wrap (Wrap (Wrap (Wrap 99))))))
+    
+    println <| debug (joinResult (Ok (Ok 88)))
+    println <| debug (joinResult (Ok (Err "error 1")))
+    println <| debug (joinResult (Err "error 2"))
+
+    println <| thing (A 1)
+    println <| thing (A 2)
+    println <| thing (A 3)
+    println <| thing (A 4)
+    println <| thing (A 5)
+    
+    println <| thing (B 'a')
+    println <| thing (B 'b')
+    println <| thing (B 'c')
+    println <| thing (B 'd')
+    println <| thing (B 'e')
+    
+    println <| thing (C { x = 1, y = 2})
+    println <| thing (C { x = 3, y = 4})

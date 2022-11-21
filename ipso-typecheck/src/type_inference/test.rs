@@ -246,7 +246,10 @@ fn infer_pattern_4() {
                 name: Rc::from("just"),
                 arg: syntax::Spanned {
                     pos: 5,
-                    item: Rc::from("x"),
+                    item: Box::new(syntax::Pattern::Name(Spanned {
+                        pos: 5,
+                        item: Rc::from("x"),
+                    })),
                 },
             },
         };
@@ -1000,7 +1003,10 @@ fn infer_case_1() {
                                     name: Rc::from("X"),
                                     arg: syntax::Spanned {
                                         pos: 20,
-                                        item: Rc::from("a"),
+                                        item: Box::new(syntax::Pattern::Name(Spanned {
+                                            pos: 20,
+                                            item: Rc::from("a"),
+                                        })),
                                     },
                                 },
                             },
@@ -1072,7 +1078,10 @@ fn infer_case_2() {
                                         name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: Rc::from("a"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 23,
+                                                item: Rc::from("a"),
+                                            })),
                                         },
                                     },
                                 },
@@ -1088,7 +1097,10 @@ fn infer_case_2() {
                                         name: Rc::from("Right"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: Rc::from("b"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 34,
+                                                item: Rc::from("b"),
+                                            })),
                                         },
                                     },
                                 },
@@ -1171,7 +1183,10 @@ fn infer_case_3() {
                                         name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: Rc::from("a"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 23,
+                                                item: Rc::from("a"),
+                                            })),
                                         },
                                     },
                                 },
@@ -1187,7 +1202,10 @@ fn infer_case_3() {
                                         name: Rc::from("Right"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: Rc::from("b"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 34,
+                                                item: Rc::from("b"),
+                                            })),
                                         },
                                     },
                                 },
@@ -1284,7 +1302,10 @@ fn infer_case_4() {
                                         name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 23,
-                                            item: Rc::from("a"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 23,
+                                                item: Rc::from("a"),
+                                            })),
                                         },
                                     },
                                 },
@@ -1300,7 +1321,10 @@ fn infer_case_4() {
                                         name: Rc::from("Left"),
                                         arg: syntax::Spanned {
                                             pos: 34,
-                                            item: Rc::from("b"),
+                                            item: Box::new(syntax::Pattern::Name(Spanned {
+                                                pos: 34,
+                                                item: Rc::from("b"),
+                                            })),
                                         },
                                     },
                                 },

@@ -259,7 +259,7 @@ pub enum Pattern {
     },
     Variant {
         name: Rc<str>,
-        arg: Spanned<Rc<str>>,
+        arg: Spanned<Box<Pattern>>,
     },
     Char(Spanned<char>),
     Int(Spanned<i32>),
@@ -295,7 +295,10 @@ impl<'a> Iterator for IterNames<'a> {
                         self.items.extend(names.iter().rev());
                         self.next()
                     }
-                    Pattern::Variant { name: _, arg } => Some(arg),
+                    Pattern::Variant { name: _, arg } => {
+                        self.pattern = Some(&arg.item);
+                        self.next()
+                    }
                     Pattern::Char(_) => None,
                     Pattern::Int(_) => None,
                     Pattern::String(_) => None,
@@ -312,34 +315,6 @@ impl Pattern {
             items: Vec::new(),
             pattern: Some(self),
         }
-    }
-
-    pub fn get_arg_names(&self) -> Vec<&Spanned<Rc<str>>> {
-        let mut arg_names = Vec::new();
-        match self {
-            Pattern::Name(n) => {
-                arg_names.push(n);
-            }
-            Pattern::Record { names, rest } => {
-                for name in names {
-                    arg_names.push(name);
-                }
-                match rest {
-                    None => {}
-                    Some(n) => {
-                        arg_names.push(n);
-                    }
-                }
-            }
-            Pattern::Variant { name: _, arg } => {
-                arg_names.push(arg);
-            }
-            Pattern::Char(_) => {}
-            Pattern::Int(_) => {}
-            Pattern::String(_) => {}
-            Pattern::Wildcard => {}
-        }
-        arg_names
     }
 }
 

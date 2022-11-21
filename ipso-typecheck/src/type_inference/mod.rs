@@ -341,7 +341,7 @@ fn fresh_type_meta(type_solutions: &mut unification::Solutions, kind: Kind) -> T
 fn check_duplicate_args(source: &Source, args: &[Spanned<syntax::Pattern>]) -> Result<(), Error> {
     let mut seen: HashSet<&str> = HashSet::new();
     args.iter()
-        .flat_map(|arg| arg.item.get_arg_names().into_iter())
+        .flat_map(|arg| arg.item.iter_names())
         .try_for_each(|arg| {
             if seen.contains(&arg.item.as_ref()) {
                 Err(Error::duplicate_argument(source, arg.pos, arg.item.clone()))
@@ -563,9 +563,17 @@ pub fn check_pattern(
         syntax::Pattern::Record { names, rest } => {
             check_record_pattern(env, state, pattern.pos, names, rest.as_ref(), expected)
         }
-        syntax::Pattern::Variant { name, arg } => {
-            check_variant_pattern(env, state, pattern.pos, name, arg, expected)
-        }
+        syntax::Pattern::Variant { name, arg } => match arg.item.as_ref() {
+            syntax::Pattern::Name(arg) => {
+                check_variant_pattern(env, state, pattern.pos, name, arg, expected)
+            }
+            syntax::Pattern::Record { .. }
+            | syntax::Pattern::Variant { .. }
+            | syntax::Pattern::Char(_)
+            | syntax::Pattern::Int(_)
+            | syntax::Pattern::String(_)
+            | syntax::Pattern::Wildcard => panic!("un-desugared pattern: {:?}", pattern),
+        },
     }
 }
 
