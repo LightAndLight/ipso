@@ -277,16 +277,6 @@ x : forall r. (| None : (), r |)
 ```
 
 ```ipsorepl
-> x = None ()
-x : forall r. (| None : (), r |)
-> case x of
-.   None _ -> 1
-.
-(repl):1:1 error: missing patterns
-  • _ -> ...
-```
-
-```ipsorepl
 > x = None () : (| None : () |)
 x : (| None : () |)
 > case x of
@@ -301,7 +291,19 @@ x : forall r1 r2. (| Ok : (| Ok : Int, r1 |), r2 |)
 > case x of
 .   Ok (Ok a) -> a
 .   _ -> 0
+.
 99
+```
+
+Incomplete pattern matches are not (yet) reported by the type checker:
+
+```ipsorepl
+> x = None ()
+x : forall r. (| None : (), r |)
+> case x of
+.   None _ -> 1
+.
+1
 ```
 
 ### Literals
