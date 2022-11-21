@@ -267,30 +267,41 @@ true
 ### Variants
 
 ```ipsorepl
-> x = None
-x : forall r. (| None, r |)
+> x = None ()
+x : forall r. (| None : (), r |)
 > case x of
-.   None -> 1
+.   None _ -> 1
 .   _ -> 2
 .
 1
 ```
 
 ```ipsorepl
-> x = None
-x : forall r. (| None, r |)
+> x = None () : (| None : () |)
+x : (| None : () |)
 > case x of
-.   None -> 1
+.   None _ -> 1
 .
-(repl):1:1 error: missing patterns
-  • _ -> ...
+1
 ```
 
 ```ipsorepl
-> x = None : (| None |)
-x : (| None |)
+> x = Ok (Ok 99)
+x : forall r1 r2. (| Ok : (| Ok : Int, r1 |), r2 |)
 > case x of
-.   None -> 1
+.   Ok (Ok a) -> a
+.   _ -> 0
+.
+99
+```
+
+Incomplete pattern matches are not (yet) reported by the type checker:
+
+```ipsorepl
+> x = None ()
+x : forall r. (| None : (), r |)
+> case x of
+.   None _ -> 1
 .
 1
 ```

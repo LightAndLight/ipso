@@ -250,440 +250,447 @@ main =
 <span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
 <span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> a <span class="kw">=</span> <span class="st">&quot;hi&quot;</span>, c <span class="kw">=</span> <span class="dv">1</span> <span class="kw">}</span></span></code></pre></div>
 <h3 id="variants">Variants</h3>
-<div class="sourceCode" id="cb19"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> forall r. <span class="kw">(|</span> None, r <span class="kw">|)</span></span>
+<div class="sourceCode" id="cb19"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None <span class="kw">()</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> forall r. <span class="kw">(|</span> None <span class="kw">:</span> <span class="kw">()</span>, r <span class="kw">|)</span></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> x <span class="kw">of</span></span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None <span class="kw">-&gt;</span> <span class="dv">1</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None _ <span class="kw">-&gt;</span> <span class="dv">1</span></span>
 <span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="dv">2</span></span>
 <span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
 <span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
-<div class="sourceCode" id="cb20"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> forall r. <span class="kw">(|</span> None, r <span class="kw">|)</span></span>
+<div class="sourceCode" id="cb20"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None <span class="kw">()</span> <span class="kw">:</span> <span class="kw">(|</span> None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> <span class="kw">(|</span> None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
 <span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> x <span class="kw">of</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None <span class="kw">-&gt;</span> <span class="dv">1</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None _ <span class="kw">-&gt;</span> <span class="dv">1</span></span>
 <span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>(repl):1:1 error: missing patterns</span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  • _ -&gt; ...</span></code></pre></div>
-<div class="sourceCode" id="cb21"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None <span class="kw">:</span> <span class="kw">(|</span> None <span class="kw">|)</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> <span class="kw">(|</span> None <span class="kw">|)</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> Ok <span class="kw">(</span>Ok <span class="dv">99</span><span class="kw">)</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> forall r1 r2. <span class="kw">(|</span> Ok <span class="kw">:</span> <span class="kw">(|</span> Ok <span class="kw">:</span> Int, r1 <span class="kw">|)</span>, r2 <span class="kw">|)</span></span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> x <span class="kw">of</span></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None <span class="kw">-&gt;</span> <span class="dv">1</span></span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
-<h3 id="literals">Literals</h3>
-<div class="sourceCode" id="cb22"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="ch">'a'</span> <span class="kw">of</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="ch">'b'</span> <span class="kw">-&gt;</span> <span class="st">&quot;b&quot;</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="ch">'a'</span> <span class="kw">-&gt;</span> <span class="st">&quot;a&quot;</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="st">&quot;something else&quot;</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   Ok <span class="kw">(</span>Ok a<span class="kw">)</span> <span class="kw">-&gt;</span> a</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="dv">0</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a><span class="dv">99</span></span></code></pre></div>
+<p>Incomplete pattern matches are not (yet) reported by the type checker:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> None <span class="kw">()</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> forall r. <span class="kw">(|</span> None <span class="kw">:</span> <span class="kw">()</span>, r <span class="kw">|)</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> x <span class="kw">of</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   None _ <span class="kw">-&gt;</span> <span class="dv">1</span></span>
 <span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;a&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb23"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="dv">1</span> <span class="kw">of</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="dv">0</span> <span class="kw">-&gt;</span> <span class="st">&quot;0&quot;</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="dv">1</span> <span class="kw">-&gt;</span> <span class="st">&quot;1&quot;</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
+<h3 id="literals">Literals</h3>
+<div class="sourceCode" id="cb23"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="ch">'a'</span> <span class="kw">of</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="ch">'b'</span> <span class="kw">-&gt;</span> <span class="st">&quot;b&quot;</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="ch">'a'</span> <span class="kw">-&gt;</span> <span class="st">&quot;a&quot;</span></span>
 <span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="st">&quot;something else&quot;</span></span>
 <span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;1&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb24"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="st">&quot;true&quot;</span> <span class="kw">of</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="st">&quot;false&quot;</span> <span class="kw">-&gt;</span> <span class="dv">0</span></span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="st">&quot;true&quot;</span> <span class="kw">-&gt;</span> <span class="dv">1</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="dv">2</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;a&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="dv">1</span> <span class="kw">of</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="dv">0</span> <span class="kw">-&gt;</span> <span class="st">&quot;0&quot;</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="dv">1</span> <span class="kw">-&gt;</span> <span class="st">&quot;1&quot;</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="st">&quot;something else&quot;</span></span>
 <span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;1&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">case</span> <span class="st">&quot;true&quot;</span> <span class="kw">of</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="st">&quot;false&quot;</span> <span class="kw">-&gt;</span> <span class="dv">0</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="st">&quot;true&quot;</span> <span class="kw">-&gt;</span> <span class="dv">1</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   _ <span class="kw">-&gt;</span> <span class="dv">2</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span></span></code></pre></div>
 <h2 id="let-bindings">Let Bindings</h2>
-<div class="sourceCode" id="cb25"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> x <span class="kw">=</span> <span class="dv">1</span> <span class="kw">in</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span> <span class="kw">let</span> y <span class="kw">=</span> <span class="dv">2</span> <span class="kw">in</span></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span> x <span class="kw">+</span> y</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span></span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> x <span class="kw">=</span> <span class="dv">1</span> <span class="kw">in</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span> <span class="kw">let</span> y <span class="kw">=</span> <span class="dv">2</span> <span class="kw">in</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span> x <span class="kw">+</span> y</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span></span></code></pre></div>
 <h2 id="computation-expressions">Computation Expressions</h2>
 <p>See also: <a href="#io">IO</a></p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">comp</span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">bind</span> x <span class="kw">&lt;-</span> readln</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">let</span> twoXs <span class="kw">=</span> <span class="st">&quot;</span><span class="kw">$</span>x <span class="kw">$</span>x<span class="st">&quot;</span></span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   print twoXs</span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>IO <span class="kw">()</span></span></code></pre></div>
 <div class="sourceCode" id="cb27"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">comp</span></span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">bind</span> x <span class="kw">&lt;-</span> readln</span>
-<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   return x</span>
-<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
-<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>IO String</span></code></pre></div>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">let</span> twoXs <span class="kw">=</span> <span class="st">&quot;</span><span class="kw">$</span>x <span class="kw">$</span>x<span class="st">&quot;</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   print twoXs</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>IO <span class="kw">()</span></span></code></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">comp</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">bind</span> x <span class="kw">&lt;-</span> readln</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   return x</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a><span class="co">.</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>IO String</span></code></pre></div>
 <h2 id="command-literals">Command Literals</h2>
 <p>See also: <a href="#commands">Commands</a></p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="st">`ls -laR`</span></span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>Cmd</span></code></pre></div>
-<div class="sourceCode" id="cb29"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> cmd.run <span class="st">`echo &quot;hello!&quot;`</span></span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>hello!</span></code></pre></div>
-<div class="sourceCode" id="cb30"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> cmd.run <span class="st">``</span></span></code></pre></div>
+<div class="sourceCode" id="cb29"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="st">`ls -laR`</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>Cmd</span></code></pre></div>
+<div class="sourceCode" id="cb30"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> cmd.run <span class="st">`echo &quot;hello!&quot;`</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>hello!</span></code></pre></div>
+<div class="sourceCode" id="cb31"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> cmd.run <span class="st">``</span></span></code></pre></div>
 <h3 id="interpolation">Interpolation</h3>
-<div class="sourceCode" id="cb31"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> arg <span class="kw">=</span> <span class="st">&quot;hi&quot;</span></span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">$</span>arg<span class="st">`</span></span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="st">`echo hi`</span></span></code></pre></div>
-<div class="sourceCode" id="cb32"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> args <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;hello&quot;</span>, <span class="st">&quot;world&quot;</span><span class="kw">]</span></span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">$</span>args<span class="st">`</span></span>
-<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="st">`echo hello world`</span></span></code></pre></div>
-<div class="sourceCode" id="cb33"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">${</span> string.join <span class="st">&quot; &quot;</span> <span class="kw">[</span><span class="st">&quot;hello&quot;</span>, <span class="st">&quot;world&quot;</span><span class="kw">]</span> <span class="kw">}</span><span class="st">`</span></span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="st">`echo &quot;hello world&quot;`</span></span></code></pre></div>
-<div class="sourceCode" id="cb34"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> <span class="st">`echo </span><span class="kw">$</span>x<span class="st">`</span></span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>ToArgs a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> Cmd</span></code></pre></div>
+<div class="sourceCode" id="cb32"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> arg <span class="kw">=</span> <span class="st">&quot;hi&quot;</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">$</span>arg<span class="st">`</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="st">`echo hi`</span></span></code></pre></div>
+<div class="sourceCode" id="cb33"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">let</span> args <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;hello&quot;</span>, <span class="st">&quot;world&quot;</span><span class="kw">]</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">$</span>args<span class="st">`</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="st">`echo hello world`</span></span></code></pre></div>
+<div class="sourceCode" id="cb34"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">`echo </span><span class="kw">${</span> string.join <span class="st">&quot; &quot;</span> <span class="kw">[</span><span class="st">&quot;hello&quot;</span>, <span class="st">&quot;world&quot;</span><span class="kw">]</span> <span class="kw">}</span><span class="st">`</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="st">`echo &quot;hello world&quot;`</span></span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> <span class="st">`echo </span><span class="kw">$</span>x<span class="st">`</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>ToArgs a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> Cmd</span></code></pre></div>
 <h2 id="operators">Operators</h2>
-<div class="sourceCode" id="cb35"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="kw">==</span> <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="kw">!=</span> <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;=</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a><span class="kw">&gt;=</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a><span class="kw">&gt;</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;&amp;</span> <span class="kw">:</span> Bool <span class="kw">-&gt;</span> Bool <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a><span class="kw">||</span> <span class="kw">:</span> Bool <span class="kw">-&gt;</span> Bool <span class="kw">-&gt;</span> Bool</span>
-<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a><span class="kw">+</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a><span class="kw">*</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a><span class="kw">++</span> <span class="kw">:</span> Array a <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
-<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;|</span> <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> b</span>
-<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a><span class="kw">|&gt;</span> <span class="kw">:</span> a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> b</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="kw">==</span> <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="kw">!=</span> <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;=</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a><span class="kw">&gt;=</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a><span class="kw">&gt;</span> <span class="kw">:</span> Ord a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;&amp;</span> <span class="kw">:</span> Bool <span class="kw">-&gt;</span> Bool <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a><span class="kw">||</span> <span class="kw">:</span> Bool <span class="kw">-&gt;</span> Bool <span class="kw">-&gt;</span> Bool</span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a><span class="kw">+</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a><span class="kw">-</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a><span class="kw">*</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span> <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a><span class="kw">++</span> <span class="kw">:</span> Array a <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a><span class="kw">&lt;|</span> <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> b</span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a><span class="kw">|&gt;</span> <span class="kw">:</span> a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> b</span></code></pre></div>
 <h2 id="datatypes">Datatypes</h2>
 <h3 id="booleans">Booleans</h3>
-<div class="sourceCode" id="cb36"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">true</span></span>
-<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>Bool</span></code></pre></div>
-<div class="sourceCode" id="cb37"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">false</span></span>
+<div class="sourceCode" id="cb37"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">true</span></span>
 <span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>Bool</span></code></pre></div>
-<div class="sourceCode" id="cb38"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">if</span> <span class="st">true</span> <span class="kw">then</span> <span class="st">&quot;yes&quot;</span> <span class="kw">else</span> <span class="st">&quot;no&quot;</span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;yes&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb39"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">if</span> <span class="st">false</span> <span class="kw">then</span> <span class="st">&quot;yes&quot;</span> <span class="kw">else</span> <span class="st">&quot;no&quot;</span></span>
-<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;no&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">false</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>Bool</span></code></pre></div>
+<div class="sourceCode" id="cb39"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">if</span> <span class="st">true</span> <span class="kw">then</span> <span class="st">&quot;yes&quot;</span> <span class="kw">else</span> <span class="st">&quot;no&quot;</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;yes&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">if</span> <span class="st">false</span> <span class="kw">then</span> <span class="st">&quot;yes&quot;</span> <span class="kw">else</span> <span class="st">&quot;no&quot;</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;no&quot;</span></span></code></pre></div>
 <h3 id="integers">Integers</h3>
-<div class="sourceCode" id="cb40"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="dv">0</span></span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>Int</span></code></pre></div>
-<div class="sourceCode" id="cb41"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="dv">1</span></span>
+<div class="sourceCode" id="cb41"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="dv">0</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>Int</span></code></pre></div>
-<div class="sourceCode" id="cb42"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">-</span><span class="dv">1</span></span>
+<div class="sourceCode" id="cb42"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="dv">1</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>Int</span></code></pre></div>
+<div class="sourceCode" id="cb43"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">-</span><span class="dv">1</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>Int</span></code></pre></div>
 <h4 id="builtins">Builtins</h4>
-<div class="sourceCode" id="cb43"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> int <span class="kw">where</span></span>
-<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Bool</span>
-<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>  toString <span class="kw">:</span> Int <span class="kw">-&gt;</span> String</span>
-<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>  mod <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<div class="sourceCode" id="cb44"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> int <span class="kw">where</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Bool</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>  toString <span class="kw">:</span> Int <span class="kw">-&gt;</span> String</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>  mod <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span></code></pre></div>
 <h3 id="characters">Characters</h3>
 <p>The <code>Char</code> type represents a unicode code point.</p>
-<div class="sourceCode" id="cb44"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="ch">'a'</span></span>
-<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>Char</span></code></pre></div>
-<div class="sourceCode" id="cb45"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="ch">'🤩'</span></span>
+<div class="sourceCode" id="cb45"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="ch">'a'</span></span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>Char</span></code></pre></div>
+<div class="sourceCode" id="cb46"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="ch">'🤩'</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>Char</span></code></pre></div>
 <h4 id="builtins-1">Builtins</h4>
-<div class="sourceCode" id="cb46"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> char <span class="kw">where</span></span>
-<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> Char <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> Bool</span>
-<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  toString <span class="kw">:</span> Char <span class="kw">-&gt;</span> String</span></code></pre></div>
+<div class="sourceCode" id="cb47"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> char <span class="kw">where</span></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> Char <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> Bool</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>  toString <span class="kw">:</span> Char <span class="kw">-&gt;</span> String</span></code></pre></div>
 <h3 id="strings">Strings</h3>
 <p>The <code>String</code> type is a UTF-8 encoded sequence of bytes.</p>
-<div class="sourceCode" id="cb47"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">&quot;hello&quot;</span></span>
-<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>String</span></code></pre></div>
+<div class="sourceCode" id="cb48"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">&quot;hello&quot;</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>String</span></code></pre></div>
 <h4 id="interpolation-1">Interpolation</h4>
-<div class="sourceCode" id="cb48"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="st">&quot;hello&quot;</span></span>
-<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> String</span>
-<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">&quot;</span><span class="kw">$</span>x <span class="st">world&quot;</span></span>
-<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;hello world&quot;</span></span></code></pre></div>
-<div class="sourceCode" id="cb49"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;a&quot;</span>, <span class="st">&quot;b&quot;</span>, <span class="st">&quot;c&quot;</span><span class="kw">]</span></span>
-<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> Array String</span>
-<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">&quot;joined: </span><span class="kw">${</span>string.join <span class="st">&quot;, &quot;</span> x<span class="kw">}</span><span class="st">&quot;</span></span>
-<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;joined: a, b, c&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb49"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="st">&quot;hello&quot;</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> String</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">&quot;</span><span class="kw">$</span>x <span class="st">world&quot;</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;hello world&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb50"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;a&quot;</span>, <span class="st">&quot;b&quot;</span>, <span class="st">&quot;c&quot;</span><span class="kw">]</span></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> Array String</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="st">&quot;joined: </span><span class="kw">${</span>string.join <span class="st">&quot;, &quot;</span> x<span class="kw">}</span><span class="st">&quot;</span></span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;joined: a, b, c&quot;</span></span></code></pre></div>
 <h4 id="builtins-2">Builtins</h4>
-<div class="sourceCode" id="cb50"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> string <span class="kw">where</span></span>
-<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>  toUtf8 <span class="kw">:</span> String <span class="kw">-&gt;</span> Bytes</span>
-<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Bool</span>
-<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a>  filter <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a>  split <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>  splitc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a>  join <span class="kw">:</span> String <span class="kw">-&gt;</span> Array String <span class="kw">-&gt;</span> String</span>
-<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
-<span id="cb50-16"><a href="#cb50-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
-<span id="cb50-17"><a href="#cb50-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb50-18"><a href="#cb50-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
-<span id="cb50-19"><a href="#cb50-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb50-20"><a href="#cb50-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
-<span id="cb50-21"><a href="#cb50-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
-<span id="cb50-22"><a href="#cb50-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb50-23"><a href="#cb50-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb50-24"><a href="#cb50-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
-<span id="cb50-25"><a href="#cb50-25" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb50-26"><a href="#cb50-26" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb50-27"><a href="#cb50-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
-<span id="cb50-28"><a href="#cb50-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
-<span id="cb50-29"><a href="#cb50-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb50-30"><a href="#cb50-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
-<span id="cb50-31"><a href="#cb50-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb50-32"><a href="#cb50-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
-<span id="cb50-33"><a href="#cb50-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
-<span id="cb50-34"><a href="#cb50-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb50-35"><a href="#cb50-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb50-36"><a href="#cb50-36" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb50-37"><a href="#cb50-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-38"><a href="#cb50-38" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> string <span class="kw">where</span></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>  toUtf8 <span class="kw">:</span> String <span class="kw">-&gt;</span> Bytes</span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Bool</span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a>  filter <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a>  split <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb51-11"><a href="#cb51-11" aria-hidden="true" tabindex="-1"></a>  splitc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb51-12"><a href="#cb51-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-13"><a href="#cb51-13" aria-hidden="true" tabindex="-1"></a>  join <span class="kw">:</span> String <span class="kw">-&gt;</span> Array String <span class="kw">-&gt;</span> String</span>
+<span id="cb51-14"><a href="#cb51-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-15"><a href="#cb51-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb51-16"><a href="#cb51-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
+<span id="cb51-17"><a href="#cb51-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb51-18"><a href="#cb51-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb51-19"><a href="#cb51-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb51-20"><a href="#cb51-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
+<span id="cb51-21"><a href="#cb51-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
+<span id="cb51-22"><a href="#cb51-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb51-23"><a href="#cb51-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb51-24"><a href="#cb51-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
+<span id="cb51-25"><a href="#cb51-25" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb51-26"><a href="#cb51-26" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb51-27"><a href="#cb51-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb51-28"><a href="#cb51-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
+<span id="cb51-29"><a href="#cb51-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb51-30"><a href="#cb51-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb51-31"><a href="#cb51-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb51-32"><a href="#cb51-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
+<span id="cb51-33"><a href="#cb51-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
+<span id="cb51-34"><a href="#cb51-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb51-35"><a href="#cb51-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb51-36"><a href="#cb51-36" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb51-37"><a href="#cb51-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-38"><a href="#cb51-38" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
 <h3 id="functions">Functions</h3>
-<div class="sourceCode" id="cb51"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> x</span>
-<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>forall t0. t0 <span class="kw">-&gt;</span> t0</span></code></pre></div>
-<div class="sourceCode" id="cb52"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x y <span class="kw">-&gt;</span> x <span class="kw">+</span> y</span>
-<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span></code></pre></div>
-<div class="sourceCode" id="cb53"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f x <span class="kw">=</span> x <span class="kw">+</span> <span class="dv">1</span></span>
-<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>f <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f <span class="dv">2</span></span>
-<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span></span></code></pre></div>
-<div class="sourceCode" id="cb54"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f <span class="kw">{</span> x, y <span class="kw">}</span> <span class="kw">=</span> x <span class="kw">+</span> y</span>
-<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>f <span class="kw">:</span> <span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
-<div class="sourceCode" id="cb55"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\{</span> x, y <span class="kw">}</span> <span class="kw">-&gt;</span> x <span class="kw">+</span> y</span>
-<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
-<div class="sourceCode" id="cb56"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\{</span> x, <span class="kw">..</span>rest <span class="kw">}</span> <span class="kw">-&gt;</span> x <span class="kw">+</span> rest.y <span class="kw">+</span> rest.z</span>
-<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int, z <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<div class="sourceCode" id="cb52"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> x</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>forall t0. t0 <span class="kw">-&gt;</span> t0</span></code></pre></div>
+<div class="sourceCode" id="cb53"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x y <span class="kw">-&gt;</span> x <span class="kw">+</span> y</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<div class="sourceCode" id="cb54"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f x <span class="kw">=</span> x <span class="kw">+</span> <span class="dv">1</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>f <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f <span class="dv">2</span></span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span></span></code></pre></div>
+<div class="sourceCode" id="cb55"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> f <span class="kw">{</span> x, y <span class="kw">}</span> <span class="kw">=</span> x <span class="kw">+</span> y</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>f <span class="kw">:</span> <span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<div class="sourceCode" id="cb56"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\{</span> x, y <span class="kw">}</span> <span class="kw">-&gt;</span> x <span class="kw">+</span> y</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<div class="sourceCode" id="cb57"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\{</span> x, <span class="kw">..</span>rest <span class="kw">}</span> <span class="kw">-&gt;</span> x <span class="kw">+</span> rest.y <span class="kw">+</span> rest.z</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Int, z <span class="kw">:</span> Int <span class="kw">}</span> <span class="kw">-&gt;</span> Int</span></code></pre></div>
 <h3 id="arrays">Arrays</h3>
-<div class="sourceCode" id="cb57"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">[</span><span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span><span class="kw">]</span></span>
-<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a>Array Int</span></code></pre></div>
-<div class="sourceCode" id="cb58"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">[</span><span class="dv">1</span>, <span class="st">true</span>, <span class="dv">3</span><span class="kw">]</span></span>
-<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>(repl):1:5: error: expected 'Int', got 'Bool'</span>
-<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>  |</span>
-<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>1 | [1, true, 3]</span>
-<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>  |     ^^^^</span></code></pre></div>
+<div class="sourceCode" id="cb58"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">[</span><span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span><span class="kw">]</span></span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>Array Int</span></code></pre></div>
+<div class="sourceCode" id="cb59"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">[</span><span class="dv">1</span>, <span class="st">true</span>, <span class="dv">3</span><span class="kw">]</span></span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>(repl):1:5: error: expected 'Int', got 'Bool'</span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>  |</span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a>1 | [1, true, 3]</span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>  |     ^^^^</span></code></pre></div>
 <h4 id="builtins-3">Builtins</h4>
-<div class="sourceCode" id="cb59"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> array <span class="kw">where</span></span>
-<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>b <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> b <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> b</span>
-<span id="cb59-6"><a href="#cb59-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-7"><a href="#cb59-7" aria-hidden="true" tabindex="-1"></a>  generate <span class="kw">:</span> Int <span class="kw">-&gt;</span> <span class="kw">(</span>Int <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> Array a</span>
-<span id="cb59-8"><a href="#cb59-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-9"><a href="#cb59-9" aria-hidden="true" tabindex="-1"></a>  length <span class="kw">:</span> Array a <span class="kw">-&gt;</span> Int</span>
-<span id="cb59-10"><a href="#cb59-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-11"><a href="#cb59-11" aria-hidden="true" tabindex="-1"></a>  index <span class="kw">:</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> a</span>
-<span id="cb59-12"><a href="#cb59-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-13"><a href="#cb59-13" aria-hidden="true" tabindex="-1"></a>  slice <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
-<span id="cb59-14"><a href="#cb59-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-15"><a href="#cb59-15" aria-hidden="true" tabindex="-1"></a>  snoc <span class="kw">:</span> Array a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Array a</span>
-<span id="cb59-16"><a href="#cb59-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-17"><a href="#cb59-17" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
-<span id="cb59-18"><a href="#cb59-18" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb59-19"><a href="#cb59-19" aria-hidden="true" tabindex="-1"></a>  flatMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Array b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
-<span id="cb59-20"><a href="#cb59-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-21"><a href="#cb59-21" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span></span>
-<span id="cb59-22"><a href="#cb59-22" aria-hidden="true" tabindex="-1"></a>    s <span class="kw">-&gt;</span> </span>
-<span id="cb59-23"><a href="#cb59-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> </span>
-<span id="cb59-24"><a href="#cb59-24" aria-hidden="true" tabindex="-1"></a>    Array a</span>
-<span id="cb59-25"><a href="#cb59-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-26"><a href="#cb59-26" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb59-27"><a href="#cb59-27" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb59-28"><a href="#cb59-28" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb59-29"><a href="#cb59-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb59-30"><a href="#cb59-30" aria-hidden="true" tabindex="-1"></a>  each_ <span class="kw">:</span> Array a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<div class="sourceCode" id="cb60"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> array <span class="kw">where</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>b <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> b <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> b</span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>  generate <span class="kw">:</span> Int <span class="kw">-&gt;</span> <span class="kw">(</span>Int <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> Array a</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>  length <span class="kw">:</span> Array a <span class="kw">-&gt;</span> Int</span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-11"><a href="#cb60-11" aria-hidden="true" tabindex="-1"></a>  index <span class="kw">:</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> a</span>
+<span id="cb60-12"><a href="#cb60-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-13"><a href="#cb60-13" aria-hidden="true" tabindex="-1"></a>  slice <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb60-14"><a href="#cb60-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-15"><a href="#cb60-15" aria-hidden="true" tabindex="-1"></a>  snoc <span class="kw">:</span> Array a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb60-16"><a href="#cb60-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-17"><a href="#cb60-17" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb60-18"><a href="#cb60-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb60-19"><a href="#cb60-19" aria-hidden="true" tabindex="-1"></a>  flatMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Array b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb60-20"><a href="#cb60-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-21"><a href="#cb60-21" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span></span>
+<span id="cb60-22"><a href="#cb60-22" aria-hidden="true" tabindex="-1"></a>    s <span class="kw">-&gt;</span> </span>
+<span id="cb60-23"><a href="#cb60-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> </span>
+<span id="cb60-24"><a href="#cb60-24" aria-hidden="true" tabindex="-1"></a>    Array a</span>
+<span id="cb60-25"><a href="#cb60-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-26"><a href="#cb60-26" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb60-27"><a href="#cb60-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb60-28"><a href="#cb60-28" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb60-29"><a href="#cb60-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-30"><a href="#cb60-30" aria-hidden="true" tabindex="-1"></a>  each_ <span class="kw">:</span> Array a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <h3 id="byte-arrays">Byte Arrays</h3>
-<div class="sourceCode" id="cb60"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Bytes</span>
-<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>
+<div class="sourceCode" id="cb61"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Bytes</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>
 <h3 id="records-1">Records</h3>
 <h4 id="construction">Construction</h4>
-<div class="sourceCode" id="cb61"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">{</span> x <span class="kw">=</span> <span class="dv">1</span>, y <span class="kw">=</span> <span class="st">true</span> <span class="kw">}</span></span>
-<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Bool <span class="kw">}</span></span></code></pre></div>
-<div class="sourceCode" id="cb62"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> a <span class="kw">=</span> <span class="dv">1</span></span>
-<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>a <span class="kw">:</span> Int</span>
-<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> b <span class="kw">=</span> <span class="st">true</span></span>
-<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>b <span class="kw">:</span> Bool</span>
-<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">{</span> a, b <span class="kw">}</span></span>
-<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> a <span class="kw">=</span> <span class="dv">1</span>, b <span class="kw">=</span> True <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb62"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">{</span> x <span class="kw">=</span> <span class="dv">1</span>, y <span class="kw">=</span> <span class="st">true</span> <span class="kw">}</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> x <span class="kw">:</span> Int, y <span class="kw">:</span> Bool <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb63"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> a <span class="kw">=</span> <span class="dv">1</span></span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>a <span class="kw">:</span> Int</span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> b <span class="kw">=</span> <span class="st">true</span></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>b <span class="kw">:</span> Bool</span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">{</span> a, b <span class="kw">}</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> a <span class="kw">=</span> <span class="dv">1</span>, b <span class="kw">=</span> True <span class="kw">}</span></span></code></pre></div>
 <h4 id="projection">Projection</h4>
-<div class="sourceCode" id="cb63"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="kw">{</span> a <span class="kw">=</span> <span class="st">&quot;hello&quot;</span>, b <span class="kw">=</span> <span class="st">false</span> <span class="kw">}</span></span>
-<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> <span class="kw">{</span> a <span class="kw">:</span> String, b <span class="kw">:</span> Bool <span class="kw">}</span></span>
-<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x.a</span>
-<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;hello&quot;</span></span>
-<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x.b</span>
-<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a><span class="st">false</span></span></code></pre></div>
+<div class="sourceCode" id="cb64"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x <span class="kw">=</span> <span class="kw">{</span> a <span class="kw">=</span> <span class="st">&quot;hello&quot;</span>, b <span class="kw">=</span> <span class="st">false</span> <span class="kw">}</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>x <span class="kw">:</span> <span class="kw">{</span> a <span class="kw">:</span> String, b <span class="kw">:</span> Bool <span class="kw">}</span></span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x.a</span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;hello&quot;</span></span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> x.b</span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a><span class="st">false</span></span></code></pre></div>
 <h4 id="extension">Extension</h4>
-<div class="sourceCode" id="cb64"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> rest <span class="kw">=</span> <span class="kw">{</span> more <span class="kw">=</span> <span class="st">false</span>, words <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;a&quot;</span>, <span class="st">&quot;b&quot;</span><span class="kw">]</span> <span class="kw">}</span></span>
-<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>rest <span class="kw">:</span> <span class="kw">{</span> more <span class="kw">:</span> Bool, words <span class="kw">:</span> Array String <span class="kw">}</span></span>
-<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">{</span> some <span class="kw">=</span> <span class="st">&quot;some&quot;</span>, <span class="kw">..</span>rest <span class="kw">}</span></span>
-<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> some <span class="kw">:</span> String, more <span class="kw">:</span> Bool, words <span class="kw">:</span> Array String <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb65"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> rest <span class="kw">=</span> <span class="kw">{</span> more <span class="kw">=</span> <span class="st">false</span>, words <span class="kw">=</span> <span class="kw">[</span><span class="st">&quot;a&quot;</span>, <span class="st">&quot;b&quot;</span><span class="kw">]</span> <span class="kw">}</span></span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>rest <span class="kw">:</span> <span class="kw">{</span> more <span class="kw">:</span> Bool, words <span class="kw">:</span> Array String <span class="kw">}</span></span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">{</span> some <span class="kw">=</span> <span class="st">&quot;some&quot;</span>, <span class="kw">..</span>rest <span class="kw">}</span></span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a><span class="kw">{</span> some <span class="kw">:</span> String, more <span class="kw">:</span> Bool, words <span class="kw">:</span> Array String <span class="kw">}</span></span></code></pre></div>
 <h3 id="variants-1">Variants</h3>
 <h4 id="construction-1">Construction</h4>
-<div class="sourceCode" id="cb65"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> None</span>
-<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>forall r. <span class="kw">(|</span> None, r <span class="kw">|)</span></span></code></pre></div>
+<div class="sourceCode" id="cb66"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> None</span>
+<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a>forall r. <span class="kw">(|</span> None, r <span class="kw">|)</span></span></code></pre></div>
 <h4 id="extension-1">Extension</h4>
-<div class="sourceCode" id="cb66"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> <span class="kw">(|</span> A, <span class="kw">..</span>x <span class="kw">|)</span></span>
-<span id="cb66-2"><a href="#cb66-2" aria-hidden="true" tabindex="-1"></a><span class="kw">(|</span> r <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">(|</span> A <span class="kw">:</span> a, r <span class="kw">|)</span></span></code></pre></div>
+<div class="sourceCode" id="cb67"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> <span class="kw">(|</span> A, <span class="kw">..</span>x <span class="kw">|)</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="kw">(|</span> r <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">(|</span> A <span class="kw">:</span> a, r <span class="kw">|)</span></span></code></pre></div>
 <h3 id="io">IO</h3>
-<div class="sourceCode" id="cb67"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> IO</span>
-<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>Type <span class="kw">-&gt;</span> Type</span></code></pre></div>
-<div class="sourceCode" id="cb68"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">comp</span></span>
-<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">bind</span> line <span class="kw">&lt;-</span> readln</span>
-<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   print line</span>
-<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a>hello</span>
-<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>hello</span></code></pre></div>
+<div class="sourceCode" id="cb68"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> IO</span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a>Type <span class="kw">-&gt;</span> Type</span></code></pre></div>
+<div class="sourceCode" id="cb69"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="kw">comp</span></span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   <span class="kw">bind</span> line <span class="kw">&lt;-</span> readln</span>
+<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a><span class="co">.</span>   print line</span>
+<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a>hello</span>
+<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a>hello</span></code></pre></div>
 <h4 id="builtins-4">Builtins</h4>
-<div class="sourceCode" id="cb69"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> io <span class="kw">where</span></span>
-<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb69-3"><a href="#cb69-3" aria-hidden="true" tabindex="-1"></a>  pure <span class="kw">:</span> a <span class="kw">-&gt;</span> IO a</span>
-<span id="cb69-4"><a href="#cb69-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb69-5"><a href="#cb69-5" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> IO a <span class="kw">-&gt;</span> IO b</span>
-<span id="cb69-6"><a href="#cb69-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb69-7"><a href="#cb69-7" aria-hidden="true" tabindex="-1"></a>  andThen <span class="kw">:</span> IO a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO b<span class="kw">)</span> <span class="kw">-&gt;</span> IO b</span></code></pre></div>
-<div class="sourceCode" id="cb70"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a>println <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
-<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>print <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
-<div class="sourceCode" id="cb71"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>readln <span class="kw">:</span> IO String</span></code></pre></div>
+<div class="sourceCode" id="cb70"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> io <span class="kw">where</span></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>  pure <span class="kw">:</span> a <span class="kw">-&gt;</span> IO a</span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> IO a <span class="kw">-&gt;</span> IO b</span>
+<span id="cb70-6"><a href="#cb70-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-7"><a href="#cb70-7" aria-hidden="true" tabindex="-1"></a>  andThen <span class="kw">:</span> IO a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO b<span class="kw">)</span> <span class="kw">-&gt;</span> IO b</span></code></pre></div>
+<div class="sourceCode" id="cb71"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>println <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>print <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<div class="sourceCode" id="cb72"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>readln <span class="kw">:</span> IO String</span></code></pre></div>
 <h3 id="commands">Commands</h3>
-<div class="sourceCode" id="cb72"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Cmd</span>
-<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>
-<div class="sourceCode" id="cb73"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">`echo &quot;hello, world!&quot;`</span></span>
-<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>Cmd</span></code></pre></div>
+<div class="sourceCode" id="cb73"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Cmd</span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>
+<div class="sourceCode" id="cb74"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="st">`echo &quot;hello, world!&quot;`</span></span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a>Cmd</span></code></pre></div>
 <h4 id="builtins-5">Builtins</h4>
-<div class="sourceCode" id="cb74"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> cmd <span class="kw">where</span></span>
-<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a>  run <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
-<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing its `stdout` as a string.</span></span>
-<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO String</span>
-<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing the lines it writes to `stdout`.</span></span>
-<span id="cb74-9"><a href="#cb74-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb74-10"><a href="#cb74-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `lines command` is equivalent to `io.map (string.splitc '\n') (cmd.read command)`</span></span>
-<span id="cb74-11"><a href="#cb74-11" aria-hidden="true" tabindex="-1"></a>  lines <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
-<span id="cb74-12"><a href="#cb74-12" aria-hidden="true" tabindex="-1"></a> </span>
-<span id="cb74-13"><a href="#cb74-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command and execute an `IO` action for each line written to `stdout`.</span></span>
-<span id="cb74-14"><a href="#cb74-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb74-15"><a href="#cb74-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `eachline_ cmd f` is equivalent to `io.andThen (cmd.lines cmd) (\lines -&gt; array.each_ lines f)`</span></span>
-<span id="cb74-16"><a href="#cb74-16" aria-hidden="true" tabindex="-1"></a>  eachline_ <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> <span class="kw">(</span>String <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
-<span id="cb74-17"><a href="#cb74-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-18"><a href="#cb74-18" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span>
-<span id="cb74-19"><a href="#cb74-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-20"><a href="#cb74-20" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ToArgs a <span class="kw">where</span></span>
-<span id="cb74-21"><a href="#cb74-21" aria-hidden="true" tabindex="-1"></a>  toArgs <span class="kw">:</span> a <span class="kw">-&gt;</span> Array String</span>
-<span id="cb74-22"><a href="#cb74-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-23"><a href="#cb74-23" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs String</span>
-<span id="cb74-24"><a href="#cb74-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb74-25"><a href="#cb74-25" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs a <span class="kw">=&gt;</span> ToArgs <span class="kw">(</span>Array a<span class="kw">)</span> </span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> cmd <span class="kw">where</span></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>  run <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing its `stdout` as a string.</span></span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO String</span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb75-8"><a href="#cb75-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command, capturing the lines it writes to `stdout`.</span></span>
+<span id="cb75-9"><a href="#cb75-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb75-10"><a href="#cb75-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `lines command` is equivalent to `io.map (string.splitc '\n') (cmd.read command)`</span></span>
+<span id="cb75-11"><a href="#cb75-11" aria-hidden="true" tabindex="-1"></a>  lines <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
+<span id="cb75-12"><a href="#cb75-12" aria-hidden="true" tabindex="-1"></a> </span>
+<span id="cb75-13"><a href="#cb75-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Run a command and execute an `IO` action for each line written to `stdout`.</span></span>
+<span id="cb75-14"><a href="#cb75-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb75-15"><a href="#cb75-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `eachline_ cmd f` is equivalent to `io.andThen (cmd.lines cmd) (\lines -&gt; array.each_ lines f)`</span></span>
+<span id="cb75-16"><a href="#cb75-16" aria-hidden="true" tabindex="-1"></a>  eachline_ <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> <span class="kw">(</span>String <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-17"><a href="#cb75-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-18"><a href="#cb75-18" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span>
+<span id="cb75-19"><a href="#cb75-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-20"><a href="#cb75-20" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ToArgs a <span class="kw">where</span></span>
+<span id="cb75-21"><a href="#cb75-21" aria-hidden="true" tabindex="-1"></a>  toArgs <span class="kw">:</span> a <span class="kw">-&gt;</span> Array String</span>
+<span id="cb75-22"><a href="#cb75-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-23"><a href="#cb75-23" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs String</span>
+<span id="cb75-24"><a href="#cb75-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-25"><a href="#cb75-25" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs a <span class="kw">=&gt;</span> ToArgs <span class="kw">(</span>Array a<span class="kw">)</span> </span></code></pre></div>
 <h2 id="type-classes">Type Classes</h2>
 <h3 id="equality">Equality</h3>
-<div class="sourceCode" id="cb75"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">where</span></span>
-<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a>neq <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
-<div class="sourceCode" id="cb76"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Bool</span>
-<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Char</span>
-<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq String</span>
-<span id="cb76-4"><a href="#cb76-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Int</span>
-<span id="cb76-5"><a href="#cb76-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq a <span class="kw">=&gt;</span> Eq <span class="kw">(</span>Array a<span class="kw">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb76"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">where</span></span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb76-4"><a href="#cb76-4" aria-hidden="true" tabindex="-1"></a>neq <span class="kw">:</span> Eq a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
+<div class="sourceCode" id="cb77"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Bool</span>
+<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Char</span>
+<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq String</span>
+<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq Int</span>
+<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Eq a <span class="kw">=&gt;</span> Eq <span class="kw">(</span>Array a<span class="kw">)</span></span></code></pre></div>
 <h3 id="comparison">Comparison</h3>
-<div class="sourceCode" id="cb77"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">=&gt;</span> Ord a <span class="kw">where</span></span>
-<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a>  compare <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> <span class="kw">(|</span> Less <span class="kw">:</span> <span class="kw">()</span>, Equal <span class="kw">:</span> <span class="kw">()</span>, Greater <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
-<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a>lte <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-6"><a href="#cb77-6" aria-hidden="true" tabindex="-1"></a>lt <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb77-7"><a href="#cb77-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-8"><a href="#cb77-8" aria-hidden="true" tabindex="-1"></a>gte <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb77-9"><a href="#cb77-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb77-10"><a href="#cb77-10" aria-hidden="true" tabindex="-1"></a>gt <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
-<div class="sourceCode" id="cb78"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Bool</span>
-<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Char</span>
-<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord String</span>
-<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Int</span>
-<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord a <span class="kw">=&gt;</span> Ord <span class="kw">(</span>Array a<span class="kw">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb78"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">=&gt;</span> Ord a <span class="kw">where</span></span>
+<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a>  compare <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> <span class="kw">(|</span> Less <span class="kw">:</span> <span class="kw">()</span>, Equal <span class="kw">:</span> <span class="kw">()</span>, Greater <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a>lte <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-6"><a href="#cb78-6" aria-hidden="true" tabindex="-1"></a>lt <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb78-7"><a href="#cb78-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-8"><a href="#cb78-8" aria-hidden="true" tabindex="-1"></a>gte <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb78-9"><a href="#cb78-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-10"><a href="#cb78-10" aria-hidden="true" tabindex="-1"></a>gt <span class="kw">:</span> a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Bool</span></code></pre></div>
+<div class="sourceCode" id="cb79"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Bool</span>
+<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Char</span>
+<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord String</span>
+<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord Int</span>
+<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Ord a <span class="kw">=&gt;</span> Ord <span class="kw">(</span>Array a<span class="kw">)</span></span></code></pre></div>
 <h3 id="debugging">Debugging</h3>
-<div class="sourceCode" id="cb79"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Debug a <span class="kw">where</span></span>
-<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a>  debug <span class="kw">:</span> a <span class="kw">-&gt;</span> String</span>
-<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug <span class="kw">()</span></span>
-<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Bool</span>
-<span id="cb79-6"><a href="#cb79-6" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Int</span>
-<span id="cb79-7"><a href="#cb79-7" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Char</span>
-<span id="cb79-8"><a href="#cb79-8" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug String</span>
-<span id="cb79-9"><a href="#cb79-9" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Cmd</span>
-<span id="cb79-10"><a href="#cb79-10" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug a <span class="kw">=&gt;</span> Debug <span class="kw">(</span>Array a<span class="kw">)</span></span>
-<span id="cb79-11"><a href="#cb79-11" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> DebugRecordFields a <span class="kw">=&gt;</span> Debug <span class="kw">{</span> a <span class="kw">}</span></span>
-<span id="cb79-12"><a href="#cb79-12" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> DebugVariantCtor a <span class="kw">=&gt;</span> Debug <span class="kw">(|</span> a <span class="kw">|)</span></span></code></pre></div>
-<div class="sourceCode" id="cb80"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a>debugRecordFields <span class="kw">:</span> DebugRecordFields a <span class="kw">=&gt;</span> <span class="kw">{</span> a <span class="kw">}</span> <span class="kw">-&gt;</span> Array <span class="kw">{</span> field <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span>
-<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a>debugVariantCtor <span class="kw">:</span> DebugVariantCtor a <span class="kw">=&gt;</span> <span class="kw">(|</span> a <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">{</span> ctor <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb80"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Debug a <span class="kw">where</span></span>
+<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a>  debug <span class="kw">:</span> a <span class="kw">-&gt;</span> String</span>
+<span id="cb80-3"><a href="#cb80-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb80-4"><a href="#cb80-4" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug <span class="kw">()</span></span>
+<span id="cb80-5"><a href="#cb80-5" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Bool</span>
+<span id="cb80-6"><a href="#cb80-6" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Int</span>
+<span id="cb80-7"><a href="#cb80-7" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Char</span>
+<span id="cb80-8"><a href="#cb80-8" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug String</span>
+<span id="cb80-9"><a href="#cb80-9" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug Cmd</span>
+<span id="cb80-10"><a href="#cb80-10" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> Debug a <span class="kw">=&gt;</span> Debug <span class="kw">(</span>Array a<span class="kw">)</span></span>
+<span id="cb80-11"><a href="#cb80-11" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> DebugRecordFields a <span class="kw">=&gt;</span> Debug <span class="kw">{</span> a <span class="kw">}</span></span>
+<span id="cb80-12"><a href="#cb80-12" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> DebugVariantCtor a <span class="kw">=&gt;</span> Debug <span class="kw">(|</span> a <span class="kw">|)</span></span></code></pre></div>
+<div class="sourceCode" id="cb81"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a>debugRecordFields <span class="kw">:</span> DebugRecordFields a <span class="kw">=&gt;</span> <span class="kw">{</span> a <span class="kw">}</span> <span class="kw">-&gt;</span> Array <span class="kw">{</span> field <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span>
+<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a>debugVariantCtor <span class="kw">:</span> DebugVariantCtor a <span class="kw">=&gt;</span> <span class="kw">(|</span> a <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">{</span> ctor <span class="kw">:</span> String, value <span class="kw">:</span> String <span class="kw">}</span></span></code></pre></div>
 <h2 id="standard-library">Standard Library</h2>
 <h3 id="env"><code>env</code></h3>
-<div class="sourceCode" id="cb81"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> env <span class="kw">where</span></span>
-<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb81-3"><a href="#cb81-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The current program's name.</span></span>
-<span id="cb81-4"><a href="#cb81-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb81-5"><a href="#cb81-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Example:</span></span>
-<span id="cb81-6"><a href="#cb81-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
-<span id="cb81-7"><a href="#cb81-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
-<span id="cb81-8"><a href="#cb81-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ cat &gt; test.ipso &lt;&lt;EOF</span></span>
-<span id="cb81-9"><a href="#cb81-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main : IO ()</span></span>
-<span id="cb81-10"><a href="#cb81-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main =</span></span>
-<span id="cb81-11"><a href="#cb81-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   comp</span></span>
-<span id="cb81-12"><a href="#cb81-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     bind program &lt;- env.program</span></span>
-<span id="cb81-13"><a href="#cb81-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     println program</span></span>
-<span id="cb81-14"><a href="#cb81-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># EOF</span></span>
-<span id="cb81-15"><a href="#cb81-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ ipso test.ipso -- a b c</span></span>
-<span id="cb81-16"><a href="#cb81-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># test.ipso</span></span>
-<span id="cb81-17"><a href="#cb81-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
-<span id="cb81-18"><a href="#cb81-18" aria-hidden="true" tabindex="-1"></a>  program <span class="kw">:</span> IO String</span>
-<span id="cb81-19"><a href="#cb81-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb81-20"><a href="#cb81-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The arguments passed to the current program.</span></span>
-<span id="cb81-21"><a href="#cb81-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb81-22"><a href="#cb81-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Example:</span></span>
-<span id="cb81-23"><a href="#cb81-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
-<span id="cb81-24"><a href="#cb81-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
-<span id="cb81-25"><a href="#cb81-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ cat &gt; test.ipso &lt;&lt;EOF</span></span>
-<span id="cb81-26"><a href="#cb81-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main : IO ()</span></span>
-<span id="cb81-27"><a href="#cb81-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main =</span></span>
-<span id="cb81-28"><a href="#cb81-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   comp</span></span>
-<span id="cb81-29"><a href="#cb81-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     bind args &lt;- env.args</span></span>
-<span id="cb81-30"><a href="#cb81-30" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     println &lt;| debug args</span></span>
-<span id="cb81-31"><a href="#cb81-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># EOF</span></span>
-<span id="cb81-32"><a href="#cb81-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ ipso test.ipso -- a b c</span></span>
-<span id="cb81-33"><a href="#cb81-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]</span></span>
-<span id="cb81-34"><a href="#cb81-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
-<span id="cb81-35"><a href="#cb81-35" aria-hidden="true" tabindex="-1"></a>  args <span class="kw">:</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
-<span id="cb81-36"><a href="#cb81-36" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb81-37"><a href="#cb81-37" aria-hidden="true" tabindex="-1"></a>  getvar <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">(|</span> Some <span class="kw">:</span> String, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
-<span id="cb81-38"><a href="#cb81-38" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb81-39"><a href="#cb81-39" aria-hidden="true" tabindex="-1"></a>  setvar <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
-<h3 id="exit"><code>exit</code></h3>
-<div class="sourceCode" id="cb82"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> exit <span class="kw">where</span></span>
+<div class="sourceCode" id="cb82"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> env <span class="kw">where</span></span>
 <span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>  success <span class="kw">:</span> IO a</span>
-<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a>  failure <span class="kw">:</span> IO a</span>
-<span id="cb82-6"><a href="#cb82-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb82-7"><a href="#cb82-7" aria-hidden="true" tabindex="-1"></a>  with <span class="kw">:</span> Int <span class="kw">-&gt;</span> IO a</span></code></pre></div>
+<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The current program's name.</span></span>
+<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Example:</span></span>
+<span id="cb82-6"><a href="#cb82-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
+<span id="cb82-7"><a href="#cb82-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
+<span id="cb82-8"><a href="#cb82-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ cat &gt; test.ipso &lt;&lt;EOF</span></span>
+<span id="cb82-9"><a href="#cb82-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main : IO ()</span></span>
+<span id="cb82-10"><a href="#cb82-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main =</span></span>
+<span id="cb82-11"><a href="#cb82-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   comp</span></span>
+<span id="cb82-12"><a href="#cb82-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     bind program &lt;- env.program</span></span>
+<span id="cb82-13"><a href="#cb82-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     println program</span></span>
+<span id="cb82-14"><a href="#cb82-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># EOF</span></span>
+<span id="cb82-15"><a href="#cb82-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ ipso test.ipso -- a b c</span></span>
+<span id="cb82-16"><a href="#cb82-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># test.ipso</span></span>
+<span id="cb82-17"><a href="#cb82-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
+<span id="cb82-18"><a href="#cb82-18" aria-hidden="true" tabindex="-1"></a>  program <span class="kw">:</span> IO String</span>
+<span id="cb82-19"><a href="#cb82-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb82-20"><a href="#cb82-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># The arguments passed to the current program.</span></span>
+<span id="cb82-21"><a href="#cb82-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb82-22"><a href="#cb82-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Example:</span></span>
+<span id="cb82-23"><a href="#cb82-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
+<span id="cb82-24"><a href="#cb82-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
+<span id="cb82-25"><a href="#cb82-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ cat &gt; test.ipso &lt;&lt;EOF</span></span>
+<span id="cb82-26"><a href="#cb82-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main : IO ()</span></span>
+<span id="cb82-27"><a href="#cb82-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># main =</span></span>
+<span id="cb82-28"><a href="#cb82-28" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   comp</span></span>
+<span id="cb82-29"><a href="#cb82-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     bind args &lt;- env.args</span></span>
+<span id="cb82-30"><a href="#cb82-30" aria-hidden="true" tabindex="-1"></a>  <span class="co">#     println &lt;| debug args</span></span>
+<span id="cb82-31"><a href="#cb82-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># EOF</span></span>
+<span id="cb82-32"><a href="#cb82-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># $ ipso test.ipso -- a b c</span></span>
+<span id="cb82-33"><a href="#cb82-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]</span></span>
+<span id="cb82-34"><a href="#cb82-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ```</span></span>
+<span id="cb82-35"><a href="#cb82-35" aria-hidden="true" tabindex="-1"></a>  args <span class="kw">:</span> IO <span class="kw">(</span>Array String<span class="kw">)</span></span>
+<span id="cb82-36"><a href="#cb82-36" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb82-37"><a href="#cb82-37" aria-hidden="true" tabindex="-1"></a>  getvar <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">(|</span> Some <span class="kw">:</span> String, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb82-38"><a href="#cb82-38" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb82-39"><a href="#cb82-39" aria-hidden="true" tabindex="-1"></a>  setvar <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<h3 id="exit"><code>exit</code></h3>
+<div class="sourceCode" id="cb83"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> exit <span class="kw">where</span></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>  success <span class="kw">:</span> IO a</span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a>  failure <span class="kw">:</span> IO a</span>
+<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a>  with <span class="kw">:</span> Int <span class="kw">-&gt;</span> IO a</span></code></pre></div>
 <h3 id="file"><code>file</code></h3>
-<div class="sourceCode" id="cb83"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> file <span class="kw">where</span></span>
-<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> String <span class="kw">-&gt;</span> IO String</span>
-<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a>  write <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
-<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a>  append <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<div class="sourceCode" id="cb84"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> file <span class="kw">where</span></span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a>  read <span class="kw">:</span> String <span class="kw">-&gt;</span> IO String</span>
+<span id="cb84-4"><a href="#cb84-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb84-5"><a href="#cb84-5" aria-hidden="true" tabindex="-1"></a>  write <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb84-6"><a href="#cb84-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb84-7"><a href="#cb84-7" aria-hidden="true" tabindex="-1"></a>  append <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <h3 id="path"><code>path</code></h3>
-<div class="sourceCode" id="cb84"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> path <span class="kw">where</span></span>
-<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a>  exists <span class="kw">:</span> String <span class="kw">-&gt;</span> IO Bool</span></code></pre></div>
+<div class="sourceCode" id="cb85"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> path <span class="kw">where</span></span>
+<span id="cb85-2"><a href="#cb85-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb85-3"><a href="#cb85-3" aria-hidden="true" tabindex="-1"></a>  exists <span class="kw">:</span> String <span class="kw">-&gt;</span> IO Bool</span></code></pre></div>
 <h2 id="grammar">Grammar</h2>
 <pre><code>ident ::=
   ident_start ident_continue*
