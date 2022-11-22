@@ -286,7 +286,8 @@ fn desugar_branches_mut(
     ) -> Result<(), Error> {
         debug_assert!(rest.is_empty());
 
-        if cfg!(debug_assertions) {
+        #[cfg(debug_assertions)]
+        {
             *actual_branches_count += 1;
         }
 
@@ -302,6 +303,7 @@ fn desugar_branches_mut(
         .try_for_each(|grouped| match grouped.first.pattern.item {
             Pattern::Variant { name, arg } => match arg.item.as_ref() {
                 Pattern::Name(_) if grouped.rest.is_empty() => desugar_non_nested(
+                    #[cfg(debug_assertions)]
                     &mut actual_branches_count,
                     source,
                     var_gen,
@@ -316,7 +318,8 @@ fn desugar_branches_mut(
                     grouped.rest,
                 ),
                 _ => {
-                    if cfg!(debug_assertions) {
+                    #[cfg(debug_assertions)]
+                    {
                         actual_branches_count += 1;
                     }
                     let mut inner_branches = vec![Branch {
@@ -340,7 +343,8 @@ fn desugar_branches_mut(
                                     name
                                 );
 
-                                if cfg!(debug_assertions) {
+                                #[cfg(debug_assertions)]
+                                {
                                     actual_branches_count += 1;
                                 }
                                 inner_branches.push(Branch {
@@ -414,7 +418,8 @@ fn desugar_branches_mut(
             ),
         })?;
 
-    debug_assert!(
+    #[cfg(debug_assertions)]
+    assert!(
         expected_branches_count == actual_branches_count,
         "branches processed ({}) != original branches count ({})",
         actual_branches_count,
