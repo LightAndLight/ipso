@@ -493,6 +493,13 @@ impl Value {
         }
     }
 
+    pub fn unpack_unit(&self) {
+        match self {
+            Value::Unit => (),
+            val => panic!("expected char, got {:?}", val),
+        }
+    }
+
     pub fn unpack_record(&self) -> Rc<[Value]> {
         self.unpack_object().unpack_record()
     }
@@ -2274,6 +2281,7 @@ where {
                                     break;
                                 }
                                 Pattern::String(_)
+                                | Pattern::Unit
                                 | Pattern::Int(_)
                                 | Pattern::Record { .. }
                                 | Pattern::Char(_) => {
@@ -2351,6 +2359,11 @@ where {
                                         target = Some(&branch.body);
                                         break;
                                     }
+                                }
+                                Pattern::Unit => {
+                                    expr.unpack_unit();
+                                    target = Some(&branch.body);
+                                    break;
                                 }
                                 Pattern::Wildcard => {
                                     target = Some(&branch.body);

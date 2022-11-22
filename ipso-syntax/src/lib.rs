@@ -264,6 +264,7 @@ pub enum Pattern {
     Char(Spanned<char>),
     Int(Spanned<i32>),
     String(Spanned<Rc<str>>),
+    Unit,
     Wildcard,
 }
 
@@ -302,6 +303,7 @@ impl<'a> Iterator for IterNames<'a> {
                     Pattern::Char(_) => None,
                     Pattern::Int(_) => None,
                     Pattern::String(_) => None,
+                    Pattern::Unit => None,
                     Pattern::Wildcard => None,
                 }
             }

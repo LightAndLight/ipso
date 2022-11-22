@@ -88,7 +88,7 @@ pattern_atom ::=
   int
   '"' string '"'
   '_'
-  '(' pattern ')'
+  '(' [pattern] ')'
 ```
 */
 pub fn pattern_atom(parser: &mut Parser) -> Parsed<Pattern> {
@@ -113,7 +113,7 @@ pub fn pattern_atom(parser: &mut Parser) -> Parsed<Pattern> {
         between!(
             parser.token(&token::Data::LParen),
             parser.token(&token::Data::RParen),
-            pattern(parser)
+            optional!(pattern(parser)).map(|pattern| pattern.unwrap_or(Pattern::Unit))
         )
     )
 }

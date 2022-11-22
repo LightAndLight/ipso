@@ -532,6 +532,7 @@ pub enum Pattern<E> {
     Char(char),
     Int(i32),
     String(Rc<str>),
+    Unit,
     Wildcard,
 }
 
@@ -541,7 +542,11 @@ impl Pattern<Expr> {
             Pattern::Name => 1,
             Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
             Pattern::Variant { tag: _ } => 1,
-            Pattern::Char(_) | Pattern::Int(_) | Pattern::String(_) | Pattern::Wildcard => 0,
+            Pattern::Char(_)
+            | Pattern::Int(_)
+            | Pattern::String(_)
+            | Pattern::Unit
+            | Pattern::Wildcard => 0,
         }
     }
 
@@ -556,6 +561,7 @@ impl Pattern<Expr> {
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
+            Pattern::Unit => Pattern::Unit,
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -577,6 +583,7 @@ impl Pattern<Expr> {
             Pattern::Char(_) => Ok(()),
             Pattern::Int(_) => Ok(()),
             Pattern::String(_) => Ok(()),
+            Pattern::Unit => Ok(()),
             Pattern::Wildcard => Ok(()),
         }
     }
@@ -595,6 +602,7 @@ impl Pattern<Expr> {
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
+            Pattern::Unit => Pattern::Unit,
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -613,6 +621,7 @@ impl Pattern<Expr> {
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
+            Pattern::Unit => Pattern::Unit,
             Pattern::Wildcard => Pattern::Wildcard,
         }
     }
@@ -651,6 +660,7 @@ impl Branch<Expr> {
                         Pattern::Char(_) => 0,
                         Pattern::Int(_) => 0,
                         Pattern::String(_) => 0,
+                        Pattern::Unit => 0,
                         // TODO: should this be 0?
                         Pattern::Wildcard => 1,
                     },
@@ -671,6 +681,7 @@ impl Branch<Expr> {
                         Pattern::Char(_) => 0,
                         Pattern::Int(_) => 0,
                         Pattern::String(_) => 0,
+                        Pattern::Unit => 0,
                         Pattern::Wildcard => 0,
                     },
                 ev,
@@ -1098,6 +1109,7 @@ impl Expr {
                             Pattern::Char(_) => b.map_expr(|e| go(e, f)),
                             Pattern::Int(_) => b.map_expr(|e| go(e, f)),
                             Pattern::String(_) => b.map_expr(|e| go(e, f)),
+                            Pattern::Unit => b.map_expr(|e| go(e, f)),
                             Pattern::Wildcard => b.map_expr(|e| go(e, f)),
                         })
                         .collect(),
@@ -1565,6 +1577,7 @@ impl Expr {
                                 | Pattern::Char(_)
                                 | Pattern::Int(_)
                                 | Pattern::String(_)
+                                | Pattern::Unit
                                 | Pattern::Wildcard => {}
                                 Pattern::Variant { tag } => {
                                     stack.push(tag);
