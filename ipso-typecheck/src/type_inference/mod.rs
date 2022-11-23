@@ -548,6 +548,28 @@ fn check_wildcard_pattern(_expected: &Type) -> Result<CheckedPattern, Error> {
     })
 }
 
+fn check_unit_pattern(
+    env: Env,
+    state: &mut State,
+    pos: usize,
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        pos,
+        expected,
+        &Type::Unit,
+    )
+    .map_err(|error| Error::unification_error(env.source, pos, error))?;
+
+    Ok(CheckedPattern::Any {
+        pattern: Pattern::Unit,
+        names: Vec::new(),
+    })
+}
+
 pub fn check_pattern(
     env: Env,
     state: &mut State,
@@ -559,6 +581,7 @@ pub fn check_pattern(
         syntax::Pattern::Char(c) => check_char_pattern(env, state, c, expected),
         syntax::Pattern::Int(n) => check_int_pattern(env, state, n, expected),
         syntax::Pattern::String(s) => check_string_pattern(env, state, s, expected),
+        syntax::Pattern::Unit => check_unit_pattern(env, state, pattern.pos, expected),
         syntax::Pattern::Wildcard => check_wildcard_pattern(expected),
         syntax::Pattern::Record { names, rest } => {
             check_record_pattern(env, state, pattern.pos, names, rest.as_ref(), expected)
@@ -572,6 +595,7 @@ pub fn check_pattern(
             | syntax::Pattern::Char(_)
             | syntax::Pattern::Int(_)
             | syntax::Pattern::String(_)
+            | syntax::Pattern::Unit
             | syntax::Pattern::Wildcard => panic!("un-desugared pattern: {:?}", pattern),
         },
     }
@@ -816,6 +840,7 @@ pub fn check(
                     Pattern::Char(_)
                     | Pattern::Int(_)
                     | Pattern::String(_)
+                    | Pattern::Unit
                     | Pattern::Record { .. }
                     | Pattern::Variant { .. } => Expr::mk_lam(
                         true,
@@ -1265,7 +1290,8 @@ pub fn check(
                                 | Pattern::Variant { .. }
                                 | Pattern::Char(_)
                                 | Pattern::Int(_)
-                                | Pattern::String(_) => false,
+                                | Pattern::String(_)
+                                | Pattern::Unit => false,
                                 Pattern::Name | Pattern::Wildcard => true,
                             },
                             CheckedPattern::Variant { .. } => false,

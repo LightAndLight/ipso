@@ -438,6 +438,7 @@ pub fn convert_pattern(pattern: &Pattern<ipso_core::Expr>) -> ConvertResult<Patt
         ipso_core::Pattern::Char(c) => ConvertResult::closed(Pattern::Char(*c)),
         ipso_core::Pattern::Int(i) => ConvertResult::closed(Pattern::Int(*i)),
         ipso_core::Pattern::String(s) => ConvertResult::closed(Pattern::String(s.clone())),
+        ipso_core::Pattern::Unit => ConvertResult::closed(Pattern::Unit),
         ipso_core::Pattern::Wildcard => ConvertResult::closed(Pattern::Wildcard),
     }
 }

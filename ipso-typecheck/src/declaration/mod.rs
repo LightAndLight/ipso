@@ -220,6 +220,7 @@ pub fn check_definition(
             core::Pattern::Char(_)
             | core::Pattern::Int(_)
             | core::Pattern::String(_)
+            | core::Pattern::Unit
             | core::Pattern::Record { .. }
             | core::Pattern::Variant { .. } => core::Expr::mk_lam(
                 true,

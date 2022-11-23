@@ -259,6 +259,7 @@ fn desugar_branches_mut(
                 | Pattern::Char(_)
                 | Pattern::Int(_)
                 | Pattern::String(_)
+                | Pattern::Unit
                 | Pattern::Wildcard => grouped_branches.push(BranchGroup {
                     first: branch,
                     rest: Vec::new(),
@@ -360,6 +361,7 @@ fn desugar_branches_mut(
                             | Pattern::Char(_)
                             | Pattern::Int(_)
                             | Pattern::String(_)
+                            | Pattern::Unit
                             | Pattern::Wildcard => panic!(
                                 "unexpected pattern {:?} in group for variant {:?}",
                                 branch.pattern, name
@@ -407,6 +409,7 @@ fn desugar_branches_mut(
             | Pattern::Char(_)
             | Pattern::Int(_)
             | Pattern::String(_)
+            | Pattern::Unit
             | Pattern::Wildcard => desugar_non_nested(
                 #[cfg(debug_assertions)]
                 &mut actual_branches_count,
