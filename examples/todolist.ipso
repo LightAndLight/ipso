@@ -2,11 +2,11 @@ strip : String -> String
 strip = string.filter (\c -> c != '\n')
 
 deleteAt : Int -> Array a -> Array a
-deleteAt target arr = 
+deleteAt target arr =
   if target < array.length arr
   then
-    array.generate 
-      (array.length arr - 1) 
+    array.generate
+      (array.length arr - 1)
       (\ix ->
         if ix < target
         then array.index ix arr
@@ -65,7 +65,7 @@ parseCommand line =
   else if array.length lines == 2 && array.index 0 lines == "add" then Add (array.index 1 lines)
   else if array.length lines == 2 && array.index 0 lines == "delete" then
     case readInt (array.index 1 lines) of
-      Err err -> Invalid stripped
+      Err () -> Invalid stripped
       Ok n -> Delete n
   else Invalid stripped
 
@@ -89,9 +89,9 @@ runCommand :
   IO (| Continue : Array String, Quit : () |)
 runCommand cmd todos =
   case cmd of
-    Quit x ->
+    Quit () ->
       io.pure (Quit ())
-    Help x -> 
+    Help () ->
       comp
         println "help - display this message"
         println "quit - exit the application"
@@ -101,29 +101,29 @@ runCommand cmd todos =
         io.pure (Continue todos)
     Add todo ->
       io.pure (Continue (array.snoc todos todo))
-    List x ->
+    List () ->
       io.map
         (\_ -> Continue todos)
         (writeTodos todos)
-    Invalid x ->
+    Invalid line ->
       io.map
         (\_ -> Continue todos)
-        (println "error: invalid command \"$x\"")
+        (println "error: invalid command \"$line\"")
     Delete ix ->
       io.pure (Continue (deleteAt ix todos))
 
 loop : Array String -> IO ()
-loop todos = 
+loop todos =
   comp
     print "> "
     bind line <- readln
     bind next <- runCommand (parseCommand line) todos
     case next of
       Continue newTodos -> loop newTodos
-      Quit x -> io.pure ()
+      Quit () -> io.pure ()
 
 main : IO ()
-main = 
+main =
   comp
     println "Welcome to your TODO list"
     loop []
