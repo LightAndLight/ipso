@@ -30,6 +30,7 @@ title: Language Reference
   * [Interpolation](#interpolation)
 * [Operators](#operators)
 * [Datatypes](#datatypes)
+  * [Unit](#unit)
   * [Booleans](#booleans)
   * [Integers](#integers)
     * [Builtins](#builtins)
@@ -270,7 +271,7 @@ true
 > x = None ()
 x : forall r. (| None : (), r |)
 > case x of
-.   None _ -> 1
+.   None () -> 1
 .   _ -> 2
 .
 1
@@ -280,7 +281,7 @@ x : forall r. (| None : (), r |)
 > x = None () : (| None : () |)
 x : (| None : () |)
 > case x of
-.   None _ -> 1
+.   None () -> 1
 .
 1
 ```
@@ -301,7 +302,7 @@ Incomplete pattern matches are not (yet) reported by the type checker:
 > x = None ()
 x : forall r. (| None : (), r |)
 > case x of
-.   None _ -> 1
+.   None () -> 1
 .
 1
 ```
@@ -442,6 +443,13 @@ ToArgs a => a -> Cmd
 ```
 
 ## Datatypes
+
+### Unit
+
+```ipsorepl
+> :type ()
+()
+```
 
 ### Booleans
 
@@ -1013,12 +1021,19 @@ type_variant_item ::=
   
   
 pattern ::=
+  pattern_atom |
+  ctor pattern_atom
+
+pattern_atom ::=
   ident |
-  '{' record_pattern '}' |
-  '_'
+  int |
+  char |
+  string |
+  '{' [record_pattern] '}' |
+  '_' |
+  '(' [pattern] ')'
   
 record_pattern ::=
-  epsilon |
   ident (',' ident)* [',' '..' ident] |
   '..' ident |
  
