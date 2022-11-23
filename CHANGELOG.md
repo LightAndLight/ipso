@@ -90,7 +90,7 @@
 
 ### Breaking changes
 
-* Duplicate top-level are no longer allowed ([#222](https://github.com/LightAndLight/ipso/issues/222))
+* Duplicate top-level definitions are no longer allowed ([#222](https://github.com/LightAndLight/ipso/issues/222))
 
 * The newline character (`U+000A`) is no longer allowed in string and command literals ([#216](https://github.com/LightAndLight/ipso/issues/216))
 
