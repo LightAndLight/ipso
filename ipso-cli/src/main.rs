@@ -1,4 +1,4 @@
-use clap::{AppSettings, Parser};
+use clap::Parser;
 use ipso_cli::{
     run::{run_interpreter, InterpreterError},
     version::VERSION,
@@ -36,7 +36,7 @@ fn report_interpreter_error(filename: String, err: InterpreterError) -> io::Resu
 }
 
 #[derive(Parser)]
-#[clap(name = "ipso", global_setting(AppSettings::NoAutoVersion))]
+#[command(name = "ipso", disable_version_flag = true)]
 struct Cli {
     /// The file to run. Starts a REPL if omitted.
     filename: Option<String>,
@@ -50,8 +50,14 @@ struct Cli {
     version: bool,
 
     /// Arguments to pass to the ipso program.
-    #[clap(last = true)]
+    #[arg(trailing_var_arg = true)]
     args: Vec<String>,
+}
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Cli::command().debug_assert()
 }
 
 fn main() -> io::Result<()> {

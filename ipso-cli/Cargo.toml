@@ -29,9 +29,9 @@ termion = "^1.5"
 typed-arena = "2.0.1"
 
 [dependencies.clap]
-version = "^3.1"
+version = "^4.0"
 default-features = false
-features = ["std", "derive"]
+features = ["std", "derive", "error-context", "help", "usage"]
 
 [dev-dependencies]
 # Development build of v0.4, which has fewer dependencies.
