@@ -45,9 +45,22 @@ jobs:
     - run: pueued -d
 
     - run: >
-        nix profile install github:LightAndLight/ipso?ref=d5afc4aa234b4a191550e1be3fb0b7aabc3c5a6c
+        nix profile install github:LightAndLight/ipso?ref=v0.3
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+
+    - name: cache .cargo
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-crates-io-index
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/src
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+          ${{ runner.os }}-build-${{ env.cache-name }}-
 
     - name: "cargo tests"
       run: >
