@@ -4,17 +4,18 @@
 args@{
   release ? true,
   rootFeatures ? [
+    "benchmarks/default"
+    "ipso-cli/default"
     "ipso-builtins/default"
     "ipso-core/default"
     "ipso-syntax/default"
     "ipso-diagnostic/default"
     "ipso-util/default"
-    "ipso-cli/default"
     "ipso-eval/default"
+    "ipso-rope/default"
     "ipso-import/default"
     "ipso-parse/default"
     "ipso-lex/default"
-    "ipso-rope/default"
     "ipso-typecheck/default"
     "ipso-repl/default"
   ],
@@ -50,17 +51,18 @@ in
 {
   cargo2nixVersion = "0.11.0";
   workspace = {
+    benchmarks = rustPackages.unknown.benchmarks."0.1.0";
+    ipso-cli = rustPackages.unknown.ipso-cli."0.1.0";
     ipso-builtins = rustPackages.unknown.ipso-builtins."0.1.0";
     ipso-core = rustPackages.unknown.ipso-core."0.1.0";
     ipso-syntax = rustPackages.unknown.ipso-syntax."0.1.0";
     ipso-diagnostic = rustPackages.unknown.ipso-diagnostic."0.1.0";
     ipso-util = rustPackages.unknown.ipso-util."0.1.0";
-    ipso-cli = rustPackages.unknown.ipso-cli."0.1.0";
     ipso-eval = rustPackages.unknown.ipso-eval."0.1.0";
+    ipso-rope = rustPackages.unknown.ipso-rope."0.1.0";
     ipso-import = rustPackages.unknown.ipso-import."0.1.0";
     ipso-parse = rustPackages.unknown.ipso-parse."0.1.0";
     ipso-lex = rustPackages.unknown.ipso-lex."0.1.0";
-    ipso-rope = rustPackages.unknown.ipso-rope."0.1.0";
     ipso-typecheck = rustPackages.unknown.ipso-typecheck."0.1.0";
     ipso-repl = rustPackages.unknown.ipso-repl."0.1.0";
   };
@@ -91,6 +93,19 @@ in
     version = "1.0.1";
     registry = "registry+https://github.com/rust-lang/crates.io-index";
     src = fetchCratesIo { inherit name version; sha256 = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"; };
+  });
+  
+  "unknown".benchmarks."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "benchmarks";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/benchmarks");
+    dependencies = {
+      ipso_cli = rustPackages."unknown".ipso-cli."0.1.0" { inherit profileName; };
+    };
+    devDependencies = {
+      criterion = rustPackages."git+https://github.com/bheisler/criterion.rs".criterion."0.3.5" { inherit profileName; };
+    };
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".bitflags."1.3.2" = overridableMkRustCrate (profileName: rec {
@@ -334,7 +349,6 @@ in
     src = fetchCrateLocal (workspaceSrc + "/ipso-cli");
     dependencies = {
       clap = rustPackages."registry+https://github.com/rust-lang/crates.io-index".clap."4.0.27" { inherit profileName; };
-      fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       ipso_builtins = rustPackages."unknown".ipso-builtins."0.1.0" { inherit profileName; };
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
       ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
@@ -343,16 +357,9 @@ in
       ipso_lex = rustPackages."unknown".ipso-lex."0.1.0" { inherit profileName; };
       ipso_parse = rustPackages."unknown".ipso-parse."0.1.0" { inherit profileName; };
       ipso_repl = rustPackages."unknown".ipso-repl."0.1.0" { inherit profileName; };
-      ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       ipso_typecheck = rustPackages."unknown".ipso-typecheck."0.1.0" { inherit profileName; };
-      ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
-      lazy_static = rustPackages."registry+https://github.com/rust-lang/crates.io-index".lazy_static."1.4.0" { inherit profileName; };
       termion = rustPackages."registry+https://github.com/rust-lang/crates.io-index".termion."1.5.6" { inherit profileName; };
-      typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
-    };
-    devDependencies = {
-      criterion = rustPackages."git+https://github.com/bheisler/criterion.rs".criterion."0.3.5" { inherit profileName; };
     };
   });
   
@@ -382,11 +389,9 @@ in
     dependencies = {
       fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
-      ipso_import = rustPackages."unknown".ipso-import."0.1.0" { inherit profileName; };
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       paste = buildRustPackages."registry+https://github.com/rust-lang/crates.io-index".paste."1.0.5" { profileName = "__noProfile"; };
-      typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
     };
   });
   
@@ -399,7 +404,6 @@ in
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
       ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
       ipso_parse = rustPackages."unknown".ipso-parse."0.1.0" { inherit profileName; };
-      ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       ipso_typecheck = rustPackages."unknown".ipso-typecheck."0.1.0" { inherit profileName; };
       ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
@@ -448,7 +452,6 @@ in
       ipso_import = rustPackages."unknown".ipso-import."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
       ipso_typecheck = rustPackages."unknown".ipso-typecheck."0.1.0" { inherit profileName; };
-      typed_arena = rustPackages."registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" { inherit profileName; };
     };
   });
   
@@ -482,12 +485,10 @@ in
     src = fetchCrateLocal (workspaceSrc + "/ipso-typecheck");
     dependencies = {
       fnv = rustPackages."registry+https://github.com/rust-lang/crates.io-index".fnv."1.0.7" { inherit profileName; };
-      ipso_builtins = rustPackages."unknown".ipso-builtins."0.1.0" { inherit profileName; };
       ipso_core = rustPackages."unknown".ipso-core."0.1.0" { inherit profileName; };
       ipso_diagnostic = rustPackages."unknown".ipso-diagnostic."0.1.0" { inherit profileName; };
       ipso_rope = rustPackages."unknown".ipso-rope."0.1.0" { inherit profileName; };
       ipso_syntax = rustPackages."unknown".ipso-syntax."0.1.0" { inherit profileName; };
-      ipso_util = rustPackages."unknown".ipso-util."0.1.0" { inherit profileName; };
     };
     devDependencies = {
       pretty_assertions = rustPackages."registry+https://github.com/rust-lang/crates.io-index".pretty_assertions."1.3.0" { inherit profileName; };
@@ -932,17 +933,6 @@ in
       serde = rustPackages."registry+https://github.com/rust-lang/crates.io-index".serde."1.0.130" { inherit profileName; };
       serde_json = rustPackages."registry+https://github.com/rust-lang/crates.io-index".serde_json."1.0.68" { inherit profileName; };
     };
-  });
-  
-  "registry+https://github.com/rust-lang/crates.io-index".typed-arena."2.0.1" = overridableMkRustCrate (profileName: rec {
-    name = "typed-arena";
-    version = "2.0.1";
-    registry = "registry+https://github.com/rust-lang/crates.io-index";
-    src = fetchCratesIo { inherit name version; sha256 = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"; };
-    features = builtins.concatLists [
-      [ "default" ]
-      [ "std" ]
-    ];
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".unicode-ident."1.0.5" = overridableMkRustCrate (profileName: rec {

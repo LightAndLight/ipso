@@ -26,6 +26,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
+name = "benchmarks"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "ipso-cli",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -202,8 +210,6 @@ name = "ipso-cli"
 version = "0.1.0"
 dependencies = [
  "clap 4.0.27",
- "criterion",
- "fnv",
  "ipso-builtins",
  "ipso-core",
  "ipso-diagnostic",
@@ -212,13 +218,9 @@ dependencies = [
  "ipso-lex",
  "ipso-parse",
  "ipso-repl",
- "ipso-rope",
  "ipso-syntax",
  "ipso-typecheck",
- "ipso-util",
- "lazy_static",
  "termion",
- "typed-arena",
 ]
 
 [[package]]
@@ -239,11 +241,9 @@ version = "0.1.0"
 dependencies = [
  "fnv",
  "ipso-core",
- "ipso-import",
  "ipso-rope",
  "ipso-syntax",
  "paste",
- "typed-arena",
 ]
 
 [[package]]
@@ -253,7 +253,6 @@ dependencies = [
  "ipso-core",
  "ipso-diagnostic",
  "ipso-parse",
- "ipso-rope",
  "ipso-syntax",
  "ipso-typecheck",
  "ipso-util",
@@ -291,7 +290,6 @@ dependencies = [
  "ipso-import",
  "ipso-syntax",
  "ipso-typecheck",
- "typed-arena",
 ]
 
 [[package]]
@@ -314,12 +312,10 @@ name = "ipso-typecheck"
 version = "0.1.0"
 dependencies = [
  "fnv",
- "ipso-builtins",
  "ipso-core",
  "ipso-diagnostic",
  "ipso-rope",
  "ipso-syntax",
- "ipso-util",
  "pretty_assertions",
 ]
 
@@ -639,12 +635,6 @@ dependencies = [
  "serde",
  "serde_json",
 ]
-
-[[package]]
-name = "typed-arena"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"
 
 [[package]]
 name = "unicode-ident"

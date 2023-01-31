@@ -8,7 +8,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 fn one(c: &mut Criterion) {
     let contents: Rc<str> =
-        Rc::from(fs::read_to_string("benches/todolist_1_input.txt").expect("failed to read file"));
+        Rc::from(fs::read_to_string("src/todolist_1_input.txt").expect("failed to read file"));
     c.bench_function("one", |b| {
         b.iter_batched(
             || {

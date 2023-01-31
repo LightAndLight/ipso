@@ -9,7 +9,6 @@ edition = "2018"
 ipso-core = { path = "../ipso-core" }
 ipso-diagnostic = { path = "../ipso-diagnostic" }
 ipso-parse = { path = "../ipso-parse" }
-ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
 ipso-util = { path = "../ipso-util" }

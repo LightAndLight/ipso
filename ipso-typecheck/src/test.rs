@@ -4,10 +4,11 @@ use crate::{evidence::Constraint, kind_inference, module, type_inference, BoundV
 use ipso_core::{self as core, ClassMember, CommonKinds, Placeholder, Signature, TypeSig};
 use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, Spanned};
-use ipso_util::void::Void;
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::rc::Rc;
+
+pub enum Void {}
 
 fn zonk_constraint(
     kind_solutions: &kind_inference::unification::Solutions,
