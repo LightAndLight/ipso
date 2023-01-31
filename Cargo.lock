@@ -314,7 +314,6 @@ name = "ipso-typecheck"
 version = "0.1.0"
 dependencies = [
  "fnv",
- "ipso-builtins",
  "ipso-core",
  "ipso-diagnostic",
  "ipso-rope",

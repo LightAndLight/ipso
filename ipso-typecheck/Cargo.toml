@@ -7,7 +7,6 @@ edition = "2018"
 
 [dependencies]
 fnv = "1.0.7"
-ipso-builtins = { path = "../ipso-builtins" }
 ipso-core = { path = "../ipso-core" }
 ipso-diagnostic = { path = "../ipso-diagnostic" }
 ipso-rope = { path = "../ipso-rope" }
