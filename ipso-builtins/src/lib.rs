@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 pub mod array;
 pub mod file;
 pub mod path;

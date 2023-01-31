@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 use diagnostic::{Location, Message};
 use ipso_core::{self as core, CommonKinds};
 use ipso_diagnostic::{self as diagnostic, Diagnostic, Source};

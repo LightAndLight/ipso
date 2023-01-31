@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "benchmarks",
     "ipso-builtins",
     "ipso-cli",
     "ipso-core",

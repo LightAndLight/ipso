@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 use ipso_core::{CommonKinds, Type};
 use ipso_diagnostic::Source;
 use ipso_eval::{closure_conversion, Env, Interpreter, Object};

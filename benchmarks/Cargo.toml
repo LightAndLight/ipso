@@ -1,0 +1,18 @@
+[package]
+name = "benchmarks"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ipso-cli = { path = "../ipso-cli" }
+
+[dev-dependencies]
+# Development build of v0.4, which has fewer dependencies.
+criterion = { git = "https://github.com/bheisler/criterion.rs", rev = "412591edec4a0e8e05093c7f9ca0ba9611e5c17f", default_features = false }
+
+[[bench]]
+name = "todolist_1"
+path = "src/todolist_1.rs"
+harness = false

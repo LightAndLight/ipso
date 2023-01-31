@@ -11,7 +11,6 @@ name = "ipso"
 path = "./src/main.rs"
 
 [dependencies]
-fnv = "1.0.7"
 ipso-builtins = { path = "../ipso-builtins" }
 ipso-core = { path = "../ipso-core" }
 ipso-diagnostic = { path = "../ipso-diagnostic" }
@@ -20,24 +19,11 @@ ipso-import = { path = "../ipso-import" }
 ipso-lex = { path = "../ipso-lex" }
 ipso-parse = { path = "../ipso-parse" }
 ipso-repl = { path = "../ipso-repl" }
-ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
 ipso-typecheck = { path = "../ipso-typecheck" }
-ipso-util = { path = "../ipso-util" }
-lazy_static = "1.4.0"
 termion = "^1.5"
-typed-arena = "2.0.1"
 
 [dependencies.clap]
 version = "^4.0"
 default-features = false
 features = ["std", "derive", "error-context", "help", "usage"]
-
-[dev-dependencies]
-# Development build of v0.4, which has fewer dependencies.
-criterion = { git = "https://github.com/bheisler/criterion.rs", rev = "412591edec4a0e8e05093c7f9ca0ba9611e5c17f", default_features = false }
-
-[[bench]]
-name = "todolist_1"
-path = "benches/todolist_1.rs"
-harness = false
