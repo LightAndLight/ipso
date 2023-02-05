@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  comp
+    println <| debug <| not true
+    println <| debug <| not false
