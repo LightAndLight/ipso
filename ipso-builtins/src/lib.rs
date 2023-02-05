@@ -1466,6 +1466,19 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     None,
                 ))),
             },
+            // not : Bool -> Bool
+            Declaration::Definition {
+                name: Rc::from("not"),
+                sig: {
+                    TypeSig {
+                        ty_vars: vec![
+                        ],
+                        body: Type::arrow(common_kinds, Type::Bool, Type::Bool),
+                    }
+                },
+                // \x -> if x then false else true
+                body: Rc::new(Expr::mk_lam(true, Expr::mk_ifthenelse(Expr::Var(0), Expr::False, Expr::True))),
+            },
         ],
     }
 }
