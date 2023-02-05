@@ -1,11 +1,11 @@
 use eval::Env;
 use ipso_builtins as builtins;
-use ipso_core::{self as core, Binding, CommonKinds, Name};
+use ipso_core::{self as core, Binding, CommonKinds, Module, Name};
 use ipso_diagnostic::Source;
 use ipso_eval::{self as eval, Interpreter};
 use ipso_import as import;
 use ipso_parse as parse;
-use ipso_syntax::{kind::Kind, ModuleKey, ModuleRef, Modules};
+use ipso_syntax::{kind::Kind, ModuleId, ModuleKey, ModuleRef, Modules};
 use ipso_typecheck::{self as typecheck, kind_inference, type_inference, BoundVars};
 use std::{
     collections::HashMap,
@@ -70,22 +70,23 @@ fn find_entrypoint_signature(
     }
 }
 
-pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
-    let main = String::from("main");
-
+pub fn check(
+    common_kinds: &CommonKinds,
+    filename: &str,
+    entrypoint: Option<String>,
+) -> Result<(Modules<Module>, ModuleId, String), InterpreterError> {
     let mut modules = Modules::new();
-    let source = Source::Interactive {
-        label: main.clone(),
+    let builtins_module_id = {
+        let builtins = builtins::builtins(common_kinds);
+        modules.insert(ModuleKey::from("builtins"), builtins)
     };
 
-    let target_path = PathBuf::from(config.filename.as_str());
+    let target_path = PathBuf::from(filename);
     if !target_path.exists() {
         return Err(InterpreterError::FileDoesNotExist(target_path));
     }
-    let common_kinds = CommonKinds::default();
-    let builtins_module_id = {
-        let builtins = builtins::builtins(&common_kinds);
-        modules.insert(ModuleKey::from("builtins"), builtins)
+    let source = Source::File {
+        path: target_path.clone(),
     };
     let module_id = import::import(
         &mut modules,
@@ -93,28 +94,28 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         &source,
         0,
         &target_path,
-        &common_kinds,
+        common_kinds,
     )?;
     let module = modules.lookup(module_id);
 
-    let entrypoint: &str = match &config.entrypoint {
-        None => &main,
+    let entrypoint = match entrypoint {
+        None => String::from("main"),
         Some(value) => value,
     };
-    let target_sig = find_entrypoint_signature(entrypoint, module)?;
+    let target_sig = find_entrypoint_signature(&entrypoint, module)?;
     {
         let mut kind_inference_state = kind_inference::State::new();
         let mut type_solutions = type_inference::unification::Solutions::new();
 
         let expected = core::Type::app(
-            core::Type::mk_io(&common_kinds),
+            core::Type::mk_io(common_kinds),
             core::Type::Meta(Kind::Type, type_solutions.fresh_meta()),
         );
         let actual = target_sig.body;
 
         type_inference::unification::unify(
             type_inference::unification::Env {
-                common_kinds: &common_kinds,
+                common_kinds,
                 types: &HashMap::new(),
                 type_variables: &BoundVars::new(),
             },
@@ -132,23 +133,43 @@ pub fn run_interpreter(config: Config) -> Result<(), InterpreterError> {
         })?;
     }
 
+    Ok((modules, module_id, entrypoint))
+}
+
+#[derive(Default)]
+pub struct IO {
+    stdin: Option<Box<dyn BufRead>>,
+    stdout: Option<Box<dyn Write>>,
+}
+
+pub fn run(
+    common_kinds: &CommonKinds,
+    modules: Modules<Module>,
+    module_id: ModuleId,
+    filename: &str,
+    args: &[Rc<str>],
+    entrypoint: &str,
+    io: IO,
+) -> Result<(), InterpreterError> {
+    let module = modules.lookup(module_id);
+
     let mut env = Env::new();
     let _result = {
-        let mut stdout = config.stdout.unwrap_or_else(|| Box::new(io::stdout()));
-        let mut stdin = config
+        let mut stdout = io.stdout.unwrap_or_else(|| Box::new(io::stdout()));
+        let mut stdin = io
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
         let context: HashMap<Name, Binding> = module
             .decls
             .iter()
-            .flat_map(|decl| decl.get_bindings(&common_kinds).into_iter())
+            .flat_map(|decl| decl.get_bindings(common_kinds).into_iter())
             .collect();
         let mut interpreter = Interpreter::new(
-            Rc::from(config.filename),
-            &config.args,
+            Rc::from(filename),
+            args,
             &mut stdin,
             &mut stdout,
-            &common_kinds,
+            common_kinds,
             &modules,
             &context,
         );
