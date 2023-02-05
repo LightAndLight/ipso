@@ -3,8 +3,9 @@
 use std::{io, path::PathBuf, rc::Rc};
 
 use clap::Parser;
+use ipso_core::CommonKinds;
 use ipso_diagnostic::{Diagnostic, Location, Message, Source};
-use run::{run_interpreter, InterpreterError};
+use run::InterpreterError;
 
 use crate::version::VERSION;
 
@@ -47,6 +48,10 @@ struct Cli {
     /// The file to run. Starts a REPL if omitted.
     filename: Option<String>,
 
+    /// Parse and type check the file without running.
+    #[arg(long)]
+    check: bool,
+
     /// Run a specific IO action from the file. Defaults to "main".
     #[clap(long = "run")]
     entrypoint: Option<String>,
@@ -82,15 +87,38 @@ pub fn main() -> io::Result<()> {
 
     match cli.filename {
         Some(filename) => {
-            let config = crate::run::Config {
-                filename: filename.clone(),
-                entrypoint: cli.entrypoint,
-                args,
-                stdin: None,
-                stdout: None,
-            };
+            /*
+            I only wrote this function because I couldn't get the `?` operator to play will
+            in the present of the top-level `io::Result<()>` value.
+            */
+            fn run_file_with_args(
+                filename: &str,
+                args: &[Rc<str>],
+                entrypoint: Option<String>,
+                check: bool,
+            ) -> Result<(), InterpreterError> {
+                let common_kinds = CommonKinds::default();
 
-            match run_interpreter(config) {
+                let (modules, module_id, entrypoint) =
+                    run::check(&common_kinds, filename, entrypoint)?;
+
+                if !check {
+                    run::run(
+                        &common_kinds,
+                        modules,
+                        module_id,
+                        filename,
+                        args,
+                        &entrypoint,
+                        run::IO::default(),
+                    )
+                } else {
+                    println!("{}: success", filename);
+                    Ok(())
+                }
+            }
+
+            match run_file_with_args(&filename, &args, cli.entrypoint, cli.check) {
                 Ok(()) => Ok(()),
                 Err(err) => {
                     report_interpreter_error(filename, err)?;
