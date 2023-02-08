@@ -1,5 +1,5 @@
 use super::{Interpreter, Value};
-use crate::{closure_conversion::Expr, Env, Object};
+use crate::{closure_conversion::Expr, Env, Object, IO};
 use ipso_core::{Builtin, CommonKinds, StringPart};
 use ipso_syntax::Modules;
 use std::{collections::HashMap, rc::Rc};
@@ -8,6 +8,7 @@ use std::{collections::HashMap, rc::Rc};
 fn eval_1() {
     let mut stdin = std::io::empty();
     let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
     let term = Expr::App(
         Rc::new(Expr::App(
             Rc::new(Expr::Builtin(Builtin::Trace)),
@@ -22,8 +23,11 @@ fn eval_1() {
     let mut interpreter = Interpreter::new(
         Rc::from("test"),
         &args,
-        &mut stdin,
-        &mut stdout,
+        IO {
+            stdin: &mut stdin,
+            stdout: &mut stdout,
+            stderr: &mut stderr,
+        },
         &common_kinds,
         &modules,
         &context,
@@ -43,6 +47,7 @@ fn eval_1() {
 fn eval_2() {
     let mut stdin = std::io::empty();
     let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
     let str = String::from("hello");
     let term = Expr::App(
         Rc::new(Expr::Builtin(Builtin::ToUtf8)),
@@ -55,8 +60,11 @@ fn eval_2() {
     let mut interpreter = Interpreter::new(
         Rc::from("test"),
         &args,
-        &mut stdin,
-        &mut stdout,
+        IO {
+            stdin: &mut stdin,
+            stdout: &mut stdout,
+            stderr: &mut stderr,
+        },
         &common_kinds,
         &modules,
         &context,

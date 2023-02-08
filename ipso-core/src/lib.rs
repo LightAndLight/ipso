@@ -789,6 +789,7 @@ pub enum Builtin {
     EnvProgram,
     EnvArgs,
     EnvGetvar,
+    EnvGetvarBang,
     EnvSetvar,
     ExitSuccess,
     ExitFailure,

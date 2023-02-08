@@ -151,6 +151,7 @@ impl Repl {
         program: Rc<str>,
         args: &[Rc<str>],
         stdout: &mut dyn Write,
+        stderr: &mut dyn Write,
         expr: Spanned<ipso_syntax::Expr>,
     ) -> Result<Option<String>, Error> {
         let mut expr = desugar_expr(&self.source, expr)?;
@@ -279,8 +280,11 @@ impl Repl {
         let mut interpreter = Interpreter::new(
             program,
             args,
-            &mut stdin,
-            stdout,
+            ipso_eval::IO {
+                stdin: &mut stdin,
+                stdout,
+                stderr,
+            },
             &self.common_kinds,
             &self.modules,
             &context,

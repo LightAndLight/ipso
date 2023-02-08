@@ -302,12 +302,19 @@ pub fn run(program: Rc<str>, args: &[Rc<str>]) -> io::Result<()> {
                                 input_state: &mut input_state,
                                 stdout: &mut stdout,
                             };
+                            let mut stderr = std::io::stderr();
                             match parse_result {
                                 Err(err) => {
                                     render_error(&mut stdout, prompt, err.position(), err.message())
                                 }
                                 Ok(expr) => {
-                                    match repl.eval_show(program.clone(), args, &mut stdout, expr) {
+                                    match repl.eval_show(
+                                        program.clone(),
+                                        args,
+                                        &mut stdout,
+                                        &mut stderr,
+                                        expr,
+                                    ) {
                                         Err(err) => render_error(
                                             &mut stdout,
                                             prompt,

@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  comp
+    bind value <- env.getvar! "THIS_IS_NOT_SET"
+    println value
