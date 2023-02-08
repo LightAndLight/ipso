@@ -679,7 +679,9 @@ main =
 <span id="cb84-36"><a href="#cb84-36" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb84-37"><a href="#cb84-37" aria-hidden="true" tabindex="-1"></a>  getvar <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">(|</span> Some <span class="kw">:</span> String, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
 <span id="cb84-38"><a href="#cb84-38" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb84-39"><a href="#cb84-39" aria-hidden="true" tabindex="-1"></a>  setvar <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<span id="cb84-39"><a href="#cb84-39" aria-hidden="true" tabindex="-1"></a>  getvar! <span class="kw">:</span> String <span class="kw">-&gt;</span> IO String</span>
+<span id="cb84-40"><a href="#cb84-40" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb84-41"><a href="#cb84-41" aria-hidden="true" tabindex="-1"></a>  setvar <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <h3 id="exit"><code>exit</code></h3>
 <div class="sourceCode" id="cb85"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> exit <span class="kw">where</span></span>
 <span id="cb85-2"><a href="#cb85-2" aria-hidden="true" tabindex="-1"></a></span>

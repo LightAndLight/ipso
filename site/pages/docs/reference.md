@@ -932,6 +932,8 @@ module env where
   
   getvar : String -> IO (| Some : String, None : () |)
   
+  getvar! : String -> IO String
+  
   setvar : String -> String -> IO ()
 ```
 
