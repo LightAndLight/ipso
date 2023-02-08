@@ -554,16 +554,22 @@ pub struct Interpreter<'io> {
     args: &'io [Rc<str>],
     stdin: &'io mut dyn BufRead,
     stdout: &'io mut dyn io::Write,
+    stderr: &'io mut dyn io::Write,
     context: Context,
     modules: HashMap<ModuleId, Module>,
+}
+
+pub struct IO<'io> {
+    pub stdin: &'io mut dyn BufRead,
+    pub stdout: &'io mut dyn io::Write,
+    pub stderr: &'io mut dyn io::Write,
 }
 
 impl<'io> Interpreter<'io> {
     pub fn new(
         program: Rc<str>,
         args: &'io [Rc<str>],
-        stdin: &'io mut dyn BufRead,
-        stdout: &'io mut dyn io::Write,
+        io: IO<'io>,
         common_kinds: &CommonKinds,
         modules: &Modules<core::Module>,
         context: &HashMap<Name, ipso_core::Binding>,
@@ -583,8 +589,9 @@ impl<'io> Interpreter<'io> {
         Interpreter {
             program,
             args,
-            stdin,
-            stdout,
+            stdin: io.stdin,
+            stdout: io.stdout,
+            stderr: io.stderr,
             context: Context {
                 modules: Vec::new(),
                 base: Bindings::from(context.clone()),
@@ -1638,6 +1645,47 @@ where {
                         let closure = Object::IO {
                             env,
                             body: IOBody(env_getvar_io),
+                        };
+                        interpreter.alloc(closure)
+                    }
+                )
+            }
+            Builtin::EnvGetvarBang => {
+                function1!(
+                    env_getvarbang,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        fn env_getvarbang_io(
+                            interpreter: &mut Interpreter,
+                            env: Rc<[Value]>,
+                        ) -> Value {
+                            let var = env[0].unpack_string();
+                            match std::env::var(var) {
+                                Err(err) => match err {
+                                    std::env::VarError::NotPresent => {
+                                        write!(
+                                            interpreter.stderr,
+                                            "getvar!: missing environment variable {}",
+                                            var
+                                        )
+                                        .unwrap();
+                                        std::process::exit(1)
+                                    }
+                                    err => {
+                                        panic!("getvar!: {}", err)
+                                    }
+                                },
+                                Ok(value) => interpreter.alloc(Object::String(Rc::from(value))),
+                            }
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+                        let closure = Object::IO {
+                            env,
+                            body: IOBody(env_getvarbang_io),
                         };
                         interpreter.alloc(closure)
                     }

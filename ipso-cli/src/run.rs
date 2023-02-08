@@ -140,6 +140,7 @@ pub fn check(
 pub struct IO {
     stdin: Option<Box<dyn BufRead>>,
     stdout: Option<Box<dyn Write>>,
+    stderr: Option<Box<dyn Write>>,
 }
 
 pub fn run(
@@ -156,6 +157,7 @@ pub fn run(
     let mut env = Env::new();
     let _result = {
         let mut stdout = io.stdout.unwrap_or_else(|| Box::new(io::stdout()));
+        let mut stderr = io.stderr.unwrap_or_else(|| Box::new(io::stderr()));
         let mut stdin = io
             .stdin
             .unwrap_or_else(|| Box::new(BufReader::new(io::stdin())));
@@ -167,8 +169,11 @@ pub fn run(
         let mut interpreter = Interpreter::new(
             Rc::from(filename),
             args,
-            &mut stdin,
-            &mut stdout,
+            ipso_eval::IO {
+                stdin: &mut stdin,
+                stdout: &mut stdout,
+                stderr: &mut stderr,
+            },
             common_kinds,
             &modules,
             &context,

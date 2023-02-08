@@ -53,6 +53,21 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::EnvGetvar),
         }),
+        // getvar! : String -> IO String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("getvar!"),
+            sig: {
+                TypeSig {
+                    ty_vars: vec![],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::String,
+                        Type::app(Type::mk_io(common_kinds), Type::String),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::EnvGetvarBang),
+        }),
         // setvar : String -> String -> IO ()
         Rc::new(Declaration::Definition {
             name: Rc::from("setvar"),
