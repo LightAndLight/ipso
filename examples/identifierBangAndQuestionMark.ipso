@@ -1,0 +1,11 @@
+main : IO ()
+main =
+  comp
+    let no! = "no"
+    cmd.run `echo $no!`
+    
+    let no = "no"
+    cmd.run `echo ${no}!`
+
+    let really? = true
+    println <| debug really?
