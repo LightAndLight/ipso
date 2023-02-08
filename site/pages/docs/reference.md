@@ -977,7 +977,9 @@ ident_start ::= (lowercase ASCII alphabetic characters)
 
 ident_continue ::= 
   (ASCII alphanumeric characters) |
-  '_'
+  '_' |
+  '!' |
+  '?'
 
 
 ctor ::=
