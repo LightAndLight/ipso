@@ -32,16 +32,17 @@ title: Language Reference
 * [Datatypes](#datatypes)
   * [Unit](#unit)
   * [Booleans](#booleans)
-  * [Integers](#integers)
     * [Builtins](#builtins)
-  * [Characters](#characters)
+  * [Integers](#integers)
     * [Builtins](#builtins-1)
+  * [Characters](#characters)
+    * [Builtins](#builtins-2)
   * [Strings](#strings)
     * [Interpolation](#interpolation-1)
-    * [Builtins](#builtins-2)
+    * [Builtins](#builtins-3)
   * [Functions](#functions)
   * [Arrays](#arrays)
-    * [Builtins](#builtins-3)
+    * [Builtins](#builtins-4)
   * [Byte Arrays](#byte-arrays)
   * [Records](#records-1)
     * [Construction](#construction)
@@ -51,9 +52,9 @@ title: Language Reference
     * [Construction](#construction-1)
     * [Extension](#extension-1)
   * [IO](#io)
-    * [Builtins](#builtins-4)
-  * [Commands](#commands)
     * [Builtins](#builtins-5)
+  * [Commands](#commands)
+    * [Builtins](#builtins-6)
 * [Type Classes](#type-classes)
   * [Equality](#equality)
   * [Comparison](#comparison)
@@ -471,6 +472,12 @@ Bool
 ```ipsorepl
 > if false then "yes" else "no"
 "no"
+```
+
+#### Builtins
+
+```
+not : Bool -> Bool
 ```
 
 ### Integers
