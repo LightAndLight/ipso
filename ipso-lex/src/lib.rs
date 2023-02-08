@@ -59,7 +59,12 @@ fn is_ident_start(c: char) -> bool {
 }
 
 fn is_ident_continue(c: char) -> bool {
-    ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c) || c == '_'
+    ('a'..='z').contains(&c)
+        || ('A'..='Z').contains(&c)
+        || ('0'..='9').contains(&c)
+        || c == '_'
+        || c == '!'
+        || c == '?'
 }
 
 impl<'input> Lexer<'input> {
