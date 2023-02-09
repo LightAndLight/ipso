@@ -1,0 +1,2 @@
+main : IO ()
+main = println <| string.trimp (\c -> c == 'a') "aaahelloa"

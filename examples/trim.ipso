@@ -1,0 +1,2 @@
+main : IO ()
+main = println <| string.trim "   \n\nhello\n\t\t"

@@ -148,5 +148,40 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::StringPartsc),
         }),
+        // trimp : (Char -> Bool) -> String -> String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("trimp"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::arrow(common_kinds, Type::Char, Type::Bool),
+                    Type::arrow(common_kinds, Type::String, Type::String),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringTrimp),
+        }),
+        // trimc : Char -> String -> String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("trimc"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::Char,
+                    Type::arrow(common_kinds, Type::String, Type::String),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringTrimc),
+        }),
+        // trim : String -> String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("trim"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(common_kinds, Type::String, Type::String),
+            },
+            body: Expr::alloc_builtin(Builtin::StringTrim),
+        }),
     ]
 }
