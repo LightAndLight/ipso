@@ -1,0 +1,8 @@
+main : IO ()
+main =
+  comp
+    bind result <- cmd.try `true`
+    println <| debug result
+    
+    bind result <- cmd.try `false`
+    println <| debug result

@@ -1489,6 +1489,65 @@ where {
                     interpreter.alloc(Object::String(interpreter.alloc_str(&buffer)))
                 }
             ),
+            Builtin::CmdTry => function1!(
+                cmd_try,
+                self,
+                |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                    fn cmd_try_io(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
+                        /*
+                        Return type: (| Success : (), Failure : Int |)
+
+                        Tags are alphabetically ordered:
+                        * Failure tag is 0
+                        * Success tag is 1
+                        */
+
+                        fn mk_failure(interpreter: &mut Interpreter<'_>, arg: Value) -> Value {
+                            interpreter.alloc(Object::Variant(0, arg))
+                        }
+
+                        fn mk_success(interpreter: &mut Interpreter<'_>) -> Value {
+                            interpreter.alloc(Object::Variant(1, Value::Unit))
+                        }
+
+                        let cmd: &[Rc<str>] = env[0].unpack_cmd();
+                        if cmd.is_empty() {
+                            mk_success(interpreter)
+                        } else {
+                            let output = process::Command::new(cmd[0].as_ref())
+                                .args(cmd[1..].iter().map(|arg| arg.as_ref()))
+                                .stdin(Stdio::inherit())
+                                .stdout(Stdio::inherit())
+                                .stderr(Stdio::inherit())
+                                .output()
+                                .unwrap_or_else(|err| {
+                                    panic!("failed to start process {:?}: {}", cmd[0], err)
+                                });
+
+                            if output.status.success() {
+                                mk_success(interpreter)
+                            } else {
+                                match output.status.code() {
+                                    Some(code) => mk_failure(interpreter, Value::Int(code)),
+                                    None => {
+                                        eprintln!(
+                                            "process {:?} exited unexpectedly: {}",
+                                            cmd[0], output.status,
+                                        );
+                                        std::process::exit(1)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    let env = interpreter.alloc_values([arg]);
+                    interpreter.alloc(Object::IO {
+                        env,
+                        body: IOBody(cmd_try_io),
+                    })
+                }
+            ),
             Builtin::FlatMap => function2!(
                 flat_map,
                 self,
