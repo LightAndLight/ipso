@@ -174,5 +174,14 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::StringTrimc),
         }),
+        // trim : String -> String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("trim"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(common_kinds, Type::String, Type::String),
+            },
+            body: Expr::alloc_builtin(Builtin::StringTrim),
+        }),
     ]
 }

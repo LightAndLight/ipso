@@ -1240,6 +1240,17 @@ where {
                     }
                 )
             }
+            Builtin::StringTrim => {
+                function1!(
+                    string_trim,
+                    self,
+                    |eval: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                        let input_string = arg.unpack_string();
+                        let output_string = input_string.trim();
+                        eval.alloc(Object::String(Rc::from(output_string)))
+                    }
+                )
+            }
             Builtin::FoldlString => {
                 function3!(
                     foldl_string,
