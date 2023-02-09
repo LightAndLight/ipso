@@ -770,6 +770,7 @@ pub enum Builtin {
     StringSplit,
     StringSplitc,
     StringTrimp,
+    StringTrimc,
     JoinString,
     StringParts,
     StringPartsc,
