@@ -1214,6 +1214,20 @@ where {
                     }
                 )
             }
+            Builtin::StringTrimp => {
+                function2!(
+                    string_trimp,
+                    self,
+                    |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let predicate = &env[0];
+                        let input_string = arg.unpack_string();
+                        let output_string = input_string.trim_matches(|c: char| {
+                            predicate.apply(eval, Value::Char(c)).unpack_bool()
+                        });
+                        eval.alloc(Object::String(Rc::from(output_string)))
+                    }
+                )
+            }
             Builtin::FoldlString => {
                 function3!(
                     foldl_string,

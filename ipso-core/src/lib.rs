@@ -769,6 +769,7 @@ pub enum Builtin {
     CompareChar,
     StringSplit,
     StringSplitc,
+    StringTrimp,
     JoinString,
     StringParts,
     StringPartsc,
