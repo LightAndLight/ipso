@@ -79,5 +79,28 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::CmdEachline_),
         }),
+        // try : Cmd -> IO (| Success : (), Failure : Int |)
+        Rc::new(Declaration::Definition {
+            name: Rc::from("try"),
+            sig: TypeSig::new(
+                vec![],
+                Type::arrow(
+                    common_kinds,
+                    Type::Cmd,
+                    Type::app(
+                        Type::mk_io(common_kinds),
+                        Type::mk_variant(
+                            common_kinds,
+                            vec![
+                                (Rc::from("Success"), Type::Unit),
+                                (Rc::from("Failure"), Type::Int),
+                            ],
+                            None,
+                        ),
+                    ),
+                ),
+            ),
+            body: Rc::new(Expr::Builtin(Builtin::CmdTry)),
+        }),
     ]
 }

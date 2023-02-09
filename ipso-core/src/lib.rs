@@ -782,6 +782,7 @@ pub enum Builtin {
     Lines,
     ShowCmd,
     DebugCmd,
+    CmdTry,
     FlatMap,
     MapArray,
     CharToString,
