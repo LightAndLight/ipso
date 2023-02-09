@@ -598,6 +598,17 @@ module string where
   # * `partsc ' ' "   hello    world   " == ["hello", "world"]`
   partsc : Char -> String -> Array String
 
+  # Remove characters from both ends of a string, according to a predicate.
+  trimp : (Char -> Bool) -> String -> String
+  
+  # Remove a specific character from both ends of a string.
+  #
+  # `trimc c1 = trimp (\c2 -> c2 == c1)`
+  trimc : Char -> String -> String
+
+  # Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.
+  trim : String -> String
+
   foldl : (a -> Char -> a) -> a -> String -> a
 ```
 
