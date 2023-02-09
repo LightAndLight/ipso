@@ -1,0 +1,8 @@
+main : IO ()
+main =
+  comp
+    let x = "world"
+    println <| debug `echo "hello $x"`
+    
+    let y = "awesome world"
+    println <| debug `echo "hello $y"`
