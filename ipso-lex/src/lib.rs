@@ -760,33 +760,20 @@ impl<'input> Iterator for Lexer<'input> {
                                         textual_length += 1;
 
                                         match self.current {
-                                            Some('"') => {
-                                                self.consume();
-                                                value.write_char('"').unwrap();
-                                                textual_length += 1;
-                                            }
-                                            Some('`') => {
-                                                self.consume();
-                                                value.write_char('`').unwrap();
-                                                textual_length += 1;
-                                            }
-                                            Some('$') => {
-                                                self.consume();
-                                                value.write_char('$').unwrap();
-                                                textual_length += 1;
-                                            }
-                                            Some('\\') => {
-                                                self.consume();
-                                                value.write_char('\\').unwrap();
-                                                textual_length += 1;
-                                            }
-                                            Some(c) => {
-                                                return Some(Token {
-                                                    data: token::Data::Unexpected(c),
-                                                    pos: self.pos,
-                                                    column: self.column,
-                                                })
-                                            }
+                                            Some(c) => match c {
+                                                '"' | '`' | '$' | '\\' => {
+                                                    self.consume();
+                                                    value.write_char(c).unwrap();
+                                                    textual_length += 1;
+                                                }
+                                                _ => {
+                                                    return Some(Token {
+                                                        data: token::Data::Unexpected(c),
+                                                        pos: self.pos,
+                                                        column: self.column,
+                                                    })
+                                                }
+                                            },
                                             None => {
                                                 return Some(Token {
                                                     data: token::Data::Unexpected('\\'),
