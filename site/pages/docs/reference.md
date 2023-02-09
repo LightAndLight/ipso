@@ -813,6 +813,9 @@ module cmd where
 
   run : Cmd -> IO ()
 
+  # Run a command and return its exit status.
+  try : Cmd -> IO (| Success : (), Failure : Int |)
+
   # Run a command, capturing its `stdout` as a string.
   read : Cmd -> IO String
   
