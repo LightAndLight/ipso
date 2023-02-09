@@ -134,32 +134,10 @@ fn desugar_cmd_part_mut(
     var_gen: &mut VarGen,
     cmd_part: &mut CmdPart,
 ) -> Result<(), Error> {
-    match cmd_part {
-        CmdPart::Literal(_) => Ok(()),
-        CmdPart::Expr(expr) => {
-            desugar_expr_mut(source, var_gen, expr)?;
-            *expr = Expr::mk_app(
-                Spanned {
-                    pos: expr.pos,
-                    item: Expr::Var(String::from("toArgs")),
-                },
-                expr.clone(),
-            );
-            Ok(())
-        }
-        CmdPart::MultiPart {
-            first,
-            second,
-            rest,
-        } => {
-            desugar_string_part_mut(source, var_gen, first)?;
-            desugar_string_part_mut(source, var_gen, second)?;
-            rest.iter_mut().try_for_each(|string_part| {
-                desugar_string_part_mut(source, var_gen, string_part)
-            })?;
-            Ok(())
-        }
-    }
+    cmd_part
+        .value
+        .iter_mut()
+        .try_for_each(|string_part| desugar_string_part_mut(source, var_gen, string_part))
 }
 
 fn desugar_branches_mut(

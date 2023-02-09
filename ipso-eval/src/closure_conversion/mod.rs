@@ -360,25 +360,7 @@ pub fn convert_string_part(part: &StringPart<ipso_core::Expr>) -> ConvertResult<
 }
 
 pub fn convert_cmd_part(part: &CmdPart<ipso_core::Expr>) -> ConvertResult<CmdPart<Expr>> {
-    match part {
-        CmdPart::Literal(string) => {
-            let string = string.clone();
-            ConvertResult::closed(CmdPart::Literal(string))
-        }
-        CmdPart::Expr(expr) => convert_expr(expr).map(CmdPart::Expr),
-        CmdPart::MultiPart {
-            first,
-            second,
-            rest,
-        } => convert_string_part(first)
-            .and(convert_string_part(second))
-            .and(convert_many(convert_string_part, rest))
-            .map(|((first, second), rest)| CmdPart::MultiPart {
-                first,
-                second,
-                rest,
-            }),
-    }
+    convert_many(convert_string_part, &part.value).map(|value| CmdPart { value })
 }
 
 pub fn convert_branch(branch: &Branch<ipso_core::Expr>) -> ConvertResult<Branch<Expr>> {

@@ -302,22 +302,10 @@ pub fn rewrite_module_accessors_expr(
                 exclude.remove_all(arg_names.into_iter());
             }
         }
-        syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| match part {
-            syntax::CmdPart::Literal(_) => {}
-            syntax::CmdPart::Expr(expr) => {
-                rewrite_module_accessors_expr(exclude, imported_items, expr)
-            }
-            syntax::CmdPart::MultiPart {
-                first,
-                second,
-                rest,
-            } => {
-                rewrite_module_accessors_string_part(exclude, imported_items, first);
-                rewrite_module_accessors_string_part(exclude, imported_items, second);
-                rest.iter_mut().for_each(|string_part| {
-                    rewrite_module_accessors_string_part(exclude, imported_items, string_part)
-                });
-            }
+        syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| {
+            part.value.iter_mut().for_each(|string_part| {
+                rewrite_module_accessors_string_part(exclude, imported_items, string_part)
+            })
         }),
         syntax::Expr::Comp(_) => {
             /*

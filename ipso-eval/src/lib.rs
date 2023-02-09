@@ -8,7 +8,7 @@ pub mod closure_conversion;
 
 use bindings::{Binding, Bindings};
 use closure_conversion::Expr;
-use ipso_core::{self as core, Binop, Builtin, CmdPart, CommonKinds, Name, Pattern, StringPart};
+use ipso_core::{self as core, Binop, Builtin, CommonKinds, Name, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
@@ -2126,6 +2126,23 @@ where {
         self.context.modules.last().copied()
     }
 
+    fn eval_string_parts(&mut self, env: &mut Env, parts: &[StringPart<Expr>]) -> String {
+        let mut value = String::new();
+
+        for part in parts {
+            match part {
+                StringPart::Expr(expr) => {
+                    let s = self.eval(env, expr);
+                    let s = s.unpack_string();
+                    value.push_str(s);
+                }
+                StringPart::String(s) => value.push_str(s.as_str()),
+            }
+        }
+
+        value
+    }
+
     pub fn eval(&mut self, env: &mut Env, expr: &Expr) -> Value {
         fn lookup_index(env: &Env, ix: usize) -> Value {
             let env_len = env.len();
@@ -2251,18 +2268,7 @@ where {
             Expr::Char(c) => Value::Char(*c),
 
             Expr::String(parts) => {
-                let mut value = String::new();
-
-                for part in parts {
-                    match part {
-                        StringPart::Expr(expr) => {
-                            let s = self.eval(env, expr);
-                            let s = s.unpack_string();
-                            value.push_str(s);
-                        }
-                        StringPart::String(s) => value.push_str(s.as_str()),
-                    }
-                }
+                let value = self.eval_string_parts(env, parts);
                 let str = self.alloc_str(&value);
                 self.alloc(Object::String(str))
             }
@@ -2526,49 +2532,13 @@ where {
                 }
             }
             Expr::Unit => Value::Unit,
-            Expr::Cmd(parts) => {
-                let mut new_parts: Vec<Rc<str>> = Vec::with_capacity(parts.len());
-                for part in parts {
-                    match part {
-                        CmdPart::Literal(value) => new_parts.push(value.clone()),
-                        CmdPart::Expr(expr) => {
-                            let args = self.eval(env, expr).unpack_array();
-                            new_parts
-                                .extend(args.iter().map(|value| Rc::from(value.unpack_string())));
-                        }
-                        CmdPart::MultiPart {
-                            first,
-                            second,
-                            rest,
-                        } => {
-                            fn add_string_part(
-                                interpreter: &mut Interpreter,
-                                env: &mut Env,
-                                buffer: &mut String,
-                                string_part: &StringPart<Expr>,
-                            ) {
-                                match string_part {
-                                    StringPart::String(value) => buffer.push_str(value),
-                                    StringPart::Expr(expr) => {
-                                        let value = interpreter.eval(env, expr);
-                                        buffer.push_str(value.unpack_string())
-                                    }
-                                };
-                            }
-
-                            let mut part = String::from("");
-
-                            add_string_part(self, env, &mut part, first);
-                            add_string_part(self, env, &mut part, second);
-                            rest.iter().for_each(|string_part| {
-                                add_string_part(self, env, &mut part, string_part)
-                            });
-
-                            new_parts.push(Rc::from(part));
-                        }
-                    }
+            Expr::Cmd(cmd_parts) => {
+                let mut new_cmd_parts: Vec<Rc<str>> = Vec::with_capacity(cmd_parts.len());
+                for cmd_part in cmd_parts {
+                    let new_part = self.eval_string_parts(env, &cmd_part.value);
+                    new_cmd_parts.push(Rc::from(new_part.as_str()));
                 }
-                self.alloc(Object::Cmd(new_parts))
+                self.alloc(Object::Cmd(new_cmd_parts))
             }
         };
         out
