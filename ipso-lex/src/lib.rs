@@ -770,6 +770,11 @@ impl<'input> Iterator for Lexer<'input> {
                                                 value.write_char('`').unwrap();
                                                 textual_length += 1;
                                             }
+                                            Some('$') => {
+                                                self.consume();
+                                                value.write_char('$').unwrap();
+                                                textual_length += 1;
+                                            }
                                             Some('\\') => {
                                                 self.consume();
                                                 value.write_char('\\').unwrap();
