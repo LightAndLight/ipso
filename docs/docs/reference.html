@@ -605,14 +605,7 @@ main =
 <span id="cb78-18"><a href="#cb78-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `eachline_ cmd f` is equivalent to `io.andThen (cmd.lines cmd) (\lines -&gt; array.each_ lines f)`</span></span>
 <span id="cb78-19"><a href="#cb78-19" aria-hidden="true" tabindex="-1"></a>  eachline_ <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> <span class="kw">(</span>String <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
 <span id="cb78-20"><a href="#cb78-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb78-21"><a href="#cb78-21" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span>
-<span id="cb78-22"><a href="#cb78-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb78-23"><a href="#cb78-23" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ToArgs a <span class="kw">where</span></span>
-<span id="cb78-24"><a href="#cb78-24" aria-hidden="true" tabindex="-1"></a>  toArgs <span class="kw">:</span> a <span class="kw">-&gt;</span> Array String</span>
-<span id="cb78-25"><a href="#cb78-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb78-26"><a href="#cb78-26" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs String</span>
-<span id="cb78-27"><a href="#cb78-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb78-28"><a href="#cb78-28" aria-hidden="true" tabindex="-1"></a><span class="kw">instance</span> ToArgs a <span class="kw">=&gt;</span> ToArgs <span class="kw">(</span>Array a<span class="kw">)</span> </span></code></pre></div>
+<span id="cb78-21"><a href="#cb78-21" aria-hidden="true" tabindex="-1"></a>  show <span class="kw">:</span> Cmd <span class="kw">-&gt;</span> String</span></code></pre></div>
 <h2 id="type-classes">Type Classes</h2>
 <h3 id="equality">Equality</h3>
 <div class="sourceCode" id="cb79"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Eq a <span class="kw">where</span></span>
