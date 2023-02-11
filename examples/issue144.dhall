@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    issue144.ipso:8:1: error: expected one of: '"', '$', '${"\${"}', string
-      |
-    8 | 
-      | ^
+    issue144.ipso:11:1: error: expected one of: '"', '$', '${"\${"}', string
+       |
+    11 | 
+       | ^
     '',
   exitcode = 1
 }
