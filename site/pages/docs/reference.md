@@ -395,7 +395,7 @@ hello!
 
 ```ipsorepl
 > let args = ["hello", "world"]
-> `echo $args`
+> `echo $..args`
 `echo hello world`
 ```
 
@@ -405,8 +405,13 @@ hello!
 ```
 
 ```ipsorepl
-> :type \x -> `echo $x`
-ToArgs a => a -> Cmd
+> `echo $..{ ["a a", "b b"] ++ ["c c", "d d"] }`
+`echo "a a" "b b" "c c" "d d"`
+```
+
+```ipsorepl
+> :type \a b c d -> `echo $a $..b $c $..d`
+String -> Array String -> String -> Array String -> Cmd
 ```
 
 ## Operators
@@ -1178,10 +1183,15 @@ cmd_char ::=
   '\' '"'
   '\' '\'
 
-cmd_part ::=
+cmd_string_part ::=
   cmd_char+
   '$' ident
   '$' '{' expr '}'
+
+cmd_part ::=
+  cmd_string_part+
+  '$..' ident
+  '$..{' expr '}'
 
 cmd ::= 
   '`' cmd_part* '`'
