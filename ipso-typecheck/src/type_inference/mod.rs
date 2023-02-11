@@ -953,13 +953,23 @@ pub fn check(
 
             let cmd_parts = cmd_parts
                 .iter()
-                .map(|cmd_part| {
-                    let value = cmd_part
-                        .value
-                        .iter()
-                        .map(|string_part| check_string_part(env, state, string_part))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Ok(CmdPart { value })
+                .map(|cmd_part| match cmd_part {
+                    syntax::CmdPart::Arg(string_parts) => {
+                        let string_parts = string_parts
+                            .iter()
+                            .map(|string_part| check_string_part(env, state, string_part))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        Ok(CmdPart::Arg(string_parts))
+                    }
+                    syntax::CmdPart::Args(expr) => {
+                        let expr = check(
+                            env,
+                            state,
+                            expr,
+                            &Type::app(Type::mk_array(env.common_kinds), Type::String),
+                        )?;
+                        Ok(CmdPart::Args(expr))
+                    }
                 })
                 .collect::<Result<_, Error>>()?;
 

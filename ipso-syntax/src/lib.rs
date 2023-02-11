@@ -378,8 +378,9 @@ echo $a/$b
 ```
 */
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CmdPart {
-    pub value: Vec<StringPart>,
+pub enum CmdPart {
+    Arg(Vec<StringPart>),
+    Args(Spanned<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

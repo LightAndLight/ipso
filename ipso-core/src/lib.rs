@@ -829,8 +829,9 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CmdPart<E> {
-    pub value: Vec<StringPart<E>>,
+pub enum CmdPart<E> {
+    Arg(Vec<StringPart<E>>),
+    Args(E),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -1119,12 +1120,14 @@ impl Expr {
                 Expr::Cmd(parts) => Expr::Cmd(
                     parts
                         .iter()
-                        .map(|part| CmdPart {
-                            value: part
-                                .value
-                                .iter()
-                                .map(|string_part| string_part.map_expr(|expr| go(expr, f)))
-                                .collect(),
+                        .map(|cmd_part| match cmd_part {
+                            CmdPart::Arg(string_parts) => CmdPart::Arg(
+                                string_parts
+                                    .iter()
+                                    .map(|string_part| string_part.map_expr(|expr| go(expr, f)))
+                                    .collect(),
+                            ),
+                            CmdPart::Args(expr) => CmdPart::Args(go(expr, f)),
                         })
                         .collect(),
                 ),
@@ -1242,12 +1245,14 @@ impl Expr {
             Expr::Cmd(parts) => Expr::Cmd(
                 parts
                     .iter()
-                    .map(|part| CmdPart {
-                        value: part
-                            .value
-                            .iter()
-                            .map(|string_part| string_part.__instantiate(depth, val))
-                            .collect(),
+                    .map(|cmd_part| match cmd_part {
+                        CmdPart::Arg(string_parts) => CmdPart::Arg(
+                            string_parts
+                                .iter()
+                                .map(|string_part| string_part.__instantiate(depth, val))
+                                .collect(),
+                        ),
+                        CmdPart::Args(expr) => CmdPart::Args(expr.__instantiate(depth, val)),
                     })
                     .collect(),
             ),
@@ -1321,12 +1326,17 @@ impl Expr {
 
             Expr::Unit => Ok(()),
 
-            Expr::Cmd(parts) => parts.iter_mut().try_for_each(|part| {
-                part.value
-                    .iter_mut()
-                    .try_for_each(|string_part| string_part.subst_placeholder(f))?;
-                Ok(())
-            }),
+            Expr::Cmd(cmd_parts) => cmd_parts
+                .iter_mut()
+                .try_for_each(|cmd_part| match cmd_part {
+                    CmdPart::Arg(string_parts) => {
+                        string_parts
+                            .iter_mut()
+                            .try_for_each(|string_part| string_part.subst_placeholder(f))?;
+                        Ok(())
+                    }
+                    CmdPart::Args(expr) => expr.subst_placeholder(f),
+                }),
         }
     }
 
@@ -1408,15 +1418,17 @@ impl Expr {
                 bs.iter().map(|b| b.__abstract_evar(depth, ev)).collect(),
             ),
             Expr::Unit => Expr::Unit,
-            Expr::Cmd(parts) => Expr::Cmd(
-                parts
+            Expr::Cmd(cmd_parts) => Expr::Cmd(
+                cmd_parts
                     .iter()
-                    .map(|part| CmdPart {
-                        value: part
-                            .value
-                            .iter()
-                            .map(|string_part| string_part.__abstract_evar(depth, ev))
-                            .collect(),
+                    .map(|cmd_part| match cmd_part {
+                        CmdPart::Arg(string_parts) => CmdPart::Arg(
+                            string_parts
+                                .iter()
+                                .map(|string_part| string_part.__abstract_evar(depth, ev))
+                                .collect(),
+                        ),
+                        CmdPart::Args(expr) => CmdPart::Args(expr.__abstract_evar(depth, ev)),
                     })
                     .collect(),
             ),
@@ -1554,18 +1566,17 @@ impl Expr {
                         });
                         stack.push(a);
                     }
-                    Expr::Cmd(parts) => {
-                        parts.iter().rev().for_each(|cmd_part| {
-                            cmd_part
-                                .value
-                                .iter()
-                                .rev()
-                                .for_each(|string_part| match string_part {
+                    Expr::Cmd(cmd_parts) => {
+                        cmd_parts.iter().rev().for_each(|cmd_part| match cmd_part {
+                            CmdPart::Arg(string_parts) => string_parts.iter().rev().for_each(
+                                |string_part| match string_part {
                                     StringPart::String(_) => {}
                                     StringPart::Expr(expr) => {
                                         stack.push(expr);
                                     }
-                                })
+                                },
+                            ),
+                            CmdPart::Args(expr) => stack.push(expr),
                         });
                     }
                     Expr::EVar(a) => {

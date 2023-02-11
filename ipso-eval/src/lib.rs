@@ -2536,8 +2536,16 @@ where {
             Expr::Cmd(cmd_parts) => {
                 let mut new_cmd_parts: Vec<Rc<str>> = Vec::with_capacity(cmd_parts.len());
                 for cmd_part in cmd_parts {
-                    let new_part = self.eval_string_parts(env, &cmd_part.value);
-                    new_cmd_parts.push(Rc::from(new_part.as_str()));
+                    match cmd_part {
+                        core::CmdPart::Arg(string_parts) => {
+                            let new_part = self.eval_string_parts(env, string_parts);
+                            new_cmd_parts.push(Rc::from(new_part.as_str()));
+                        }
+                        core::CmdPart::Args(expr) => {
+                            let args = self.eval(env, expr).unpack_array();
+                            new_cmd_parts.extend(args.iter().map(|arg| arg.unpack_string()))
+                        }
+                    }
                 }
                 self.alloc(Object::Cmd(new_cmd_parts))
             }

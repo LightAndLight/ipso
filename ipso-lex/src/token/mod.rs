@@ -31,6 +31,8 @@ pub enum Name {
     DoubleQuote,
     Dollar,
     DollarLBrace,
+    DollarDotDot,
+    DollarDotDotLBrace,
     String,
     SingleQuote,
     Char,
@@ -80,6 +82,8 @@ impl Arbitrary for Name {
             Name::DoubleQuote,
             Name::Dollar,
             Name::DollarLBrace,
+            Name::DollarDotDot,
+            Name::DollarDotDotLBrace,
             Name::String,
             Name::SingleQuote,
             Name::Char,
@@ -121,7 +125,7 @@ impl Arbitrary for Name {
 
 impl Name {
     pub fn num_variants() -> usize {
-        44 + Keyword::num_variants()
+        46 + Keyword::num_variants()
     }
 
     pub fn from_int(ix: usize) -> Option<Self> {
@@ -187,6 +191,8 @@ impl Name {
             59 => Some(Self::LParenPipe),
             60 => Some(Self::PipeRParen),
             61 => Some(Self::Space),
+            62 => Some(Self::DollarDotDot),
+            63 => Some(Self::DollarDotDotLBrace),
             _ => None,
         }
     }
@@ -254,6 +260,8 @@ impl Name {
             Self::LParenPipe => 59,
             Self::PipeRParen => 60,
             Self::Space => 61,
+            Self::DollarDotDot => 62,
+            Self::DollarDotDotLBrace => 63,
         }
     }
 
@@ -266,6 +274,8 @@ impl Name {
             Name::DoubleQuote => String::from("'\"'"),
             Name::Dollar => String::from("'$'"),
             Name::DollarLBrace => String::from("'${'"),
+            Name::DollarDotDot => String::from("'$..'"),
+            Name::DollarDotDotLBrace => String::from("'$..{'"),
             Name::String => String::from("string"),
             Name::SingleQuote => String::from("'"),
             Name::Char => String::from("character"),
@@ -339,6 +349,8 @@ pub enum Data {
     DoubleQuote,
     Dollar,
     DollarLBrace,
+    DollarDotDot,
+    DollarDotDotLBrace,
     String {
         value: String,
         length: usize,
@@ -432,6 +444,8 @@ impl Data {
             Data::SingleQuote => 1,
             Data::Dollar => 1,
             Data::DollarLBrace => 2,
+            Data::DollarDotDot => 3,
+            Data::DollarDotDotLBrace => 4,
             Data::String { length, .. } => *length,
             Data::Char { length, .. } => *length,
             Data::Pipe => 1,
@@ -459,6 +473,8 @@ impl Data {
             Data::DoubleQuote => Name::DoubleQuote,
             Data::Dollar => Name::Dollar,
             Data::DollarLBrace => Name::DollarLBrace,
+            Data::DollarDotDot => Name::DollarDotDot,
+            Data::DollarDotDotLBrace => Name::DollarDotDotLBrace,
             Data::String { .. } => Name::String,
             Data::SingleQuote => Name::SingleQuote,
             Data::Char { .. } => Name::Char,

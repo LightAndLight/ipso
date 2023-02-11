@@ -302,10 +302,13 @@ pub fn rewrite_module_accessors_expr(
                 exclude.remove_all(arg_names.into_iter());
             }
         }
-        syntax::Expr::Cmd(parts) => parts.iter_mut().for_each(|part| {
-            part.value.iter_mut().for_each(|string_part| {
+        syntax::Expr::Cmd(cmd_parts) => cmd_parts.iter_mut().for_each(|cmd_part| match cmd_part {
+            syntax::CmdPart::Arg(string_parts) => string_parts.iter_mut().for_each(|string_part| {
                 rewrite_module_accessors_string_part(exclude, imported_items, string_part)
-            })
+            }),
+            syntax::CmdPart::Args(expr) => {
+                rewrite_module_accessors_expr(exclude, imported_items, expr)
+            }
         }),
         syntax::Expr::Comp(_) => {
             /*

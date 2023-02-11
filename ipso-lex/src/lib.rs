@@ -713,9 +713,7 @@ impl<'input> Iterator for Lexer<'input> {
                             self.consume();
 
                             match self.current {
-                                Some(c) if c == '{' => {
-                                    let pos = self.pos;
-                                    let column = self.column;
+                                Some('{') => {
                                     self.consume();
 
                                     self.context.push(Mode::Normal);
@@ -725,6 +723,48 @@ impl<'input> Iterator for Lexer<'input> {
                                         pos,
                                         column,
                                     })
+                                }
+                                Some('.') => {
+                                    self.consume();
+
+                                    match self.current {
+                                        Some('.') => {
+                                            self.consume();
+
+                                            match self.current {
+                                                Some('{') => {
+                                                    self.consume();
+
+                                                    self.context.push(Mode::Normal);
+
+                                                    Some(Token {
+                                                        data: token::Data::DollarDotDotLBrace,
+                                                        pos,
+                                                        column,
+                                                    })
+                                                }
+                                                _ => {
+                                                    self.context.push(Mode::Ident);
+
+                                                    Some(Token {
+                                                        data: token::Data::DollarDotDot,
+                                                        pos,
+                                                        column,
+                                                    })
+                                                }
+                                            }
+                                        }
+                                        Some(c) => Some(Token {
+                                            data: token::Data::Unexpected(c),
+                                            pos: self.pos,
+                                            column: self.column,
+                                        }),
+                                        None => Some(Token {
+                                            data: token::Data::Unexpected('.'),
+                                            pos: self.pos,
+                                            column: self.column,
+                                        }),
+                                    }
                                 }
                                 _ => {
                                     self.context.push(Mode::Ident);
