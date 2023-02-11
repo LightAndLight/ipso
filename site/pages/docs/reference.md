@@ -835,13 +835,6 @@ module cmd where
   eachline_ : Cmd -> (String -> IO ()) -> IO ()
 
   show : Cmd -> String
-
-class ToArgs a where
-  toArgs : a -> Array String
-
-instance ToArgs String
-
-instance ToArgs a => ToArgs (Array a) 
 ```
 
 ## Type Classes
