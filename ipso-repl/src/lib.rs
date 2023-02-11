@@ -153,7 +153,7 @@ impl Repl {
         stdout: &mut dyn Write,
         stderr: &mut dyn Write,
         expr: Spanned<ipso_syntax::Expr>,
-    ) -> Result<Option<String>, Error> {
+    ) -> Result<Option<Rc<str>>, Error> {
         let mut expr = desugar_expr(&self.source, expr)?;
         rewrite_module_accessors_expr(&mut Default::default(), &self.imported_items, &mut expr);
 
@@ -301,11 +301,11 @@ impl Repl {
                 | Object::Closure { .. }
                 | Object::StaticClosure { .. }
                 | Object::Cmd(_) => todo!(),
-                Object::String(s) => Ok(Some(String::from(s.as_ref()))),
+                Object::String(s) => Ok(Some(s.clone())),
                 Object::IO { env, body } => {
                     let result = body.run(&mut interpreter, env.clone());
                     Ok(if show_final_value {
-                        Some(String::from(result.unpack_string()))
+                        Some(result.unpack_string())
                     } else {
                         // `show_final_value` should only be false for `IO ()`
                         debug_assert!(result == ipso_eval::Value::Unit);
