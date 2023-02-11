@@ -255,7 +255,7 @@ pub fn expr_array(parser: &mut Parser) -> Parsed<Expr> {
 /**
 ```text
 cmd_part ::=
-  '"' string_char* '"'
+  '"' string_part* '"'
   ( cmd_char* | '$' ident | '${' expr '}' )+
 ```
 
@@ -269,52 +269,23 @@ cmd_char ::=
 ```
 */
 pub fn cmd_part(parser: &mut Parser) -> Parsed<CmdPart> {
-    fn literal_or_expr(parser: &mut Parser) -> Parsed<StringPart> {
-        choices!(
-            parser
-                .cmd_part_literal()
-                .map(|string| StringPart::String(String::from(string.as_ref()))),
-            keep_right!(
-                parser.token(&token::Data::Dollar),
-                spanned!(parser, parser.ident())
-            )
-            .map(|value| StringPart::Expr(Spanned {
-                pos: value.pos,
-                item: Expr::Var(String::from(value.item.as_ref()))
-            })),
-            between!(
-                parser.token(&token::Data::DollarLBrace),
-                parser.token(&token::Data::RBrace),
-                expr(parser).map(StringPart::Expr)
-            )
-        )
-    }
-
-    fn multipart(parser: &mut Parser) -> Parsed<CmdPart> {
-        literal_or_expr(parser)
-            .and_then(|first| many!(literal_or_expr(parser)).map(|rest| (first, rest)))
-            .map(|(first, rest)| match rest.split_first() {
-                Some((second, rest)) => CmdPart::MultiPart {
-                    first,
-                    second: second.clone(),
-                    rest: Vec::from(rest),
-                },
-                None => match first {
-                    StringPart::String(string) => CmdPart::Literal(Rc::from(string)),
-                    StringPart::Expr(expr) => CmdPart::Expr(expr),
-                },
-            })
-    }
-
     choices!(
         between!(
             parser.token(&token::Data::DoubleQuote),
             parser.token(&token::Data::DoubleQuote),
-            parser.string().map(Rc::from)
-        )
-        .map(CmdPart::Literal),
-        multipart(parser)
+            many!(choices!(
+                string_part_expr(parser),
+                string_part_string(parser)
+            ))
+        ),
+        many!(choices!(
+            string_part_expr(parser),
+            parser
+                .cmd_part_literal()
+                .map(|string| StringPart::String(String::from(string.as_ref())))
+        ))
     )
+    .map(|value| CmdPart { value })
 }
 
 /**

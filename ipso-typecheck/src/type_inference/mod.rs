@@ -953,35 +953,13 @@ pub fn check(
 
             let cmd_parts = cmd_parts
                 .iter()
-                .map(|cmd_part| match cmd_part {
-                    syntax::CmdPart::Literal(string) => Ok(CmdPart::Literal(string.clone())),
-                    syntax::CmdPart::Expr(expr) => check(
-                        env,
-                        state,
-                        expr,
-                        &Type::app(
-                            Type::Array(env.common_kinds.type_to_type.clone()),
-                            Type::String,
-                        ),
-                    )
-                    .map(CmdPart::Expr),
-                    syntax::CmdPart::MultiPart {
-                        first,
-                        second,
-                        rest,
-                    } => {
-                        let first = check_string_part(env, state, first)?;
-                        let second = check_string_part(env, state, second)?;
-                        let rest = rest
-                            .iter()
-                            .map(|string_part| check_string_part(env, state, string_part))
-                            .collect::<Result<_, Error>>()?;
-                        Ok(CmdPart::MultiPart {
-                            first,
-                            second,
-                            rest,
-                        })
-                    }
+                .map(|cmd_part| {
+                    let value = cmd_part
+                        .value
+                        .iter()
+                        .map(|string_part| check_string_part(env, state, string_part))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok(CmdPart { value })
                 })
                 .collect::<Result<_, Error>>()?;
 
