@@ -5,7 +5,7 @@ mod test;
 
 use crate::{
     between, choices, grammar::pattern::pattern, indent, indent_scope, keep_left, keep_right, many,
-    map0, map2, operator::operator, optional, sep_by, spanned, Parsed, Parser,
+    many1, map0, map2, operator::operator, optional, sep_by, spanned, Parsed, Parser,
 };
 use ipso_lex::token;
 use ipso_syntax::{Binop, Branch, CmdPart, CompLine, Expr, Keyword, Spanned, StringPart};
@@ -257,6 +257,8 @@ pub fn expr_array(parser: &mut Parser) -> Parsed<Expr> {
 cmd_part ::=
   '"' string_part* '"'
   ( cmd_char* | '$' ident | '${' expr '}' )+
+  '$..' ident
+  '$..{' expr '}'
 ```
 
 ```text
@@ -277,15 +279,25 @@ pub fn cmd_part(parser: &mut Parser) -> Parsed<CmdPart> {
                 string_part_expr(parser),
                 string_part_string(parser)
             ))
-        ),
-        many!(choices!(
+        )
+        .map(CmdPart::Arg),
+        many1!(choices!(
             string_part_expr(parser),
             parser
                 .cmd_part_literal()
                 .map(|string| StringPart::String(String::from(string.as_ref())))
         ))
+        .map(CmdPart::Arg),
+        between!(
+            parser.token(&token::Data::DollarDotDotLBrace),
+            parser.token(&token::Data::RBrace),
+            expr(parser).map(CmdPart::Args)
+        ),
+        keep_right!(
+            parser.token(&token::Data::DollarDotDot),
+            spanned!(parser, parser.ident_owned().map(Expr::Var)).map(CmdPart::Args)
+        )
     )
-    .map(|value| CmdPart { value })
 }
 
 /**

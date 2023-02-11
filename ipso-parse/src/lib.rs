@@ -417,6 +417,14 @@ macro_rules! many {
 }
 
 #[macro_export]
+macro_rules! many1 {
+    ($x:expr) => {{
+        use $crate::many_with;
+        $x.and_then(|x| many_with!(vec![x], $x))
+    }};
+}
+
+#[macro_export]
 macro_rules! choices {
     ($x:expr, $y:expr) => {{
         use $crate::Parsed;

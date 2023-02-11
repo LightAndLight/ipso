@@ -134,10 +134,12 @@ fn desugar_cmd_part_mut(
     var_gen: &mut VarGen,
     cmd_part: &mut CmdPart,
 ) -> Result<(), Error> {
-    cmd_part
-        .value
-        .iter_mut()
-        .try_for_each(|string_part| desugar_string_part_mut(source, var_gen, string_part))
+    match cmd_part {
+        CmdPart::Arg(string_parts) => string_parts
+            .iter_mut()
+            .try_for_each(|string_part| desugar_string_part_mut(source, var_gen, string_part)),
+        CmdPart::Args(expr) => desugar_expr_mut(source, var_gen, expr),
+    }
 }
 
 fn desugar_branches_mut(

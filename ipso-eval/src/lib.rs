@@ -250,9 +250,9 @@ impl Object {
         }
     }
 
-    pub fn unpack_string(&self) -> &str {
+    pub fn unpack_string(&self) -> Rc<str> {
         match self {
-            Object::String(str) => str,
+            Object::String(str) => str.clone(),
             val => panic!("expected string, got {:?}", val),
         }
     }
@@ -446,7 +446,7 @@ impl Value {
         self.unpack_object().perform_io(interpreter)
     }
 
-    pub fn unpack_string(&self) -> &str {
+    pub fn unpack_string(&self) -> Rc<str> {
         self.unpack_object().unpack_string()
     }
 
@@ -818,7 +818,7 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
-                        interpreter.alloc_ordering(a.cmp(b))
+                        interpreter.alloc_ordering(a.as_ref().cmp(b.as_ref()))
                     }
                 )
             }
@@ -1081,7 +1081,7 @@ where {
                         let sep = env[0].unpack_string();
                         let s = arg.unpack_string();
                         let a = eval.alloc_values(
-                            s.split(sep)
+                            s.split(sep.as_ref())
                                 .map(|s| eval.alloc(Object::String(Rc::from(s)))),
                         );
                         eval.alloc(Object::Array(a))
@@ -1112,10 +1112,10 @@ where {
                         if strings.is_empty() {
                             eval.alloc(Object::String(Rc::from("")))
                         } else {
-                            let mut joined = String::from(strings[0].unpack_string());
+                            let mut joined = String::from(strings[0].unpack_string().as_ref());
                             for string in &strings[1..] {
-                                joined.push_str(sep);
-                                joined.push_str(string.unpack_string());
+                                joined.push_str(sep.as_ref());
+                                joined.push_str(string.unpack_string().as_ref());
                             }
                             let joined = eval.alloc_str(&joined);
                             eval.alloc(Object::String(joined))
@@ -1160,8 +1160,8 @@ where {
                         let s = arg.unpack_string();
                         let a = eval.alloc_values(
                             Parts {
-                                delimiter: sep,
-                                string: s,
+                                delimiter: sep.as_ref(),
+                                string: s.as_ref(),
                             }
                             .map(|part| eval.alloc(Object::String(Rc::from(part)))),
                         );
@@ -1206,7 +1206,7 @@ where {
                         let a = eval.alloc_values(
                             Partsc {
                                 delimiter: c,
-                                string: s,
+                                string: s.as_ref(),
                             }
                             .map(|part| eval.alloc(Object::String(Rc::from(part)))),
                         );
@@ -1665,7 +1665,7 @@ where {
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         fn path_exists_io_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let path = env[0].unpack_string();
-                            if Path::new(&path).exists() {
+                            if Path::new(path.as_ref()).exists() {
                                 Value::True
                             } else {
                                 Value::False
@@ -1716,7 +1716,7 @@ where {
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         fn env_getvar_io(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let var = env[0].unpack_string();
-                            match std::env::var(var) {
+                            match std::env::var(var.as_ref()) {
                                 Err(err) => match err {
                                     std::env::VarError::NotPresent => {
                                         // None () : (| None : (), Some : String |)
@@ -1756,7 +1756,7 @@ where {
                             env: Rc<[Value]>,
                         ) -> Value {
                             let var = env[0].unpack_string();
-                            match std::env::var(var) {
+                            match std::env::var(var.as_ref()) {
                                 Err(err) => match err {
                                     std::env::VarError::NotPresent => {
                                         write!(
@@ -1795,7 +1795,7 @@ where {
                         fn env_setvar_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let key = env[0].unpack_string();
                             let value = env[1].unpack_string();
-                            std::env::set_var(key, value);
+                            std::env::set_var(key.as_ref(), value.as_ref());
                             Value::Unit
                         }
                         let env = interpreter.alloc_values({
@@ -1859,8 +1859,8 @@ where {
                 |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     fn file_read_io(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
                         let path = env[0].unpack_string();
-                        let contents =
-                            std::fs::read_to_string(path).unwrap_or_else(|err| panic!("{}", err));
+                        let contents = std::fs::read_to_string(path.as_ref())
+                            .unwrap_or_else(|err| panic!("{}", err));
                         interpreter.alloc(Object::String(Rc::from(contents)))
                     }
 
@@ -1879,7 +1879,8 @@ where {
                         fn file_write_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let path = env[0].unpack_string();
                             let content = env[1].unpack_string();
-                            std::fs::write(path, content).unwrap_or_else(|err| panic!("{}", err));
+                            std::fs::write(path.as_ref(), content.as_ref())
+                                .unwrap_or_else(|err| panic!("{}", err));
                             Value::Unit
                         }
                         let env = interpreter.alloc_values({
@@ -1906,7 +1907,7 @@ where {
                             let mut file = std::fs::OpenOptions::new()
                                 .create(true)
                                 .append(true)
-                                .open(path)
+                                .open(path.as_ref())
                                 .unwrap_or_else(|err| panic!("{}", err));
                             file.write_all(content.as_bytes())
                                 .unwrap_or_else(|err| panic!("{}", err));
@@ -2134,7 +2135,7 @@ where {
                 StringPart::Expr(expr) => {
                     let s = self.eval(env, expr);
                     let s = s.unpack_string();
-                    value.push_str(s);
+                    value.push_str(s.as_ref());
                 }
                 StringPart::String(s) => value.push_str(s.as_str()),
             }
@@ -2507,7 +2508,7 @@ where {
                                 }
                                 Pattern::String(actual_string) => {
                                     let expected_string = expr.unpack_string();
-                                    if expected_string == actual_string.as_ref() {
+                                    if expected_string.as_ref() == actual_string.as_ref() {
                                         target = Some(&branch.body);
                                         break;
                                     }
@@ -2535,8 +2536,16 @@ where {
             Expr::Cmd(cmd_parts) => {
                 let mut new_cmd_parts: Vec<Rc<str>> = Vec::with_capacity(cmd_parts.len());
                 for cmd_part in cmd_parts {
-                    let new_part = self.eval_string_parts(env, &cmd_part.value);
-                    new_cmd_parts.push(Rc::from(new_part.as_str()));
+                    match cmd_part {
+                        core::CmdPart::Arg(string_parts) => {
+                            let new_part = self.eval_string_parts(env, string_parts);
+                            new_cmd_parts.push(Rc::from(new_part.as_str()));
+                        }
+                        core::CmdPart::Args(expr) => {
+                            let args = self.eval(env, expr).unpack_array();
+                            new_cmd_parts.extend(args.iter().map(|arg| arg.unpack_string()))
+                        }
+                    }
                 }
                 self.alloc(Object::Cmd(new_cmd_parts))
             }
