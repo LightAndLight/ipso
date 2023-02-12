@@ -23,6 +23,7 @@ title: Language Reference
 * [Pattern Matching](#pattern-matching)
   * [Records](#records)
   * [Variants](#variants)
+  * [Arrays](#arrays)
   * [Literals](#literals)
 * [Let Bindings](#let-bindings)
 * [Computation Expressions](#computation-expressions)
@@ -41,7 +42,7 @@ title: Language Reference
     * [Interpolation](#interpolation-1)
     * [Builtins](#builtins-3)
   * [Functions](#functions)
-  * [Arrays](#arrays)
+  * [Arrays](#arrays-1)
     * [Builtins](#builtins-4)
   * [Byte Arrays](#byte-arrays)
   * [Records](#records-1)
@@ -306,6 +307,18 @@ x : forall r. (| None : (), r |)
 .   None () -> 1
 .
 1
+```
+
+### Arrays
+
+```ipsorepl
+> x = [1, 2, 3]
+x : Array Int
+> case x of
+.   [a, b, c] -> a + b + c
+.   _ -> 0
+.
+6
 ```
 
 ### Literals
@@ -1053,12 +1066,16 @@ pattern_atom ::=
   char |
   string |
   '{' [record_pattern] '}' |
+  array_pattern |
   '_' |
   '(' [pattern] ')'
   
 record_pattern ::=
   ident (',' ident)* [',' '..' ident] |
   '..' ident |
+
+array_pattern ::=
+  '[' [ident (',' ident)*] ']'
  
 expr ::=
   lambda |
