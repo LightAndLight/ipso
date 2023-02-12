@@ -2437,7 +2437,8 @@ where {
                                 | Pattern::Unit
                                 | Pattern::Int(_)
                                 | Pattern::Record { .. }
-                                | Pattern::Char(_) => {
+                                | Pattern::Char(_)
+                                | Pattern::Array { .. } => {
                                     panic!("expected variant pattern, got: {:?}", branch.pattern);
                                 }
                             }
@@ -2488,6 +2489,14 @@ where {
                                         self.eval(env, branch_tag).unpack_int() as usize;
                                     if *tag == branch_tag {
                                         env.push(value.clone());
+                                        target = Some(&branch.body);
+                                        break;
+                                    }
+                                }
+                                Pattern::Array { names } => {
+                                    let array = expr.unpack_array();
+                                    if array.len() == *names {
+                                        array.iter().for_each(|item| env.push(item.clone()));
                                         target = Some(&branch.body);
                                         break;
                                     }

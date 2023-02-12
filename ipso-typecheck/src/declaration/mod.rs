@@ -231,7 +231,8 @@ pub fn check_definition(
             | core::Pattern::String(_)
             | core::Pattern::Unit
             | core::Pattern::Record { .. }
-            | core::Pattern::Variant { .. } => core::Expr::mk_lam(
+            | core::Pattern::Variant { .. }
+            | core::Pattern::Array { .. } => core::Expr::mk_lam(
                 true,
                 core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
             ),

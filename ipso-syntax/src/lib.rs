@@ -266,6 +266,9 @@ pub enum Pattern {
     Char(Spanned<char>),
     Int(Spanned<i32>),
     String(Spanned<Rc<str>>),
+    Array {
+        items: Vec<Spanned<Rc<str>>>,
+    },
     Unit,
     Wildcard,
 }
@@ -310,6 +313,11 @@ impl<'a> Iterator for IterNames<'a> {
                         }
                         Pattern::Variant { name: _, arg } => {
                             self.items.push(IterNamesItem::Pattern(&arg.item));
+                            continue;
+                        }
+                        Pattern::Array { items } => {
+                            self.items
+                                .extend(items.iter().rev().map(IterNamesItem::Name));
                             continue;
                         }
                         Pattern::Char(_)

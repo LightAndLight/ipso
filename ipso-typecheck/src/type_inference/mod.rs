@@ -441,6 +441,35 @@ fn check_record_pattern(
     })
 }
 
+fn check_array_pattern(
+    env: Env,
+    state: &mut State,
+    pos: usize,
+    names: &[Spanned<Rc<str>>],
+    expected: &Type,
+) -> Result<CheckedPattern, Error> {
+    let item_type = state.fresh_type_meta(Kind::Type);
+    let actual = Type::app(Type::mk_array(env.common_kinds), item_type.clone());
+
+    unification::unify(
+        env.as_unification_env(),
+        &mut state.kind_inference_state,
+        &mut state.type_solutions,
+        pos,
+        expected,
+        &actual,
+    )
+    .map_err(|error| Error::unification_error(env.source, pos, error))?;
+
+    Ok(CheckedPattern::Any {
+        pattern: Pattern::Array { names: names.len() },
+        names: names
+            .iter()
+            .map(|name| (name.item.clone(), item_type.clone()))
+            .collect(),
+    })
+}
+
 fn check_variant_pattern(
     env: Env,
     state: &mut State,
@@ -530,11 +559,15 @@ pub fn check_pattern(
         syntax::Pattern::Record { names, rest } => {
             check_record_pattern(env, state, pattern.pos, names, rest.as_ref(), expected)
         }
+        syntax::Pattern::Array { items } => {
+            check_array_pattern(env, state, pattern.pos, items, expected)
+        }
         syntax::Pattern::Variant { name, arg } => match arg.item.as_ref() {
             syntax::Pattern::Name(arg) => {
                 check_variant_pattern(env, state, pattern.pos, name, arg, expected)
             }
             syntax::Pattern::Record { .. }
+            | syntax::Pattern::Array { .. }
             | syntax::Pattern::Variant { .. }
             | syntax::Pattern::Char(_)
             | syntax::Pattern::Int(_)
@@ -756,7 +789,8 @@ pub fn check(
                     | Pattern::String(_)
                     | Pattern::Unit
                     | Pattern::Record { .. }
-                    | Pattern::Variant { .. } => Expr::mk_lam(
+                    | Pattern::Variant { .. }
+                    | Pattern::Array { .. } => Expr::mk_lam(
                         true,
                         Expr::mk_case(
                             Expr::Var(0),
@@ -1193,7 +1227,8 @@ pub fn check(
                                 | Pattern::Char(_)
                                 | Pattern::Int(_)
                                 | Pattern::String(_)
-                                | Pattern::Unit => false,
+                                | Pattern::Unit
+                                | Pattern::Array { .. } => false,
                                 Pattern::Name | Pattern::Wildcard => true,
                             },
                             CheckedPattern::Variant { .. } => false,
