@@ -1,0 +1,5 @@
+one : Int -> String
+one [a, b, c] = "$a$b$c"
+
+main : IO ()
+main = io.pure ()
