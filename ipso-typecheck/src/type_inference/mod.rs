@@ -112,62 +112,6 @@ impl Error {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum InferredPattern {
-    Any {
-        pattern: Pattern<Expr>,
-        names: Vec<(Rc<str>, Type)>,
-        ty: Type,
-    },
-    Variant {
-        /// Evidence for the variant's tag.
-        tag: Rc<Expr>,
-
-        /// The variant's constructor name.
-        ctor: Rc<str>,
-
-        /// The variant's argument name.
-        arg_name: Rc<str>,
-
-        /// The variant's argument type.
-        arg_ty: Type,
-
-        /// The row corresponding to the all the other constructors of the variant.
-        rest: Type,
-    },
-}
-
-impl InferredPattern {
-    pub fn ty(&self, common_kinds: &CommonKinds) -> Type {
-        match self {
-            InferredPattern::Any { ty, .. } => ty.clone(),
-            InferredPattern::Variant {
-                ctor, arg_ty, rest, ..
-            } => Type::mk_variant(
-                common_kinds,
-                vec![(ctor.clone(), arg_ty.clone())],
-                Some(rest.clone()),
-            ),
-        }
-    }
-
-    pub fn pattern(&self) -> Pattern<Expr> {
-        match self {
-            InferredPattern::Any { pattern, .. } => pattern.clone(),
-            InferredPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
-        }
-    }
-
-    pub fn names(&self) -> Vec<(Rc<str>, Type)> {
-        match self {
-            InferredPattern::Any { names, .. } => names.clone(),
-            InferredPattern::Variant {
-                arg_name, arg_ty, ..
-            } => vec![(arg_name.clone(), arg_ty.clone())],
-        }
-    }
-}
-
-#[derive(Debug)]
 pub enum CheckedPattern {
     Any {
         pattern: Pattern<Expr>,
@@ -192,14 +136,14 @@ pub enum CheckedPattern {
 }
 
 impl CheckedPattern {
-    fn pattern(&self) -> Pattern<Expr> {
+    pub fn pattern(&self) -> Pattern<Expr> {
         match self {
             CheckedPattern::Any { pattern, .. } => pattern.clone(),
             CheckedPattern::Variant { tag, .. } => Pattern::Variant { tag: tag.clone() },
         }
     }
 
-    fn names(&self) -> Vec<(Rc<str>, Type)> {
+    pub fn names(&self) -> Vec<(Rc<str>, Type)> {
         match self {
             CheckedPattern::Any { names, .. } => names.clone(),
             CheckedPattern::Variant {
@@ -598,36 +542,6 @@ pub fn check_pattern(
             | syntax::Pattern::Unit
             | syntax::Pattern::Wildcard => panic!("un-desugared pattern: {:?}", pattern),
         },
-    }
-}
-
-/// Infer a pattern's type.
-pub fn infer_pattern(
-    env: Env,
-    state: &mut State,
-    pattern: &Spanned<syntax::Pattern>,
-) -> Result<InferredPattern, Error> {
-    let expected = fresh_type_meta(&mut state.type_solutions, Kind::Type);
-    let pattern = check_pattern(env, state, pattern, &expected)?;
-    match pattern {
-        CheckedPattern::Any { pattern, names } => Ok(InferredPattern::Any {
-            pattern,
-            names,
-            ty: expected,
-        }),
-        CheckedPattern::Variant {
-            tag,
-            ctor,
-            arg_name,
-            arg_ty,
-            rest,
-        } => Ok(InferredPattern::Variant {
-            tag,
-            ctor,
-            arg_name,
-            arg_ty,
-            rest,
-        }),
     }
 }
 
