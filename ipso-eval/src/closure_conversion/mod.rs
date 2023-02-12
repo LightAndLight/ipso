@@ -421,6 +421,9 @@ pub fn convert_pattern(pattern: &Pattern<ipso_core::Expr>) -> ConvertResult<Patt
         ipso_core::Pattern::Variant { tag } => {
             convert_expr(tag).map(move |tag| Pattern::Variant { tag: Rc::new(tag) })
         }
+        ipso_core::Pattern::Array { names } => {
+            ConvertResult::closed(Pattern::Array { names: *names })
+        }
         ipso_core::Pattern::Name => ConvertResult::closed(Pattern::Name),
         ipso_core::Pattern::Char(c) => ConvertResult::closed(Pattern::Char(*c)),
         ipso_core::Pattern::Int(i) => ConvertResult::closed(Pattern::Int(*i)),

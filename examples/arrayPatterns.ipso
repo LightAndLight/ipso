@@ -1,0 +1,19 @@
+one : Array String -> String
+one xs =
+  case xs of
+    [] -> "empty"
+    [x] -> "singleton: $x"
+    [x, y] -> "two: $x and $y"
+    _ -> "many: ${debug xs}"
+
+two : Array String -> String
+two [a, b, c, d] = "$a$b$c$d"
+
+main : IO ()
+main =
+  comp
+    println <| one []
+    println <| one ["hi"]
+    println <| one ["hi", "bye"]
+    println <| one ["a", "b", "c", "d", "e"]
+    println <| two ["a", "b", "c", "d"]

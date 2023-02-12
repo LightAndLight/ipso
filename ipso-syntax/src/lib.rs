@@ -266,58 +266,79 @@ pub enum Pattern {
     Char(Spanned<char>),
     Int(Spanned<i32>),
     String(Spanned<Rc<str>>),
+    Array {
+        items: Vec<Spanned<Rc<str>>>,
+    },
     Unit,
     Wildcard,
 }
 
+enum IterNamesItem<'a> {
+    Name(&'a Spanned<Rc<str>>),
+    Pattern(&'a Pattern),
+}
+
 pub struct IterNames<'a> {
-    items: Vec<&'a Spanned<Rc<str>>>,
-    pattern: Option<&'a Pattern>,
+    items: Vec<IterNamesItem<'a>>,
 }
 
 impl<'a> Iterator for IterNames<'a> {
     type Item = &'a Spanned<Rc<str>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.pattern {
-            None => match self.items.pop() {
-                None => None,
-                Some(item) => Some(item),
-            },
-            Some(pattern) => {
-                self.pattern = None;
-                match pattern {
-                    Pattern::Name(n) => Some(n),
-                    Pattern::Record { names, rest } => {
-                        match rest {
-                            Some(n) => {
-                                self.items.push(n);
-                            }
-                            None => {}
-                        }
-                        self.items.extend(names.iter().rev());
-                        self.next()
-                    }
-                    Pattern::Variant { name: _, arg } => {
-                        self.pattern = Some(&arg.item);
-                        self.next()
-                    }
-                    Pattern::Char(_) => None,
-                    Pattern::Int(_) => None,
-                    Pattern::String(_) => None,
-                    Pattern::Unit => None,
-                    Pattern::Wildcard => None,
+        let result: Option<&'a Spanned<Rc<str>>>;
+        loop {
+            match self.items.pop() {
+                None => {
+                    result = None;
+                    break;
                 }
+                Some(item) => match item {
+                    IterNamesItem::Name(name) => {
+                        result = Some(name);
+                        break;
+                    }
+                    IterNamesItem::Pattern(pattern) => match pattern {
+                        Pattern::Name(n) => {
+                            result = Some(n);
+                            break;
+                        }
+                        Pattern::Record { names, rest } => {
+                            if let Some(n) = rest {
+                                self.items.push(IterNamesItem::Name(n));
+                            }
+                            self.items
+                                .extend(names.iter().rev().map(IterNamesItem::Name));
+                            continue;
+                        }
+                        Pattern::Variant { name: _, arg } => {
+                            self.items.push(IterNamesItem::Pattern(&arg.item));
+                            continue;
+                        }
+                        Pattern::Array { items } => {
+                            self.items
+                                .extend(items.iter().rev().map(IterNamesItem::Name));
+                            continue;
+                        }
+                        Pattern::Char(_)
+                        | Pattern::Int(_)
+                        | Pattern::String(_)
+                        | Pattern::Unit
+                        | Pattern::Wildcard => {
+                            continue;
+                        }
+                    },
+                },
             }
         }
+        result
     }
 }
 
 impl Pattern {
     pub fn iter_names(&self) -> IterNames {
         IterNames {
-            items: Vec::new(),
-            pattern: Some(self),
+            items: vec![IterNamesItem::Pattern(self)],
         }
     }
 }
