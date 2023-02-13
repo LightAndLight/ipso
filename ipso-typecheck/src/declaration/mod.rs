@@ -4,7 +4,7 @@ use crate::{
     check_kind,
     constraint_solving::{self, solve_constraint, solve_placeholder},
     evidence, fill_ty_names, generalise, infer_kind, kind_inference,
-    type_inference::{self, infer_pattern},
+    type_inference::{self, check_pattern},
     BoundVars, Error, Implication,
 };
 use ipso_core::{self as core, CommonKinds, EVar, TypeSig};
@@ -159,24 +159,15 @@ pub fn check_definition(
         );
     }
 
-    let arg_tys: Vec<type_inference::InferredPattern> = args
-        .iter()
-        .map(|arg| {
-            infer_pattern(
-                type_inference::Env {
-                    common_kinds: env.common_kinds,
-                    modules: env.module_context,
-                    types: env.type_context,
-                    type_variables: &type_variables,
-                    type_signatures: &type_signatures,
-                    source: env.source,
-                },
-                &mut type_inference_state,
-                arg,
-            )
-        })
-        .collect::<Result<_, type_inference::Error>>()?;
+    let mut arg_tys = Vec::with_capacity(args.len());
     let out_ty = type_inference_state.fresh_type_meta(Kind::Type);
+    let mut actual_ty = out_ty.clone();
+    for _arg in args.iter().rev() {
+        let arg_ty = type_inference_state.fresh_type_meta(Kind::Type);
+        actual_ty = core::Type::arrow(env.common_kinds, arg_ty.clone(), actual_ty);
+        arg_tys.push(arg_ty);
+    }
+    arg_tys.reverse();
 
     type_inference::unification::unify(
         type_inference::unification::Env {
@@ -188,11 +179,29 @@ pub fn check_definition(
         &mut type_inference_state.type_solutions,
         ty_pos,
         ty,
-        &arg_tys.iter().rev().fold(out_ty.clone(), |acc, el| {
-            core::Type::mk_arrow(env.common_kinds, &el.ty(env.common_kinds), &acc)
-        }),
+        &actual_ty,
     )
     .map_err(|error| type_inference::Error::unification_error(env.source, position, error))?;
+
+    let arg_tys: Vec<type_inference::CheckedPattern> = args
+        .iter()
+        .zip(arg_tys.iter())
+        .map(|(arg, arg_ty)| {
+            check_pattern(
+                type_inference::Env {
+                    common_kinds: env.common_kinds,
+                    modules: env.module_context,
+                    types: env.type_context,
+                    type_variables: &type_variables,
+                    type_signatures: &type_signatures,
+                    source: env.source,
+                },
+                &mut type_inference_state,
+                arg,
+                arg_ty,
+            )
+        })
+        .collect::<Result<_, type_inference::Error>>()?;
 
     let arg_bound_vars = arg_tys
         .iter()
@@ -222,7 +231,8 @@ pub fn check_definition(
             | core::Pattern::String(_)
             | core::Pattern::Unit
             | core::Pattern::Record { .. }
-            | core::Pattern::Variant { .. } => core::Expr::mk_lam(
+            | core::Pattern::Variant { .. }
+            | core::Pattern::Array { .. } => core::Expr::mk_lam(
                 true,
                 core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
             ),

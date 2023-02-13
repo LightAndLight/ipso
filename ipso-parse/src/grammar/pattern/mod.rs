@@ -4,7 +4,8 @@
 mod test;
 
 use crate::{
-    between, choices, indent, indent_scope, keep_right, map0, optional, spanned, Parsed, Parser,
+    between, choices, indent, indent_scope, keep_right, many_with, map0, optional, spanned, Parsed,
+    Parser,
 };
 use ipso_lex::token;
 use ipso_syntax::{Pattern, Spanned};
@@ -81,12 +82,35 @@ pub fn pattern_variant(parser: &mut Parser) -> Parsed<Pattern> {
 
 /**
 ```text
+pattern_array ::=
+  '[' [ident (',' ident)*] ']'
+```
+*/
+pub fn pattern_array(parser: &mut Parser) -> Parsed<Pattern> {
+    between!(
+        parser.token(&token::Data::LBracket),
+        parser.token(&token::Data::RBracket),
+        optional!(spanned!(parser, parser.ident()).and_then(|name| many_with!(
+            vec![name],
+            keep_right!(
+                parser.token(&token::Data::Comma),
+                spanned!(parser, parser.ident())
+            )
+        )))
+        .map(|items| items.unwrap_or_default())
+    )
+    .map(|items| Pattern::Array { items })
+}
+
+/**
+```text
 pattern_atom ::=
   ident
   pattern_record
   char
   int
   '"' string '"'
+  pattern_array
   '_'
   '(' [pattern] ')'
 ```
@@ -109,6 +133,7 @@ pub fn pattern_atom(parser: &mut Parser) -> Parsed<Pattern> {
             pos: s.pos,
             item: Rc::from(s.item)
         })),
+        pattern_array(parser),
         map0!(Pattern::Wildcard, parser.token(&token::Data::Underscore)),
         between!(
             parser.token(&token::Data::LParen),

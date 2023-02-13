@@ -236,6 +236,7 @@ fn desugar_branches_mut(
                 }
                 Pattern::Name(_)
                 | Pattern::Record { .. }
+                | Pattern::Array { .. }
                 | Pattern::Char(_)
                 | Pattern::Int(_)
                 | Pattern::String(_)
@@ -338,6 +339,7 @@ fn desugar_branches_mut(
                             }
                             Pattern::Name(_)
                             | Pattern::Record { .. }
+                            | Pattern::Array { .. }
                             | Pattern::Char(_)
                             | Pattern::Int(_)
                             | Pattern::String(_)
@@ -386,6 +388,7 @@ fn desugar_branches_mut(
             },
             Pattern::Name(_)
             | Pattern::Record { .. }
+            | Pattern::Array { .. }
             | Pattern::Char(_)
             | Pattern::Int(_)
             | Pattern::String(_)

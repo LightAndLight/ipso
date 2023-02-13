@@ -1,6 +1,6 @@
-use super::{Env, Error, InferredPattern, State};
+use super::{check_pattern, fresh_type_meta, CheckedPattern, Env, Error, State};
 use crate::{
-    type_inference::{infer, infer_pattern, unification},
+    type_inference::{infer, unification},
     BoundVars,
 };
 use ipso_core::{Branch, CommonKinds, Expr, Pattern, Type};
@@ -76,6 +76,16 @@ fn occurs_1() {
     })
 }
 
+pub fn infer_pattern(
+    env: Env,
+    state: &mut State,
+    pattern: &Spanned<syntax::Pattern>,
+) -> Result<(CheckedPattern, Type), Error> {
+    let expected = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+    let pattern = check_pattern(env, state, pattern, &expected)?;
+    Ok((pattern, expected))
+}
+
 #[test]
 fn infer_pattern_1() {
     with_empty_env_and_state(|env, state| {
@@ -88,38 +98,51 @@ fn infer_pattern_1() {
         };
         assert_eq!(
             infer_pattern(env, state, &pattern),
-            Ok(InferredPattern::Any {
-                pattern: Pattern::Name,
-                names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
-                ty: Type::Meta(Kind::Type, 0),
-            })
+            Ok((
+                CheckedPattern::Any {
+                    pattern: Pattern::Name,
+                    names: vec![(Rc::from("x"), Type::Meta(Kind::Type, 0))],
+                },
+                Type::Meta(Kind::Type, 0)
+            ))
         )
     })
 }
 
-fn zonk_inferred_pattern(state: &mut State, pattern: InferredPattern) -> InferredPattern {
+fn zonk_inferred_pattern(
+    state: &mut State,
+    pattern: (CheckedPattern, Type),
+) -> (CheckedPattern, Type) {
     match pattern {
-        InferredPattern::Any { pattern, names, ty } => InferredPattern::Any {
-            pattern,
-            names: names
-                .into_iter()
-                .map(|(name, ty)| (name, state.zonk_type(ty)))
-                .collect(),
-            ty: state.zonk_type(ty),
-        },
-        InferredPattern::Variant {
-            tag,
-            ctor,
-            arg_name,
-            arg_ty,
-            rest,
-        } => InferredPattern::Variant {
-            tag,
-            ctor,
-            arg_name,
-            arg_ty: state.zonk_type(arg_ty),
-            rest: state.zonk_type(rest),
-        },
+        (CheckedPattern::Any { pattern, names }, ty) => (
+            CheckedPattern::Any {
+                pattern,
+                names: names
+                    .into_iter()
+                    .map(|(name, ty)| (name, state.zonk_type(ty)))
+                    .collect(),
+            },
+            state.zonk_type(ty),
+        ),
+        (
+            CheckedPattern::Variant {
+                tag,
+                ctor,
+                arg_name,
+                arg_ty,
+                rest,
+            },
+            ty,
+        ) => (
+            CheckedPattern::Variant {
+                tag,
+                ctor,
+                arg_name,
+                arg_ty: state.zonk_type(arg_ty),
+                rest: state.zonk_type(rest),
+            },
+            state.zonk_type(ty),
+        ),
     }
 }
 
@@ -146,16 +169,23 @@ fn infer_pattern_2() {
                 rest: None,
             },
         };
-        let expected = Ok(InferredPattern::Any {
-            pattern: Pattern::Record {
+        let expected = Ok((
+            CheckedPattern::Any {
+                pattern: Pattern::Record {
+                    names: vec![
+                        Expr::mk_placeholder(0),
+                        Expr::mk_placeholder(1),
+                        Expr::mk_placeholder(2),
+                    ],
+                    rest: false,
+                },
                 names: vec![
-                    Expr::mk_placeholder(0),
-                    Expr::mk_placeholder(1),
-                    Expr::mk_placeholder(2),
+                    (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                    (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("z"), Type::Meta(Kind::Type, 3)),
                 ],
-                rest: false,
             },
-            ty: Type::mk_record(
+            Type::mk_record(
                 env.common_kinds,
                 vec![
                     (Rc::from("x"), Type::Meta(Kind::Type, 1)),
@@ -164,12 +194,7 @@ fn infer_pattern_2() {
                 ],
                 None,
             ),
-            names: vec![
-                (Rc::from("x"), Type::Meta(Kind::Type, 1)),
-                (Rc::from("y"), Type::Meta(Kind::Type, 2)),
-                (Rc::from("z"), Type::Meta(Kind::Type, 3)),
-            ],
-        });
+        ));
         let actual =
             infer_pattern(env, state, &pat).map(|pattern| zonk_inferred_pattern(state, pattern));
 
@@ -203,16 +228,31 @@ fn infer_pattern_3() {
                 }),
             },
         };
-        let expected = Ok(InferredPattern::Any {
-            pattern: Pattern::Record {
+        let expected = Ok((
+            CheckedPattern::Any {
+                pattern: Pattern::Record {
+                    names: vec![
+                        Expr::mk_placeholder(0),
+                        Expr::mk_placeholder(1),
+                        Expr::mk_placeholder(2),
+                    ],
+                    rest: true,
+                },
                 names: vec![
-                    Expr::mk_placeholder(0),
-                    Expr::mk_placeholder(1),
-                    Expr::mk_placeholder(2),
+                    (Rc::from("x"), Type::Meta(Kind::Type, 1)),
+                    (Rc::from("y"), Type::Meta(Kind::Type, 2)),
+                    (Rc::from("z"), Type::Meta(Kind::Type, 3)),
+                    (
+                        Rc::from("w"),
+                        Type::mk_record(
+                            env.common_kinds,
+                            Vec::new(),
+                            Some(Type::Meta(Kind::Row, 4)),
+                        ),
+                    ),
                 ],
-                rest: true,
             },
-            ty: Type::mk_record(
+            Type::mk_record(
                 env.common_kinds,
                 vec![
                     (Rc::from("x"), Type::Meta(Kind::Type, 1)),
@@ -221,16 +261,7 @@ fn infer_pattern_3() {
                 ],
                 Some(Type::Meta(Kind::Row, 4)),
             ),
-            names: vec![
-                (Rc::from("x"), Type::Meta(Kind::Type, 1)),
-                (Rc::from("y"), Type::Meta(Kind::Type, 2)),
-                (Rc::from("z"), Type::Meta(Kind::Type, 3)),
-                (
-                    Rc::from("w"),
-                    Type::mk_record(env.common_kinds, Vec::new(), Some(Type::Meta(Kind::Row, 4))),
-                ),
-            ],
-        });
+        ));
         let actual =
             infer_pattern(env, state, &pat).map(|pattern| zonk_inferred_pattern(state, pattern));
         assert_eq!(expected, actual)
@@ -253,13 +284,16 @@ fn infer_pattern_4() {
                 },
             },
         };
-        let expected = Ok(InferredPattern::Variant {
-            tag: Rc::new(Expr::mk_placeholder(0)),
-            ctor: Rc::from("just"),
-            arg_name: Rc::from("x"),
-            arg_ty: Type::Meta(Kind::Type, 1),
-            rest: Type::Meta(Kind::Row, 2),
-        });
+        let expected = Ok((
+            CheckedPattern::Variant {
+                tag: Rc::new(Expr::mk_placeholder(0)),
+                ctor: Rc::from("just"),
+                arg_name: Rc::from("x"),
+                arg_ty: Type::Meta(Kind::Type, 1),
+                rest: Type::Meta(Kind::Row, 2),
+            },
+            Type::Meta(Kind::Type, 0),
+        ));
         let actual = infer_pattern(env, state, &pat);
         assert_eq!(expected, actual)
     })

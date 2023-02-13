@@ -534,6 +534,7 @@ pub enum Pattern<E> {
     Char(char),
     Int(i32),
     String(Rc<str>),
+    Array { names: usize },
     Unit,
     Wildcard,
 }
@@ -544,6 +545,7 @@ impl Pattern<Expr> {
             Pattern::Name => 1,
             Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
             Pattern::Variant { tag: _ } => 1,
+            Pattern::Array { names } => *names,
             Pattern::Char(_)
             | Pattern::Int(_)
             | Pattern::String(_)
@@ -560,6 +562,7 @@ impl Pattern<Expr> {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(f(tag)),
+            Pattern::Array { names } => Pattern::Array { names: *names },
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
@@ -582,6 +585,7 @@ impl Pattern<Expr> {
                 .iter_mut()
                 .try_for_each(|name| name.subst_placeholder(f)),
             Pattern::Variant { tag } => Rc::make_mut(tag).subst_placeholder(f),
+            Pattern::Array { .. } => Ok(()),
             Pattern::Char(_) => Ok(()),
             Pattern::Int(_) => Ok(()),
             Pattern::String(_) => Ok(()),
@@ -601,6 +605,7 @@ impl Pattern<Expr> {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__instantiate(depth, val)),
+            Pattern::Array { names } => Pattern::Array { names: *names },
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
@@ -620,6 +625,7 @@ impl Pattern<Expr> {
                 rest: *rest,
             },
             Pattern::Variant { tag } => Pattern::mk_variant(tag.__abstract_evar(depth, ev)),
+            Pattern::Array { names } => Pattern::Array { names: *names },
             Pattern::Char(c) => Pattern::Char(*c),
             Pattern::Int(n) => Pattern::Int(*n),
             Pattern::String(s) => Pattern::String(s.clone()),
@@ -659,6 +665,7 @@ impl Branch<Expr> {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
+                        Pattern::Array { names } => *names,
                         Pattern::Char(_) => 0,
                         Pattern::Int(_) => 0,
                         Pattern::String(_) => 0,
@@ -680,6 +687,7 @@ impl Branch<Expr> {
                         Pattern::Name => 1,
                         Pattern::Record { names, rest } => names.len() + if *rest { 1 } else { 0 },
                         Pattern::Variant { tag: _ } => 1,
+                        Pattern::Array { names } => *names,
                         Pattern::Char(_) => 0,
                         Pattern::Int(_) => 0,
                         Pattern::String(_) => 0,
@@ -1107,6 +1115,9 @@ impl Expr {
                             }
                             Pattern::Variant { tag: _ } => {
                                 b.map_expr(|e| go(e, &Function::Under(1, f)))
+                            }
+                            Pattern::Array { names } => {
+                                b.map_expr(|e| go(e, &Function::Under(*names, f)))
                             }
                             Pattern::Char(_) => b.map_expr(|e| go(e, f)),
                             Pattern::Int(_) => b.map_expr(|e| go(e, f)),
@@ -1555,7 +1566,8 @@ impl Expr {
                                 | Pattern::Int(_)
                                 | Pattern::String(_)
                                 | Pattern::Unit
-                                | Pattern::Wildcard => {}
+                                | Pattern::Wildcard
+                                | Pattern::Array { .. } => {}
                                 Pattern::Variant { tag } => {
                                     stack.push(tag);
                                 }
