@@ -1,5 +1,158 @@
 # Changelog
 
+## 0.4
+
+*2023-02-13*
+
+### Breaking changes
+
+* `String` interpolation in commands with `$` ([#138](https://github.com/LightAndLight/ipso/issues/138))
+
+  To simplify <a href="#cmd-literal-quoted-string-interpolation">string interpolation in quoted
+  command literal arguments</a>, `$` now only substitutes `String` values instead being overloaded
+  by `ToArgs`.
+
+  Use <a href="#cmd-argument-splatting">command argument splatting</a> with `$..` to substitue an
+  array of arguments.
+
+* Removed `ToArgs` class ([#348](https://github.com/LightAndLight/ipso/issues/348))
+
+  Command argument interpolation uses `$` to substitute `String`s
+  ([#138](https://github.com/LightAndLight/ipso/issues/138)) and `$..`
+  ([#346](https://github.com/LightAndLight/ipso/issues/346)) to substitute
+  `Array String`s. `ToArgs` is no longer needed to overload `$`.
+
+### Features and additions
+
+#### `ipso` CLI
+
+* `--check` flag ([#312](https://github.com/LightAndLight/ipso/issues/312))
+
+  `ipso --check FILE` parses and type checks a file without running it. It either
+  exits successfully (with exit status 0) or prints the relevant error messages
+  and exits with a failure status.
+
+* Arguments can be passed to script without `--` ([#316](https://github.com/LightAndLight/ipso/issues/316))
+
+  This allows arguments to be correctly forwarded to scripts that have shebang lines:
+
+  `test.ipso` 
+  ```ipso
+  #! /usr/bin/env ipso
+
+  main : IO ()
+  main = 
+    comp
+      bind args <- env.args
+      println <| debug args
+  ```
+
+  ```bash
+  $ ./test.ipso --help
+  ["--help"]
+  ```
+
+#### Language
+
+* Array pattern matching ([#81](https://github.com/LightAndLight/ipso/issues/81))
+
+  You can pattern match on arrays in function definitions and `case` expressions:
+
+  ```ipso
+  f [a, b, c] = a * b * c
+
+  case x of
+    [] -> "zero"
+    [x] -> "one"
+    _ -> "many"
+  ```
+
+  Array patterns can only contain variables; nested patterns in arrays aren't supported
+  yet. Progress is tracked in [#354](https://github.com/LightAndLight/ipso/issues/354).
+
+* <a name="cmd-argument-splatting">Command argument splatting</a> ([#346](https://github.com/LightAndLight/ipso/issues/346))
+
+  Use `$..` to substute `Array String`s into commands, where each item becomes a separate
+  command argument:
+
+  ```ipsorepl
+  > :t \x -> `echo $..x`
+  Array String -> Cmd
+  
+  > `echo $..{ ["a", "b", "c d"] }
+  `echo a b "c d"`
+  ```
+
+* <a name="cmd-literal-quoted-string-interpolation">String interpolation in quoted command literal arguments</a> ([#138](https://github.com/LightAndLight/ipso/issues/138))
+
+  Expressions like
+
+  ```ipso
+  `echo "hello: $name"`
+  ```
+
+  are now allowed.
+
+  Previously they were rejected as sytnax errors, and you'd have to work around it by writing
+
+  ```ipso
+  let arg = "hello: $name" in `echo $arg`
+  ```
+
+  instead.
+
+* `!` and `?` in identifiers ([#286](https://github.com/LightAndLight/ipso/issues/286))
+
+  `!` and `?` symbols are now allowed in identifiers:
+
+  ```ipso
+  bangbang! : IO ()
+  bangbang! = println "my baby shot me down"
+  ```
+
+  ```ipso
+  if empty?
+    then "yes"
+    else "no"
+  ```
+
+#### Builtins
+
+* `not : Bool -> Bool` ([#322](https://github.com/LightAndLight/ipso/issues/322))
+* `env.getvar! : String -> IO String` ([#285](https://github.com/LightAndLight/ipso/issues/285))
+* `cmd.try : Cmd -> IO (| Success : (), Failure : Int |)` ([#327](https://github.com/LightAndLight/ipso/issues/327))
+* `string.trimp : (Char -> Bool) -> String -> String` ([#256](https://github.com/LightAndLight/ipso/issues/256))
+* `string.trimc : Char -> String -> String` ([#256](https://github.com/LightAndLight/ipso/issues/256))
+* `string.trim : String -> String` ([#256](https://github.com/LightAndLight/ipso/issues/256))
+
+### Improvements and fixes
+
+#### Language
+
+* Use escaped `$` symbol in command literals ([#335](https://github.com/LightAndLight/ipso/issues/335))
+
+  Expressions like
+
+  ```ipso
+  `echo \$`
+  ```
+
+  were incorrectly rejected as syntax errors.
+
+  Here's what happens now:
+
+  ```ipsorepl
+  > cmd.run `echo \$`
+  $
+
+  ```
+
+#### CI / Build
+
+* Add GitHub actions cache for `.cargo` directories ([#294](https://github.com/LightAndLight/ipso/issues/294)) 
+* Share GitHub actions caches across branches ([#338](https://github.com/LightAndLight/ipso/issues/338))
+* Report errors for unused crate dependencies ([#126](https://github.com/LightAndLight/ipso/issues/126))
+
 ## 0.3
 
 *2022-11-24*
