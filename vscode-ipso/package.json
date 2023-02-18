@@ -1,0 +1,25 @@
+{
+  "name": "vscode-ipso",
+  "displayName": "Ipso Language",
+  "description": "Ipso language support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "ipso",
+      "aliases": ["Ipso", "ipso"],
+      "extensions": [".ipso"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "ipso",
+      "scopeName": "source.ipso",
+      "path": "./syntaxes/ipso.tmLanguage.json"
+    }]
+  }
+}
