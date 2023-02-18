@@ -1,11 +1,12 @@
 {
   "name": "vscode-ipso",
   "displayName": "Ipso Language",
+  "icon": "images/extension-icon.png",
   "description": "Ipso language support",
   "repository": "https://github.com/LightAndLight/ipso/tree/main/vscode-ipso",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.73.0"
   },
   "categories": [
     "Programming Languages"
@@ -13,6 +14,7 @@
   "contributes": {
     "languages": [{
       "id": "ipso",
+      "icon": { "light": "images/file-icon.png", "dark": "images/file-icon.png" },
       "aliases": ["Ipso", "ipso"],
       "extensions": [".ipso"],
       "configuration": "./language-configuration.json"
