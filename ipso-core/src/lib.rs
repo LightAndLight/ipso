@@ -539,6 +539,25 @@ pub enum Pattern<E> {
     Wildcard,
 }
 
+impl<E> Pattern<E> {
+    pub fn map_mut<F: Fn(&mut E)>(&mut self, f: F)
+    where
+        E: Clone,
+    {
+        match self {
+            Pattern::Record { names, rest: _ } => names.iter_mut().for_each(f),
+            Pattern::Variant { tag } => f(Rc::make_mut(tag)),
+            Pattern::Array { .. } => {}
+            Pattern::Name
+            | Pattern::Char(_)
+            | Pattern::Int(_)
+            | Pattern::String(_)
+            | Pattern::Unit
+            | Pattern::Wildcard => {}
+        }
+    }
+}
+
 impl Pattern<Expr> {
     pub fn bound_vars(&self) -> usize {
         match self {
@@ -642,12 +661,28 @@ pub struct Branch<E> {
 }
 
 impl Branch<Expr> {
+    pub fn map_free_vars_mut<F: Fn(usize) -> usize>(&mut self, f: F) {
+        self.__map_free_vars_mut(&MapFreeVarsFn::Code(f))
+    }
+
+    fn __map_free_vars_mut<F: Fn(usize) -> usize>(&mut self, f: &MapFreeVarsFn<F>) {
+        self.pattern.map_mut(|e| e.__map_free_vars_mut(f));
+        let bound_vars = self.pattern.bound_vars();
+        if bound_vars == 0 {
+            self.body.__map_free_vars_mut(f)
+        } else {
+            self.body
+                .__map_free_vars_mut(&MapFreeVarsFn::Under(bound_vars, f))
+        }
+    }
+
     pub fn map_expr<F: Fn(&Expr) -> Expr>(&self, f: F) -> Branch<Expr> {
         Branch {
             pattern: self.pattern.map_expr(&f),
             body: f(&self.body),
         }
     }
+
     pub fn subst_placeholder<E, F: FnMut(&Placeholder) -> Result<Expr, E>>(
         &mut self,
         f: &mut F,
@@ -704,6 +739,15 @@ impl Branch<Expr> {
 pub enum StringPart<E> {
     String(String),
     Expr(E),
+}
+
+impl<E> StringPart<E> {
+    fn map_mut<F: Fn(&mut E)>(&mut self, f: F) {
+        match self {
+            StringPart::String(_) => {}
+            StringPart::Expr(e) => f(e),
+        }
+    }
 }
 
 impl StringPart<Expr> {
@@ -924,6 +968,25 @@ pub enum Expr {
 
     Cmd(Vec<CmdPart<Expr>>),
 }
+enum MapFreeVarsFn<'a, F> {
+    Code(F),
+    Under(usize, &'a MapFreeVarsFn<'a, F>),
+}
+
+impl<'a, F: Fn(usize) -> usize> MapFreeVarsFn<'a, F> {
+    fn apply(&self, x: usize) -> usize {
+        match self {
+            MapFreeVarsFn::Code(f) => f(x),
+            MapFreeVarsFn::Under(n, f) => {
+                if x < *n {
+                    x
+                } else {
+                    n + f.apply(x - n)
+                }
+            }
+        }
+    }
+}
 
 impl Expr {
     pub fn alloc_builtin(b: Builtin) -> Rc<Expr> {
@@ -1043,27 +1106,7 @@ impl Expr {
     }
 
     pub fn map_vars<F: Fn(usize) -> usize>(&self, f: F) -> Expr {
-        enum Function<'a, F> {
-            Code(F),
-            Under(usize, &'a Function<'a, F>),
-        }
-
-        impl<'a, F: Fn(usize) -> usize> Function<'a, F> {
-            fn apply(&self, x: usize) -> usize {
-                match self {
-                    Function::Code(f) => f(x),
-                    Function::Under(n, f) => {
-                        if x < *n {
-                            x
-                        } else {
-                            n + f.apply(x - n)
-                        }
-                    }
-                }
-            }
-        }
-
-        fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a Function<'a, F>) -> Expr {
+        fn go<'a, F: Fn(usize) -> usize>(expr: &Expr, f: &'a MapFreeVarsFn<'a, F>) -> Expr {
             match expr {
                 Expr::Var(v) => Expr::Var(f.apply(*v)),
                 Expr::Module { id, path, item } => Expr::Module {
@@ -1078,14 +1121,14 @@ impl Expr {
                 Expr::App(a, b) => Expr::mk_app(go(a, f), go(b, f)),
                 Expr::Lam { arg, body } => {
                     if *arg {
-                        Expr::mk_lam(*arg, go(body, &Function::Under(1, f)))
+                        Expr::mk_lam(*arg, go(body, &MapFreeVarsFn::Under(1, f)))
                     } else {
                         Expr::mk_lam(*arg, go(body, f))
                     }
                 }
                 Expr::Let { value, rest } => Expr::Let {
                     value: Rc::new(go(value, f)),
-                    rest: Rc::new(go(rest, &Function::Under(1, f))),
+                    rest: Rc::new(go(rest, &MapFreeVarsFn::Under(1, f))),
                 },
                 Expr::True => Expr::True,
                 Expr::False => Expr::False,
@@ -1108,16 +1151,16 @@ impl Expr {
                     go(a, f),
                     bs.iter()
                         .map(|b| match &b.pattern {
-                            Pattern::Name => b.map_expr(|e| go(e, &Function::Under(1, f))),
+                            Pattern::Name => b.map_expr(|e| go(e, &MapFreeVarsFn::Under(1, f))),
                             Pattern::Record { names, rest } => {
                                 let offset = names.len() + if *rest { 1 } else { 0 };
-                                b.map_expr(|e| go(e, &Function::Under(offset, f)))
+                                b.map_expr(|e| go(e, &MapFreeVarsFn::Under(offset, f)))
                             }
                             Pattern::Variant { tag: _ } => {
-                                b.map_expr(|e| go(e, &Function::Under(1, f)))
+                                b.map_expr(|e| go(e, &MapFreeVarsFn::Under(1, f)))
                             }
                             Pattern::Array { names } => {
-                                b.map_expr(|e| go(e, &Function::Under(*names, f)))
+                                b.map_expr(|e| go(e, &MapFreeVarsFn::Under(*names, f)))
                             }
                             Pattern::Char(_) => b.map_expr(|e| go(e, f)),
                             Pattern::Int(_) => b.map_expr(|e| go(e, f)),
@@ -1145,7 +1188,85 @@ impl Expr {
             }
         }
 
-        go(self, &Function::Code(f))
+        go(self, &MapFreeVarsFn::Code(f))
+    }
+
+    pub fn map_free_vars_mut<F: Fn(usize) -> usize>(&mut self, f: F) {
+        self.__map_free_vars_mut(&MapFreeVarsFn::Code(f));
+    }
+
+    fn __map_free_vars_mut<'a, F: Fn(usize) -> usize>(&mut self, f: &'a MapFreeVarsFn<'a, F>) {
+        match self {
+            Expr::Var(v) => {
+                *v = f.apply(*v);
+            }
+            Expr::App(a, b) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(b), f);
+            }
+            Expr::Lam { arg, body } => {
+                if *arg {
+                    Expr::__map_free_vars_mut(Rc::make_mut(body), &MapFreeVarsFn::Under(1, f));
+                } else {
+                    Expr::__map_free_vars_mut(Rc::make_mut(body), f);
+                }
+            }
+            Expr::Let { value, rest } => {
+                Expr::__map_free_vars_mut(Rc::make_mut(value), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(rest), &MapFreeVarsFn::Under(1, f));
+            }
+            Expr::IfThenElse(a, b, c) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(b), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(c), f);
+            }
+            Expr::Binop(_op, l, r) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(l), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(r), f)
+            }
+            Expr::String(ss) => ss
+                .iter_mut()
+                .for_each(|s| s.map_mut(|e| Expr::__map_free_vars_mut(e, f))),
+            Expr::Array(es) => es.iter_mut().for_each(|e| Expr::__map_free_vars_mut(e, f)),
+            Expr::Extend(a, b, c) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(b), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(c), f);
+            }
+            Expr::Record(xs) => xs.iter_mut().for_each(|(a, b)| {
+                Expr::__map_free_vars_mut(a, f);
+                Expr::__map_free_vars_mut(b, f)
+            }),
+            Expr::Project(a, b) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(b), f);
+            }
+            Expr::Variant(a) => Expr::__map_free_vars_mut(Rc::make_mut(a), f),
+            Expr::Embed(a, b) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                Expr::__map_free_vars_mut(Rc::make_mut(b), f);
+            }
+            Expr::Case(a, bs) => {
+                Expr::__map_free_vars_mut(Rc::make_mut(a), f);
+                bs.iter_mut().for_each(|b| b.__map_free_vars_mut(f));
+            }
+            Expr::Cmd(parts) => parts.iter_mut().for_each(|cmd_part| match cmd_part {
+                CmdPart::Arg(string_parts) => string_parts.iter_mut().for_each(|string_part| {
+                    string_part.map_mut(|expr| Expr::__map_free_vars_mut(expr, f))
+                }),
+                CmdPart::Args(expr) => Expr::__map_free_vars_mut(expr, f),
+            }),
+            Expr::Module { .. }
+            | Expr::EVar(_)
+            | Expr::Placeholder(_)
+            | Expr::Name(_)
+            | Expr::Builtin(_)
+            | Expr::True
+            | Expr::False
+            | Expr::Int(_)
+            | Expr::Char(_)
+            | Expr::Unit => {}
+        }
     }
 
     /// ```

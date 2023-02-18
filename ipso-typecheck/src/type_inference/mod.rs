@@ -790,16 +790,42 @@ pub fn check(
                     | Pattern::Unit
                     | Pattern::Record { .. }
                     | Pattern::Variant { .. }
-                    | Pattern::Array { .. } => Expr::mk_lam(
-                        true,
-                        Expr::mk_case(
-                            Expr::Var(0),
-                            vec![Branch {
-                                pattern: arg_pattern,
-                                body,
-                            }],
-                        ),
-                    ),
+                    | Pattern::Array { .. } => {
+                        Expr::mk_lam(
+                            true,
+                            Expr::mk_case(
+                                Expr::Var(0),
+                                vec![{
+                                    let mut branch = Branch {
+                                        pattern: arg_pattern,
+                                        body,
+                                    };
+
+                                    /*
+                                    Example:
+
+                                    ```
+                                    \() -> body
+                                    ```
+
+                                    ~>
+
+                                    ```
+                                    \x ->
+                                      case x of
+                                        () -> body
+                                    ```
+
+                                    We've introduced a variable binding (`x`), so we need to update the free variables
+                                    of `body` to avoid being captured by the new binding.
+                                    */
+                                    branch.map_free_vars_mut(|var| var + 1);
+
+                                    branch
+                                }],
+                            ),
+                        )
+                    }
                     Pattern::Wildcard => Expr::mk_lam(false, body),
                 });
 
