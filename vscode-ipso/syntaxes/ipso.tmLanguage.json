@@ -1,0 +1,126 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Ipso",
+	"patterns": [
+		{
+			"include": "#expression"
+		}
+	],
+	"repository": {
+		"expression": {
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#literals"
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.ipso",
+					"match": "\\b(if|then|else|case|of|bind|let|in|comp)\\b"
+				},
+				{
+					"name": "keyword.operator.ipso",
+					"match": "(=|!)?=|<(-|\\|)?|\\|?>|&&|\\+|->?|\\*|/|:|\\\\"
+				}
+			]
+		},
+		"comments": {
+			"name": "comment.ipso",
+			"patterns": [
+				{
+					"name": "comment.line.ipso",
+					"match": "\\#[^\\n]*"
+				}
+			]
+		},
+		"literals": {
+			"patterns": [
+				{
+					"name": "constant.numeric.ipso",
+					"match": "\\b\\d+\\b"
+				},
+				{
+					"name": "constant.language.ipso",
+					"match": "true|false"
+				},
+				{
+					"name": "constant.language.ipso",
+					"match": "\\(\\)"
+				},
+				{
+					"name": "constant.language.ipso",
+					"begin": "'",
+					"end": "'",
+					"patterns": [
+						{
+							"name": "constant.character.escape.ipso",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"begin": "\"",
+					"beginCaptures": {
+						"0": {
+							"name": "string.quoted.double.ipso"
+						}
+					},
+					"end": "\"",
+					"endCaptures": {
+						"0": {
+							"name": "string.quoted.double.ipso"
+						}
+					},
+					"patterns": [
+						{
+							"name": "string.quoted.double.ipso",
+							"match": "[^\\$\\\\]"
+						},
+						{
+							"name": "constant.character.escape.ipso",
+							"match": "\\\\."
+						},
+						{
+							"begin": "(\\$){",
+							"beginCaptures": {
+								"1": {
+									"name": "keyword.operator.ipso"
+								}
+							},
+							"end": "}",
+							"patterns": [
+								{
+									"include": "#expression"
+								}
+							]
+						},
+						{
+							"match": "(\\$)([a-zA-Z][a-zA-Z0-9\\!\\?]*)?",
+							"captures": {
+								"1": {
+									"name": "keyword.operator.ipso"
+								},
+								"2": {
+									"patterns": [
+										{
+											"include": "#expression"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	},
+	"scopeName": "source.ipso"
+}
