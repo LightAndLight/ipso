@@ -6,13 +6,21 @@
     flake-utils.lib.eachDefaultSystem (system:
       let 
         pkgs = import nixpkgs { inherit system; };
-        npmShell = pkgs.symlinkJoin { name = "npm"; paths = [ pkgs.nodePackages.yo pkgs.nodePackages.generator-code ]; };
+        npmPackages = pkgs.symlinkJoin {
+          name = "npmPackages";
+          paths = [
+            pkgs.nodePackages.yo
+            pkgs.nodePackages.generator-code 
+          ];
+        };
       in {
         devShell = pkgs.mkShell {
-          NODE_PATH = "${npmShell}/lib/node_modules";
+          NODE_PATH = "${npmPackages}/lib/node_modules";
           buildInputs = with pkgs; [
-            # nodejs
-            npmShell
+            npmPackages
+            
+            nodePackages.npm
+            vsce
           ];
         };
       }

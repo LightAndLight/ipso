@@ -2,6 +2,7 @@
   "name": "vscode-ipso",
   "displayName": "Ipso Language",
   "description": "Ipso language support",
+  "repository": "https://github.com/LightAndLight/ipso/tree/main/vscode-ipso",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.75.0"
