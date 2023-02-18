@@ -623,6 +623,7 @@ impl From<&str> for ModuleKey {
     }
 }
 
+#[derive(Debug)]
 pub struct Modules<M> {
     data: Vec<M>,
     key_to_index: HashMap<ModuleKey, usize>,
