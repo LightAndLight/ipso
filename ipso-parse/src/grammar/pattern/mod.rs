@@ -109,7 +109,7 @@ pattern_atom ::=
   pattern_record
   char
   int
-  '"' string '"'
+  '"' [string] '"'
   pattern_array
   '_'
   '(' [pattern] ')'
@@ -126,7 +126,7 @@ pub fn pattern_atom(parser: &mut Parser) -> Parsed<Pattern> {
             between!(
                 parser.token(&token::Data::DoubleQuote),
                 parser.token(&token::Data::DoubleQuote),
-                parser.string()
+                optional!(parser.string()).map(|string| string.unwrap_or_default())
             )
         )
         .map(|s| Pattern::String(Spanned {
