@@ -175,6 +175,19 @@ impl Env {
         }
     }
 
+    fn pop(&mut self) -> Option<Value> {
+        match self {
+            Env::Empty => panic!("env is empty"),
+            Env::Borrowed(values) => {
+                let mut values = Vec::from(values.as_ref());
+                let result = values.pop();
+                *self = Env::Owned(values);
+                result
+            }
+            Env::Owned(values) => values.pop(),
+        }
+    }
+
     fn len(&self) -> usize {
         match self {
             Env::Empty => 0,
@@ -2192,7 +2205,9 @@ where {
             Expr::Let { value, rest } => {
                 let value = self.eval(env, value);
                 env.push(value);
-                self.eval(env, rest)
+                let result = self.eval(env, rest);
+                env.pop();
+                result
             }
 
             Expr::True => Value::True,
@@ -2349,7 +2364,11 @@ where {
             Expr::Case(expr, branches) => {
                 let expr = self.eval(env, expr);
 
-                let mut target: Option<&Expr> = None;
+                struct MatchedBranch<'a> {
+                    body: &'a Expr,
+                    bound_vars: usize,
+                }
+                let mut target: Option<MatchedBranch> = None;
 
                 match expr {
                     Value::Object(object) if matches!(object.as_ref(), Object::Variant(_, _)) => {
@@ -2394,7 +2413,10 @@ where {
 
                                         std::cmp::Ordering::Equal => {
                                             env.push(value.clone());
-                                            target = Some(&branch.body);
+                                            target = Some(MatchedBranch {
+                                                body: &branch.body,
+                                                bound_vars: 1,
+                                            });
                                             break;
                                         }
 
@@ -2426,11 +2448,17 @@ where {
                                         self.alloc(Object::Variant(expected_tag, value.clone())),
                                     );
 
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars: 1,
+                                    });
                                     break;
                                 }
                                 Pattern::Wildcard => {
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars: 0,
+                                    });
                                     break;
                                 }
                                 Pattern::String(_)
@@ -2449,7 +2477,10 @@ where {
                             match &branch.pattern {
                                 Pattern::Name => {
                                     env.push(expr);
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars: 1,
+                                    });
                                     break;
                                 }
                                 Pattern::Record { names, rest } => {
@@ -2473,14 +2504,19 @@ where {
                                         None
                                     };
 
+                                    let mut bound_vars = 0;
                                     for ix in extracted.iter() {
                                         env.push(fields[*ix].clone());
+                                        bound_vars += 1;
                                     }
                                     if let Some(leftover_record) = leftover_record {
-                                        env.push(leftover_record)
+                                        env.push(leftover_record);
+                                        bound_vars += 1;
                                     };
-
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars,
+                                    });
                                     break;
                                 }
                                 Pattern::Variant { tag: branch_tag } => {
@@ -2489,46 +2525,71 @@ where {
                                         self.eval(env, branch_tag).unpack_int() as usize;
                                     if *tag == branch_tag {
                                         env.push(value.clone());
-                                        target = Some(&branch.body);
+                                        target = Some(MatchedBranch {
+                                            body: &branch.body,
+                                            bound_vars: 1,
+                                        });
                                         break;
                                     }
                                 }
                                 Pattern::Array { names } => {
                                     let array = expr.unpack_array();
                                     if array.len() == *names {
-                                        array.iter().for_each(|item| env.push(item.clone()));
-                                        target = Some(&branch.body);
+                                        let mut bound_vars = 0;
+                                        array.iter().for_each(|item| {
+                                            env.push(item.clone());
+                                            bound_vars += 1;
+                                        });
+                                        target = Some(MatchedBranch {
+                                            body: &branch.body,
+                                            bound_vars,
+                                        });
                                         break;
                                     }
                                 }
                                 Pattern::Char(actual_char) => {
                                     let expected_char = expr.unpack_char();
                                     if expected_char == *actual_char {
-                                        target = Some(&branch.body);
+                                        target = Some(MatchedBranch {
+                                            body: &branch.body,
+                                            bound_vars: 0,
+                                        });
                                         break;
                                     }
                                 }
                                 Pattern::Int(actual_int) => {
                                     let expected_int = expr.unpack_int();
                                     if expected_int == *actual_int {
-                                        target = Some(&branch.body);
+                                        target = Some(MatchedBranch {
+                                            body: &branch.body,
+                                            bound_vars: 0,
+                                        });
                                         break;
                                     }
                                 }
                                 Pattern::String(actual_string) => {
                                     let expected_string = expr.unpack_string();
                                     if expected_string.as_ref() == actual_string.as_ref() {
-                                        target = Some(&branch.body);
+                                        target = Some(MatchedBranch {
+                                            body: &branch.body,
+                                            bound_vars: 0,
+                                        });
                                         break;
                                     }
                                 }
                                 Pattern::Unit => {
                                     expr.unpack_unit();
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars: 0,
+                                    });
                                     break;
                                 }
                                 Pattern::Wildcard => {
-                                    target = Some(&branch.body);
+                                    target = Some(MatchedBranch {
+                                        body: &branch.body,
+                                        bound_vars: 0,
+                                    });
                                     break;
                                 }
                             }
@@ -2537,7 +2598,13 @@ where {
                 }
 
                 match target {
-                    Some(target) => self.eval(env, target),
+                    Some(matched_branch) => {
+                        let result = self.eval(env, matched_branch.body);
+                        for _ in 0..matched_branch.bound_vars {
+                            env.pop();
+                        }
+                        result
+                    }
                     None => panic!("incomplete pattern match"),
                 }
             }
