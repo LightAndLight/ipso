@@ -1,0 +1,5 @@
+main : IO ()
+main =
+  case "hello" of
+    "" -> println "empty"
+    _ -> println "not empty"
