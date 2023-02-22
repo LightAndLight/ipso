@@ -450,38 +450,40 @@ main =
 <span id="cb55-15"><a href="#cb55-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
 <span id="cb55-16"><a href="#cb55-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
 <span id="cb55-17"><a href="#cb55-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-18"><a href="#cb55-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-18"><a href="#cb55-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Passing an empty string as `delimiter` is a runtime error.</span></span>
 <span id="cb55-19"><a href="#cb55-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-20"><a href="#cb55-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
-<span id="cb55-21"><a href="#cb55-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
-<span id="cb55-22"><a href="#cb55-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb55-23"><a href="#cb55-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb55-24"><a href="#cb55-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
-<span id="cb55-25"><a href="#cb55-25" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb55-26"><a href="#cb55-26" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb55-27"><a href="#cb55-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
-<span id="cb55-28"><a href="#cb55-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
-<span id="cb55-29"><a href="#cb55-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-30"><a href="#cb55-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-20"><a href="#cb55-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-21"><a href="#cb55-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-22"><a href="#cb55-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
+<span id="cb55-23"><a href="#cb55-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
+<span id="cb55-24"><a href="#cb55-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb55-25"><a href="#cb55-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb55-26"><a href="#cb55-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
+<span id="cb55-27"><a href="#cb55-27" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-28"><a href="#cb55-28" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-29"><a href="#cb55-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb55-30"><a href="#cb55-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
 <span id="cb55-31"><a href="#cb55-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-32"><a href="#cb55-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
-<span id="cb55-33"><a href="#cb55-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
-<span id="cb55-34"><a href="#cb55-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb55-35"><a href="#cb55-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb55-36"><a href="#cb55-36" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb55-37"><a href="#cb55-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-38"><a href="#cb55-38" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove characters from both ends of a string, according to a predicate.</span></span>
-<span id="cb55-39"><a href="#cb55-39" aria-hidden="true" tabindex="-1"></a>  trimp <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-40"><a href="#cb55-40" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb55-41"><a href="#cb55-41" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove a specific character from both ends of a string.</span></span>
-<span id="cb55-42"><a href="#cb55-42" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-43"><a href="#cb55-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `trimc c1 = trimp (\c2 -&gt; c2 == c1)`</span></span>
-<span id="cb55-44"><a href="#cb55-44" aria-hidden="true" tabindex="-1"></a>  trimc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-45"><a href="#cb55-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-46"><a href="#cb55-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.</span></span>
-<span id="cb55-47"><a href="#cb55-47" aria-hidden="true" tabindex="-1"></a>  trim <span class="kw">:</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-48"><a href="#cb55-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-49"><a href="#cb55-49" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
+<span id="cb55-32"><a href="#cb55-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-33"><a href="#cb55-33" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-34"><a href="#cb55-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
+<span id="cb55-35"><a href="#cb55-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
+<span id="cb55-36"><a href="#cb55-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb55-37"><a href="#cb55-37" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb55-38"><a href="#cb55-38" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-39"><a href="#cb55-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-40"><a href="#cb55-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove characters from both ends of a string, according to a predicate.</span></span>
+<span id="cb55-41"><a href="#cb55-41" aria-hidden="true" tabindex="-1"></a>  trimp <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-42"><a href="#cb55-42" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-43"><a href="#cb55-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove a specific character from both ends of a string.</span></span>
+<span id="cb55-44"><a href="#cb55-44" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-45"><a href="#cb55-45" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `trimc c1 = trimp (\c2 -&gt; c2 == c1)`</span></span>
+<span id="cb55-46"><a href="#cb55-46" aria-hidden="true" tabindex="-1"></a>  trimc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-47"><a href="#cb55-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-48"><a href="#cb55-48" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.</span></span>
+<span id="cb55-49"><a href="#cb55-49" aria-hidden="true" tabindex="-1"></a>  trim <span class="kw">:</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-50"><a href="#cb55-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-51"><a href="#cb55-51" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
 <h3 id="functions">Functions</h3>
 <div class="sourceCode" id="cb56"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> x</span>
 <span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>forall t0. t0 <span class="kw">-&gt;</span> t0</span></code></pre></div>
@@ -790,12 +792,16 @@ pattern_atom ::=
   char |
   string |
   '{' [record_pattern] '}' |
+  array_pattern |
   '_' |
   '(' [pattern] ')'
   
 record_pattern ::=
   ident (',' ident)* [',' '..' ident] |
   '..' ident |
+
+array_pattern ::=
+  '[' [ident (',' ident)*] ']'
  
 expr ::=
   lambda |

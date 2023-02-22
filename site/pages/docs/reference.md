@@ -596,6 +596,8 @@ module string where
   # `parts delimiter value` returns the sections of `value` that don't contain
   # the string `delimiter`.
   #
+  # Passing an empty string as `delimiter` is a runtime error.
+  #
   # # Examples
   #
   # * `parts "::" "" == []`
