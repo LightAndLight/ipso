@@ -1171,14 +1171,22 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let sep = env[0].unpack_string();
                         let s = arg.unpack_string();
-                        let a = eval.alloc_values(
-                            Parts {
-                                delimiter: sep.as_ref(),
-                                string: s.as_ref(),
-                            }
-                            .map(|part| eval.alloc(Object::String(Rc::from(part)))),
-                        );
-                        eval.alloc(Object::Array(a))
+
+                        if sep.is_empty() {
+                            eval.stderr
+                                .write_all(b"error: string.parts called with empty delimiter\n")
+                                .unwrap();
+                            std::process::exit(1)
+                        } else {
+                            let a = eval.alloc_values(
+                                Parts {
+                                    delimiter: sep.as_ref(),
+                                    string: s.as_ref(),
+                                }
+                                .map(|part| eval.alloc(Object::String(Rc::from(part)))),
+                            );
+                            eval.alloc(Object::Array(a))
+                        }
                     }
                 )
             }
