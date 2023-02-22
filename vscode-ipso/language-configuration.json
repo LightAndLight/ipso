@@ -79,5 +79,6 @@
                 "indent": "indent"
             }
         }
-    ]
+    ],
+    "wordPattern": "([a-zA-Z0-9:\\+\\-\\*\\/])+"
 }

@@ -1,0 +1,29 @@
+{
+  "Complete top-level function definition": {
+    "prefix": ":",
+    "body": [
+      ": ${1:type}",
+      "${TM_CURRENT_LINE/\\s*([^:\\s]*)\\s*:/$1/} ${2:args} = ${3:body}"
+    ]
+  },
+  "Case expression": {
+    "prefix": [
+      "case",
+      "case "
+    ],
+    "body": [
+      "case ${1:value} of",
+      "\t$2"
+    ]
+  },
+  "Let binding": {
+    "prefix": [
+      "let",
+      "let "
+    ],
+    "body": [
+      "let ${1:name} = ${2:value} in",
+      "$3"
+    ]
+  }
+}
