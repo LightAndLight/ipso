@@ -7,6 +7,7 @@ use ipso_syntax::{self as syntax, kind::Kind, r#type::Type, InstanceMember, Span
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 use std::rc::Rc;
+use syntax::desugar::desugar_decl;
 
 pub enum Void {}
 
@@ -412,27 +413,33 @@ fn check_definition_1() {
     */
     let decl = syntax::Spanned {
         pos: 0,
-        item: syntax::Declaration::Definition {
-            name: Spanned {
-                item: Rc::from("id"),
-                pos: 12,
+        item: desugar_decl(
+            &Source::Interactive {
+                label: String::from("test"),
             },
-            ty: Spanned {
-                pos: 5,
-                item: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
-            },
-            args: vec![syntax::Spanned {
-                pos: 14,
-                item: syntax::Pattern::Name(syntax::Spanned {
+            syntax::Declaration::Definition {
+                name: Spanned {
+                    item: Rc::from("id"),
+                    pos: 12,
+                },
+                ty: Spanned {
+                    pos: 5,
+                    item: Type::mk_arrow(Type::Var(Rc::from("a")), Type::Var(Rc::from("a"))),
+                },
+                args: vec![syntax::Spanned {
                     pos: 14,
-                    item: Rc::from("x"),
-                }),
-            }],
-            body: syntax::Spanned {
-                pos: 18,
-                item: syntax::Expr::Var(String::from("x")),
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 14,
+                        item: Rc::from("x"),
+                    }),
+                }],
+                body: syntax::Spanned {
+                    pos: 18,
+                    item: syntax::Expr::Var(String::from("x")),
+                },
             },
-        },
+        )
+        .unwrap(),
     };
 
     let a = core::Type::unsafe_mk_var(0, Kind::Type);
@@ -458,45 +465,51 @@ fn check_definition_2() {
     */
     let decl = syntax::Spanned {
         pos: 0,
-        item: syntax::Declaration::Definition {
-            name: Spanned {
-                item: Rc::from("thing"),
-                pos: 31,
+        item: desugar_decl(
+            &Source::Interactive {
+                label: String::from("test"),
             },
-            ty: Spanned {
-                pos: 8,
-                item: Type::mk_arrow(
-                    Type::mk_record(Vec::new(), Some(Type::Var(Rc::from("r")))),
-                    Type::mk_record(
-                        vec![(Rc::from("x"), Type::Int)],
-                        Some(Type::Var(Rc::from("r"))),
+            syntax::Declaration::Definition {
+                name: Spanned {
+                    item: Rc::from("thing"),
+                    pos: 31,
+                },
+                ty: Spanned {
+                    pos: 8,
+                    item: Type::mk_arrow(
+                        Type::mk_record(Vec::new(), Some(Type::Var(Rc::from("r")))),
+                        Type::mk_record(
+                            vec![(Rc::from("x"), Type::Int)],
+                            Some(Type::Var(Rc::from("r"))),
+                        ),
                     ),
-                ),
-            },
-            args: vec![syntax::Spanned {
-                pos: 37,
-                item: syntax::Pattern::Name(syntax::Spanned {
+                },
+                args: vec![syntax::Spanned {
                     pos: 37,
-                    item: Rc::from("r"),
-                }),
-            }],
-            body: syntax::Spanned {
-                pos: 41,
-                item: syntax::Expr::mk_record(
-                    vec![(
-                        String::from("x"),
-                        syntax::Spanned {
-                            pos: 47,
-                            item: syntax::Expr::Int(0),
-                        },
-                    )],
-                    Some(syntax::Spanned {
-                        pos: 52,
-                        item: syntax::Expr::Var(String::from("r")),
+                    item: syntax::Pattern::Name(syntax::Spanned {
+                        pos: 37,
+                        item: Rc::from("r"),
                     }),
-                ),
+                }],
+                body: syntax::Spanned {
+                    pos: 41,
+                    item: syntax::Expr::mk_record(
+                        vec![(
+                            String::from("x"),
+                            syntax::Spanned {
+                                pos: 47,
+                                item: syntax::Expr::Int(0),
+                            },
+                        )],
+                        Some(syntax::Spanned {
+                            pos: 52,
+                            item: syntax::Expr::Var(String::from("r")),
+                        }),
+                    ),
+                },
             },
-        },
+        )
+        .unwrap(),
     };
 
     let r = core::Type::unsafe_mk_var(0, Kind::Row);
@@ -625,39 +638,45 @@ fn check_definition_4() {
     */
     let decl = syntax::Spanned {
         pos: 0,
-        item: syntax::Declaration::Definition {
-            name: Spanned {
-                item: Rc::from("getx"),
-                pos: 29,
+        item: desugar_decl(
+            &Source::Interactive {
+                label: String::from("test"),
             },
-            ty: Spanned {
-                pos: 7,
-                item: Type::mk_arrow(
-                    Type::mk_record(
-                        vec![(Rc::from("x"), Type::Int)],
-                        Some(Type::Var(Rc::from("r"))),
-                    ),
-                    Type::Int,
-                ),
-            },
-            args: vec![syntax::Spanned {
-                pos: 3,
-                item: syntax::Pattern::Record {
-                    names: vec![syntax::Spanned {
-                        pos: 1,
-                        item: Rc::from("x"),
-                    }],
-                    rest: Some(syntax::Spanned {
-                        pos: 2,
-                        item: Rc::from("r"),
-                    }),
+            syntax::Declaration::Definition {
+                name: Spanned {
+                    item: Rc::from("getx"),
+                    pos: 29,
                 },
-            }],
-            body: syntax::Spanned {
-                pos: 2,
-                item: syntax::Expr::Var(String::from("x")),
+                ty: Spanned {
+                    pos: 7,
+                    item: Type::mk_arrow(
+                        Type::mk_record(
+                            vec![(Rc::from("x"), Type::Int)],
+                            Some(Type::Var(Rc::from("r"))),
+                        ),
+                        Type::Int,
+                    ),
+                },
+                args: vec![syntax::Spanned {
+                    pos: 3,
+                    item: syntax::Pattern::Record {
+                        names: vec![syntax::Spanned {
+                            pos: 1,
+                            item: Rc::from("x"),
+                        }],
+                        rest: Some(syntax::Spanned {
+                            pos: 2,
+                            item: Rc::from("r"),
+                        }),
+                    },
+                }],
+                body: syntax::Spanned {
+                    pos: 2,
+                    item: syntax::Expr::Var(String::from("x")),
+                },
             },
-        },
+        )
+        .unwrap(),
     };
     let expected = Ok(declaration::Checked::Definition {
         name: Rc::from("getx"),

@@ -107,7 +107,16 @@ fn desugar_decl_mut(
     decl: &mut Declaration,
 ) -> Result<(), Error> {
     match decl {
-        Declaration::Definition { body, .. } => desugar_expr_mut(source, var_gen, body),
+        Declaration::Definition {
+            name, args, body, ..
+        } => {
+            let args = std::mem::take(args);
+            *body = Spanned {
+                pos: name.pos,
+                item: Expr::mk_lam(args, body.clone()),
+            };
+            desugar_expr_mut(source, var_gen, body)
+        }
         Declaration::Instance { members, .. } => members
             .iter_mut()
             .try_for_each(|member| desugar_expr_mut(source, var_gen, &mut member.body)),
@@ -116,6 +125,12 @@ fn desugar_decl_mut(
         | Declaration::Import { .. }
         | Declaration::FromImport { .. } => Ok(()),
     }
+}
+
+pub fn desugar_decl(source: &Source, mut decl: Declaration) -> Result<Declaration, Error> {
+    let mut var_gen = VarGen::new();
+    desugar_decl_mut(source, &mut var_gen, &mut decl)?;
+    Ok(decl)
 }
 
 fn desugar_string_part_mut(
