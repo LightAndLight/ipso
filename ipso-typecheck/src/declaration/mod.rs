@@ -3,9 +3,8 @@
 use crate::{
     check_kind,
     constraint_solving::{self, solve_constraint, solve_placeholder},
-    evidence, fill_ty_names, generalise, infer_kind, kind_inference,
-    type_inference::{self, check_pattern},
-    BoundVars, Error, Implication,
+    evidence, fill_ty_names, generalise, infer_kind, kind_inference, type_inference, BoundVars,
+    Error, Implication,
 };
 use ipso_core::{self as core, CommonKinds, EVar, TypeSig};
 use ipso_diagnostic::Source;
@@ -97,7 +96,9 @@ pub fn check_definition(
     args: &[Spanned<syntax::Pattern>],
     body: &Spanned<syntax::Expr>,
 ) -> Result<Checked, Error> {
-    let position = ty.pos;
+    if !args.is_empty() {
+        panic!("undesugared definition arguments: {:?}", args)
+    }
 
     match env.context.get(name.item.as_ref()) {
         None => Ok(()),
@@ -131,7 +132,6 @@ pub fn check_definition(
 
     type_variables.insert(&ty_var_kinds);
 
-    let ty_pos = ty.pos;
     let ty = check_kind(
         env.common_kinds,
         env.type_context,
@@ -159,87 +159,19 @@ pub fn check_definition(
         );
     }
 
-    let mut arg_tys = Vec::with_capacity(args.len());
-    let out_ty = type_inference_state.fresh_type_meta(Kind::Type);
-    let mut actual_ty = out_ty.clone();
-    for _arg in args.iter().rev() {
-        let arg_ty = type_inference_state.fresh_type_meta(Kind::Type);
-        actual_ty = core::Type::arrow(env.common_kinds, arg_ty.clone(), actual_ty);
-        arg_tys.push(arg_ty);
-    }
-    arg_tys.reverse();
-
-    type_inference::unification::unify(
-        type_inference::unification::Env {
+    let body = type_inference::check(
+        type_inference::Env {
             common_kinds: env.common_kinds,
+            modules: env.module_context,
             types: env.type_context,
             type_variables: &type_variables,
+            type_signatures: &type_signatures,
+            source: env.source,
         },
-        &mut type_inference_state.kind_inference_state,
-        &mut type_inference_state.type_solutions,
-        ty_pos,
+        &mut type_inference_state,
+        body,
         ty,
-        &actual_ty,
-    )
-    .map_err(|error| type_inference::Error::unification_error(env.source, position, error))?;
-
-    let arg_tys: Vec<type_inference::CheckedPattern> = args
-        .iter()
-        .zip(arg_tys.iter())
-        .map(|(arg, arg_ty)| {
-            check_pattern(
-                type_inference::Env {
-                    common_kinds: env.common_kinds,
-                    modules: env.module_context,
-                    types: env.type_context,
-                    type_variables: &type_variables,
-                    type_signatures: &type_signatures,
-                    source: env.source,
-                },
-                &mut type_inference_state,
-                arg,
-                arg_ty,
-            )
-        })
-        .collect::<Result<_, type_inference::Error>>()?;
-
-    let arg_bound_vars = arg_tys
-        .iter()
-        .flat_map(|arg_ty| arg_ty.names().into_iter())
-        .collect::<Vec<_>>();
-    let body = type_inference_state.with_bound_vars(&arg_bound_vars, |type_inference_state| {
-        type_inference::check(
-            type_inference::Env {
-                common_kinds: env.common_kinds,
-                modules: env.module_context,
-                types: env.type_context,
-                type_variables: &type_variables,
-                type_signatures: &type_signatures,
-                source: env.source,
-            },
-            type_inference_state,
-            body,
-            &out_ty,
-        )
-    })?;
-
-    let body = arg_tys.into_iter().rev().fold(body, |body, arg_ty| {
-        let pattern = arg_ty.pattern();
-        match &pattern {
-            core::Pattern::Char(_)
-            | core::Pattern::Int(_)
-            | core::Pattern::String(_)
-            | core::Pattern::Unit
-            | core::Pattern::Record { .. }
-            | core::Pattern::Variant { .. }
-            | core::Pattern::Array { .. } => core::Expr::mk_lam(
-                true,
-                core::Expr::mk_case(core::Expr::Var(0), vec![core::Branch { pattern, body }]),
-            ),
-            core::Pattern::Name => core::Expr::mk_lam(true, body),
-            core::Pattern::Wildcard => core::Expr::mk_lam(false, body),
-        }
-    });
+    )?;
 
     let (body, sig) = generalise(
         env.common_kinds,

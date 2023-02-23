@@ -1,0 +1,5 @@
+test : Int -> Bool
+test 'c' = true
+
+main : IO ()
+main = io.pure ()

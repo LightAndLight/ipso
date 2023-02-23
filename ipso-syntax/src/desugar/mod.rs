@@ -107,7 +107,16 @@ fn desugar_decl_mut(
     decl: &mut Declaration,
 ) -> Result<(), Error> {
     match decl {
-        Declaration::Definition { body, .. } => desugar_expr_mut(source, var_gen, body),
+        Declaration::Definition {
+            name, args, body, ..
+        } => {
+            let args = std::mem::take(args);
+            *body = Spanned {
+                pos: name.pos,
+                item: Expr::mk_lam(args, body.clone()),
+            };
+            desugar_expr_mut(source, var_gen, body)
+        }
         Declaration::Instance { members, .. } => members
             .iter_mut()
             .try_for_each(|member| desugar_expr_mut(source, var_gen, &mut member.body)),
@@ -116,6 +125,12 @@ fn desugar_decl_mut(
         | Declaration::Import { .. }
         | Declaration::FromImport { .. } => Ok(()),
     }
+}
+
+pub fn desugar_decl(source: &Source, mut decl: Declaration) -> Result<Declaration, Error> {
+    let mut var_gen = VarGen::new();
+    desugar_decl_mut(source, &mut var_gen, &mut decl)?;
+    Ok(decl)
 }
 
 fn desugar_string_part_mut(
@@ -437,12 +452,60 @@ fn desugar_expr_mut(
     var_gen: &mut VarGen,
     expr: &mut Spanned<Expr>,
 ) -> Result<(), Error> {
+    let expr_pos = expr.pos;
     match &mut expr.item {
         Expr::App(func, arg) => {
             desugar_expr_mut(source, var_gen, Rc::make_mut(func))?;
             desugar_expr_mut(source, var_gen, Rc::make_mut(arg))
         }
-        Expr::Lam { body, .. } => desugar_expr_mut(source, var_gen, Rc::make_mut(body)),
+        Expr::Lam { args, body } => {
+            let mut arg_patterns: Vec<(String, Spanned<Pattern>)> = Vec::new();
+
+            args.iter_mut().for_each(|arg| match &arg.item {
+                Pattern::Name(_) | Pattern::Wildcard => {}
+                Pattern::Record { .. }
+                | Pattern::Variant { .. }
+                | Pattern::Char(_)
+                | Pattern::Int(_)
+                | Pattern::String(_)
+                | Pattern::Array { .. }
+                | Pattern::Unit => {
+                    let fresh_name = var_gen.gen();
+
+                    arg_patterns.push((fresh_name.clone(), arg.clone()));
+
+                    *arg = Spanned {
+                        pos: arg.pos,
+                        item: Pattern::Name(Spanned {
+                            pos: arg.pos,
+                            item: Rc::from(fresh_name),
+                        }),
+                    };
+                }
+            });
+
+            if !arg_patterns.is_empty() {
+                let new_body = arg_patterns.into_iter().rev().fold(
+                    body.as_ref().clone(),
+                    |body, (fresh_name, arg_pattern)| Spanned {
+                        pos: expr_pos,
+                        item: Expr::mk_case(
+                            Spanned {
+                                pos: arg_pattern.pos,
+                                item: Expr::Var(fresh_name),
+                            },
+                            vec![Branch {
+                                pattern: arg_pattern,
+                                body,
+                            }],
+                        ),
+                    },
+                );
+                *body = Rc::new(new_body);
+            };
+
+            desugar_expr_mut(source, var_gen, Rc::make_mut(body))
+        }
         Expr::Let { value, rest, .. } => {
             desugar_expr_mut(source, var_gen, Rc::make_mut(value))?;
             desugar_expr_mut(source, var_gen, Rc::make_mut(rest))

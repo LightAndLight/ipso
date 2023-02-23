@@ -784,6 +784,7 @@ pub fn check(
                 .rev()
                 .fold(body, |body, (arg_pattern, _)| match arg_pattern {
                     Pattern::Name => Expr::mk_lam(true, body),
+                    Pattern::Wildcard => Expr::mk_lam(false, body),
                     Pattern::Char(_)
                     | Pattern::Int(_)
                     | Pattern::String(_)
@@ -791,42 +792,8 @@ pub fn check(
                     | Pattern::Record { .. }
                     | Pattern::Variant { .. }
                     | Pattern::Array { .. } => {
-                        Expr::mk_lam(
-                            true,
-                            Expr::mk_case(
-                                Expr::Var(0),
-                                vec![{
-                                    let mut branch = Branch {
-                                        pattern: arg_pattern,
-                                        body,
-                                    };
-
-                                    /*
-                                    Example:
-
-                                    ```
-                                    \() -> body
-                                    ```
-
-                                    ~>
-
-                                    ```
-                                    \x ->
-                                      case x of
-                                        () -> body
-                                    ```
-
-                                    We've introduced a variable binding (`x`), so we need to update the free variables
-                                    of `body` to avoid being captured by the new binding.
-                                    */
-                                    branch.map_free_vars_mut(|var| var + 1);
-
-                                    branch
-                                }],
-                            ),
-                        )
+                        panic!("undesugared pattern: {:?}", arg_pattern)
                     }
-                    Pattern::Wildcard => Expr::mk_lam(false, body),
                 });
 
             Ok(expr)

@@ -8,6 +8,7 @@ use ipso_diagnostic::Source;
 use ipso_syntax::{self as syntax, kind::Kind, Spanned};
 use pretty_assertions::assert_eq;
 use std::{collections::HashMap, rc::Rc};
+use syntax::desugar::desugar_expr;
 
 const SOURCE_LABEL: &str = "test";
 
@@ -336,31 +337,37 @@ fn infer_lam_1() {
 fn infer_lam_2() {
     with_empty_env_and_state(|env, state| {
         // \{x, y} -> x
-        let term = syntax::Spanned {
-            pos: 0,
-            item: syntax::Expr::mk_lam(
-                vec![syntax::Spanned {
-                    pos: 1,
-                    item: syntax::Pattern::Record {
-                        names: vec![
-                            syntax::Spanned {
-                                pos: 2,
-                                item: Rc::from("x"),
-                            },
-                            syntax::Spanned {
-                                pos: 5,
-                                item: Rc::from("y"),
-                            },
-                        ],
-                        rest: None,
+        let term = desugar_expr(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            syntax::Spanned {
+                pos: 0,
+                item: syntax::Expr::mk_lam(
+                    vec![syntax::Spanned {
+                        pos: 1,
+                        item: syntax::Pattern::Record {
+                            names: vec![
+                                syntax::Spanned {
+                                    pos: 2,
+                                    item: Rc::from("x"),
+                                },
+                                syntax::Spanned {
+                                    pos: 5,
+                                    item: Rc::from("y"),
+                                },
+                            ],
+                            rest: None,
+                        },
+                    }],
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("x")),
                     },
-                }],
-                syntax::Spanned {
-                    pos: 11,
-                    item: syntax::Expr::Var(String::from("x")),
-                },
-            ),
-        };
+                ),
+            },
+        )
+        .unwrap();
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         let expected = Ok((
             Expr::mk_lam(
@@ -381,12 +388,12 @@ fn infer_lam_2() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 3),
+                Type::Meta(Kind::Type, 4),
             ),
         ));
         assert_eq!(expected, actual)
@@ -397,31 +404,37 @@ fn infer_lam_2() {
 fn infer_lam_3() {
     with_empty_env_and_state(|env, state| {
         // \{x, y} -> y
-        let term = syntax::Spanned {
-            pos: 0,
-            item: syntax::Expr::mk_lam(
-                vec![syntax::Spanned {
-                    pos: 1,
-                    item: syntax::Pattern::Record {
-                        names: vec![
-                            syntax::Spanned {
-                                pos: 2,
-                                item: Rc::from("x"),
-                            },
-                            syntax::Spanned {
-                                pos: 5,
-                                item: Rc::from("y"),
-                            },
-                        ],
-                        rest: None,
+        let term = desugar_expr(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            syntax::Spanned {
+                pos: 0,
+                item: syntax::Expr::mk_lam(
+                    vec![syntax::Spanned {
+                        pos: 1,
+                        item: syntax::Pattern::Record {
+                            names: vec![
+                                syntax::Spanned {
+                                    pos: 2,
+                                    item: Rc::from("x"),
+                                },
+                                syntax::Spanned {
+                                    pos: 5,
+                                    item: Rc::from("y"),
+                                },
+                            ],
+                            rest: None,
+                        },
+                    }],
+                    syntax::Spanned {
+                        pos: 11,
+                        item: syntax::Expr::Var(String::from("y")),
                     },
-                }],
-                syntax::Spanned {
-                    pos: 11,
-                    item: syntax::Expr::Var(String::from("y")),
-                },
-            ),
-        };
+                ),
+            },
+        )
+        .unwrap();
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
         let expected = Ok((
             Expr::mk_lam(
@@ -442,12 +455,12 @@ fn infer_lam_3() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
                     ],
                     None,
                 ),
-                Type::Meta(Kind::Type, 4),
+                Type::Meta(Kind::Type, 5),
             ),
         ));
         assert_eq!(expected, actual)
@@ -458,34 +471,40 @@ fn infer_lam_3() {
 fn infer_lam_4() {
     with_empty_env_and_state(|env, state| {
         // \{x, y, ...z} -> z
-        let term = syntax::Spanned {
-            pos: 0,
-            item: syntax::Expr::mk_lam(
-                vec![syntax::Spanned {
-                    pos: 1,
-                    item: syntax::Pattern::Record {
-                        names: vec![
-                            syntax::Spanned {
-                                pos: 2,
-                                item: Rc::from("x"),
-                            },
-                            syntax::Spanned {
-                                pos: 5,
-                                item: Rc::from("y"),
-                            },
-                        ],
-                        rest: Some(syntax::Spanned {
-                            pos: 11,
-                            item: Rc::from("z"),
-                        }),
+        let term = desugar_expr(
+            &Source::Interactive {
+                label: String::from(SOURCE_LABEL),
+            },
+            syntax::Spanned {
+                pos: 0,
+                item: syntax::Expr::mk_lam(
+                    vec![syntax::Spanned {
+                        pos: 1,
+                        item: syntax::Pattern::Record {
+                            names: vec![
+                                syntax::Spanned {
+                                    pos: 2,
+                                    item: Rc::from("x"),
+                                },
+                                syntax::Spanned {
+                                    pos: 5,
+                                    item: Rc::from("y"),
+                                },
+                            ],
+                            rest: Some(syntax::Spanned {
+                                pos: 11,
+                                item: Rc::from("z"),
+                            }),
+                        },
+                    }],
+                    syntax::Spanned {
+                        pos: 17,
+                        item: syntax::Expr::Var(String::from("z")),
                     },
-                }],
-                syntax::Spanned {
-                    pos: 17,
-                    item: syntax::Expr::Var(String::from("z")),
-                },
-            ),
-        };
+                ),
+            },
+        )
+        .unwrap();
         let expected = Ok((
             Expr::mk_lam(
                 true,
@@ -505,12 +524,12 @@ fn infer_lam_4() {
                 Type::mk_record(
                     env.common_kinds,
                     vec![
-                        (Rc::from("x"), Type::Meta(Kind::Type, 3)),
-                        (Rc::from("y"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("x"), Type::Meta(Kind::Type, 4)),
+                        (Rc::from("y"), Type::Meta(Kind::Type, 5)),
                     ],
-                    Some(Type::Meta(Kind::Row, 5)),
+                    Some(Type::Meta(Kind::Row, 6)),
                 ),
-                Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 5))),
+                Type::mk_record(env.common_kinds, vec![], Some(Type::Meta(Kind::Row, 6))),
             ),
         ));
         let actual = infer(env, state, &term).map(|(expr, ty)| (expr, state.zonk_type(ty)));
