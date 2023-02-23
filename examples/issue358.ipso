@@ -1,0 +1,33 @@
+test1 : ()
+test1 = (\(Ok x) -> ()) (Ok ())
+
+test2 : ()
+test2 =
+  (\x ->
+    case x of
+      Ok (Ok x) -> ()
+  )
+  (Ok (Ok ()))
+
+# Should be equivalent to `test2`
+test3 : ()
+test3 = (\(Ok (Ok x)) -> ()) (Ok (Ok ()))
+
+test4 : ()
+test4 = (\(Ok 1) -> ()) (Ok 1)
+
+test5 : ()
+test5 = (\(Ok _) -> ()) (Ok ())
+
+test6 : (| Ok : () |) -> ()
+test6 (Ok _) = ()
+
+main : IO ()
+main =
+  comp
+    println <| debug test1
+    println <| debug test2
+    println <| debug test3
+    println <| debug test4
+    println <| debug test5
+    println <| debug (test6 (Ok ()))
