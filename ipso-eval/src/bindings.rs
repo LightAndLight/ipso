@@ -44,11 +44,15 @@ impl From<ipso_core::Binding> for BindingInternal {
 pub struct Bindings(HashMap<Name, BindingInternal>);
 
 impl Bindings {
-    pub fn get(&mut self, name: &Name) -> Option<Binding> {
+    pub fn get<'a>(&'a mut self, name: &Name) -> Option<Binding<'a>> {
         self.0.get_mut(name).map(|binding| match binding {
             BindingInternal::Expr(expr) => Binding::Expr(get_closure_converted(expr)),
             BindingInternal::Module(bindings) => Binding::Module(bindings),
         })
+    }
+
+    pub fn contains(&self, name: &Name) -> bool {
+        self.0.contains_key(name)
     }
 }
 

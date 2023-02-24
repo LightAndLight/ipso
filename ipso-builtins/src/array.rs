@@ -269,11 +269,9 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             // foldl (\a b -> a + b) 0
             body: Rc::new(Expr::mk_app(
                 Expr::mk_app(
-                    // We *should* be able to use an empty `path` here.
-                    // See: https://github.com/LightAndLight/ipso/issues/189
                     Expr::Module {
                         id: ModuleRef::This,
-                        path: vec![String::from("array")],
+                        path: vec![],
                         item: Name::definition("foldl"),
                     },
                     Expr::mk_lam(
@@ -309,7 +307,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
                     Expr::mk_app(
                         Expr::Module {
                             id: ModuleRef::This,
-                            path: vec![String::from("array")],
+                            path: vec![],
                             item: Name::definition("foldl"),
                         },
                         Expr::mk_lam(
