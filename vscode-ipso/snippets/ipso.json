@@ -8,22 +8,29 @@
   },
   "Case expression": {
     "prefix": [
-      "case",
       "case "
     ],
     "body": [
       "case ${1:value} of",
-      "\t$2"
+      "\t"
     ]
   },
   "Let binding": {
     "prefix": [
-      "let",
       "let "
     ],
-    "body": [
-      "let ${1:name} = ${2:value} in",
-      "$3"
-    ]
+    "body": "let ${1:name} = ${2:value} in"
+  },
+  "Computation expression bind": {
+    "prefix": [
+      "bind "
+    ],
+    "body": "bind ${1:name} <- "
+  },
+  "If expression": {
+    "prefix": [
+      "if "
+    ],
+    "body": "if $1 then $2 else "
   }
 }
