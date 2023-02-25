@@ -70,19 +70,19 @@
 					"begin": "\"",
 					"beginCaptures": {
 						"0": {
-							"name": "string.quoted.double.ipso"
+							"name": "string.quoted.double.begin.ipso"
 						}
 					},
 					"end": "\"",
 					"endCaptures": {
 						"0": {
-							"name": "string.quoted.double.ipso"
+							"name": "string.quoted.double.end.ipso"
 						}
 					},
 					"patterns": [
 						{
-							"name": "string.quoted.double.ipso",
-							"match": "[^\\$\\\\]"
+							"name": "string.quoted.double.content.ipso",
+							"match": "[^\\$\\\\\"]"
 						},
 						{
 							"name": "constant.character.escape.ipso",
@@ -109,6 +109,59 @@
 									"name": "keyword.operator.ipso"
 								},
 								"2": {
+									"patterns": [
+										{
+											"include": "#expression"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"begin": "`",
+					"beginCaptures": {
+						"0": {
+							"name": "string.command.begin.ipso"
+						}
+					},
+					"end": "`",
+					"endCaptures": {
+						"0": {
+							"name": "string.command.end.ipso"
+						}
+					},
+					"patterns": [
+						{
+							"name": "string.command.content.ipso",
+							"match": "[^\\$\\\\`]"
+						},
+						{
+							"name": "constant.character.escape.ipso",
+							"match": "\\\\."
+						},
+						{
+							"begin": "(\\$(\\.\\.)?){",
+							"beginCaptures": {
+								"1": {
+									"name": "keyword.operator.ipso"
+								}
+							},
+							"end": "}",
+							"patterns": [
+								{
+									"include": "#expression"
+								}
+							]
+						},
+						{
+							"match": "(\\$(\\.\\.)?)([a-zA-Z][a-zA-Z0-9\\!\\?]*)?",
+							"captures": {
+								"1": {
+									"name": "keyword.operator.ipso"
+								},
+								"3": {
 									"patterns": [
 										{
 											"include": "#expression"
