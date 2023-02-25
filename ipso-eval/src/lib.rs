@@ -234,7 +234,7 @@ pub enum Object {
 
         Any [`Expr::Name`]s in the closure's body reference definitions in this module.
         */
-        module: Option<ModuleId>,
+        module: Option<ModulePath>,
         body: Rc<Expr>,
     },
     StaticClosure {
@@ -312,7 +312,7 @@ impl Object {
                 }
 
                 if let Some(module) = module {
-                    interpreter.context.modules.push(*module);
+                    interpreter.context.modules.push(module.clone());
                 }
                 let result = interpreter.eval(&mut env, body);
                 if module.is_some() {
@@ -557,8 +557,25 @@ pub struct Module {
     pub bindings: Bindings,
 }
 
+/**
+A module is either a top-level module or a submodule.
+
+A top-level module is identified by a [`ModuleId`], and a submodule
+is identified by a path through a top-level module.
+*/
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ModulePath {
+    pub id: ModuleId,
+    pub path: Vec<String>,
+}
+
 struct Context {
-    modules: Vec<ModuleId>,
+    /**
+    A stack of module scopes.
+
+    The top of the stack is the current module in which evaluation is taking place.
+    */
+    modules: Vec<ModulePath>,
     base: Bindings,
 }
 
@@ -570,6 +587,45 @@ pub struct Interpreter<'io> {
     stderr: &'io mut dyn io::Write,
     context: Context,
     modules: HashMap<ModuleId, Module>,
+}
+
+fn lookup_path<'a>(bindings: &'a mut Bindings, path: &[String]) -> &'a mut Bindings {
+    if path.is_empty() {
+        bindings
+    } else {
+        let name = Name::definition(path[0].as_str());
+
+        // This implementation isn't intuitive to me.
+        if bindings.contains(&name) {
+            let binding = bindings.get(&name).unwrap();
+            /*
+            I tried to write it like this:
+
+            ```rust
+            match bindings.get(&Name::definition(path[0].as_str())) {
+                None => panic!("submodule {:?} not found in {:?}", path[0], bindings),
+                Some(binding) => match binding {
+                    Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
+                    Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
+                },
+            }
+            ```
+
+            But the compiler, as of 1.63.0, thinks that `get`'s exclusive borrow of `bindings` is still
+            active in the `None` case and prevents `panic!` from casting `bindings` to a shared reference.
+
+            I think the code I *want* to write requires the "polonius" borrow checker:
+            https://smallcultfollowing.com/babysteps/blog/2018/06/15/mir-based-borrow-check-nll-status-update/#polonius
+            */
+
+            match binding {
+                Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
+                Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
+            }
+        } else {
+            panic!("submodule {:?} not found in {:?}", path[0], bindings)
+        }
+    }
 }
 
 pub struct IO<'io> {
@@ -2069,7 +2125,10 @@ where {
 
     fn current_bindings(&mut self) -> &mut Bindings {
         match self.context.modules.last() {
-            Some(id) => &mut self.modules.get_mut(id).unwrap().bindings,
+            Some(module_path) => lookup_path(
+                &mut self.modules.get_mut(&module_path.id).unwrap().bindings,
+                &module_path.path,
+            ),
             None => &mut self.context.base,
         }
     }
@@ -2081,20 +2140,6 @@ where {
         path: &[String],
         item: &Name,
     ) -> Value {
-        fn lookup_path<'a>(bindings: &'a mut Bindings, path: &[String]) -> &'a mut Bindings {
-            if path.is_empty() {
-                bindings
-            } else {
-                match bindings.get(&Name::definition(path[0].as_str())) {
-                    None => panic!("submodule {:?} not found", path[0]),
-                    Some(binding) => match binding {
-                        Binding::Expr(expr) => panic!("unexpected expr {:?}", expr),
-                        Binding::Module(bindings) => lookup_path(bindings, &path[1..]),
-                    },
-                }
-            }
-        }
-
         let bindings = match id {
             ModuleRef::This => self.current_bindings(),
             ModuleRef::Id(id) => match self.modules.get_mut(id) {
@@ -2114,7 +2159,10 @@ where {
         };
 
         if let ModuleRef::Id(id) = id {
-            self.context.modules.push(*id);
+            self.context.modules.push(ModulePath {
+                id: *id,
+                path: Vec::from(path),
+            });
         }
 
         let result = self.eval(env, &expr);
@@ -2132,8 +2180,16 @@ where {
                 None => panic!("{:?} not in base scope", name),
                 Some(binding) => binding,
             },
-            Some(module_id) => match self.modules.get_mut(module_id).unwrap().bindings.get(name) {
-                None => panic!("{:?} not in {:?}'s scope", name, module_id),
+            Some(module_path) => match lookup_path(
+                &mut self.modules.get_mut(&module_path.id).unwrap().bindings,
+                &module_path.path,
+            )
+            .get(name)
+            {
+                None => panic!(
+                    "{:?} not in scope of {:?}{:?}",
+                    name, module_path.id, module_path.path
+                ),
                 Some(binding) => binding,
             },
         };
@@ -2144,8 +2200,8 @@ where {
         }
     }
 
-    fn current_module(&self) -> Option<ModuleId> {
-        self.context.modules.last().copied()
+    fn current_module(&self) -> Option<&ModulePath> {
+        self.context.modules.last()
     }
 
     fn eval_string_parts(&mut self, env: &mut Env, parts: &[StringPart<Expr>]) -> String {
@@ -2206,7 +2262,7 @@ where {
             } => self.alloc(Object::Closure {
                 env: lookup_indices(env, new_env),
                 arg: *arg,
-                module: self.current_module(),
+                module: self.current_module().cloned(),
                 body: body.clone(),
             }),
 
