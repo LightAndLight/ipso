@@ -1,0 +1,131 @@
+#! /usr/bin/env ipso
+
+getChangedFiles : { old : String, new : String } -> IO (Array String)
+getChangedFiles { old, new } =
+  cmd.lines `git diff $old $new --name-only`
+
+# https://github.com/LightAndLight/ipso/issues/376
+first : Array a -> (| Some : a, None : () |)
+first =
+  array.foldl
+    (\result item ->
+      case result of
+        None () -> Some item
+        Some _ -> result
+    )
+    (None ())
+
+# https://github.com/LightAndLight/ipso/issues/376
+last : Array a -> (| Some : a, None : () |)
+last = array.foldl (\_ item -> Some item) (None ())
+
+hasExtension : String -> String -> Bool
+hasExtension file extension =
+  case last <| string.parts "." file of
+    Some fileExtension ->
+      fileExtension == extension
+    None () -> false
+
+hasPrefix : String -> String -> Bool
+hasPrefix file prefix =
+  case first <| string.parts "/" file of
+    Some filePrefix ->
+      filePrefix == prefix
+    None () -> false
+
+# https://github.com/LightAndLight/ipso/issues/321
+filter : (a -> Bool) -> Array a -> Array a
+filter predicate =
+  array.foldl
+    (\result item -> if predicate item then array.snoc result item else result)
+    []
+
+runCheck :
+  Array String ->
+  { name : String, matcher : String -> Bool, command : Cmd } ->
+  IO ()
+runCheck files { name, matcher, command } =
+  comp
+    let changedFiles = filter matcher files
+    case changedFiles of
+      [] ->
+        println "$name: no relevant files changed. Skipping."
+      _ ->
+        comp
+          println "$name: the following relevant files changed:\n"
+          array.each_ changedFiles (\file -> println "  $file")
+
+          println ""
+          println "Running `${cmd.show command}`:\n"
+          cmd.run command
+
+parseArgs : IO (| Some : { old : String, new : (| Some : String, None : () |) }, None : () |)
+parseArgs =
+  comp
+    bind args <- env.args
+    case args of
+      [old] ->
+        io.pure <| Some { old = old, new = None () }
+      [old, new] ->
+        io.pure <| Some { old = old, new = Some new }
+      _ ->
+        io.pure <| None ()
+
+printHelp : IO ()
+printHelp =
+  comp
+    bind program <- env.program 
+    println "usage: $program OLD_COMMIT [NEW_COMMIT]"
+
+recheck :
+  Array { name : String, matcher : String -> Bool, command : Cmd } ->
+  IO ()
+recheck checks =
+  comp
+    bind args? <- parseArgs
+    case args? of
+      None () ->
+        comp
+          println "error: invalid usage"
+          printHelp
+          exit.failure
+      Some args ->
+        comp
+          let old = args.old
+          let new =
+            case args.new of
+              None () -> "HEAD"
+              Some new -> new
+
+          bind oldCommit <- io.map string.trim <| cmd.read `git rev-parse $old`
+          println "Old: $old${if oldCommit == old then "" else " ($oldCommit)"}"
+          
+          let new = "HEAD"
+          bind newCommit <- io.map string.trim <| cmd.read `git rev-parse $new`
+          println "New: $new${if newCommit == new then "" else " ($newCommit)"}"
+
+          println ""
+
+          bind changedFiles <- getChangedFiles { old = old, new = new }
+          array.each_ checks (runCheck changedFiles)
+
+main : IO ()
+main =
+  recheck
+    [
+      { 
+        name = "cargo test (*.rs)",
+        matcher = \file -> hasExtension file "rs",
+        command = `cargo test`
+      },
+      { 
+        name = "golden tests (*.rs, examples/*)",
+        matcher = \file -> hasExtension file "rs" || hasPrefix file "examples",
+        command = `./scripts/golden`
+      },
+      { 
+        name = "shebang tests (*.rs, examples/*)",
+        matcher = \file -> hasExtension file "rs" || hasPrefix file "examples",
+        command = `./scripts/shebang`
+      }
+    ]

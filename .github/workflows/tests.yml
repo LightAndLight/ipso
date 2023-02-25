@@ -28,6 +28,10 @@ jobs:
       POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
     - uses: actions/checkout@v2.4.0
+      with:
+        # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
+        fetch-depth: 0
+    
     - uses: cachix/install-nix-action@v15
 
     # Used by `uploadToCache` to sign store paths.
@@ -54,7 +58,7 @@ jobs:
     - run: pueued -d
 
     - run: >
-        nix profile install github:LightAndLight/ipso?ref=v0.3
+        nix profile install github:LightAndLight/ipso?commit=24f53253a49172b47c228c237a749f0ab120730c
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
 
@@ -71,29 +75,13 @@ jobs:
           ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
           ${{ runner.os }}-build-${{ env.cache-name }}-
 
-    - name: "cargo tests"
+    - name: "tests"
       run: >
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
-        -c cargo test
-
-    - name: "golden tests"
-      run: >
-        nix develop .#tests
-        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
-        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
-        -c ./scripts/golden
-
-    - name: "shebang tests"
-      run: >
-        nix develop .#tests
-        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
-        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
-        -c ./scripts/shebang
+        -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
 
     - name: wait for uploads to finish
       if: always()
