@@ -1,0 +1,3 @@
+#! /usr/bin/env bash
+
+yes | nix develop -c vsce package
