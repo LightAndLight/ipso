@@ -82,9 +82,15 @@
     ],
     "onEnterRules": [
         {
-            "beforeText": "^(.*=)|(\\s*case.*of)|(\\s*comp)$",
+            "beforeText": "(^.*=\\s*$)|(^\\s*case.*of$)|(^\\s*comp$)|(^\\s*if\\s*(\\w\\s*)+)|(^\\s*(then|else)\\s*)|(\\\\.*->\\s*$)",
             "action": {
                 "indent": "indent"
+            }
+        },
+        {
+            "beforeText": "(^\\s*else\\s*(\\w\\s*)+$)",
+            "action": {
+                "indent": "outdent"
             }
         }
     ],
