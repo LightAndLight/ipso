@@ -74,14 +74,31 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
           ${{ runner.os }}-build-${{ env.cache-name }}-
-
+    
     - name: "tests"
+      if: github.event_name == 'pull_request'
       run: >
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
+
+    # `tests.yml` is currently set to run on pushes to `main`. When that happens, `$GITHUB_BASE_REF`
+    # isn't set because it's not a pull request. Instead we use the most recent commit before the
+    # push
+    # (https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push)
+    # as the "old" commit for `./scripts/recheck`.
+    #
+    # If it's a force push (which it really shouldn't be for main) then we skip this step.
+    - name: "tests"
+      if: github.event_name == 'push' && !github.event.forced
+      run: >
+        nix develop .#tests
+        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
+        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
+        -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
 
     - name: wait for uploads to finish
       if: always()
