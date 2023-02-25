@@ -1,0 +1,12 @@
+first : Array a -> (| Some : a, None : () |)
+first =
+  array.foldl
+    (\result item ->
+      case result of
+        None () -> item
+        Some _ -> result
+    )
+    (None ())
+
+main : IO ()
+main = io.pure ()
