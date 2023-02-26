@@ -6,4 +6,3 @@ main : IO ()
 main = # comments shouldn't interfere with indentation
   print # really
     stdooout
-    "hello world!"
