@@ -4,8 +4,7 @@
 mod test;
 
 use crate::{
-    between, choices, indent, indent_scope, keep_right, many, map0, map2, optional, spanned,
-    Parsed, Parser,
+    between, choices, indent, keep_right, many, map0, map2, optional, spanned, Parsed, Parser,
 };
 use ipso_syntax::{Spanned, Type};
 use std::rc::Rc;
@@ -18,23 +17,19 @@ pub fn type_record_fields(
     parser: &mut Parser,
     fields: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
 ) -> Parsed<Option<Type<Rc<str>>>> {
-    /*
-    `indent_gte` allows the record type's contents to be in any column
-    greater than or equal to the record type's opening brace.
-    */
-    optional!(indent!(parser, Relation::Gte, parser.ident())).and_then(|m_ident| match m_ident {
+    optional!(indent!(parser, Relation::Gt, parser.ident())).and_then(|m_ident| match m_ident {
         None => Parsed::pure(None),
         Some(ident) => optional!(keep_right!(
-            indent!(parser, Relation::Gte, parser.token(&token::Data::Colon)),
-            indent!(parser, Relation::Gte, type_(parser))
+            indent!(parser, Relation::Gt, parser.token(&token::Data::Colon)),
+            indent!(parser, Relation::Gt, type_(parser))
         ))
         .and_then(|m_ty| match m_ty {
             None => Parsed::pure(Some(Type::Var(ident))),
             Some(ty) => {
                 fields.push((ident, ty));
                 optional!(keep_right!(
-                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma)),
-                    indent!(parser, Relation::Gte, type_record_fields(parser, fields))
+                    indent!(parser, Relation::Gt, parser.token(&token::Data::Comma)),
+                    indent!(parser, Relation::Gt, type_record_fields(parser, fields))
                 ))
                 .map(|m_rest| match m_rest {
                     None => None,
@@ -52,16 +47,14 @@ type_record ::=
 ```
  */
 pub fn type_record(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
-    indent_scope!(parser, {
-        between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LBrace)),
-            indent!(parser, Relation::Gte, parser.token(&token::Data::RBrace)),
-            {
-                let mut fields = Vec::new();
-                type_record_fields(parser, &mut fields).map(|rest| Type::mk_record(fields, rest))
-            }
-        )
-    })
+    between!(
+        indent!(parser, Relation::Gt, parser.token(&token::Data::LBrace)),
+        indent!(parser, Relation::Gt, parser.token(&token::Data::RBrace)),
+        {
+            let mut fields = Vec::new();
+            type_record_fields(parser, &mut fields).map(|rest| Type::mk_record(fields, rest))
+        }
+    )
 }
 
 /**
@@ -76,17 +69,17 @@ pub fn type_variant_ctors(
     ctors: &mut Vec<(Rc<str>, Type<Rc<str>>)>,
 ) -> Parsed<Option<Type<Rc<str>>>> {
     choices!(
-        indent!(parser, Relation::Gte, parser.ident()).map(|x| Some(Type::Var(x))),
-        indent!(parser, Relation::Gte, parser.ctor())
+        indent!(parser, Relation::Gt, parser.ident()).map(|x| Some(Type::Var(x))),
+        indent!(parser, Relation::Gt, parser.ctor())
             .and_then(|ctor| map0!(
                 ctor,
-                indent!(parser, Relation::Gte, parser.token(&token::Data::Colon))
+                indent!(parser, Relation::Gt, parser.token(&token::Data::Colon))
             ))
             .and_then(|ctor| type_(parser).map(|ty| (ctor, ty)))
             .and_then(|(ctor, ty)| {
                 ctors.push((ctor, ty));
                 optional!(
-                    indent!(parser, Relation::Gte, parser.token(&token::Data::Comma))
+                    indent!(parser, Relation::Gt, parser.token(&token::Data::Comma))
                         .and_then(|_| type_variant_ctors(parser, ctors))
                 )
                 .map(|m_rest| match m_rest {
@@ -104,23 +97,17 @@ type_variant ::=
 ```
  */
 pub fn type_variant(parser: &mut Parser) -> Parsed<Type<Rc<str>>> {
-    indent_scope!(parser, {
-        between!(
-            indent!(parser, Relation::Eq, parser.token(&token::Data::LParenPipe)),
-            indent!(
-                parser,
-                Relation::Gte,
-                parser.token(&token::Data::PipeRParen)
-            ),
-            {
-                let mut ctors = Vec::new();
-                optional!(type_variant_ctors(parser, &mut ctors)).map(|m_rest| match m_rest {
-                    None => Type::mk_variant(Vec::new(), None),
-                    Some(rest) => Type::mk_variant(ctors, rest),
-                })
-            }
-        )
-    })
+    between!(
+        indent!(parser, Relation::Gt, parser.token(&token::Data::LParenPipe)),
+        indent!(parser, Relation::Gt, parser.token(&token::Data::PipeRParen)),
+        {
+            let mut ctors = Vec::new();
+            optional!(type_variant_ctors(parser, &mut ctors)).map(|m_rest| match m_rest {
+                None => Type::mk_variant(Vec::new(), None),
+                Some(rest) => Type::mk_variant(ctors, rest),
+            })
+        }
+    )
 }
 
 /**

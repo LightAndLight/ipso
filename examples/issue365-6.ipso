@@ -1,0 +1,20 @@
+parseUri : 
+  String -> 
+  (| 
+    Object : { hash : String },
+    Blob : { hash : String },
+    Commit : { 
+hash : String,
+      path : (|
+        None : (),
+        Tree : Array String,
+        Parent : Array String
+      |)
+    },
+    Tree : { hash : String },
+    Error : String
+  |)
+parseUri = Error
+
+main : IO ()
+main = println <| debug (parseUri "hi")
