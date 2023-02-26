@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.5
+
+*2023-02-26*
+
+### Breaking changes
+
+* Calling `string.parts` with an empty delimiter results in a runtime error ([#359](https://github.com/LightAndLight/ipso/issues/359))
+
+  Before this change, `string.parts "" input` looped forever for non-empty values of `input`. It
+  returned `""` when `input` was empty. Now the function exits with a runtime error when it's called
+  with an empty delimiter, regardless of the `input`:
+
+  ```ipsorepl
+  > string.parts "" "a"
+  error: string.parts called with empty delimiter
+  ```
+
+### Features and additions
+
+* Relax indentation in record and variant types ([#365](https://github.com/LightAndLight/ipso/issues/365))
+
+  You can now use "Java-style indentation" for large record and variant types in type signatures.
+  For example:
+
+  ```ipso
+  test :
+    String ->
+    {
+      a : {
+        b : (),
+        c : (),
+        d : ()
+      },
+      b : (|
+        A : (),
+        B : (),
+        C : (),
+        D : ()
+      |)
+    }
+  test = ...
+  ```
+
+  [Line joining rules](https://ipso.dev/docs/reference.html#line-joining) still apply, so code like
+  this:
+  
+  ```ipso
+  test : {
+    a : (),
+    b : (),
+    c : ()
+  }
+  test = ...
+  ```
+
+  is invalid.
+
+
+### Improvements and fixes
+
+* Allow empty string patterns ([#356](https://github.com/LightAndLight/ipso/issues/356))
+
+  Pattern matching on string literals was already allowed, but I forgot to support the empty string.
+
+  ```ipso
+  case x of
+    "" -> "it's empty"
+    "a" -> "it's a"
+    "b" -> "it's b"
+    _ -> "it's not empty, a, or b"
+  ```
+
+* Improve type errors in function arguments ([#377](https://github.com/LightAndLight/ipso/issues/377))
+
+  Type errors in function arguments are now more accurate in some situations. See the issue for an
+  example.
+
+#### Bug fixes
+
+* Fix a panic due to an undesugared pattern ([#358](https://github.com/LightAndLight/ipso/issues/358))
+* Fix lambda pattern elaboration ([#357](https://github.com/LightAndLight/ipso/issues/357), [#326](https://github.com/LightAndLight/ipso/issues/326))
+* Fix scope management in interpreter ([#362](https://github.com/LightAndLight/ipso/issues/362))
+* Fix name resolution in submodules ([#189](https://github.com/LightAndLight/ipso/issues/189))
+
 ## 0.4
 
 *2023-02-13*
