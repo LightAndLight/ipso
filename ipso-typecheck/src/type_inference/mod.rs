@@ -713,18 +713,36 @@ pub fn check(
                 },
             }
         }
-        syntax::Expr::App(fun, arg) => {
-            let in_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+        syntax::Expr::App(_fun, _arg) => {
+            fn unapply(
+                expr: &Spanned<syntax::Expr>,
+            ) -> (&Spanned<syntax::Expr>, Vec<&Spanned<syntax::Expr>>) {
+                match &expr.item {
+                    syntax::Expr::App(f, x) => {
+                        let (f, mut xs) = unapply(f.as_ref());
+                        xs.push(x.as_ref());
+                        (f, xs)
+                    }
+                    _ => (expr, Vec::new()),
+                }
+            }
+
+            let (fun, args) = unapply(expr);
+
+            let in_tys = args
+                .iter()
+                .map(|_| fresh_type_meta(&mut state.type_solutions, Kind::Type))
+                .collect::<Vec<_>>();
             let out_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
 
             let fun = check(
                 env,
                 state,
                 fun,
-                &Type::mk_arrow(env.common_kinds, &in_ty, &out_ty),
+                &in_tys.iter().rev().fold(out_ty.clone(), |result, in_ty| {
+                    Type::arrow(env.common_kinds, in_ty.clone(), result)
+                }),
             )?;
-
-            let arg = check(env, state, arg, &in_ty)?;
 
             unification::unify(
                 env.as_unification_env(),
@@ -736,7 +754,13 @@ pub fn check(
             )
             .map_err(|error| Error::unification_error(env.source, position, error))?;
 
-            Ok(Expr::mk_app(fun, arg))
+            let args = args
+                .iter()
+                .zip(in_tys.iter())
+                .map(|(arg, in_ty)| check(env, state, arg, in_ty))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(args.into_iter().fold(fun, Expr::mk_app))
         }
         syntax::Expr::Lam { args, body } => {
             check_duplicate_args(env.source, args)?;
