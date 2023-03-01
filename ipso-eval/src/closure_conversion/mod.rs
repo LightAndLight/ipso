@@ -362,7 +362,7 @@ pub fn convert_string_part(part: &StringPart<ipso_core::Expr>) -> ConvertResult<
 pub fn convert_cmd_part(cmd_part: &CmdPart<ipso_core::Expr>) -> ConvertResult<CmdPart<Expr>> {
     match cmd_part {
         CmdPart::Arg(string_parts) => {
-            convert_many(convert_string_part, &string_parts).map(CmdPart::Arg)
+            convert_many(convert_string_part, string_parts).map(CmdPart::Arg)
         }
         CmdPart::Args(expr) => convert_expr(expr).map(CmdPart::Args),
     }
