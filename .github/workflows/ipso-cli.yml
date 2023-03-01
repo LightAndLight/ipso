@@ -16,6 +16,9 @@ env:
   # limiting](https://discourse.nixos.org/t/flakes-provide-github-api-token-for-rate-limiting/18609)
   # by allowing Nix to make authenticated GitHub requests.
   NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+
+  # The version of ipso to use for CI scripts that are written in the language.
+  IPSO_PACKAGE: "github:LightAndLight/ipso?commit=24f53253a49172b47c228c237a749f0ab120730c"
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -46,13 +49,18 @@ jobs:
     # Used in `postBuildHook`.
     - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
 
+    # See [note: nix profile install not adding to PATH]
     - run: nix profile install nixpkgs#pueue
+    - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
+
     - run: pueued -d
 
+    # See [note: nix profile install not adding to PATH]
     - run: >
-        nix profile install github:LightAndLight/ipso?ref=04b97934b7c671f641f9800b809f3153c49d5e6d
+        nix profile install $IPSO_PACKAGE
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+    - run: "echo \"$(nix path-info $IPSO_PACKAGE)/bin\" >> $GITHUB_PATH"
 
     - run: >
         nix build
@@ -108,13 +116,18 @@ jobs:
     # Used in `postBuildHookMacos`.
     - run: sudo cp $UPLOAD_TO_CACHE /var/run/uploadToCache
 
+    # See [note: nix profile install not adding to PATH]
     - run: nix profile install nixpkgs#pueue
+    - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
+
     - run: pueued -d
 
+    # See [note: nix profile install not adding to PATH]
     - run: >
-        nix profile install github:LightAndLight/ipso?ref=04b97934b7c671f641f9800b809f3153c49d5e6d
+        nix profile install $IPSO_PACKAGE
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+    - run: "echo \"$(nix path-info $IPSO_PACKAGE)/bin\" >> $GITHUB_PATH"
 
     - run: >
         nix build
@@ -176,13 +189,18 @@ jobs:
     # Used in `postBuildHook`.
     - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
 
+    # See [note: nix profile install not adding to PATH]
     - run: nix profile install nixpkgs#pueue
+    - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
+
     - run: pueued -d
 
+    # See [note: nix profile install not adding to PATH]
     - run: >
-        nix profile install github:LightAndLight/ipso?ref=04b97934b7c671f641f9800b809f3153c49d5e6d
+        nix profile install $IPSO_PACKAGE
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+    - run: "echo \"$(nix path-info $IPSO_PACKAGE)/bin\" >> $GITHUB_PATH"
 
     - name: Check release version
       run: >
