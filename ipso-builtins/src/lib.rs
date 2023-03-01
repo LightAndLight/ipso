@@ -249,7 +249,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
                         Rc::from("Eq"),
                     ),
-                    Type::app(array_ty.clone(), Type::Var(Kind::Type, 0)),
+                    Type::app(array_ty, Type::Var(Kind::Type, 0)),
                 ),
                 evidence: Rc::from("Eq a => Eq (Array a)"),
             },
