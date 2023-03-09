@@ -345,7 +345,140 @@ pub fn unify(
     })
 }
 
-fn unify_inner(
+fn solve_left(
+    kind_inference_state: &mut kind_inference::State,
+    type_variables: &BoundVars<Kind>,
+    type_solutions: &mut Solutions,
+    meta: Meta,
+    actual: &Type,
+) -> Result<(), ErrorInfo> {
+    /*
+    [note: avoiding solved metas as solutions]
+
+    If `actual` is a solved meta, then it's possible for its solution
+    to be `Type::Meta(_, meta)`. This would trigger the occurs check, even
+    though the equation is valid.
+
+    To keep the occurs check simple, we assume that if a solution is a metavariable
+    then it should be unsolved.
+    */
+    debug_assert!(match actual {
+        Type::Meta(_, actual_meta) => {
+            type_solutions.get(*actual_meta).is_unsolved()
+        }
+        _ => true,
+    });
+
+    if type_solutions.occurs(meta, actual) {
+        Err(ErrorInfo::occurs(
+            type_variables,
+            meta,
+            &type_solutions.zonk(&kind_inference_state.kind_solutions, actual.clone()),
+        ))
+    } else {
+        type_solutions.set(meta, actual);
+        Ok(())
+    }
+}
+
+fn solve_right(
+    kind_inference_state: &mut kind_inference::State,
+    type_variables: &BoundVars<Kind>,
+    type_solutions: &mut Solutions,
+    expected: &Type,
+    meta: Meta,
+) -> Result<(), ErrorInfo> {
+    // See [note: avoiding solved metas as solutions]
+    debug_assert!(match expected {
+        Type::Meta(_, expected_meta) => {
+            type_solutions.get(*expected_meta).is_unsolved()
+        }
+        _ => true,
+    });
+
+    if type_solutions.occurs(meta, expected) {
+        Err(ErrorInfo::occurs(
+            type_variables,
+            meta,
+            &type_solutions.zonk(&kind_inference_state.kind_solutions, expected.clone()),
+        ))
+    } else {
+        type_solutions.set(meta, expected);
+        Ok(())
+    }
+}
+
+fn walk(type_solutions: &Solutions, ty: &Type) -> Type {
+    match ty {
+        Type::Meta(_, meta) => match type_solutions.get(*meta) {
+            Solution::Unsolved => ty.clone(),
+            Solution::Solved(ty) => walk(type_solutions, ty),
+        },
+        _ => ty.clone(),
+    }
+}
+
+pub fn unify_meta_left(
+    env: &Env,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut Solutions,
+    pos: usize,
+    meta: &usize,
+    actual: &Type,
+) -> Result<(), ErrorInfo> {
+    match walk(type_solutions, actual) {
+        Type::Meta(_, actual_meta) if *meta == actual_meta => Ok(()),
+        actual => match type_solutions.get(*meta).clone() {
+            Solution::Unsolved => solve_left(
+                kind_inference_state,
+                env.type_variables,
+                type_solutions,
+                *meta,
+                &actual,
+            ),
+            Solution::Solved(expected) => unify_inner(
+                env,
+                kind_inference_state,
+                type_solutions,
+                pos,
+                &expected,
+                &actual,
+            ),
+        },
+    }
+}
+
+pub fn unify_meta_right(
+    env: &Env,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut Solutions,
+    pos: usize,
+    expected: &Type,
+    meta: &usize,
+) -> Result<(), ErrorInfo> {
+    match walk(type_solutions, expected) {
+        Type::Meta(_, expected_meta) if *meta == expected_meta => Ok(()),
+        expected => match type_solutions.get(*meta).clone() {
+            Solution::Unsolved => solve_right(
+                kind_inference_state,
+                env.type_variables,
+                type_solutions,
+                &expected,
+                *meta,
+            ),
+            Solution::Solved(actual) => unify_inner(
+                env,
+                kind_inference_state,
+                type_solutions,
+                pos,
+                &expected,
+                &actual,
+            ),
+        },
+    }
+}
+
+pub fn unify_inner(
     env: &Env,
     kind_inference_state: &mut kind_inference::State,
     type_solutions: &mut Solutions,
@@ -353,154 +486,18 @@ fn unify_inner(
     expected: &Type,
     actual: &Type,
 ) -> Result<(), ErrorInfo> {
-    fn solve_left(
-        kind_inference_state: &mut kind_inference::State,
-        type_variables: &BoundVars<Kind>,
-        type_solutions: &mut Solutions,
-        meta: Meta,
-        actual: &Type,
-    ) -> Result<(), ErrorInfo> {
-        /*
-        [note: avoiding solved metas as solutions]
-
-        If `actual` is a solved meta, then it's possible for its solution
-        to be `Type::Meta(_, meta)`. This would trigger the occurs check, even
-        though the equation is valid.
-
-        To keep the occurs check simple, we assume that if a solution is a metavariable
-        then it should be unsolved.
-        */
-        debug_assert!(match actual {
-            Type::Meta(_, actual_meta) => {
-                type_solutions.get(*actual_meta).is_unsolved()
-            }
-            _ => true,
-        });
-
-        if type_solutions.occurs(meta, actual) {
-            Err(ErrorInfo::occurs(
-                type_variables,
-                meta,
-                &type_solutions.zonk(&kind_inference_state.kind_solutions, actual.clone()),
-            ))
-        } else {
-            type_solutions.set(meta, actual);
-            Ok(())
-        }
-    }
-
-    fn solve_right(
-        kind_inference_state: &mut kind_inference::State,
-        type_variables: &BoundVars<Kind>,
-        type_solutions: &mut Solutions,
-        expected: &Type,
-        meta: Meta,
-    ) -> Result<(), ErrorInfo> {
-        // See [note: avoiding solved metas as solutions]
-        debug_assert!(match expected {
-            Type::Meta(_, expected_meta) => {
-                type_solutions.get(*expected_meta).is_unsolved()
-            }
-            _ => true,
-        });
-
-        if type_solutions.occurs(meta, expected) {
-            Err(ErrorInfo::occurs(
-                type_variables,
-                meta,
-                &type_solutions.zonk(&kind_inference_state.kind_solutions, expected.clone()),
-            ))
-        } else {
-            type_solutions.set(meta, expected);
-            Ok(())
-        }
-    }
-
-    fn walk(type_solutions: &Solutions, ty: &Type) -> Type {
-        match ty {
-            Type::Meta(_, meta) => match type_solutions.get(*meta) {
-                Solution::Unsolved => ty.clone(),
-                Solution::Solved(ty) => walk(type_solutions, ty),
-            },
-            _ => ty.clone(),
-        }
-    }
-
-    fn unify_meta_left(
-        env: &Env,
-        kind_inference_state: &mut kind_inference::State,
-        type_solutions: &mut Solutions,
-        pos: usize,
-        meta: &usize,
-        actual: &Type,
-    ) -> Result<(), ErrorInfo> {
-        match walk(type_solutions, actual) {
-            Type::Meta(_, actual_meta) if *meta == actual_meta => Ok(()),
-            actual => match type_solutions.get(*meta).clone() {
-                Solution::Unsolved => solve_left(
-                    kind_inference_state,
-                    env.type_variables,
-                    type_solutions,
-                    *meta,
-                    &actual,
-                ),
-                Solution::Solved(expected) => unify_inner(
-                    env,
-                    kind_inference_state,
-                    type_solutions,
-                    pos,
-                    &expected,
-                    &actual,
-                ),
-            },
-        }
-    }
-
-    fn unify_meta_right(
-        env: &Env,
-        kind_inference_state: &mut kind_inference::State,
-        type_solutions: &mut Solutions,
-        pos: usize,
-        expected: &Type,
-        meta: &usize,
-    ) -> Result<(), ErrorInfo> {
-        match walk(type_solutions, expected) {
-            Type::Meta(_, expected_meta) if *meta == expected_meta => Ok(()),
-            expected => match type_solutions.get(*meta).clone() {
-                Solution::Unsolved => solve_right(
-                    kind_inference_state,
-                    env.type_variables,
-                    type_solutions,
-                    &expected,
-                    *meta,
-                ),
-                Solution::Solved(actual) => unify_inner(
-                    env,
-                    kind_inference_state,
-                    type_solutions,
-                    pos,
-                    &expected,
-                    &actual,
-                ),
-            },
-        }
-    }
-
-    kind_inference::unification::unify(
+    unify_kinds(
         &mut kind_inference_state.kind_solutions,
+        pos,
+        Some(|| kind_inference::ErrorHint::WhileChecking {
+            ty: actual
+                .to_syntax()
+                .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            has_kind: expected.kind(),
+        }),
         &expected.kind(),
         &actual.kind(),
-    )
-    .map_err(|error| ErrorInfo::KindError {
-        error: kind_inference::Error::unification_error(pos, error).with_hint(
-            kind_inference::ErrorHint::WhileChecking {
-                ty: actual
-                    .to_syntax()
-                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
-                has_kind: expected.kind(),
-            },
-        ),
-    })?;
+    )?;
 
     match expected {
         Type::Meta(_, meta) => {
@@ -1048,4 +1045,117 @@ fn unify_inner(
             )),
         },
     }
+}
+
+pub fn unify_kinds(
+    kind_solutions: &mut kind_inference::unification::Solutions,
+    pos: usize,
+    mk_hint: Option<impl FnOnce() -> kind_inference::ErrorHint>,
+    expected_kind: &Kind,
+    actual_kind: &Kind,
+) -> Result<(), ErrorInfo> {
+    kind_inference::unification::unify(kind_solutions, expected_kind, actual_kind).map_err(
+        |error| {
+            let mut error = kind_inference::Error::unification_error(pos, error);
+            if let Some(mk_hint) = mk_hint {
+                error = error.with_hint(mk_hint());
+            }
+            ErrorInfo::KindError { error }
+        },
+    )
+}
+
+/// The known [`Type::App`] node argument for [`unify_app`].
+pub struct App {
+    pub left: Type,
+    pub right: Type,
+}
+
+/** Unify against a known [`Type::App`] node.
+
+`unify_app(env, kind_inference_state, type_solutions, pos, expected, App{left, right})` is equivalent
+to `unify(env, kind_inference_state, type_solutions, pos, expected, Type::app(left, right))`, but avoids
+allocating heap memory for `left` and `right`.
+
+[`Type::App`] contains two [`std::rc::Rc`]-wrapped children, which means [`Type::app`] allocates by
+calling [`Rc::new`].
+*/
+pub fn unify_app(
+    env: Env,
+    kind_inference_state: &mut kind_inference::State,
+    type_solutions: &mut Solutions,
+    pos: usize,
+    expected: &Type,
+    actual: App,
+) -> Result<(), Error> {
+    {
+        let actual_left_kind = actual.left.kind();
+
+        unify_kinds(
+            &mut kind_inference_state.kind_solutions,
+            pos,
+            Some(|| kind_inference::ErrorHint::WhileChecking {
+                ty: Type::app(actual.left.clone(), actual.right.clone())
+                    .to_syntax()
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+                has_kind: expected.kind(),
+            }),
+            &expected.kind(),
+            actual_left_kind.unwrap_return_kind(),
+        )?;
+
+        match expected {
+            Type::Meta(_, meta) => unify_meta_left(
+                &env,
+                kind_inference_state,
+                type_solutions,
+                pos,
+                meta,
+                &Type::app(actual.left.clone(), actual.right.clone()),
+            ),
+            Type::App(_, expected_left, expected_right) => {
+                unify_inner(
+                    &env,
+                    kind_inference_state,
+                    type_solutions,
+                    pos,
+                    expected_left,
+                    &actual.left,
+                )?;
+                unify_inner(
+                    &env,
+                    kind_inference_state,
+                    type_solutions,
+                    pos,
+                    expected_right,
+                    &actual.right,
+                )
+            }
+            _ => Err(ErrorInfo::mismatch(
+                &kind_inference_state.kind_solutions,
+                type_solutions,
+                env.type_variables,
+                expected.clone(),
+                Type::app(actual.left.clone(), actual.right.clone()),
+            )),
+        }
+    }
+    .map_err(|error| {
+        Error::from(error).with_hint({
+            ErrorHint::WhileUnifying {
+                expected: type_solutions
+                    .zonk(&kind_inference_state.kind_solutions, expected.clone())
+                    .to_syntax()
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+
+                actual: type_solutions
+                    .zonk(
+                        &kind_inference_state.kind_solutions,
+                        Type::app(actual.left.clone(), actual.right.clone()),
+                    )
+                    .to_syntax()
+                    .map(&mut |ix| env.type_variables.lookup_index(*ix).unwrap().0.clone()),
+            }
+        })
+    })
 }

@@ -106,4 +106,13 @@ impl Kind {
             _ => false,
         }
     }
+
+    pub fn unwrap_return_kind(&self) -> &Kind {
+        match self {
+            Kind::Ref(r) => match r.as_ref() {
+                KindCompound::Arrow(_, b) => b,
+            },
+            r => panic!("{:?} has no return kind", r),
+        }
+    }
 }
