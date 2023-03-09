@@ -396,13 +396,18 @@ fn check_record_pattern(
         Type::mk_rows(fields, rest)
     };
 
-    unification::unify(
+    let actual = unification::App {
+        left: Type::mk_record_ctor(env.common_kinds),
+        right: entire_row.clone(),
+    };
+
+    unification::unify_app(
         env.as_unification_env(),
         &mut state.kind_inference_state,
         &mut state.type_solutions,
         pos,
         expected,
-        &Type::mk_app(&Type::mk_record_ctor(env.common_kinds), &entire_row),
+        actual,
     )
     .map_err(|error| Error::unification_error(env.source, pos, error))?;
 
@@ -449,15 +454,18 @@ fn check_array_pattern(
     expected: &Type,
 ) -> Result<CheckedPattern, Error> {
     let item_type = state.fresh_type_meta(Kind::Type);
-    let actual = Type::app(Type::mk_array(env.common_kinds), item_type.clone());
+    let actual = unification::App {
+        left: Type::mk_array(env.common_kinds),
+        right: item_type.clone(),
+    };
 
-    unification::unify(
+    unification::unify_app(
         env.as_unification_env(),
         &mut state.kind_inference_state,
         &mut state.type_solutions,
         pos,
         expected,
-        &actual,
+        actual,
     )
     .map_err(|error| Error::unification_error(env.source, pos, error))?;
 
@@ -482,18 +490,18 @@ fn check_variant_pattern(
 
     let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
     let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+    let actual = unification::App {
+        left: Type::mk_variant_ctor(env.common_kinds),
+        right: Type::mk_rows(vec![(ctor.clone(), arg_ty.clone())], Some(rest_row.clone())),
+    };
 
-    unification::unify(
+    unification::unify_app(
         env.as_unification_env(),
         &mut state.kind_inference_state,
         &mut state.type_solutions,
         pos,
         expected,
-        &Type::mk_variant(
-            env.common_kinds,
-            vec![(ctor.clone(), arg_ty.clone())],
-            Some(rest_row.clone()),
-        ),
+        actual,
     )
     .map_err(|error| Error::unification_error(env.source, pos, error))?;
 
@@ -942,14 +950,18 @@ pub fn check(
         }
         syntax::Expr::Array(items) => {
             let item_type = fresh_type_meta(&mut state.type_solutions, Kind::Type);
+            let actual = unification::App {
+                left: Type::mk_array(env.common_kinds),
+                right: item_type.clone(),
+            };
 
-            unification::unify(
+            unification::unify_app(
                 env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
                 expr.pos,
                 expected,
-                &Type::app(Type::mk_array(env.common_kinds), item_type.clone()),
+                actual,
             )
             .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
@@ -1058,23 +1070,22 @@ pub fn check(
 
             let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
             let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
-            let actual = Type::mk_arrow(
-                env.common_kinds,
-                &arg_ty,
-                &Type::mk_variant(
+            let actual = unification::App {
+                left: Type::app(Type::mk_arrow_ctor(env.common_kinds), (&arg_ty).clone()),
+                right: Type::mk_variant(
                     env.common_kinds,
                     vec![(constructor_name.clone(), arg_ty.clone())],
                     Some(rest_row.clone()),
                 ),
-            );
+            };
 
-            unification::unify(
+            unification::unify_app(
                 env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
                 expr.pos,
                 expected,
-                &actual,
+                actual,
             )
             .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
@@ -1093,18 +1104,21 @@ pub fn check(
 
             let arg_ty = fresh_type_meta(&mut state.type_solutions, Kind::Type);
             let rest_row = fresh_type_meta(&mut state.type_solutions, Kind::Row);
+            let actual = unification::App {
+                left: Type::mk_variant_ctor(env.common_kinds),
+                right: Type::mk_rows(
+                    vec![(constructor_name.clone(), arg_ty)],
+                    Some(rest_row.clone()),
+                ),
+            };
 
-            unification::unify(
+            unification::unify_app(
                 env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
                 expr.pos,
                 expected,
-                &Type::mk_variant(
-                    env.common_kinds,
-                    vec![(constructor_name.clone(), arg_ty)],
-                    Some(rest_row.clone()),
-                ),
+                actual,
             )
             .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 
@@ -1140,15 +1154,18 @@ pub fn check(
                 .collect::<Vec<_>>();
 
             let actual_row = Type::mk_rows(typed_fields, Some(rest_row.clone()));
-            let actual = Type::app(Type::mk_record_ctor(env.common_kinds), actual_row.clone());
+            let actual = unification::App {
+                left: Type::mk_record_ctor(env.common_kinds),
+                right: actual_row.clone(),
+            };
 
-            unification::unify(
+            unification::unify_app(
                 env.as_unification_env(),
                 &mut state.kind_inference_state,
                 &mut state.type_solutions,
                 expr.pos,
                 expected,
-                &actual,
+                actual,
             )
             .map_err(|error| Error::unification_error(env.source, expr.pos, error))?;
 

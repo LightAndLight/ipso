@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod test;
 
-use ipso_syntax::{self as syntax, kind::Kind, r#type, ModuleRef};
+use ipso_syntax::{kind::Kind, r#type, ModuleRef};
 use ipso_util::iter::Stack;
 use std::{
     cmp,
@@ -146,12 +146,7 @@ impl Type {
 
     pub fn app(a: Type, b: Type) -> Self {
         Type::App(
-            match a.kind() {
-                Kind::Ref(r) => match r.as_ref() {
-                    syntax::kind::KindCompound::Arrow(_, b) => b.clone(),
-                },
-                r => panic!("{:?} has no return kind", r),
-            },
+            a.kind().unwrap_return_kind().clone(),
             Rc::new(a),
             Rc::new(b),
         )
