@@ -767,7 +767,7 @@ rest : { more : Bool, words : Array String }
 
 ```ipsorepl
 > :t None
-forall r. (| None, r |)
+forall a r. a -> (| None : a, r |)
 ```
 
 #### Extension

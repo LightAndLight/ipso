@@ -566,7 +566,7 @@ main =
 <h3 id="variants-1">Variants</h3>
 <h4 id="construction-1">Construction</h4>
 <div class="sourceCode" id="cb70"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> None</span>
-<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>forall r. <span class="kw">(|</span> None, r <span class="kw">|)</span></span></code></pre></div>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a>forall a r. a <span class="kw">-&gt;</span> <span class="kw">(|</span> None <span class="kw">:</span> a, r <span class="kw">|)</span></span></code></pre></div>
 <h4 id="extension-1">Extension</h4>
 <div class="sourceCode" id="cb71"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:t</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> <span class="kw">(|</span> A, <span class="kw">..</span>x <span class="kw">|)</span></span>
 <span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="kw">(|</span> r <span class="kw">|)</span> <span class="kw">-&gt;</span> <span class="kw">(|</span> A <span class="kw">:</span> a, r <span class="kw">|)</span></span></code></pre></div>
