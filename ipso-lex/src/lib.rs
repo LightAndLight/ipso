@@ -236,7 +236,7 @@ impl<'input> Iterator for Lexer<'input> {
                                                 })
                                             }
                                             Some(c) => match c {
-                                                '$' | '"' => {
+                                                '\\' | '$' | '"' => {
                                                     textual_len += 1;
                                                     self.consume();
                                                     str.push(c);
