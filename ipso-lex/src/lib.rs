@@ -114,6 +114,40 @@ impl<'input> Lexer<'input> {
     }
 }
 
+/// Generate the next token, assuming [`Mode::Ident`] mode.
+fn ident_next(lexer: &mut Lexer, c: char, pos: usize, column: usize) -> Option<Token> {
+    if is_ident_start(c) {
+        lexer.consume();
+
+        let mut ident = String::new();
+        ident.push(c);
+
+        loop {
+            match lexer.current {
+                Some(c) if is_ident_continue(c) => {
+                    lexer.consume();
+                    ident.push(c);
+                }
+                _ => break,
+            }
+        }
+
+        let _ = lexer.context.pop();
+
+        Some(Token {
+            data: token::Data::Ident(Rc::from(ident)),
+            pos,
+            column,
+        })
+    } else {
+        Some(Token {
+            data: token::Data::Unexpected(c),
+            pos,
+            column,
+        })
+    }
+}
+
 impl<'input> Iterator for Lexer<'input> {
     type Item = Token;
 
@@ -135,715 +169,697 @@ impl<'input> Iterator for Lexer<'input> {
                 }
             }
             Some(c) => match self.context.current() {
-                Mode::Ident => {
-                    if is_ident_start(c) {
-                        self.consume();
+                Mode::Ident => ident_next(self, c, pos, column),
+                Mode::String => string_next(self, c, pos, column),
+                Mode::Char => char_next(self, c, pos, column),
+                Mode::Normal => normal_next(self, c, pos, column),
+                Mode::Cmd => cmd_next(self, c, pos, column),
+            },
+        }
+    }
+}
 
-                        let mut ident = String::new();
-                        ident.push(c);
+/// Generate the next token, assuming [`Mode::String`] mode.
+fn string_next(lexer: &mut Lexer, c: char, pos: usize, column: usize) -> Option<Token> {
+    match c {
+        '"' => {
+            lexer.consume();
 
-                        loop {
-                            match self.current {
-                                Some(c) if is_ident_continue(c) => {
-                                    self.consume();
-                                    ident.push(c);
-                                }
-                                _ => break,
-                            }
-                        }
+            let _ = lexer.context.pop();
 
-                        let _ = self.context.pop();
+            Some(Token {
+                data: token::Data::DoubleQuote,
+                pos,
+                column,
+            })
+        }
+        '$' => {
+            lexer.consume();
 
-                        Some(Token {
-                            data: token::Data::Ident(Rc::from(ident)),
-                            pos,
-                            column,
-                        })
-                    } else {
-                        Some(Token {
-                            data: token::Data::Unexpected(c),
-                            pos,
-                            column,
-                        })
-                    }
+            match lexer.current {
+                Some(c) if c == '{' => {
+                    lexer.consume();
+                    lexer.context.push(Mode::Normal);
+                    Some(Token {
+                        data: token::Data::DollarLBrace,
+                        pos,
+                        column,
+                    })
                 }
-                Mode::String => match c {
-                    '"' => {
-                        self.consume();
+                _ => {
+                    lexer.context.push(Mode::Ident);
+                    Some(Token {
+                        data: token::Data::Dollar,
+                        pos,
+                        column,
+                    })
+                }
+            }
+        }
+        '\n' => {
+            lexer.consume();
 
-                        let _ = self.context.pop();
+            Some(Token {
+                data: token::Data::Unexpected(c),
+                pos,
+                column,
+            })
+        }
+        _ => {
+            let mut str = String::new();
+            let mut textual_len: usize = 0;
 
-                        Some(Token {
-                            data: token::Data::DoubleQuote,
-                            pos,
-                            column,
-                        })
+            loop {
+                match lexer.current {
+                    None => {
+                        break;
                     }
-                    '$' => {
-                        self.consume();
-
-                        match self.current {
-                            Some(c) if c == '{' => {
-                                self.consume();
-                                self.context.push(Mode::Normal);
-                                Some(Token {
-                                    data: token::Data::DollarLBrace,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            _ => {
-                                self.context.push(Mode::Ident);
-                                Some(Token {
-                                    data: token::Data::Dollar,
-                                    pos,
-                                    column,
-                                })
-                            }
+                    Some(c) => match c {
+                        '$' | '"' | '\n' => {
+                            break;
                         }
-                    }
-                    '\n' => {
-                        self.consume();
-
-                        Some(Token {
-                            data: token::Data::Unexpected(c),
-                            pos,
-                            column,
-                        })
-                    }
-                    _ => {
-                        let mut str = String::new();
-                        let mut textual_len: usize = 0;
-
-                        loop {
-                            match self.current {
+                        '\\' => {
+                            textual_len += 1;
+                            lexer.consume();
+                            match lexer.current {
                                 None => {
-                                    break;
+                                    return Some(Token {
+                                        data: token::Data::Unexpected('\\'),
+                                        pos: lexer.pos,
+                                        column: lexer.column,
+                                    })
                                 }
                                 Some(c) => match c {
-                                    '$' | '"' | '\n' => {
-                                        break;
-                                    }
-                                    '\\' => {
+                                    '\\' | '$' | '"' => {
                                         textual_len += 1;
-                                        self.consume();
-                                        match self.current {
-                                            None => {
-                                                return Some(Token {
-                                                    data: token::Data::Unexpected('\\'),
-                                                    pos: self.pos,
-                                                    column: self.column,
-                                                })
-                                            }
-                                            Some(c) => match c {
-                                                '$' | '"' => {
-                                                    textual_len += 1;
-                                                    self.consume();
-                                                    str.push(c);
-                                                }
-                                                'n' => {
-                                                    textual_len += 1;
-                                                    self.consume();
-                                                    str.push('\n');
-                                                }
-                                                't' => {
-                                                    textual_len += 1;
-                                                    self.consume();
-                                                    str.push('\t');
-                                                }
-                                                _ => {
-                                                    return Some(Token {
-                                                        data: token::Data::Unexpected('\\'),
-                                                        pos: self.pos,
-                                                        column: self.column,
-                                                    });
-                                                }
-                                            },
-                                        }
-                                    }
-                                    c => {
-                                        textual_len += 1;
-                                        self.consume();
+                                        lexer.consume();
                                         str.push(c);
+                                    }
+                                    'n' => {
+                                        textual_len += 1;
+                                        lexer.consume();
+                                        str.push('\n');
+                                    }
+                                    't' => {
+                                        textual_len += 1;
+                                        lexer.consume();
+                                        str.push('\t');
+                                    }
+                                    _ => {
+                                        return Some(Token {
+                                            data: token::Data::Unexpected('\\'),
+                                            pos: lexer.pos,
+                                            column: lexer.column,
+                                        });
                                     }
                                 },
                             }
                         }
+                        c => {
+                            textual_len += 1;
+                            lexer.consume();
+                            str.push(c);
+                        }
+                    },
+                }
+            }
 
-                        Some(Token {
-                            data: token::Data::String {
-                                value: str,
-                                length: textual_len,
-                            },
-                            pos,
-                            column,
-                        })
-                    }
+            Some(Token {
+                data: token::Data::String {
+                    value: str,
+                    length: textual_len,
                 },
-                Mode::Char => match c {
-                    '\'' => {
-                        self.consume();
+                pos,
+                column,
+            })
+        }
+    }
+}
 
-                        let _ = self.context.pop();
+/// Generate the next token, assuming [`Mode::Char`] mode.
+fn char_next(lexer: &mut Lexer, c: char, pos: usize, column: usize) -> Option<Token> {
+    match c {
+        '\'' => {
+            lexer.consume();
 
-                        Some(Token {
-                            data: token::Data::SingleQuote,
-                            pos,
-                            column,
-                        })
-                    }
-                    _ => {
-                        let char;
-                        let mut textual_len: usize = 0;
+            let _ = lexer.context.pop();
 
-                        match self.current {
+            Some(Token {
+                data: token::Data::SingleQuote,
+                pos,
+                column,
+            })
+        }
+        _ => {
+            let char;
+            let mut textual_len: usize = 0;
+
+            match lexer.current {
+                None => {
+                    char = None;
+                }
+                Some(c) => match c {
+                    '\\' => {
+                        textual_len += 1;
+                        lexer.consume();
+                        match lexer.current {
                             None => {
-                                char = None;
+                                return Some(Token {
+                                    data: token::Data::Unexpected('\\'),
+                                    pos,
+                                    column,
+                                })
                             }
                             Some(c) => match c {
-                                '\\' => {
+                                '\'' | '\\' => {
                                     textual_len += 1;
-                                    self.consume();
-                                    match self.current {
-                                        None => {
-                                            return Some(Token {
-                                                data: token::Data::Unexpected('\\'),
-                                                pos,
-                                                column,
-                                            })
-                                        }
-                                        Some(c) => match c {
-                                            '\'' | '\\' => {
-                                                textual_len += 1;
-                                                self.consume();
-                                                char = Some(c);
-                                            }
-                                            'n' => {
-                                                textual_len += 1;
-                                                self.consume();
-                                                char = Some('\n');
-                                            }
-                                            't' => {
-                                                textual_len += 1;
-                                                self.consume();
-                                                char = Some('\t');
-                                            }
-                                            _ => {
-                                                return Some(Token {
-                                                    data: token::Data::Unexpected('\\'),
-                                                    pos: self.pos,
-                                                    column: self.column,
-                                                });
-                                            }
-                                        },
-                                    }
-                                }
-                                c => {
-                                    textual_len += 1;
-                                    self.consume();
+                                    lexer.consume();
                                     char = Some(c);
                                 }
-                            },
-                        }
-
-                        char.map(|value| Token {
-                            data: token::Data::Char {
-                                value,
-                                length: textual_len,
-                            },
-                            pos,
-                            column,
-                        })
-                    }
-                },
-                Mode::Normal => match c {
-                    '\n' => {
-                        self.consume_newline();
-                        self.next()
-                    }
-                    ' ' => {
-                        self.consume();
-                        self.next()
-                    }
-                    '#' => {
-                        self.consume();
-
-                        while let Some(c) = self.current {
-                            if c != '\n' {
-                                self.consume();
-                            } else {
-                                break;
-                            }
-                        }
-
-                        self.next()
-                    }
-                    '"' => {
-                        self.consume();
-                        self.context.push(Mode::String);
-                        Some(Token {
-                            data: token::Data::DoubleQuote,
-                            pos,
-                            column,
-                        })
-                    }
-                    '\'' => {
-                        self.consume();
-                        self.context.push(Mode::Char);
-                        Some(Token {
-                            data: token::Data::SingleQuote,
-                            pos,
-                            column,
-                        })
-                    }
-                    '`' => {
-                        self.consume();
-                        self.context.push(Mode::Cmd);
-
-                        Some(Token {
-                            data: token::Data::Backtick,
-                            pos,
-                            column,
-                        })
-                    }
-                    '{' => {
-                        self.consume();
-                        self.context.push(Mode::Normal);
-                        Some(Token {
-                            data: token::Data::LBrace,
-                            pos,
-                            column,
-                        })
-                    }
-                    '}' => {
-                        self.consume();
-
-                        let _ = self.context.pop();
-
-                        Some(Token {
-                            data: token::Data::RBrace,
-                            pos,
-                            column,
-                        })
-                    }
-                    '(' => {
-                        self.consume();
-
-                        match self.current {
-                            Some('|') => {
-                                self.consume();
-                                Some(Token {
-                                    data: token::Data::LParenPipe,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            _ => Some(Token {
-                                data: token::Data::LParen,
-                                pos,
-                                column,
-                            }),
-                        }
-                    }
-                    ')' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::RParen,
-                            pos,
-                            column,
-                        })
-                    }
-                    '[' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::LBracket,
-                            pos,
-                            column,
-                        })
-                    }
-                    ']' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::RBracket,
-                            pos,
-                            column,
-                        })
-                    }
-                    '<' => {
-                        self.consume();
-                        if let Some('-') = self.current {
-                            self.consume();
-                            Some(Token {
-                                data: token::Data::LeftArrow,
-                                pos,
-                                column,
-                            })
-                        } else {
-                            Some(Token {
-                                data: token::Data::LAngle,
-                                pos,
-                                column,
-                            })
-                        }
-                    }
-                    '>' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::RAngle,
-                            pos,
-                            column,
-                        })
-                    }
-                    '|' => {
-                        self.consume();
-
-                        match self.current {
-                            Some(')') => {
-                                self.consume();
-                                Some(Token {
-                                    data: token::Data::PipeRParen,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            _ => Some(Token {
-                                data: token::Data::Pipe,
-                                pos,
-                                column,
-                            }),
-                        }
-                    }
-                    ',' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Comma,
-                            pos,
-                            column,
-                        })
-                    }
-                    ':' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Colon,
-                            pos,
-                            column,
-                        })
-                    }
-                    '.' => {
-                        self.consume();
-
-                        match self.current {
-                            Some(c) if c == '.' => {
-                                self.consume();
-                                Some(Token {
-                                    data: token::Data::DotDot,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            _ => Some(Token {
-                                data: token::Data::Dot,
-                                pos,
-                                column,
-                            }),
-                        }
-                    }
-                    '=' => {
-                        self.consume();
-                        match self.current {
-                            Some('>') => {
-                                self.consume();
-
-                                Some(Token {
-                                    data: token::Data::FatArrow,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            _ => Some(Token {
-                                data: token::Data::Equals,
-                                pos,
-                                column,
-                            }),
-                        }
-                    }
-                    '-' => {
-                        self.consume();
-                        match self.current {
-                            Some('>') => {
-                                self.consume();
-
-                                Some(Token {
-                                    data: token::Data::Arrow,
-                                    pos,
-                                    column,
-                                })
-                            }
-                            Some(c) if c.is_ascii_digit() => {
-                                self.consume_int(Sign::Negative, c, pos, column)
-                            }
-                            _ => Some(Token {
-                                data: token::Data::Hyphen,
-                                pos,
-                                column,
-                            }),
-                        }
-                    }
-                    '+' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Plus,
-                            pos,
-                            column,
-                        })
-                    }
-                    '/' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Slash,
-                            pos,
-                            column,
-                        })
-                    }
-                    '!' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Bang,
-                            pos,
-                            column,
-                        })
-                    }
-                    '&' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Ampersand,
-                            pos,
-                            column,
-                        })
-                    }
-                    '\\' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Backslash,
-                            pos,
-                            column,
-                        })
-                    }
-                    '*' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Asterisk,
-                            pos,
-                            column,
-                        })
-                    }
-                    '_' => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Underscore,
-                            pos,
-                            column,
-                        })
-                    }
-                    _ if is_ident_start(c) => {
-                        self.consume();
-                        let mut ident = String::new();
-                        ident.push(c);
-                        loop {
-                            match self.current {
-                                Some(c) if is_ident_continue(c) => {
-                                    self.consume();
-                                    ident.push(c);
+                                'n' => {
+                                    textual_len += 1;
+                                    lexer.consume();
+                                    char = Some('\n');
                                 }
-                                _ => break,
-                            }
-                        }
-                        Some(Token {
-                            data: token::Data::Ident(Rc::from(ident)),
-                            pos,
-                            column,
-                        })
-                    }
-                    _ if c.is_ascii_digit() => self.consume_int(Sign::None, c, pos, column),
-                    _ => {
-                        self.consume();
-                        Some(Token {
-                            data: token::Data::Unexpected(c),
-                            pos,
-                            column,
-                        })
-                    }
-                },
-                Mode::Cmd => {
-                    let pos = self.pos;
-                    let column = self.column;
-
-                    match c {
-                        '`' => {
-                            self.consume();
-
-                            self.context.pop();
-
-                            Some(Token {
-                                data: token::Data::Backtick,
-                                pos,
-                                column,
-                            })
-                        }
-                        ' ' => {
-                            self.consume();
-
-                            Some(Token {
-                                data: token::Data::Space,
-                                pos,
-                                column,
-                            })
-                        }
-                        '"' => {
-                            self.consume();
-                            self.context.push(Mode::String);
-
-                            Some(Token {
-                                data: token::Data::DoubleQuote,
-                                pos,
-                                column,
-                            })
-                        }
-                        '$' => {
-                            self.consume();
-
-                            match self.current {
-                                Some('{') => {
-                                    self.consume();
-
-                                    self.context.push(Mode::Normal);
-
-                                    Some(Token {
-                                        data: token::Data::DollarLBrace,
-                                        pos,
-                                        column,
-                                    })
-                                }
-                                Some('.') => {
-                                    self.consume();
-
-                                    match self.current {
-                                        Some('.') => {
-                                            self.consume();
-
-                                            match self.current {
-                                                Some('{') => {
-                                                    self.consume();
-
-                                                    self.context.push(Mode::Normal);
-
-                                                    Some(Token {
-                                                        data: token::Data::DollarDotDotLBrace,
-                                                        pos,
-                                                        column,
-                                                    })
-                                                }
-                                                _ => {
-                                                    self.context.push(Mode::Ident);
-
-                                                    Some(Token {
-                                                        data: token::Data::DollarDotDot,
-                                                        pos,
-                                                        column,
-                                                    })
-                                                }
-                                            }
-                                        }
-                                        Some(c) => Some(Token {
-                                            data: token::Data::Unexpected(c),
-                                            pos: self.pos,
-                                            column: self.column,
-                                        }),
-                                        None => Some(Token {
-                                            data: token::Data::Unexpected('.'),
-                                            pos: self.pos,
-                                            column: self.column,
-                                        }),
-                                    }
+                                't' => {
+                                    textual_len += 1;
+                                    lexer.consume();
+                                    char = Some('\t');
                                 }
                                 _ => {
-                                    self.context.push(Mode::Ident);
+                                    return Some(Token {
+                                        data: token::Data::Unexpected('\\'),
+                                        pos: lexer.pos,
+                                        column: lexer.column,
+                                    });
+                                }
+                            },
+                        }
+                    }
+                    c => {
+                        textual_len += 1;
+                        lexer.consume();
+                        char = Some(c);
+                    }
+                },
+            }
+
+            char.map(|value| Token {
+                data: token::Data::Char {
+                    value,
+                    length: textual_len,
+                },
+                pos,
+                column,
+            })
+        }
+    }
+}
+
+/// Generate the next token, assuming [`Mode::Normal`] mode.
+fn normal_next(lexer: &mut Lexer, c: char, pos: usize, column: usize) -> Option<Token> {
+    match c {
+        '\n' => {
+            lexer.consume_newline();
+            lexer.next()
+        }
+        ' ' => {
+            lexer.consume();
+            lexer.next()
+        }
+        '#' => {
+            lexer.consume();
+
+            while let Some(c) = lexer.current {
+                if c != '\n' {
+                    lexer.consume();
+                } else {
+                    break;
+                }
+            }
+
+            lexer.next()
+        }
+        '"' => {
+            lexer.consume();
+            lexer.context.push(Mode::String);
+            Some(Token {
+                data: token::Data::DoubleQuote,
+                pos,
+                column,
+            })
+        }
+        '\'' => {
+            lexer.consume();
+            lexer.context.push(Mode::Char);
+            Some(Token {
+                data: token::Data::SingleQuote,
+                pos,
+                column,
+            })
+        }
+        '`' => {
+            lexer.consume();
+            lexer.context.push(Mode::Cmd);
+
+            Some(Token {
+                data: token::Data::Backtick,
+                pos,
+                column,
+            })
+        }
+        '{' => {
+            lexer.consume();
+            lexer.context.push(Mode::Normal);
+            Some(Token {
+                data: token::Data::LBrace,
+                pos,
+                column,
+            })
+        }
+        '}' => {
+            lexer.consume();
+
+            let _ = lexer.context.pop();
+
+            Some(Token {
+                data: token::Data::RBrace,
+                pos,
+                column,
+            })
+        }
+        '(' => {
+            lexer.consume();
+
+            match lexer.current {
+                Some('|') => {
+                    lexer.consume();
+                    Some(Token {
+                        data: token::Data::LParenPipe,
+                        pos,
+                        column,
+                    })
+                }
+                _ => Some(Token {
+                    data: token::Data::LParen,
+                    pos,
+                    column,
+                }),
+            }
+        }
+        ')' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::RParen,
+                pos,
+                column,
+            })
+        }
+        '[' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::LBracket,
+                pos,
+                column,
+            })
+        }
+        ']' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::RBracket,
+                pos,
+                column,
+            })
+        }
+        '<' => {
+            lexer.consume();
+            if let Some('-') = lexer.current {
+                lexer.consume();
+                Some(Token {
+                    data: token::Data::LeftArrow,
+                    pos,
+                    column,
+                })
+            } else {
+                Some(Token {
+                    data: token::Data::LAngle,
+                    pos,
+                    column,
+                })
+            }
+        }
+        '>' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::RAngle,
+                pos,
+                column,
+            })
+        }
+        '|' => {
+            lexer.consume();
+
+            match lexer.current {
+                Some(')') => {
+                    lexer.consume();
+                    Some(Token {
+                        data: token::Data::PipeRParen,
+                        pos,
+                        column,
+                    })
+                }
+                _ => Some(Token {
+                    data: token::Data::Pipe,
+                    pos,
+                    column,
+                }),
+            }
+        }
+        ',' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Comma,
+                pos,
+                column,
+            })
+        }
+        ':' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Colon,
+                pos,
+                column,
+            })
+        }
+        '.' => {
+            lexer.consume();
+
+            match lexer.current {
+                Some(c) if c == '.' => {
+                    lexer.consume();
+                    Some(Token {
+                        data: token::Data::DotDot,
+                        pos,
+                        column,
+                    })
+                }
+                _ => Some(Token {
+                    data: token::Data::Dot,
+                    pos,
+                    column,
+                }),
+            }
+        }
+        '=' => {
+            lexer.consume();
+            match lexer.current {
+                Some('>') => {
+                    lexer.consume();
+
+                    Some(Token {
+                        data: token::Data::FatArrow,
+                        pos,
+                        column,
+                    })
+                }
+                _ => Some(Token {
+                    data: token::Data::Equals,
+                    pos,
+                    column,
+                }),
+            }
+        }
+        '-' => {
+            lexer.consume();
+            match lexer.current {
+                Some('>') => {
+                    lexer.consume();
+
+                    Some(Token {
+                        data: token::Data::Arrow,
+                        pos,
+                        column,
+                    })
+                }
+                Some(c) if c.is_ascii_digit() => lexer.consume_int(Sign::Negative, c, pos, column),
+                _ => Some(Token {
+                    data: token::Data::Hyphen,
+                    pos,
+                    column,
+                }),
+            }
+        }
+        '+' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Plus,
+                pos,
+                column,
+            })
+        }
+        '/' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Slash,
+                pos,
+                column,
+            })
+        }
+        '!' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Bang,
+                pos,
+                column,
+            })
+        }
+        '&' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Ampersand,
+                pos,
+                column,
+            })
+        }
+        '\\' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Backslash,
+                pos,
+                column,
+            })
+        }
+        '*' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Asterisk,
+                pos,
+                column,
+            })
+        }
+        '_' => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Underscore,
+                pos,
+                column,
+            })
+        }
+        _ if is_ident_start(c) => {
+            lexer.consume();
+            let mut ident = String::new();
+            ident.push(c);
+            loop {
+                match lexer.current {
+                    Some(c) if is_ident_continue(c) => {
+                        lexer.consume();
+                        ident.push(c);
+                    }
+                    _ => break,
+                }
+            }
+            Some(Token {
+                data: token::Data::Ident(Rc::from(ident)),
+                pos,
+                column,
+            })
+        }
+        _ if c.is_ascii_digit() => lexer.consume_int(Sign::None, c, pos, column),
+        _ => {
+            lexer.consume();
+            Some(Token {
+                data: token::Data::Unexpected(c),
+                pos,
+                column,
+            })
+        }
+    }
+}
+
+/// Generate the next token, assuming [`Mode::Cmd`] mode.
+fn cmd_next(lexer: &mut Lexer, c: char, pos: usize, column: usize) -> Option<Token> {
+    match c {
+        '`' => {
+            lexer.consume();
+
+            lexer.context.pop();
+
+            Some(Token {
+                data: token::Data::Backtick,
+                pos,
+                column,
+            })
+        }
+        ' ' => {
+            lexer.consume();
+
+            Some(Token {
+                data: token::Data::Space,
+                pos,
+                column,
+            })
+        }
+        '"' => {
+            lexer.consume();
+            lexer.context.push(Mode::String);
+
+            Some(Token {
+                data: token::Data::DoubleQuote,
+                pos,
+                column,
+            })
+        }
+        '$' => {
+            lexer.consume();
+
+            match lexer.current {
+                Some('{') => {
+                    lexer.consume();
+
+                    lexer.context.push(Mode::Normal);
+
+                    Some(Token {
+                        data: token::Data::DollarLBrace,
+                        pos,
+                        column,
+                    })
+                }
+                Some('.') => {
+                    lexer.consume();
+
+                    match lexer.current {
+                        Some('.') => {
+                            lexer.consume();
+
+                            match lexer.current {
+                                Some('{') => {
+                                    lexer.consume();
+
+                                    lexer.context.push(Mode::Normal);
 
                                     Some(Token {
-                                        data: token::Data::Dollar,
+                                        data: token::Data::DollarDotDotLBrace,
+                                        pos,
+                                        column,
+                                    })
+                                }
+                                _ => {
+                                    lexer.context.push(Mode::Ident);
+
+                                    Some(Token {
+                                        data: token::Data::DollarDotDot,
                                         pos,
                                         column,
                                     })
                                 }
                             }
                         }
-                        '\n' => {
-                            self.consume();
+                        Some(c) => Some(Token {
+                            data: token::Data::Unexpected(c),
+                            pos: lexer.pos,
+                            column: lexer.column,
+                        }),
+                        None => Some(Token {
+                            data: token::Data::Unexpected('.'),
+                            pos: lexer.pos,
+                            column: lexer.column,
+                        }),
+                    }
+                }
+                _ => {
+                    lexer.context.push(Mode::Ident);
 
-                            Some(Token {
-                                data: token::Data::Unexpected(c),
-                                pos,
-                                column,
-                            })
-                        }
-                        _ => {
-                            let mut textual_length = 0;
-                            let mut value = String::new();
+                    Some(Token {
+                        data: token::Data::Dollar,
+                        pos,
+                        column,
+                    })
+                }
+            }
+        }
+        '\n' => {
+            lexer.consume();
 
-                            while let Some(c) = self.current {
-                                match c {
-                                    '`' | ' ' | '"' | '$' | '\n' => {
-                                        break;
-                                    }
-                                    '\\' => {
-                                        self.consume();
-                                        textual_length += 1;
+            Some(Token {
+                data: token::Data::Unexpected(c),
+                pos,
+                column,
+            })
+        }
+        _ => {
+            let mut textual_length = 0;
+            let mut value = String::new();
 
-                                        match self.current {
-                                            Some(c) => match c {
-                                                '"' | '`' | '$' | '\\' => {
-                                                    self.consume();
-                                                    value.write_char(c).unwrap();
-                                                    textual_length += 1;
-                                                }
-                                                _ => {
-                                                    return Some(Token {
-                                                        data: token::Data::Unexpected(c),
-                                                        pos: self.pos,
-                                                        column: self.column,
-                                                    })
-                                                }
-                                            },
-                                            None => {
-                                                return Some(Token {
-                                                    data: token::Data::Unexpected('\\'),
-                                                    pos: self.pos,
-                                                    column: self.column,
-                                                })
-                                            }
-                                        }
-                                    }
-                                    _ => {
-                                        self.consume();
-                                        value.write_char(c).unwrap();
-                                        textual_length += 1;
-                                    }
+            while let Some(c) = lexer.current {
+                match c {
+                    '`' | ' ' | '"' | '$' | '\n' => {
+                        break;
+                    }
+                    '\\' => {
+                        lexer.consume();
+                        textual_length += 1;
+
+                        match lexer.current {
+                            Some(c) => match c {
+                                '"' | '`' | '$' | '\\' => {
+                                    lexer.consume();
+                                    value.write_char(c).unwrap();
+                                    textual_length += 1;
                                 }
-                            }
-
-                            if textual_length > 0 {
-                                Some(Token {
-                                    data: token::Data::Cmd(Rc::from(value)),
-                                    pos,
-                                    column,
+                                _ => {
+                                    return Some(Token {
+                                        data: token::Data::Unexpected(c),
+                                        pos: lexer.pos,
+                                        column: lexer.column,
+                                    })
+                                }
+                            },
+                            None => {
+                                return Some(Token {
+                                    data: token::Data::Unexpected('\\'),
+                                    pos: lexer.pos,
+                                    column: lexer.column,
                                 })
-                            } else {
-                                self.next()
                             }
                         }
                     }
+                    _ => {
+                        lexer.consume();
+                        value.write_char(c).unwrap();
+                        textual_length += 1;
+                    }
                 }
-            },
+            }
+
+            if textual_length > 0 {
+                Some(Token {
+                    data: token::Data::Cmd(Rc::from(value)),
+                    pos,
+                    column,
+                })
+            } else {
+                lexer.next()
+            }
         }
     }
 }
