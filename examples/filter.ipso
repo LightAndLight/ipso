@@ -1,0 +1,11 @@
+oneToFive : Array Int
+oneToFive = [1, 2, 3, 4, 5]
+
+even : Int -> Bool
+even n = int.mod n 2 == 0
+
+main : IO ()
+main =
+  comp
+    println <| debug (array.filter even oneToFive)
+    println <| debug (array.filterMap (\n -> if even n then Some (n + 1) else None ()) oneToFive)
