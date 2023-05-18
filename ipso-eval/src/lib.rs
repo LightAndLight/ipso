@@ -5,6 +5,7 @@ mod test;
 
 pub mod bindings;
 pub mod closure_conversion;
+pub mod reflect;
 
 use bindings::{Binding, Bindings};
 use closure_conversion::Expr;
@@ -12,6 +13,7 @@ use ipso_core::{self as core, Binop, Builtin, CommonKinds, Name, Pattern, String
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
 use paste::paste;
+use reflect::{Reflect, ReflectRef};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -688,21 +690,14 @@ where {
         Rc::from(values)
     }
 
-    pub fn alloc_ordering(&self, ordering: Ordering) -> Value {
-        match ordering {
-            std::cmp::Ordering::Less => {
-                // Less () : (| Equal : (), Greater : (), Less : () |)
-                self.alloc(Object::Variant(2, Value::Unit))
-            }
-            std::cmp::Ordering::Equal => {
-                // Equal () : (| Equal : (), Greater : (), Less : () |)
-                self.alloc(Object::Variant(0, Value::Unit))
-            }
-            std::cmp::Ordering::Greater => {
-                // Greater () : (| Equal : (), Greater : (), Less : () |)
-                self.alloc(Object::Variant(1, Value::Unit))
-            }
-        }
+    #[inline(always)]
+    pub fn reflect<T: Reflect>(&mut self, value: T) -> Value {
+        value.reflect(self)
+    }
+
+    #[inline(always)]
+    pub fn reflect_ref<T: ReflectRef + ?Sized>(&mut self, value: &T) -> Value {
+        value.reflect_ref(self)
     }
 
     pub fn eval_builtin(&self, name: &Builtin) -> Value {
@@ -794,7 +789,8 @@ where {
                     self,
                     |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_string();
-                        interpreter.alloc(Object::Bytes(Rc::from(a.as_bytes())))
+                        let bytes: Rc<[u8]> = Rc::from(a.as_bytes());
+                        interpreter.reflect(bytes)
                     }
                 )
             }
@@ -856,8 +852,8 @@ where {
                     // env[0] : Stdin
                     let mut str = String::new();
                     let _ = interpreter.stdin.read_line(&mut str).unwrap();
-                    let str = interpreter.alloc_str(&str);
-                    interpreter.alloc(Object::String(str))
+                    let str: Rc<str> = interpreter.alloc_str(&str);
+                    interpreter.reflect(str)
                 }
 
                 self.alloc(Object::IO {
@@ -869,14 +865,10 @@ where {
                 function2!(
                     eq_string,
                     self,
-                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
-                        if a == b {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
+                        interpreter.reflect(a == b)
                     }
                 )
             }
@@ -887,7 +879,7 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_string();
                         let b = arg.unpack_string();
-                        interpreter.alloc_ordering(a.as_ref().cmp(b.as_ref()))
+                        interpreter.reflect(a.as_ref().cmp(b.as_ref()))
                     }
                 )
             }
@@ -895,14 +887,10 @@ where {
                 function2!(
                     eq_int,
                     self,
-                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
-                        if a == b {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
+                        interpreter.reflect(a == b)
                     }
                 )
             }
@@ -913,7 +901,7 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
-                        interpreter.alloc_ordering(a.cmp(&b))
+                        interpreter.reflect(a.cmp(&b))
                     }
                 )
             }
@@ -923,8 +911,8 @@ where {
                     self,
                     |eval: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let a = arg.unpack_int();
-                        let str = eval.alloc_str(&format!("{}", a));
-                        eval.alloc(Object::String(str))
+                        let str: Rc<str> = eval.alloc_str(&format!("{}", a));
+                        eval.reflect(str)
                     }
                 )
             }
@@ -1021,7 +1009,7 @@ where {
                                 break;
                             }
                         }
-                        interpreter.alloc_ordering(ordering)
+                        interpreter.reflect(ordering)
                     }
                 )
             }
@@ -1056,8 +1044,8 @@ where {
                             array.push(f.apply(eval, ix));
                         }
 
-                        let array = eval.alloc_values(array);
-                        eval.alloc(Object::Array(array))
+                        let array: Rc<[Value]> = eval.alloc_values(array);
+                        eval.reflect(array)
                     }
                 )
             }
@@ -1065,10 +1053,9 @@ where {
                 function1!(
                     length_array,
                     self,
-                    |_: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let arr = arg.unpack_array();
-
-                        Value::Int(arr.len() as i32)
+                        interpreter.reflect(arr.len() as i32)
                     }
                 )
             }
@@ -1079,7 +1066,6 @@ where {
                     |_eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let ix = env[0].unpack_int() as usize;
                         let arr = arg.unpack_array();
-
                         arr[ix].clone()
                     }
                 )
@@ -1091,9 +1077,8 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let start = env[0].unpack_int() as usize;
                         let len = env[1].unpack_int() as usize;
-                        let arr = arg.unpack_array();
-
-                        eval.alloc(Object::Array(Rc::from(&arr[start..start + len])))
+                        let array = arg.unpack_array();
+                        eval.reflect_ref(&array[start..start + len])
                     }
                 )
             }
@@ -1107,12 +1092,11 @@ where {
                         let new_string: String = string
                             .chars()
                             .filter(|c| {
-                                let c_val = Value::Char(*c);
+                                let c_val = eval.reflect(c);
                                 predicate.apply(eval, c_val).unpack_bool()
                             })
                             .collect();
-                        let str = eval.alloc_str(&new_string);
-                        eval.alloc(Object::String(str))
+                        eval.reflect(new_string)
                     }
                 )
             }
@@ -1120,14 +1104,10 @@ where {
                 function2!(
                     eq_char,
                     self,
-                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
-                        if c1 == c2 {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
+                        interpreter.reflect(c1 == c2)
                     }
                 )
             }
@@ -1138,7 +1118,7 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c1 = env[0].unpack_char();
                         let c2 = arg.unpack_char();
-                        interpreter.alloc_ordering(c1.cmp(&c2))
+                        interpreter.reflect(c1.cmp(&c2))
                     }
                 )
             }
@@ -1149,11 +1129,7 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let sep = env[0].unpack_string();
                         let s = arg.unpack_string();
-                        let a = eval.alloc_values(
-                            s.split(sep.as_ref())
-                                .map(|s| eval.alloc(Object::String(Rc::from(s)))),
-                        );
-                        eval.alloc(Object::Array(a))
+                        eval.reflect(s.split(sep.as_ref()).collect::<Vec<_>>())
                     }
                 )
             }
@@ -1164,10 +1140,7 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
-                        let a = eval.alloc_values(
-                            s.split(c).map(|s| eval.alloc(Object::String(Rc::from(s)))),
-                        );
-                        eval.alloc(Object::Array(a))
+                        eval.reflect(s.split(c).collect::<Vec<_>>())
                     }
                 )
             }
@@ -1179,15 +1152,14 @@ where {
                         let sep = env[0].unpack_string();
                         let strings = arg.unpack_array();
                         if strings.is_empty() {
-                            eval.alloc(Object::String(Rc::from("")))
+                            eval.reflect("")
                         } else {
                             let mut joined = String::from(strings[0].unpack_string().as_ref());
                             for string in &strings[1..] {
                                 joined.push_str(sep.as_ref());
                                 joined.push_str(string.unpack_string().as_ref());
                             }
-                            let joined = eval.alloc_str(&joined);
-                            eval.alloc(Object::String(joined))
+                            eval.reflect(joined)
                         }
                     }
                 )
@@ -1234,14 +1206,13 @@ where {
                                 .unwrap();
                             std::process::exit(1)
                         } else {
-                            let a = eval.alloc_values(
+                            eval.reflect(
                                 Parts {
                                     delimiter: sep.as_ref(),
                                     string: s.as_ref(),
                                 }
-                                .map(|part| eval.alloc(Object::String(Rc::from(part)))),
-                            );
-                            eval.alloc(Object::Array(a))
+                                .collect::<Vec<_>>(),
+                            )
                         }
                     }
                 )
@@ -1280,14 +1251,13 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c = env[0].unpack_char();
                         let s = arg.unpack_string();
-                        let a = eval.alloc_values(
+                        eval.reflect(
                             Partsc {
                                 delimiter: c,
                                 string: s.as_ref(),
                             }
-                            .map(|part| eval.alloc(Object::String(Rc::from(part)))),
-                        );
-                        eval.alloc(Object::Array(a))
+                            .collect::<Vec<_>>(),
+                        )
                     }
                 )
             }
@@ -1298,10 +1268,11 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let predicate = &env[0];
                         let input_string = arg.unpack_string();
-                        let output_string = input_string.trim_matches(|c: char| {
-                            predicate.apply(eval, Value::Char(c)).unpack_bool()
+                        let output_string: &str = input_string.trim_matches(|c: char| {
+                            let c = eval.reflect(c);
+                            predicate.apply(eval, c).unpack_bool()
                         });
-                        eval.alloc(Object::String(Rc::from(output_string)))
+                        eval.reflect(output_string)
                     }
                 )
             }
@@ -1312,8 +1283,8 @@ where {
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let c: char = env[0].unpack_char();
                         let input_string = arg.unpack_string();
-                        let output_string = input_string.trim_matches(c);
-                        eval.alloc(Object::String(Rc::from(output_string)))
+                        let output_string: &str = input_string.trim_matches(c);
+                        eval.reflect(output_string)
                     }
                 )
             }
@@ -1323,8 +1294,8 @@ where {
                     self,
                     |eval: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
                         let input_string = arg.unpack_string();
-                        let output_string = input_string.trim();
-                        eval.alloc(Object::String(Rc::from(output_string)))
+                        let output_string: &str = input_string.trim();
+                        eval.reflect(output_string)
                     }
                 )
             }
@@ -1337,7 +1308,7 @@ where {
                         let mut acc = env[1].clone();
                         let s = arg.unpack_string();
                         for c in s.chars() {
-                            let c_value = Value::Char(c);
+                            let c_value = eval.reflect(c);
                             acc = f.apply(eval, acc).apply(eval, c_value);
                         }
                         acc
@@ -1350,12 +1321,12 @@ where {
                     self,
                     |eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let array = env[0].unpack_array();
-                        let new_array = eval.alloc_values({
+                        let new_array: Rc<[Value]> = eval.alloc_values({
                             let mut new_array = Vec::from(array.as_ref());
                             new_array.push(arg);
                             new_array
                         });
-                        eval.alloc(Object::Array(new_array))
+                        eval.reflect(new_array)
                     }
                 )
             }
@@ -1400,14 +1371,10 @@ where {
             Builtin::EqBool => function2!(
                 eq_bool,
                 self,
-                |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                     let a = env[0].unpack_bool();
                     let b = arg.unpack_bool();
-                    if a == b {
-                        Value::True
-                    } else {
-                        Value::False
-                    }
+                    interpreter.reflect(a == b)
                 }
             ),
             Builtin::Lines => function1!(
@@ -1431,20 +1398,17 @@ where {
 
                             check_exit_status(&cmd[0], &output.status);
 
-                            let lines: Vec<Value> = output
-                                .stdout
-                                .lines()
-                                .map(|line| {
-                                    let line = line.unwrap_or_else(|err| {
-                                        panic!("failed to decode line: {}", err)
-                                    });
-                                    let line = interpreter.alloc_str(&line);
-                                    interpreter.alloc(Object::String(line))
-                                })
-                                .collect();
-
-                            let lines = interpreter.alloc_values(lines);
-                            interpreter.alloc(Object::Array(lines))
+                            interpreter.reflect(
+                                output
+                                    .stdout
+                                    .lines()
+                                    .map(|line: Result<String, _>| {
+                                        line.unwrap_or_else(|err| {
+                                            panic!("failed to decode line: {}", err)
+                                        })
+                                    })
+                                    .collect::<Vec<_>>(),
+                            )
                         }
                     }
 
@@ -1462,7 +1426,7 @@ where {
                     fn cmd_read_io(interpreter: &mut Interpreter<'_>, env: Rc<[Value]>) -> Value {
                         let cmd: &[Rc<str>] = env[0].unpack_cmd();
                         if cmd.is_empty() {
-                            interpreter.alloc(Object::String(Rc::from("")))
+                            interpreter.reflect("")
                         } else {
                             let output = process::Command::new(cmd[0].as_ref())
                                 .args(cmd[1..].iter().map(|arg| arg.as_ref()))
@@ -1476,12 +1440,10 @@ where {
 
                             check_exit_status(&cmd[0], &output.status);
 
-                            let line: Rc<str> = Rc::from(
-                                std::str::from_utf8(&output.stdout)
-                                    .unwrap_or_else(|err| panic!("{:?}", err)),
-                            );
+                            let line: &str = std::str::from_utf8(&output.stdout)
+                                .unwrap_or_else(|err| panic!("{:?}", err));
 
-                            interpreter.alloc(Object::String(line))
+                            interpreter.reflect(line)
                         }
                     }
 
@@ -1519,7 +1481,7 @@ where {
                         })
                         .collect::<Vec<String>>()
                         .join(" ");
-                    interpreter.alloc(Object::String(interpreter.alloc_str(cmd.as_str())))
+                    interpreter.reflect(cmd.as_str())
                 }
             ),
             Builtin::DebugCmd => function1!(
@@ -1563,7 +1525,7 @@ where {
 
                     buffer.push('`');
 
-                    interpreter.alloc(Object::String(interpreter.alloc_str(&buffer)))
+                    interpreter.reflect(buffer)
                 }
             ),
             Builtin::CmdTry => function1!(
@@ -1643,7 +1605,7 @@ where {
                         )
                     }
 
-                    interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
+                    interpreter.reflect(result)
                 }
             ),
             Builtin::MapArray => function2!(
@@ -1653,12 +1615,12 @@ where {
                     let f = env[0].clone();
                     let xs = arg.unpack_array();
 
-                    let result = xs
+                    let result: Vec<Value> = xs
                         .iter()
                         .map(|x| f.apply(interpreter, x.clone()))
                         .collect::<Vec<_>>();
 
-                    interpreter.alloc(Object::Array(interpreter.alloc_values(result)))
+                    interpreter.reflect(result)
                 }
             ),
             Builtin::CharToString => function1!(
@@ -1666,8 +1628,8 @@ where {
                 self,
                 |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     let char = arg.unpack_char();
-                    let string = format!("{:?}", char);
-                    interpreter.alloc(Object::String(interpreter.alloc_str(&string)))
+                    let string: String = format!("{:?}", char);
+                    interpreter.reflect(string)
                 }
             ),
             Builtin::DebugString => function1!(
@@ -1675,8 +1637,8 @@ where {
                 self,
                 |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
                     let string = arg.unpack_string();
-                    let new_string = format!("{:?}", string);
-                    interpreter.alloc(Object::String(interpreter.alloc_str(&new_string)))
+                    let new_string: String = format!("{:?}", string);
+                    interpreter.reflect(new_string)
                 }
             ),
             Builtin::ArrayUnfoldr => {
@@ -1687,7 +1649,7 @@ where {
                         let mut s = env[0].clone();
                         let f = arg;
 
-                        let mut array = Vec::new();
+                        let mut array: Vec<Value> = Vec::new();
                         loop {
                             // (| Step : ..., Skip : ..., Done : ... |)
                             let value = f.apply(interpreter, s);
@@ -1719,8 +1681,7 @@ where {
                             }
                         }
 
-                        let array = interpreter.alloc_values(array);
-                        interpreter.alloc(Object::Array(array))
+                        interpreter.reflect(array)
                     }
                 )
             }
@@ -1728,10 +1689,10 @@ where {
                 function2!(
                     int_mod,
                     self,
-                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let a = env[0].unpack_int();
                         let b = arg.unpack_int();
-                        Value::Int(a % b)
+                        interpreter.reflect(a % b)
                     }
                 )
             }
@@ -1740,13 +1701,12 @@ where {
                     path_exists,
                     self,
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
-                        fn path_exists_io_1(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                        fn path_exists_io_1(
+                            interpreter: &mut Interpreter,
+                            env: Rc<[Value]>,
+                        ) -> Value {
                             let path = env[0].unpack_string();
-                            if Path::new(path.as_ref()).exists() {
-                                Value::True
-                            } else {
-                                Value::False
-                            }
+                            interpreter.reflect(Path::new(path.as_ref()).exists())
                         }
                         let env = interpreter.alloc_values({
                             let mut env = Vec::from(env.as_ref());
@@ -1763,7 +1723,7 @@ where {
             }
             Builtin::EnvProgram => {
                 fn env_program_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
-                    interpreter.alloc(Object::String(interpreter.program.clone()))
+                    interpreter.reflect(interpreter.program.clone())
                 }
                 let closure = Object::IO {
                     env: Rc::from([]),
@@ -1773,12 +1733,7 @@ where {
             }
             Builtin::EnvArgs => {
                 fn env_args_io(interpreter: &mut Interpreter, _: Rc<[Value]>) -> Value {
-                    let args = &interpreter.args;
-                    let args = interpreter.alloc_values(
-                        args.iter()
-                            .map(|arg| interpreter.alloc(Object::String(arg.clone()))),
-                    );
-                    interpreter.alloc(Object::Array(args))
+                    interpreter.reflect(interpreter.args)
                 }
                 let closure = Object::IO {
                     env: Rc::from([]),
@@ -1797,16 +1752,15 @@ where {
                                 Err(err) => match err {
                                     std::env::VarError::NotPresent => {
                                         // None () : (| None : (), Some : String |)
-                                        interpreter.alloc(Object::Variant(0, Value::Unit))
+                                        interpreter.reflect(None::<String>)
                                     }
                                     err => {
                                         panic!("getvar: {}", err)
                                     }
                                 },
                                 Ok(value) => {
-                                    let value = interpreter.alloc(Object::String(Rc::from(value)));
                                     // Some value : (| None : (), Some : String |)
-                                    interpreter.alloc(Object::Variant(1, value))
+                                    interpreter.reflect(Some(value))
                                 }
                             }
                         }
@@ -1848,7 +1802,7 @@ where {
                                         panic!("getvar!: {}", err)
                                     }
                                 },
-                                Ok(value) => interpreter.alloc(Object::String(Rc::from(value))),
+                                Ok(value) => interpreter.reflect(value),
                             }
                         }
                         let env = interpreter.alloc_values({
@@ -1915,7 +1869,7 @@ where {
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         fn exit_with_io(_: &mut Interpreter, env: Rc<[Value]>) -> Value {
                             let code: i32 = env[0].unpack_int();
-                            std::process::exit(code as i32)
+                            std::process::exit(code)
                         }
                         let env = interpreter.alloc_values({
                             let mut env = Vec::from(env.as_ref());
@@ -1938,7 +1892,7 @@ where {
                         let path = env[0].unpack_string();
                         let contents = std::fs::read_to_string(path.as_ref())
                             .unwrap_or_else(|err| panic!("{}", err));
-                        interpreter.alloc(Object::String(Rc::from(contents)))
+                        interpreter.reflect(contents)
                     }
 
                     let env = interpreter.alloc_values([arg]);
@@ -2075,9 +2029,7 @@ where {
                                                         let stripped = buffer
                                                             .strip_suffix('\n')
                                                             .unwrap_or(&buffer);
-                                                        let line = interpreter.alloc(
-                                                            Object::String(Rc::from(stripped)),
-                                                        );
+                                                        let line = interpreter.reflect(stripped);
                                                         func.apply(interpreter, line)
                                                             .perform_io(interpreter);
                                                     }
@@ -2126,9 +2078,8 @@ where {
                     self,
                     |interpreter: &mut Interpreter, _env: Rc<[Value]>, arg: Value| {
                         let string = arg.unpack_string();
-                        let chars: Rc<[Value]> =
-                            string.chars().map(Value::Char).collect::<Vec<_>>().into();
-                        interpreter.alloc(Object::Array(chars))
+                        let chars: Vec<char> = string.chars().collect::<Vec<_>>();
+                        interpreter.reflect(chars)
                     }
                 )
             }
@@ -2138,12 +2089,8 @@ where {
                     self,
                     |interpreter: &mut Interpreter, _env: Rc<[Value]>, arg: Value| {
                         let chars = arg.unpack_array();
-                        let string: Rc<str> = chars
-                            .iter()
-                            .map(|c| c.unpack_char())
-                            .collect::<String>()
-                            .into();
-                        interpreter.alloc(Object::String(string))
+                        let string = chars.iter().map(|c| c.unpack_char()).collect::<String>();
+                        interpreter.reflect(string)
                     }
                 )
             }
@@ -2154,19 +2101,7 @@ where {
                     |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         let prefix = env[0].unpack_string();
                         let string = arg.unpack_string();
-                        match string.strip_prefix(prefix.as_ref()) {
-                            None => {
-                                // None () : (| None : (), Some : String |)
-                                interpreter.alloc(Object::Variant(0, Value::Unit))
-                            }
-                            Some(rest) => interpreter.alloc(
-                                // Some rest : (| None : (), Some : String |)
-                                Object::Variant(
-                                    1,
-                                    interpreter.alloc(Object::String(Rc::from(rest))),
-                                ),
-                            ),
-                        }
+                        interpreter.reflect(string.strip_prefix(prefix.as_ref()))
                     }
                 )
             }
@@ -2174,14 +2109,10 @@ where {
                 function2!(
                     string_starts_with,
                     self,
-                    |_interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
                         let prefix = env[0].unpack_string();
                         let string = arg.unpack_string();
-                        if string.starts_with(prefix.as_ref()) {
-                            Value::True
-                        } else {
-                            Value::False
-                        }
+                        interpreter.reflect(string.starts_with(prefix.as_ref()))
                     }
                 )
             }
@@ -2192,13 +2123,12 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let predicate = &env[0];
                         let array = arg.unpack_array();
-                        let new_array: Rc<[Value]> = array
+                        let new_array: Vec<Value> = array
                             .iter()
                             .cloned()
                             .filter(|item| predicate.apply(interpreter, item.clone()).unpack_bool())
-                            .collect::<Vec<_>>()
-                            .into();
-                        interpreter.alloc(Object::Array(new_array))
+                            .collect::<Vec<_>>();
+                        interpreter.reflect(new_array)
                     }
                 )
             }
@@ -2209,7 +2139,7 @@ where {
                     |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
                         let predicate = &env[0];
                         let array = arg.unpack_array();
-                        let new_array: Rc<[Value]> = array
+                        let new_array: Vec<Value> = array
                             .iter()
                             .cloned()
                             .filter_map(|item| {
@@ -2224,9 +2154,8 @@ where {
                                     value => panic!("expected tag 0 or 1, got: {:?}", value),
                                 }
                             })
-                            .collect::<Vec<_>>()
-                            .into();
-                        interpreter.alloc(Object::Array(new_array))
+                            .collect::<Vec<_>>();
+                        interpreter.reflect(new_array)
                     }
                 )
             }
@@ -2427,7 +2356,7 @@ where {
                         c.extend(b.as_ref().iter().cloned());
                         c
                     };
-                    self.alloc(Object::Array(self.alloc_values(c)))
+                    self.reflect(c)
                 }
                 Binop::Or => {
                     if self.eval(env, a).unpack_bool() {
@@ -2459,14 +2388,12 @@ where {
 
             Expr::String(parts) => {
                 let value = self.eval_string_parts(env, parts);
-                let str = self.alloc_str(&value);
-                self.alloc(Object::String(str))
+                self.reflect(value)
             }
 
             Expr::Array(items) => {
                 let items: Vec<Value> = items.iter().map(|item| self.eval(env, item)).collect();
-                let items = self.alloc_values(items);
-                self.alloc(Object::Array(items))
+                self.reflect(items)
             }
 
             Expr::Extend(ev, value, rest) => {
