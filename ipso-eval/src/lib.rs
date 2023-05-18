@@ -2147,6 +2147,44 @@ where {
                     }
                 )
             }
+            Builtin::StringStripPrefix => {
+                function2!(
+                    string_strip_prefix,
+                    self,
+                    |interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        let prefix = env[0].unpack_string();
+                        let string = arg.unpack_string();
+                        match string.strip_prefix(prefix.as_ref()) {
+                            None => {
+                                // None () : (| None : (), Some : String |)
+                                interpreter.alloc(Object::Variant(0, Value::Unit))
+                            }
+                            Some(rest) => interpreter.alloc(
+                                // Some rest : (| None : (), Some : String |)
+                                Object::Variant(
+                                    1,
+                                    interpreter.alloc(Object::String(Rc::from(rest))),
+                                ),
+                            ),
+                        }
+                    }
+                )
+            }
+            Builtin::StringStartsWith => {
+                function2!(
+                    string_starts_with,
+                    self,
+                    |_interpreter: &mut Interpreter, env: Rc<[Value]>, arg: Value| {
+                        let prefix = env[0].unpack_string();
+                        let string = arg.unpack_string();
+                        if string.starts_with(prefix.as_ref()) {
+                            Value::True
+                        } else {
+                            Value::False
+                        }
+                    }
+                )
+            }
         }
     }
 

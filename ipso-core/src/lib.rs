@@ -853,6 +853,8 @@ pub enum Builtin {
     CmdEachline_,
     StringToChars,
     StringFromChars,
+    StringStripPrefix,
+    StringStartsWith,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
