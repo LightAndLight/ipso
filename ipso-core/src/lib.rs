@@ -855,6 +855,8 @@ pub enum Builtin {
     StringFromChars,
     StringStripPrefix,
     StringStartsWith,
+    ArrayFilter,
+    ArrayFilterMap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

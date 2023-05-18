@@ -353,5 +353,57 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::ArrayEach_),
         }),
+        // filter : (a -> Bool) -> Array a -> Array a
+        Rc::new(Declaration::Definition {
+            name: Rc::from("filter"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::arrow(common_kinds, a.clone(), Type::Bool),
+                        Type::arrow(
+                            common_kinds,
+                            Type::app(Type::mk_array(common_kinds), a.clone()),
+                            Type::app(Type::mk_array(common_kinds), a),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayFilter),
+        }),
+        // filterMap : (a -> (| Some : b, None : () |)) -> Array a -> Array b
+        Rc::new(Declaration::Definition {
+            name: Rc::from("filterMap"),
+            sig: {
+                let a = Type::unsafe_mk_var(1, Kind::Type);
+                let b = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind()), (Rc::from("b"), b.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::arrow(
+                            common_kinds,
+                            a.clone(),
+                            Type::mk_variant(
+                                common_kinds,
+                                vec![
+                                    (Rc::from("Some"), b.clone()),
+                                    (Rc::from("None"), Type::Unit),
+                                ],
+                                None,
+                            ),
+                        ),
+                        Type::arrow(
+                            common_kinds,
+                            Type::app(Type::mk_array(common_kinds), a),
+                            Type::app(Type::mk_array(common_kinds), b),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayFilterMap),
+        }),
     ]
 }
