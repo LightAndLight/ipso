@@ -2120,6 +2120,33 @@ where {
                     }
                 )
             }
+            Builtin::StringToChars => {
+                function1!(
+                    string_to_chars,
+                    self,
+                    |interpreter: &mut Interpreter, _env: Rc<[Value]>, arg: Value| {
+                        let string = arg.unpack_string();
+                        let chars: Rc<[Value]> =
+                            string.chars().map(Value::Char).collect::<Vec<_>>().into();
+                        interpreter.alloc(Object::Array(chars))
+                    }
+                )
+            }
+            Builtin::StringFromChars => {
+                function1!(
+                    string_from_chars,
+                    self,
+                    |interpreter: &mut Interpreter, _env: Rc<[Value]>, arg: Value| {
+                        let chars = arg.unpack_array();
+                        let string: Rc<str> = chars
+                            .iter()
+                            .map(|c| c.unpack_char())
+                            .collect::<String>()
+                            .into();
+                        interpreter.alloc(Object::String(string))
+                    }
+                )
+            }
         }
     }
 
