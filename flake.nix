@@ -22,7 +22,7 @@
           ];
         };
 
-        rustVersion = "1.62.1";
+        rustVersion = "1.69.0";
         
         rustPkgs = { release }: pkgs.rustBuilder.makePackageSet {
           rustChannel = rustVersion;
