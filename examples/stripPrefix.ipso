@@ -1,0 +1,7 @@
+main : IO ()
+main =
+  comp
+    println <| debug (string.stripPrefix "" "hello")
+    println <| debug (string.stripPrefix "h" "hello")
+    println <| debug (string.stripPrefix "he" "hello")
+    println <| debug (string.stripPrefix "boo" "hello")

@@ -1,0 +1,7 @@
+main : IO ()
+main =
+  comp
+    println <| debug (string.startsWith "" "hello")
+    println <| debug (string.startsWith "h" "hello")
+    println <| debug (string.startsWith "he" "hello")
+    println <| debug (string.startsWith "boo" "hello")

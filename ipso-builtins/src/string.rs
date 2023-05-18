@@ -209,5 +209,42 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::StringFromChars),
         }),
+        // stripPrefix : String -> String -> (| Some : String, None : () |)
+        Rc::new(Declaration::Definition {
+            name: Rc::from("stripPrefix"),
+            sig: TypeSig {
+                ty_vars: vec![],
+                body: Type::arrow(
+                    common_kinds,
+                    Type::String,
+                    Type::arrow(
+                        common_kinds,
+                        Type::String,
+                        Type::mk_variant(
+                            common_kinds,
+                            vec![
+                                (Rc::from("Some"), Type::String),
+                                (Rc::from("None"), Type::Unit),
+                            ],
+                            None,
+                        ),
+                    ),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringStripPrefix),
+        }),
+        // startsWith : String -> String -> Bool
+        Rc::new(Declaration::Definition {
+            name: Rc::from("startsWith"),
+            sig: TypeSig {
+                ty_vars: vec![],
+                body: Type::arrow(
+                    common_kinds,
+                    Type::String,
+                    Type::arrow(common_kinds, Type::String, Type::Bool),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringStartsWith),
+        }),
     ]
 }
