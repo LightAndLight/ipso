@@ -851,6 +851,8 @@ pub enum Builtin {
     FileAppend,
     ArrayEach_,
     CmdEachline_,
+    StringToChars,
+    StringFromChars,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

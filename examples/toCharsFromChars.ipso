@@ -1,0 +1,6 @@
+main : IO ()
+main =
+  comp
+    let chars = string.toChars "abcd"
+    println <| debug chars
+    println <| debug (string.fromChars chars)

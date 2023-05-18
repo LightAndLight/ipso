@@ -183,5 +183,31 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::StringTrim),
         }),
+        // toChars : String -> Array Char
+        Rc::new(Declaration::Definition {
+            name: Rc::from("toChars"),
+            sig: TypeSig {
+                ty_vars: vec![],
+                body: Type::arrow(
+                    common_kinds,
+                    Type::String,
+                    Type::app(Type::mk_array(common_kinds), Type::Char),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringToChars),
+        }),
+        // fromChars : Array Char -> String
+        Rc::new(Declaration::Definition {
+            name: Rc::from("fromChars"),
+            sig: TypeSig {
+                ty_vars: vec![],
+                body: Type::arrow(
+                    common_kinds,
+                    Type::app(Type::mk_array(common_kinds), Type::Char),
+                    Type::String,
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::StringFromChars),
+        }),
     ]
 }
