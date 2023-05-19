@@ -2159,6 +2159,44 @@ where {
                     }
                 )
             }
+            Builtin::ArrayFind => {
+                function2!(
+                    array_find,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let predicate = &env[0];
+                        let array = arg.unpack_array();
+                        let result = array
+                            .iter()
+                            .cloned()
+                            .find(|item| predicate.apply(interpreter, item.clone()).unpack_bool());
+                        interpreter.reflect(result)
+                    }
+                )
+            }
+            Builtin::ArrayFindMap => {
+                function2!(
+                    array_find_map,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let predicate = &env[0];
+                        let array = arg.unpack_array();
+                        let result = array.iter().cloned().find_map(|item| {
+                            match predicate.apply(interpreter, item).unpack_variant() {
+                                // None () : (| None : (), Some : b |)
+                                (0, value) => {
+                                    value.unpack_unit();
+                                    None
+                                }
+                                // Some value : (| None : (), Some : b |)
+                                (1, value) => Some(value.clone()),
+                                value => panic!("expected tag 0 or 1, got: {:?}", value),
+                            }
+                        });
+                        interpreter.reflect(result)
+                    }
+                )
+            }
         }
     }
 

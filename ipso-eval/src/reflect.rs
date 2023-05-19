@@ -180,6 +180,12 @@ impl<T: Reflect> Reflect for Option<T> {
     }
 }
 
+impl Reflect for Value {
+    fn reflect(self, _interpreter: &mut Interpreter) -> Value {
+        self
+    }
+}
+
 /// Ipso type: `Bool`
 impl Reflect for bool {}
 

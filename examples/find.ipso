@@ -1,0 +1,10 @@
+oneToFive : Array Int
+oneToFive = [1, 2, 3, 4, 5]
+
+main : IO ()
+main =
+  comp
+    println <| debug (array.find (\n -> n > 2) oneToFive)
+    println <| debug (array.find (\n -> n > 10) oneToFive)
+    println <| debug (array.findMap (\n -> if n > 2 then Some (debug n) else None ()) oneToFive)
+    println <| debug (array.findMap (\n -> if n > 10 then Some (debug n) else None ()) oneToFive)
