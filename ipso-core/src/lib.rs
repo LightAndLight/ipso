@@ -859,6 +859,7 @@ pub enum Builtin {
     ArrayFilterMap,
     ArrayFind,
     ArrayFindMap,
+    ArraySwap,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

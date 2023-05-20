@@ -465,5 +465,29 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::ArrayFindMap),
         }),
+        // swap : Int -> Int -> Array a -> Array a
+        Rc::new(Declaration::Definition {
+            name: Rc::from("swap"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::Int,
+                        Type::arrow(
+                            common_kinds,
+                            Type::Int,
+                            Type::arrow(
+                                common_kinds,
+                                Type::app(Type::mk_array(common_kinds), a.clone()),
+                                Type::app(Type::mk_array(common_kinds), a),
+                            ),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArraySwap),
+        }),
     ]
 }

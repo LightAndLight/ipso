@@ -1,0 +1,8 @@
+fiveToOne : Array Int
+fiveToOne = [5, 4, 3, 2, 1]
+
+main : IO ()
+main =
+  comp
+    println <| debug (array.swap 1 3 fiveToOne)
+    println <| debug (array.swap 2 2 fiveToOne)
