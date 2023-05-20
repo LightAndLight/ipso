@@ -1,7 +1,7 @@
 bad : Int
 bad =
   let zzz = [3] in
-  (let xxx = "xxx" in 2) * (let yyy = array.index 0 zzz in yyy)
+  (let xxx = "xxx" in 2) * (let yyy = array.get! 0 zzz in yyy)
 
 main : IO ()
 main =

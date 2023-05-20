@@ -1,0 +1,8 @@
+oneToFive : Array Int
+oneToFive = [1, 2, 3, 4, 5]
+
+main : IO ()
+main =
+  comp
+    println <| debug (array.get 2 oneToFive)
+    println <| debug (array.get 10 oneToFive)
