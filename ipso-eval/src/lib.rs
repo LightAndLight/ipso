@@ -2216,6 +2216,26 @@ where {
                     }
                 )
             }
+            Builtin::ArrayFirst => {
+                function1!(
+                    array_first,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                        let array = arg.unpack_array();
+                        interpreter.reflect(array.first())
+                    }
+                )
+            }
+            Builtin::ArrayLast => {
+                function1!(
+                    array_last,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                        let array = arg.unpack_array();
+                        interpreter.reflect(array.last())
+                    }
+                )
+            }
         }
     }
 
