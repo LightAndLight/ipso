@@ -1,6 +1,6 @@
 first! : Array a -> String
 first! =
-  array.index 0
+  array.get! 0
 
 main : IO ()
 main = io.pure ()

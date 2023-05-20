@@ -97,9 +97,33 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::LengthArray),
         }),
-        // index : Int -> Array a -> a
+        // get : Int -> Array a -> (| Some : a, None : () |)
         Rc::new(Declaration::Definition {
-            name: Rc::from("index"),
+            name: Rc::from("get"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::Int,
+                        Type::arrow(
+                            common_kinds,
+                            Type::app(Type::mk_array(common_kinds), a.clone()),
+                            Type::mk_variant(
+                                common_kinds,
+                                vec![("Some".into(), a), ("None".into(), Type::Unit)],
+                                None,
+                            ),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayGet),
+        }),
+        // get! : Int -> Array a -> a
+        Rc::new(Declaration::Definition {
+            name: Rc::from("get!"),
             sig: {
                 let a = Type::unsafe_mk_var(0, Kind::Type);
                 TypeSig {
@@ -115,7 +139,7 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
                     ),
                 }
             },
-            body: Expr::alloc_builtin(Builtin::IndexArray),
+            body: Expr::alloc_builtin(Builtin::ArrayGetBang),
         }),
         // slice : Int -> Int -> Array a -> Array a
         Rc::new(Declaration::Definition {
@@ -464,6 +488,70 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
                 }
             },
             body: Expr::alloc_builtin(Builtin::ArrayFindMap),
+        }),
+        // swap : Int -> Int -> Array a -> Array a
+        Rc::new(Declaration::Definition {
+            name: Rc::from("swap"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::Int,
+                        Type::arrow(
+                            common_kinds,
+                            Type::Int,
+                            Type::arrow(
+                                common_kinds,
+                                Type::app(Type::mk_array(common_kinds), a.clone()),
+                                Type::app(Type::mk_array(common_kinds), a),
+                            ),
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArraySwap),
+        }),
+        // first : Array a -> (| Some : a, None : () |)
+        Rc::new(Declaration::Definition {
+            name: Rc::from("first"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::app(Type::mk_array(common_kinds), a.clone()),
+                        Type::mk_variant(
+                            common_kinds,
+                            vec![("Some".into(), a), ("None".into(), Type::Unit)],
+                            None,
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayFirst),
+        }),
+        // last : Array a -> (| Some : a, None : () |)
+        Rc::new(Declaration::Definition {
+            name: Rc::from("last"),
+            sig: {
+                let a = Type::unsafe_mk_var(0, Kind::Type);
+                TypeSig {
+                    ty_vars: vec![(Rc::from("a"), a.kind())],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::app(Type::mk_array(common_kinds), a.clone()),
+                        Type::mk_variant(
+                            common_kinds,
+                            vec![("Some".into(), a), ("None".into(), Type::Unit)],
+                            None,
+                        ),
+                    ),
+                }
+            },
+            body: Expr::alloc_builtin(Builtin::ArrayLast),
         }),
     ]
 }

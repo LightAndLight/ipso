@@ -29,6 +29,12 @@ impl ReflectRef for Value {
     }
 }
 
+impl ReflectRef for &Value {
+    fn reflect_ref(&self, _interpreter: &mut Interpreter) -> Value {
+        (*self).clone()
+    }
+}
+
 /// Ipso type: `Bool`
 impl ReflectRef for bool {
     fn reflect_ref(&self, _interpreter: &mut Interpreter) -> Value {
@@ -183,6 +189,12 @@ impl<T: Reflect> Reflect for Option<T> {
 impl Reflect for Value {
     fn reflect(self, _interpreter: &mut Interpreter) -> Value {
         self
+    }
+}
+
+impl Reflect for &Value {
+    fn reflect(self, _interpreter: &mut Interpreter) -> Value {
+        self.clone()
     }
 }
 

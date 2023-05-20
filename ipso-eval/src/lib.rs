@@ -1059,14 +1059,25 @@ where {
                     }
                 )
             }
-            Builtin::IndexArray => {
+            Builtin::ArrayGet => {
                 function2!(
-                    index_array,
+                    array_get,
                     self,
-                    |_eval: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
-                        let ix = env[0].unpack_int() as usize;
-                        let arr = arg.unpack_array();
-                        arr[ix].clone()
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let index = env[0].unpack_int() as usize;
+                        let array = arg.unpack_array();
+                        interpreter.reflect(array.get(index))
+                    }
+                )
+            }
+            Builtin::ArrayGetBang => {
+                function2!(
+                    array_get_bang,
+                    self,
+                    |_: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let index = env[0].unpack_int() as usize;
+                        let array = arg.unpack_array();
+                        array[index].clone()
                     }
                 )
             }
@@ -2194,6 +2205,45 @@ where {
                             }
                         });
                         interpreter.reflect(result)
+                    }
+                )
+            }
+            Builtin::ArraySwap => {
+                function3!(
+                    array_swap,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let from = env[0].unpack_int();
+                        let to = env[1].unpack_int();
+                        let array = arg.unpack_array();
+
+                        let new_array: Vec<Value> = {
+                            let mut array: Vec<Value> = Vec::from(array.as_ref());
+                            array.as_mut_slice().swap(from as usize, to as usize);
+                            array
+                        };
+
+                        interpreter.reflect(new_array)
+                    }
+                )
+            }
+            Builtin::ArrayFirst => {
+                function1!(
+                    array_first,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                        let array = arg.unpack_array();
+                        interpreter.reflect(array.first())
+                    }
+                )
+            }
+            Builtin::ArrayLast => {
+                function1!(
+                    array_last,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _: Rc<[Value]>, arg: Value| {
+                        let array = arg.unpack_array();
+                        interpreter.reflect(array.last())
                     }
                 )
             }

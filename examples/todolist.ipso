@@ -9,8 +9,8 @@ deleteAt target arr =
       (array.length arr - 1)
       (\ix ->
         if ix < target
-        then array.index ix arr
-        else array.index (ix + 1) arr
+        then array.get! ix arr
+        else array.get! (ix + 1) arr
       )
   else arr
 
@@ -59,12 +59,12 @@ parseCommand :
 parseCommand line =
   let stripped = strip line in
   let lines = string.partsc ' ' stripped in
-  if array.length lines == 1 && array.index 0 lines == "quit" then Quit ()
-  else if array.length lines == 1 && array.index 0 lines == "help" then Help ()
-  else if array.length lines == 1 && array.index 0 lines == "list" then List ()
-  else if array.length lines == 2 && array.index 0 lines == "add" then Add (array.index 1 lines)
-  else if array.length lines == 2 && array.index 0 lines == "delete" then
-    case readInt (array.index 1 lines) of
+  if array.length lines == 1 && array.get! 0 lines == "quit" then Quit ()
+  else if array.length lines == 1 && array.get! 0 lines == "help" then Help ()
+  else if array.length lines == 1 && array.get! 0 lines == "list" then List ()
+  else if array.length lines == 2 && array.get! 0 lines == "add" then Add (array.get! 1 lines)
+  else if array.length lines == 2 && array.get! 0 lines == "delete" then
+    case readInt (array.get! 1 lines) of
       Err () -> Invalid stripped
       Ok n -> Delete n
   else Invalid stripped

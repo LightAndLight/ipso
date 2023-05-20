@@ -807,7 +807,8 @@ pub enum Builtin {
     CompareArray,
     GenerateArray,
     LengthArray,
-    IndexArray,
+    ArrayGet,
+    ArrayGetBang,
     SliceArray,
     EqString,
     CompareString,
@@ -859,6 +860,9 @@ pub enum Builtin {
     ArrayFilterMap,
     ArrayFind,
     ArrayFindMap,
+    ArraySwap,
+    ArrayFirst,
+    ArrayLast,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

@@ -7,7 +7,7 @@
     ''
     etaReductionTypeError.ipso:3:3: error: expected type "Array a -> String", got type "Array a -> a"
       |
-    3 |   array.index 0
+    3 |   array.get! 0
       |   ^
     '',
   exitcode = 1

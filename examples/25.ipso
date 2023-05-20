@@ -12,7 +12,7 @@ prettyArray arr =
     else 
       array.foldl 
         (\acc el -> "${acc}, ${show el}") 
-        (array.index 0 arr)
+        (array.get! 0 arr)
         (array.slice 1 (array.length arr - 1) arr)
   }]"
 

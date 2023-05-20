@@ -5,10 +5,10 @@
   stdout = "",
   stderr =
     ''
-    25.ipso:15:24: error: expected type "Array String", got type "Array a"
+    25.ipso:15:23: error: expected type "Array String", got type "Array a"
        |
-    15 |         (array.index 0 arr)
-       |                        ^
+    15 |         (array.get! 0 arr)
+       |                       ^
     '',
   exitcode = 1
 }
