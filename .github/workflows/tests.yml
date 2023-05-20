@@ -23,7 +23,7 @@ env:
   NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
 
   # The version of ipso to use for CI scripts that are written in the language.
-  IPSO_PACKAGE: "github:LightAndLight/ipso?commit=24f53253a49172b47c228c237a749f0ab120730c"
+  IPSO_PACKAGE: "github:LightAndLight/ipso?commit=2a6837f560d902f70c7bb2eecf7eeff822ee6030"
 jobs:
   tests:
     runs-on: ubuntu-latest
