@@ -117,6 +117,10 @@ jobs:
       if: always()
       run: pueue wait
 
+    - name: log all uploads
+      if: always()
+      run: pueue log --json | jq '.[].task.original_command' -r
+
     - name: log failed uploads
       if: always()
       run: pueue log --json | jq 'to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
