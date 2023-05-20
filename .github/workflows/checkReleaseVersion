@@ -19,9 +19,9 @@ main =
           let versionInRust = 
             versionLine 
             |> string.partsc ' '
-            |> array.index 5
+            |> array.get! 5
             |> string.partsc '"'
-            |> array.index 0
+            |> array.get! 0
           
           println "$versionVar version: $versionInGit"
           println "$versionFile version: $versionInRust"
