@@ -1,7 +1,4 @@
-#! /nix/var/nix/profiles/per-user/runner/profile/bin/ipso
-
-# On Macos, `/usr/bin/env ipso` doesn't find `ipso` after I install it with Nix.
-# I haven't figured out why.
+#! /usr/bin/env ipso
 
 getvar : String -> IO String
 getvar key =
