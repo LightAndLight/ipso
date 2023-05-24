@@ -23,7 +23,7 @@ env:
   NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
 
   # The version of ipso to use for CI scripts that are written in the language.
-  IPSO_PACKAGE: "github:LightAndLight/ipso?commit=2a6837f560d902f70c7bb2eecf7eeff822ee6030"
+  CI_IPSO_VERSION: "v0.5"
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -56,6 +56,18 @@ jobs:
 
     # Used in `postBuildHook`.
     - run: sudo cp .github/workflows/uploadToCache /run/uploadToCache
+
+    # [note: installing Ipso binary]
+    #
+    # Installing an Ipso release binary leads to more reliable Nix caching (versus using `nix
+    # profile install`). See <https://github.com/LightAndLight/ipso/issues/407>.
+    - run: mkdir -p $HOME/bin
+    - run: >
+        curl -L
+        "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64"
+        > $HOME/bin/ipso
+    - run: chmod +x $HOME/bin/ipso
+    - run: echo "$HOME/bin" >> $GITHUB_PATH
     
     # [note: nix profile install not adding to PATH]
     #
@@ -65,15 +77,7 @@ jobs:
     # [Docs for `GITHUB_PATH`](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path)
     - run: nix profile install nixpkgs#pueue
     - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
-    
     - run: pueued -d
-
-    # See [note: nix profile install not adding to PATH]
-    - run: >
-        nix profile install $IPSO_PACKAGE
-        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
-        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-    - run: "echo \"$(nix path-info $IPSO_PACKAGE)/bin\" >> $GITHUB_PATH"
 
     - name: cache .cargo
       uses: actions/cache@v3
