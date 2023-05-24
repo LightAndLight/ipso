@@ -130,9 +130,11 @@ jobs:
     - run: chmod +x $HOME/bin/ipso
     - run: echo "$HOME/bin" >> $GITHUB_PATH
 
-    # See [note: nix profile install not adding to PATH]
     - run: nix profile install nixpkgs#pueue
-    - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
+
+    # See [note: nix profile install not adding to PATH]
+    - run: echo "$(readlink ~/.nix-profile)/bin" >> $GITHUB_PATH
+
     - run: pueued -d
 
     - run: >
