@@ -50,13 +50,14 @@ jobs:
     - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
 
     # See [note: installing Ipso binary]
-    - run: mkdir -p $HOME/bin
-    - run: >
-        curl -L
-        "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64"
-        > $HOME/bin/ipso
-    - run: chmod +x $HOME/bin/ipso
-    - run: echo "$HOME/bin" >> $GITHUB_PATH
+    - name: Install Ipso binary
+      run: |
+        mkdir -p $HOME/bin
+        curl -L \
+          "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64" \
+          > $HOME/bin/ipso
+        chmod +x $HOME/bin/ipso
+        echo "$HOME/bin" >> $GITHUB_PATH
 
     - run: nix profile install nixpkgs#pueue
 
@@ -124,13 +125,14 @@ jobs:
     - run: sudo cp $UPLOAD_TO_CACHE /var/run/uploadToCache
 
     # See [note: installing Ipso binary]
-    - run: mkdir -p $HOME/bin
-    - run: >
-        curl -L
-        "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-macos-x86_64"
-        > $HOME/bin/ipso
-    - run: chmod +x $HOME/bin/ipso
-    - run: echo "$HOME/bin" >> $GITHUB_PATH
+    - name: Install Ipso binary
+      run: |
+        mkdir -p $HOME/bin
+        curl -L \
+          "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-macos-x86_64" \
+          > $HOME/bin/ipso
+        chmod +x $HOME/bin/ipso
+        echo "$HOME/bin" >> $GITHUB_PATH
 
     - run: nix profile install nixpkgs#pueue
 
@@ -204,13 +206,14 @@ jobs:
     - run: sudo cp $UPLOAD_TO_CACHE /run/uploadToCache
 
     # See [note: installing Ipso binary]
-    - run: mkdir -p $HOME/bin
-    - run: >
-        curl -L
-        "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64"
-        > $HOME/bin/ipso
-    - run: chmod +x $HOME/bin/ipso
-    - run: echo "$HOME/bin" >> $GITHUB_PATH
+    - name: Install Ipso binary
+      run: |
+        mkdir -p $HOME/bin
+        curl -L \
+          "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64" \
+          > $HOME/bin/ipso
+        chmod +x $HOME/bin/ipso
+        echo "$HOME/bin" >> $GITHUB_PATH
 
     - run: nix profile install nixpkgs#pueue
 
