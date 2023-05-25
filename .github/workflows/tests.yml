@@ -7,7 +7,7 @@ on:
   push:
     branches:
     - main
-  
+
   pull_request:
 
 env:
@@ -34,7 +34,7 @@ jobs:
       with:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
-    
+
     - uses: cachix/install-nix-action@v15
 
     # Used by `uploadToCache` to sign store paths.
@@ -61,22 +61,25 @@ jobs:
     #
     # Installing an Ipso release binary leads to more reliable Nix caching (versus using `nix
     # profile install`). See <https://github.com/LightAndLight/ipso/issues/407>.
-    - run: mkdir -p $HOME/bin
-    - run: >
-        curl -L
-        "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64"
-        > $HOME/bin/ipso
-    - run: chmod +x $HOME/bin/ipso
-    - run: echo "$HOME/bin" >> $GITHUB_PATH
-    
+    - name: Install Ipso binary
+      run: |
+        mkdir -p $HOME/bin
+        curl -L \
+          "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64" \
+          > $HOME/bin/ipso
+        chmod +x $HOME/bin/ipso
+        echo "$HOME/bin" >> $GITHUB_PATH
+
+    - run: nix profile install nixpkgs#pueue
+
     # [note: nix profile install not adding to PATH]
     #
     # `nix profile install nixpkgs#pueue` used to "just work", but on 2023-03-02 I started getting
     # `pueued: command not found` errors. So add it to the path manually.
     #
     # [Docs for `GITHUB_PATH`](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path)
-    - run: nix profile install nixpkgs#pueue
-    - run: "echo \"$(nix path-info nixpkgs#pueue)/bin\" >> $GITHUB_PATH"
+    - run: echo "$(readlink ~/.nix-profile)/bin" >> $GITHUB_PATH
+
     - run: pueued -d
 
     - name: cache .cargo
@@ -91,7 +94,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
           ${{ runner.os }}-build-${{ env.cache-name }}-
-    
+
     - name: "tests"
       if: github.event_name == 'pull_request'
       run: >
