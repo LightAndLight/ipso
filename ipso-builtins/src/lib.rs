@@ -1,14 +1,14 @@
 #![deny(unused_crate_dependencies)]
 
 pub mod array;
-pub mod file;
-pub mod path;
-pub mod exit;
-pub mod env;
 pub mod char;
 pub mod cmd;
+pub mod env;
+pub mod exit;
+pub mod file;
 pub mod int;
 pub mod io;
+pub mod path;
 pub mod string;
 
 use ipso_core::{
@@ -107,6 +107,76 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     ),
                 },
                 body: Expr::alloc_builtin(Builtin::Print),
+            },
+            // eprintln : String -> IO ()
+            Declaration::Definition {
+                name: Rc::from("eprintln"),
+                sig: TypeSig {
+                    ty_vars: vec![],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::String,
+                        Type::app(io_ty.clone(), Type::Unit),
+                    ),
+                },
+                body: Expr::alloc_builtin(Builtin::Eprintln),
+            },
+            // eprint : String -> IO ()
+            Declaration::Definition {
+                name: Rc::from("eprint"),
+                sig: TypeSig {
+                    ty_vars: vec![],
+                    body: Type::arrow(
+                        common_kinds,
+                        Type::String,
+                        Type::app(io_ty.clone(), Type::Unit),
+                    ),
+                },
+                body: Expr::alloc_builtin(Builtin::Eprint),
+            },
+            // dprintln : Debug a => a -> IO ()
+            Declaration::Definition {
+                name: Rc::from("dprintln"),
+                sig: TypeSig {
+                    ty_vars: vec![("a".into(), Kind::Type)],
+                    body: {
+                        let a = Type::unsafe_mk_var(0, Kind::Type);
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Debug"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(common_kinds, a, Type::app(io_ty.clone(), Type::Unit)),
+                        )
+                    },
+                },
+                body: Expr::alloc_builtin(Builtin::Dprintln),
+            },
+            // dprint : Debug a => a -> IO ()
+            Declaration::Definition {
+                name: Rc::from("dprint"),
+                sig: TypeSig {
+                    ty_vars: vec![("a".into(), Kind::Type)],
+                    body: {
+                        let a = Type::unsafe_mk_var(0, Kind::Type);
+                        Type::mk_fatarrow(
+                            common_kinds,
+                            Type::app(
+                                Type::Name(
+                                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
+                                    Rc::from("Debug"),
+                                ),
+                                a.clone(),
+                            ),
+                            Type::arrow(common_kinds, a, Type::app(io_ty.clone(), Type::Unit)),
+                        )
+                    },
+                },
+                body: Expr::alloc_builtin(Builtin::Dprint),
             },
             // readln : IO String
             Declaration::Definition {
@@ -1318,14 +1388,14 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                     Rc::from("Debug"),
                 );
                 let a = Type::Var(Kind::Type, 0);
-                
+
                 Declaration::Instance {
                     ty_vars: vec![(Rc::from("a"), Kind::Type)],
                     assumes: vec![
                         // Debug a
                         Type::app(debug.clone(), a.clone()),
                     ],
-                    head: 
+                    head:
                     // Debug (Array a)
                     Type::app(
                         debug,
@@ -1336,61 +1406,65 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             },
             Declaration::Evidence {
                 name: Rc::from("Debug Array"),
-                
+
                 // \debugDict -> { debug = ... }
-                body: Rc::new(Expr::mk_lam(true, Expr::mk_record(
-                    vec![(
-                        // debug
-                        Expr::Int(0),
-                        // \x -> "[${string.join ", " (array.map (debug debugDict) x)}]"
-                        Expr::mk_lam(
-                            true,
-                            Expr::String(
-                                vec![
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_record(
+                        vec![(
+                            // debug
+                            Expr::Int(0),
+                            // \x -> "[${string.join ", " (array.map (debug debugDict) x)}]"
+                            Expr::mk_lam(
+                                true,
+                                Expr::String(vec![
                                     StringPart::from("["),
-                                    StringPart::Expr(
+                                    StringPart::Expr(Expr::mk_app(
+                                        Expr::mk_app(
+                                            Expr::Module {
+                                                id: ModuleRef::This,
+                                                path: vec![String::from("string")],
+                                                item: Name::definition("join"),
+                                            },
+                                            Expr::String(vec![StringPart::from(", ")]),
+                                        ),
                                         Expr::mk_app(
                                             Expr::mk_app(
                                                 Expr::Module {
                                                     id: ModuleRef::This,
-                                                    path: vec![String::from("string")],
-                                                    item: Name::definition("join"),
+                                                    path: vec![String::from("array")],
+                                                    item: Name::definition("map"),
                                                 },
-                                                Expr::String(vec![StringPart::from(", ")]),
-                                            ),
-                                            Expr::mk_app(
                                                 Expr::mk_app(
-                                                    Expr::Module {
-                                                        id: ModuleRef::This,
-                                                        path: vec![String::from("array")],
-                                                        item: Name::definition("map"),
-                                                    },
-                                                    Expr::mk_app(Expr::Name(Name::definition("debug")), Expr::Var(1)),
+                                                    Expr::Name(Name::definition("debug")),
+                                                    Expr::Var(1),
                                                 ),
-                                                Expr::Var(0),
                                             ),
+                                            Expr::Var(0),
                                         ),
-                                    ),
+                                    )),
                                     StringPart::from("]"),
-                                ]
-                            )
-                        ),
-                    )],
-                    None,
-                ))),
+                                ]),
+                            ),
+                        )],
+                        None,
+                    ),
+                )),
             },
             // not : Bool -> Bool
             Declaration::Definition {
                 name: Rc::from("not"),
                 sig: {
                     TypeSig {
-                        ty_vars: vec![
-                        ],
+                        ty_vars: vec![],
                         body: Type::arrow(common_kinds, Type::Bool, Type::Bool),
                     }
                 },
                 // \x -> if x then false else true
-                body: Rc::new(Expr::mk_lam(true, Expr::mk_ifthenelse(Expr::Var(0), Expr::False, Expr::True))),
+                body: Rc::new(Expr::mk_lam(
+                    true,
+                    Expr::mk_ifthenelse(Expr::Var(0), Expr::False, Expr::True),
+                )),
             },
         ],
     }

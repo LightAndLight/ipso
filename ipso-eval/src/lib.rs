@@ -2247,6 +2247,134 @@ where {
                     }
                 )
             }
+            Builtin::Eprintln => {
+                function1!(
+                    eprintln,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        fn eprintln(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            writeln!(interpreter.stderr, "{}", value)
+                                .expect("writing to stderr failed");
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+
+                        interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(eprintln),
+                        })
+                    }
+                )
+            }
+            Builtin::Eprint => {
+                function1!(
+                    eprint,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        fn eprint(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            // env[0] : String
+                            let value = env[0].unpack_string();
+                            {
+                                write!(interpreter.stderr, "{}", value)
+                                    .expect("writing to stderr failed");
+                                interpreter.stderr.flush().expect("flushing stderr failed");
+                            }
+                            Value::Unit
+                        }
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+
+                        interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(eprint),
+                        })
+                    }
+                )
+            }
+            Builtin::Dprintln => {
+                function2!(
+                    dprintln,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        fn dprintln(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            // env[0] : { debug : a -> String }
+                            let debug_dict = &env[0];
+
+                            // env[1] : a
+                            let value = env[1].clone();
+
+                            let string = debug_dict
+                                .unpack_record()
+                                .get(0)
+                                .unwrap()
+                                .apply(interpreter, value)
+                                .unpack_string();
+                            writeln!(interpreter.stdout, "{}", string)
+                                .expect("writing to stdout failed");
+
+                            Value::Unit
+                        }
+
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+
+                        interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(dprintln),
+                        })
+                    }
+                )
+            }
+            Builtin::Dprint => {
+                function2!(
+                    dprint,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        fn dprint(interpreter: &mut Interpreter, env: Rc<[Value]>) -> Value {
+                            // env[0] : { debug : a -> String }
+                            let debug_dict = &env[0];
+
+                            // env[1] : a
+                            let value = env[1].clone();
+
+                            let string = debug_dict
+                                .unpack_record()
+                                .get(0)
+                                .unwrap()
+                                .apply(interpreter, value)
+                                .unpack_string();
+                            write!(interpreter.stdout, "{}", string)
+                                .expect("writing to stdout failed");
+                            interpreter.stdout.flush().expect("flushing stdout failed");
+
+                            Value::Unit
+                        }
+
+                        let env = interpreter.alloc_values({
+                            let mut env = Vec::from(env.as_ref());
+                            env.push(arg);
+                            env
+                        });
+
+                        interpreter.alloc(Object::IO {
+                            env,
+                            body: IOBody(dprint),
+                        })
+                    }
+                )
+            }
         }
     }
 
