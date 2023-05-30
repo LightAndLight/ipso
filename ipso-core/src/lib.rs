@@ -867,6 +867,10 @@ pub enum Builtin {
     Eprint,
     Dprintln,
     Dprint,
+    ParseBin,
+    ParseOct,
+    ParseDec,
+    ParseHex,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

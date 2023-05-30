@@ -1,0 +1,24 @@
+main : IO ()
+main =
+  comp
+    dprintln <| int.parseBin "1011"
+    dprintln <| int.parseBin "-1011"
+    dprintln <| int.parseBin "0b1011"
+    dprintln <| int.parseBin "-0b1011"
+    dprintln <| int.parseBin "89"
+
+    dprintln <| int.parseOct "123"
+    dprintln <| int.parseOct "-123"
+    dprintln <| int.parseOct "0o123"
+    dprintln <| int.parseOct "-0o123"
+    dprintln <| int.parseOct "89"
+
+    dprintln <| int.parseDec "1011"
+    dprintln <| int.parseDec "-1011"
+    dprintln <| int.parseDec "faf"
+
+    dprintln <| int.parseHex "1a"
+    dprintln <| int.parseHex "1A"
+    dprintln <| int.parseHex "-8"
+    dprintln <| int.parseHex "0x1a"
+    dprintln <| int.parseHex "-0x1a"

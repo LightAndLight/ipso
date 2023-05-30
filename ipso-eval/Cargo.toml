@@ -10,4 +10,6 @@ fnv = "1.0.7"
 ipso-core = { path = "../ipso-core" }
 ipso-rope = { path = "../ipso-rope" }
 ipso-syntax = { path = "../ipso-syntax" }
+lazy_static = "1.4.0"
 paste = "1.0.5"
+regex = "1.8.3"
