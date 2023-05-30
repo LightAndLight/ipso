@@ -21,6 +21,7 @@ use std::rc::Rc;
 pub fn builtins(common_kinds: &CommonKinds) -> Module {
     let io_ty = Type::mk_io(common_kinds);
     let array_ty = Type::mk_array(common_kinds);
+    let debug_ctor: Rc<str> = Rc::from("Debug");
 
     Module {
         decls: vec![
@@ -146,7 +147,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             Type::app(
                                 Type::Name(
                                     Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                                    Rc::from("Debug"),
+                                    debug_ctor.clone(),
                                 ),
                                 a.clone(),
                             ),
@@ -168,7 +169,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                             Type::app(
                                 Type::Name(
                                     Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                                    Rc::from("Debug"),
+                                    debug_ctor.clone(),
                                 ),
                                 a.clone(),
                             ),
@@ -931,7 +932,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
             */
             Declaration::Class(ClassDeclaration {
                 supers: vec![],
-                name: Rc::from("Debug"),
+                name: debug_ctor.clone(),
                 args: vec![(Rc::from("a"), Kind::Type)],
                 members: vec![ClassMember {
                     name: String::from("debug"),
@@ -951,7 +952,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::Unit,
                 ),
@@ -979,7 +980,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::Int,
                 ),
@@ -1011,7 +1012,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::Char,
                 ),
@@ -1043,7 +1044,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::String,
                 ),
@@ -1070,7 +1071,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::Cmd,
                 ),
@@ -1097,7 +1098,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     Type::Bool,
                 ),
@@ -1180,7 +1181,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     // { a }
                     Type::app(Type::mk_record_ctor(common_kinds), Type::Var(Kind::Row, 0)),
@@ -1337,7 +1338,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
                 head: Type::app(
                     Type::Name(
                         Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                        Rc::from("Debug"),
+                        debug_ctor.clone(),
                     ),
                     // (| a |)
                     Type::app(Type::mk_variant_ctor(common_kinds), Type::Var(Kind::Row, 0)),
@@ -1383,10 +1384,7 @@ pub fn builtins(common_kinds: &CommonKinds) -> Module {
               debug x = string.join ", " <| array.map debug x
             */
             {
-                let debug = Type::Name(
-                    Kind::mk_arrow(&Kind::Type, &Kind::Constraint),
-                    Rc::from("Debug"),
-                );
+                let debug = Type::Name(Kind::mk_arrow(&Kind::Type, &Kind::Constraint), debug_ctor);
                 let a = Type::Var(Kind::Type, 0);
 
                 Declaration::Instance {
