@@ -12,8 +12,10 @@ use closure_conversion::Expr;
 use ipso_core::{self as core, Binop, Builtin, CommonKinds, Name, Pattern, StringPart};
 use ipso_rope::Rope;
 use ipso_syntax::{ModuleId, ModuleRef, Modules};
+use lazy_static::lazy_static;
 use paste::paste;
 use reflect::{Reflect, ReflectRef};
+use regex::Regex;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -2372,6 +2374,185 @@ where {
                             env,
                             body: IOBody(dprint),
                         })
+                    }
+                )
+            }
+            Builtin::ParseBin => {
+                const BASE: i32 = 2;
+
+                lazy_static! {
+                    static ref REGEX: Regex =
+                        Regex::new("^(?P<negative>-)?(0b)?(?P<value>[01]+)$").unwrap();
+                }
+
+                function1!(
+                    parse_bin,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                        let string = arg.unpack_string();
+
+                        match REGEX.captures(&string) {
+                            None => interpreter.reflect(None::<Option<i32>>),
+                            Some(captures) => {
+                                let sign: i32 = if captures.name("negative").is_some() {
+                                    -1
+                                } else {
+                                    1
+                                };
+
+                                let value: i32 = sign
+                                    * captures["value"].chars().fold(0, |value, digit| {
+                                        BASE * value + (if digit == '1' { 1 } else { 0 })
+                                    });
+
+                                interpreter.reflect(Some(value))
+                            }
+                        }
+                    }
+                )
+            }
+            Builtin::ParseOct => {
+                const BASE: i32 = 8;
+
+                lazy_static! {
+                    static ref REGEX: Regex =
+                        Regex::new("^(?P<negative>-)?(0o)?(?P<value>[0-7]+)$").unwrap();
+                }
+
+                function1!(
+                    parse_oct,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                        let string = arg.unpack_string();
+
+                        match REGEX.captures(&string) {
+                            None => interpreter.reflect(None::<Option<i32>>),
+                            Some(captures) => {
+                                let sign: i32 = if captures.name("negative").is_some() {
+                                    -1
+                                } else {
+                                    1
+                                };
+
+                                let value: i32 = sign
+                                    * captures["value"].chars().fold(0, |value, digit| {
+                                        BASE * value
+                                            + (match digit {
+                                                '0' => 0,
+                                                '1' => 1,
+                                                '2' => 2,
+                                                '3' => 3,
+                                                '4' => 4,
+                                                '5' => 5,
+                                                '6' => 6,
+                                                '7' => 7,
+                                                _ => unreachable!(),
+                                            })
+                                    });
+
+                                interpreter.reflect(Some(value))
+                            }
+                        }
+                    }
+                )
+            }
+            Builtin::ParseDec => {
+                const BASE: i32 = 10;
+
+                lazy_static! {
+                    static ref REGEX: Regex =
+                        Regex::new("^(?P<negative>-)?(?P<value>[0-9]+)$").unwrap();
+                }
+
+                function1!(
+                    parse_dec,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                        let string = arg.unpack_string();
+
+                        match REGEX.captures(&string) {
+                            None => interpreter.reflect(None::<Option<i32>>),
+                            Some(captures) => {
+                                let sign: i32 = if captures.name("negative").is_some() {
+                                    -1
+                                } else {
+                                    1
+                                };
+
+                                let value: i32 = sign
+                                    * captures["value"].chars().fold(0, |value, digit| {
+                                        BASE * value
+                                            + (match digit {
+                                                '0' => 0,
+                                                '1' => 1,
+                                                '2' => 2,
+                                                '3' => 3,
+                                                '4' => 4,
+                                                '5' => 5,
+                                                '6' => 6,
+                                                '7' => 7,
+                                                '8' => 8,
+                                                '9' => 9,
+                                                _ => unreachable!(),
+                                            })
+                                    });
+
+                                interpreter.reflect(Some(value))
+                            }
+                        }
+                    }
+                )
+            }
+            Builtin::ParseHex => {
+                const BASE: i32 = 16;
+
+                lazy_static! {
+                    static ref REGEX: Regex =
+                        Regex::new("^(?P<negative>-)?(0x)?(?P<value>[0-9a-fA-F]+)$").unwrap();
+                }
+
+                function1!(
+                    parse_hex,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, _env: Rc<[Value]>, arg: Value| {
+                        let string = arg.unpack_string();
+
+                        match REGEX.captures(&string) {
+                            None => interpreter.reflect(None::<Option<i32>>),
+                            Some(captures) => {
+                                let sign: i32 = if captures.name("negative").is_some() {
+                                    -1
+                                } else {
+                                    1
+                                };
+
+                                let value: i32 = sign
+                                    * captures["value"].chars().fold(0, |value, digit| {
+                                        BASE * value
+                                            + (match digit {
+                                                '0' => 0,
+                                                '1' => 1,
+                                                '2' => 2,
+                                                '3' => 3,
+                                                '4' => 4,
+                                                '5' => 5,
+                                                '6' => 6,
+                                                '7' => 7,
+                                                '8' => 8,
+                                                '9' => 9,
+                                                'a' | 'A' => 10,
+                                                'b' | 'B' => 11,
+                                                'c' | 'C' => 12,
+                                                'd' | 'D' => 13,
+                                                'e' | 'E' => 13,
+                                                'f' | 'F' => 15,
+                                                _ => unreachable!(),
+                                            })
+                                    });
+
+                                interpreter.reflect(Some(value))
+                            }
+                        }
                     }
                 )
             }
