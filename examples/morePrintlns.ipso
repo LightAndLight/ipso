@@ -1,0 +1,7 @@
+main : IO ()
+main =
+  comp
+    eprint "hel"
+    dprint "hel"
+    eprintln "lo"
+    dprintln "lo"

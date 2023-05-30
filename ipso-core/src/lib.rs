@@ -863,6 +863,10 @@ pub enum Builtin {
     ArraySwap,
     ArrayFirst,
     ArrayLast,
+    Eprintln,
+    Eprint,
+    Dprintln,
+    Dprint,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
