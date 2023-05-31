@@ -2556,6 +2556,28 @@ where {
                     }
                 )
             }
+            Builtin::IntMin => {
+                function2!(
+                    int_min,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        interpreter.reflect(a.min(b))
+                    }
+                )
+            }
+            Builtin::IntMax => {
+                function2!(
+                    int_max,
+                    self,
+                    |interpreter: &mut Interpreter<'_>, env: Rc<[Value]>, arg: Value| {
+                        let a = env[0].unpack_int();
+                        let b = arg.unpack_int();
+                        interpreter.reflect(a.max(b))
+                    }
+                )
+            }
         }
     }
 
