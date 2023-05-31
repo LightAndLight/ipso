@@ -525,6 +525,30 @@ module int where
   toString : Int -> String
 
   mod : Int -> Int -> Int
+  
+  min : Int -> Int -> Int
+  
+  max : Int -> Int -> Int
+ 
+  # Parse a binary number.
+  #
+  # Parses strings that match: `-?(0b)?[01]+`
+  parseBin : String -> (| Some : Int, None : () |)
+
+  # Parse an octal number.
+  #
+  # Parses strings that match: `-?(0o)?[0-7]+`
+  parseOct : String -> (| Some : Int, None : () |)
+
+  # Parse a decimal (base 10) number.
+  #
+  # Parses strings that match: `-?[0-9]+`
+  parseDec : String -> (| Some : Int, None : () |)
+
+  # Parse a hexadecimal number (case insensitive).
+  #
+  #Parses strings that match: `-?(0x)?[0-9a-fA-F]+`
+  parseHex : String -> (| Some : Int, None : () |)  
 ```
 
 ### Characters
@@ -585,7 +609,13 @@ module string where
 
   eq : String -> String -> Bool
 
+  foldl : (a -> Char -> a) -> a -> String -> a
+
   filter : (Char -> Bool) -> String -> String
+  
+  toChars : String -> Array Char
+  
+  fromChars : Array Char -> String
 
   split : String -> String -> Array String
   
@@ -628,8 +658,24 @@ module string where
 
   # Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.
   trim : String -> String
-
-  foldl : (a -> Char -> a) -> a -> String -> a
+  
+  # Removes the first argument (`prefix`) from the start of the second argument (`value`).
+  #
+  # Returns `None ()` if `value` doesn't start with `prefix`.
+  # 
+  # # Examples
+  #
+  # * `stripPrefix "hello" "hello world" == Some " world"`
+  # * `stripPrefix "helicopter" "hello world" == None ()`
+  stripPrefix : String -> String -> (| Some : String, None : () |)
+  
+  # Returns `true` when the second argument (`value`) starts with the first argument (`prefix`).
+  # 
+  # # Examples
+  #
+  # * `startsWith "hello" "hello world" == true`
+  # * `startsWith "helicopter" "hello world" == false`
+  startsWith : String -> String -> Bool
 ```
 
 ### Functions
@@ -694,20 +740,53 @@ module array where
 
   length : Array a -> Int
 
-  index : Int -> Array a -> a
+  # Get the value at a given index in the array.
+  #
+  # Returns `None ()` when the index is out of bounds.
+  get : Int -> Array a -> (| Some : a, None : () |)
+  
+  # Like `get`, but crashes when the index is out of bounds.
+  get! : Int -> Array a -> a
+  
+  # Get the first value in the array.
+  #
+  # Returns `None ()` when the array is empty.
+  first : Array -> (| Some : a, None : () |)
+  
+  # Get the last value in the array.
+  #
+  # Returns `None ()` when the array is empty.
+  last : Array -> (| Some : a, None : () |)
 
   slice : Int -> Int -> Array a -> Array a
+  
+  # Swap two elements in an array.
+  #
+  # Crashes when either index is out of bounds.
+  swap : Int -> Int -> Array a -> Array a
 
   snoc : Array a -> a -> Array a
 
   map : (a -> b) -> Array a -> Array b
   
   flatMap : (a -> Array b) -> Array a -> Array b
+  
+  # Keep only the values that satisfy a predicate.
+  filter : (a -> Bool) -> Array a -> Array a
+
+  # Keep and transform the values that satisfy some condition.
+  filterMap : (a -> (| Some : b, None : () |)) -> Array a -> Array b
 
   unfoldr :
     s -> 
     (s -> (| Step : { value : a, next : s }, Skip : { next : s }, Done : () |)) -> 
     Array a
+    
+  # Return the first value of an array that satisfies a predicate.
+  find : (a -> Bool) -> Array a -> (| Some : a, None : () |)
+
+  # Return and transform the first value of an array that satisfies some condition.
+  findMap : (a -> (| Some : b, None : () |)) -> Array a -> (| Some : b, None : () |)
 
   sum : Array Int -> Int
   
@@ -808,6 +887,18 @@ module io where
 println : String -> IO ()
 
 print : String -> IO ()
+
+# Like `println`, but outputs to stderr.
+eprintln : String -> IO ()
+
+# Like `print`, but outputs to stderr.
+eprint : String -> IO ()
+
+# `dprintln x = println <| debug x`
+dprintln : Debug a => a -> IO ()
+
+# `dprint x = print <| debug x`
+dprint : Debug a => a -> IO ()
 ```
 
 ```ipso
