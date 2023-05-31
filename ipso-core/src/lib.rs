@@ -871,6 +871,8 @@ pub enum Builtin {
     ParseOct,
     ParseDec,
     ParseHex,
+    IntMin,
+    IntMax,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

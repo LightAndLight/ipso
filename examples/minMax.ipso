@@ -1,0 +1,10 @@
+main : IO ()
+main =
+  comp
+    dprintln <| int.min -1 1
+    dprintln <| int.min 1 -1
+    dprintln <| int.min 0 0
+    
+    dprintln <| int.max -1 1
+    dprintln <| int.max 1 -1
+    dprintln <| int.max 0 0

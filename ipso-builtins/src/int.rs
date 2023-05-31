@@ -80,5 +80,31 @@ pub fn decls(common_kinds: &CommonKinds) -> Vec<Rc<Declaration>> {
             },
             body: Expr::alloc_builtin(Builtin::ParseHex),
         }),
+        // min : Int -> Int -> Int
+        Rc::new(Declaration::Definition {
+            name: Rc::from("min"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::Int,
+                    Type::arrow(common_kinds, Type::Int, Type::Int),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::IntMin),
+        }),
+        // max : Int -> Int -> Int
+        Rc::new(Declaration::Definition {
+            name: Rc::from("max"),
+            sig: TypeSig {
+                ty_vars: Vec::new(),
+                body: Type::arrow(
+                    common_kinds,
+                    Type::Int,
+                    Type::arrow(common_kinds, Type::Int, Type::Int),
+                ),
+            },
+            body: Expr::alloc_builtin(Builtin::IntMax),
+        }),
     ]
 }
