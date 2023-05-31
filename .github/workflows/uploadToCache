@@ -1,17 +1,5 @@
 #! /usr/bin/env ipso
 
-getvar : String -> IO String
-getvar key =
-  comp
-    bind mValue <- env.getvar key
-    case mValue of
-      None () ->
-        comp
-          println "missing environment variable: $key"
-          exit.failure
-      Some value ->
-        io.pure value
-
 binaryCacheBucket : String
 binaryCacheBucket = "ipso-binary-cache"
 
@@ -21,7 +9,7 @@ binaryCacheEndpoint = "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com
 main : IO ()
 main =
   comp
-    bind outPaths <- getvar "OUT_PATHS"
+    bind outPaths <- env.getvar! "OUT_PATHS"
     println "Uploading paths $outPaths"
     let binaryCacheUrl = "s3://${binaryCacheBucket}?scheme=https&endpoint=$binaryCacheEndpoint&secret-key=/run/nix-signing-key"
     cmd.run `/nix/var/nix/profiles/default/bin/nix copy --to $binaryCacheUrl $..{string.partsc ' ' outPaths}`

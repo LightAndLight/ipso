@@ -1,6 +1,3 @@
-strip : String -> String
-strip = string.filter (\c -> c != '\n')
-
 deleteAt : Int -> Array a -> Array a
 deleteAt target arr =
   if target < array.length arr
@@ -14,38 +11,6 @@ deleteAt target arr =
       )
   else arr
 
-readDigit : Char -> (| Err : (), Ok : Int |)
-readDigit c =
-  case c of
-    '0' -> Ok 0
-    '1' -> Ok 1
-    '2' -> Ok 2
-    '3' -> Ok 3
-    '4' -> Ok 4
-    '5' -> Ok 5
-    '6' -> Ok 6
-    '7' -> Ok 7
-    '8' -> Ok 8
-    '9' -> Ok 9
-    _ -> Err ()
-
-readInt : String -> (| Err : (), Ok : Int |)
-readInt str =
-  if str == ""
-  then Err ()
-  else
-    string.foldl
-      (\acc el ->
-        case acc of
-          Err err -> Err err
-          Ok val ->
-            case readDigit el of
-              Err err -> Err err
-              Ok n -> Ok (10 * val + n)
-      )
-      (Ok 0)
-      str
-
 parseCommand :
   String ->
   (|
@@ -57,31 +22,34 @@ parseCommand :
     Invalid : String
   |)
 parseCommand line =
-  let stripped = strip line in
-  let lines = string.partsc ' ' stripped in
+  let trimmed = string.trim line in
+  let lines = string.partsc ' ' trimmed in
+
+  # Needs https://github.com/LightAndLight/ipso/issues/354
   if array.length lines == 1 && array.get! 0 lines == "quit" then Quit ()
   else if array.length lines == 1 && array.get! 0 lines == "help" then Help ()
   else if array.length lines == 1 && array.get! 0 lines == "list" then List ()
   else if array.length lines == 2 && array.get! 0 lines == "add" then Add (array.get! 1 lines)
   else if array.length lines == 2 && array.get! 0 lines == "delete" then
-    case readInt (array.get! 1 lines) of
-      Err () -> Invalid stripped
-      Ok n -> Delete n
-  else Invalid stripped
+    case int.parseDec (array.get! 1 lines) of
+      None () -> Invalid trimmed
+      Some n -> Delete n
+  else Invalid trimmed
 
 writeTodos : Array String -> IO ()
 writeTodos todos =
-  if todos == []
-  then println "nothing to do"
-  else
-    array.foldl
-      (\acc todo ->
-        comp
-          acc
-          println todo
-      )
-      (io.pure ())
-      todos
+  case todos of
+    [] ->
+      println "nothing to do"
+    _ ->
+      array.foldl
+        (\acc todo ->
+          comp
+            acc
+            println todo
+        )
+        (io.pure ())
+        todos
 
 runCommand :
   (| Quit : (), Help : (), Add : String, List : (), Delete : Int, Invalid : String |) ->
@@ -116,8 +84,8 @@ loop : Array String -> IO ()
 loop todos =
   comp
     print "> "
-    bind line <- readln
-    bind next <- runCommand (parseCommand line) todos
+    bind command <- io.map parseCommand readln
+    bind next <- runCommand command todos
     case next of
       Continue newTodos -> loop newTodos
       Quit () -> io.pure ()
