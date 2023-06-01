@@ -406,7 +406,31 @@ main =
 <span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>  toString <span class="kw">:</span> Int <span class="kw">-&gt;</span> String</span>
 <span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a>  mod <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span></code></pre></div>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a>  mod <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a>  min <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a>  max <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a> </span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parse a binary number.</span></span>
+<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parses strings that match: `-?(0b)?[01]+`</span></span>
+<span id="cb48-16"><a href="#cb48-16" aria-hidden="true" tabindex="-1"></a>  parseBin <span class="kw">:</span> String <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> Int, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb48-17"><a href="#cb48-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-18"><a href="#cb48-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parse an octal number.</span></span>
+<span id="cb48-19"><a href="#cb48-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb48-20"><a href="#cb48-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parses strings that match: `-?(0o)?[0-7]+`</span></span>
+<span id="cb48-21"><a href="#cb48-21" aria-hidden="true" tabindex="-1"></a>  parseOct <span class="kw">:</span> String <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> Int, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb48-22"><a href="#cb48-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-23"><a href="#cb48-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parse a decimal (base 10) number.</span></span>
+<span id="cb48-24"><a href="#cb48-24" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb48-25"><a href="#cb48-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parses strings that match: `-?[0-9]+`</span></span>
+<span id="cb48-26"><a href="#cb48-26" aria-hidden="true" tabindex="-1"></a>  parseDec <span class="kw">:</span> String <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> Int, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb48-27"><a href="#cb48-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-28"><a href="#cb48-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Parse a hexadecimal number (case insensitive).</span></span>
+<span id="cb48-29"><a href="#cb48-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb48-30"><a href="#cb48-30" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Parses strings that match: `-?(0x)?[0-9a-fA-F]+`</span></span>
+<span id="cb48-31"><a href="#cb48-31" aria-hidden="true" tabindex="-1"></a>  parseHex <span class="kw">:</span> String <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> Int, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span>  </span></code></pre></div>
 <h3 id="characters">Characters</h3>
 <p>The <code>Char</code> type represents a unicode code point.</p>
 <div class="sourceCode" id="cb49"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="ch">'a'</span></span>
@@ -439,51 +463,73 @@ main =
 <span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a>  eq <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Bool</span>
 <span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>  filter <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span>
 <span id="cb55-8"><a href="#cb55-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a>  split <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a>  filter <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
 <span id="cb55-10"><a href="#cb55-10" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb55-11"><a href="#cb55-11" aria-hidden="true" tabindex="-1"></a>  splitc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb55-12"><a href="#cb55-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-13"><a href="#cb55-13" aria-hidden="true" tabindex="-1"></a>  join <span class="kw">:</span> String <span class="kw">-&gt;</span> Array String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-11"><a href="#cb55-11" aria-hidden="true" tabindex="-1"></a>  toChars <span class="kw">:</span> String <span class="kw">-&gt;</span> Array Char</span>
+<span id="cb55-12"><a href="#cb55-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-13"><a href="#cb55-13" aria-hidden="true" tabindex="-1"></a>  fromChars <span class="kw">:</span> Array Char <span class="kw">-&gt;</span> String</span>
 <span id="cb55-14"><a href="#cb55-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-15"><a href="#cb55-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
-<span id="cb55-16"><a href="#cb55-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
-<span id="cb55-17"><a href="#cb55-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-18"><a href="#cb55-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Passing an empty string as `delimiter` is a runtime error.</span></span>
-<span id="cb55-19"><a href="#cb55-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-20"><a href="#cb55-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
-<span id="cb55-21"><a href="#cb55-21" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-22"><a href="#cb55-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
-<span id="cb55-23"><a href="#cb55-23" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
-<span id="cb55-24"><a href="#cb55-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb55-25"><a href="#cb55-25" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
-<span id="cb55-26"><a href="#cb55-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
-<span id="cb55-27"><a href="#cb55-27" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb55-28"><a href="#cb55-28" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb55-29"><a href="#cb55-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
-<span id="cb55-30"><a href="#cb55-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
-<span id="cb55-31"><a href="#cb55-31" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-32"><a href="#cb55-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
-<span id="cb55-33"><a href="#cb55-33" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-34"><a href="#cb55-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
-<span id="cb55-35"><a href="#cb55-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
-<span id="cb55-36"><a href="#cb55-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb55-37"><a href="#cb55-37" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
-<span id="cb55-38"><a href="#cb55-38" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
-<span id="cb55-39"><a href="#cb55-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-40"><a href="#cb55-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove characters from both ends of a string, according to a predicate.</span></span>
-<span id="cb55-41"><a href="#cb55-41" aria-hidden="true" tabindex="-1"></a>  trimp <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-42"><a href="#cb55-42" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb55-43"><a href="#cb55-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove a specific character from both ends of a string.</span></span>
-<span id="cb55-44"><a href="#cb55-44" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
-<span id="cb55-45"><a href="#cb55-45" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `trimc c1 = trimp (\c2 -&gt; c2 == c1)`</span></span>
-<span id="cb55-46"><a href="#cb55-46" aria-hidden="true" tabindex="-1"></a>  trimc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-47"><a href="#cb55-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-48"><a href="#cb55-48" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.</span></span>
-<span id="cb55-49"><a href="#cb55-49" aria-hidden="true" tabindex="-1"></a>  trim <span class="kw">:</span> String <span class="kw">-&gt;</span> String</span>
-<span id="cb55-50"><a href="#cb55-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb55-51"><a href="#cb55-51" aria-hidden="true" tabindex="-1"></a>  foldl <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Char <span class="kw">-&gt;</span> a<span class="kw">)</span> <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> a</span></code></pre></div>
+<span id="cb55-15"><a href="#cb55-15" aria-hidden="true" tabindex="-1"></a>  split <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-16"><a href="#cb55-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-17"><a href="#cb55-17" aria-hidden="true" tabindex="-1"></a>  splitc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-18"><a href="#cb55-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-19"><a href="#cb55-19" aria-hidden="true" tabindex="-1"></a>  join <span class="kw">:</span> String <span class="kw">-&gt;</span> Array String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-20"><a href="#cb55-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-21"><a href="#cb55-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `parts delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb55-22"><a href="#cb55-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the string `delimiter`.</span></span>
+<span id="cb55-23"><a href="#cb55-23" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-24"><a href="#cb55-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Passing an empty string as `delimiter` is a runtime error.</span></span>
+<span id="cb55-25"><a href="#cb55-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-26"><a href="#cb55-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-27"><a href="#cb55-27" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-28"><a href="#cb55-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;&quot; == []`</span></span>
+<span id="cb55-29"><a href="#cb55-29" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a&quot; == [&quot;a&quot;]`</span></span>
+<span id="cb55-30"><a href="#cb55-30" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb55-31"><a href="#cb55-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;::&quot; &quot;a::b::&quot; == [&quot;a&quot;, &quot;b&quot;]`</span></span>
+<span id="cb55-32"><a href="#cb55-32" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `parts &quot;!=&quot; &quot;a != b&quot; == [&quot;a &quot;, &quot; b&quot;]`</span></span>
+<span id="cb55-33"><a href="#cb55-33" aria-hidden="true" tabindex="-1"></a>  parts <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-34"><a href="#cb55-34" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-35"><a href="#cb55-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `partsc delimiter value` returns the sections of `value` that don't contain</span></span>
+<span id="cb55-36"><a href="#cb55-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># the character `delimiter`.</span></span>
+<span id="cb55-37"><a href="#cb55-37" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-38"><a href="#cb55-38" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-39"><a href="#cb55-39" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-40"><a href="#cb55-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;&quot; == []`</span></span>
+<span id="cb55-41"><a href="#cb55-41" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello&quot; == [&quot;hello&quot;]`</span></span>
+<span id="cb55-42"><a href="#cb55-42" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;hello world&quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb55-43"><a href="#cb55-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `partsc ' ' &quot;   hello    world   &quot; == [&quot;hello&quot;, &quot;world&quot;]`</span></span>
+<span id="cb55-44"><a href="#cb55-44" aria-hidden="true" tabindex="-1"></a>  partsc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Array String</span>
+<span id="cb55-45"><a href="#cb55-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-46"><a href="#cb55-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove characters from both ends of a string, according to a predicate.</span></span>
+<span id="cb55-47"><a href="#cb55-47" aria-hidden="true" tabindex="-1"></a>  trimp <span class="kw">:</span> <span class="kw">(</span>Char <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-48"><a href="#cb55-48" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-49"><a href="#cb55-49" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove a specific character from both ends of a string.</span></span>
+<span id="cb55-50"><a href="#cb55-50" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-51"><a href="#cb55-51" aria-hidden="true" tabindex="-1"></a>  <span class="co"># `trimc c1 = trimp (\c2 -&gt; c2 == c1)`</span></span>
+<span id="cb55-52"><a href="#cb55-52" aria-hidden="true" tabindex="-1"></a>  trimc <span class="kw">:</span> Char <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-53"><a href="#cb55-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb55-54"><a href="#cb55-54" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove [whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) from both ends of a string.</span></span>
+<span id="cb55-55"><a href="#cb55-55" aria-hidden="true" tabindex="-1"></a>  trim <span class="kw">:</span> String <span class="kw">-&gt;</span> String</span>
+<span id="cb55-56"><a href="#cb55-56" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-57"><a href="#cb55-57" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Removes the first argument (`prefix`) from the start of the second argument (`value`).</span></span>
+<span id="cb55-58"><a href="#cb55-58" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-59"><a href="#cb55-59" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns `None ()` if `value` doesn't start with `prefix`.</span></span>
+<span id="cb55-60"><a href="#cb55-60" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
+<span id="cb55-61"><a href="#cb55-61" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-62"><a href="#cb55-62" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-63"><a href="#cb55-63" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `stripPrefix &quot;hello&quot; &quot;hello world&quot; == Some &quot; world&quot;`</span></span>
+<span id="cb55-64"><a href="#cb55-64" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `stripPrefix &quot;helicopter&quot; &quot;hello world&quot; == None ()`</span></span>
+<span id="cb55-65"><a href="#cb55-65" aria-hidden="true" tabindex="-1"></a>  stripPrefix <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> String, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb55-66"><a href="#cb55-66" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb55-67"><a href="#cb55-67" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns `true` when the second argument (`value`) starts with the first argument (`prefix`).</span></span>
+<span id="cb55-68"><a href="#cb55-68" aria-hidden="true" tabindex="-1"></a>  <span class="co"># </span></span>
+<span id="cb55-69"><a href="#cb55-69" aria-hidden="true" tabindex="-1"></a>  <span class="co"># # Examples</span></span>
+<span id="cb55-70"><a href="#cb55-70" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb55-71"><a href="#cb55-71" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `startsWith &quot;hello&quot; &quot;hello world&quot; == true`</span></span>
+<span id="cb55-72"><a href="#cb55-72" aria-hidden="true" tabindex="-1"></a>  <span class="co"># * `startsWith &quot;helicopter&quot; &quot;hello world&quot; == false`</span></span>
+<span id="cb55-73"><a href="#cb55-73" aria-hidden="true" tabindex="-1"></a>  startsWith <span class="kw">:</span> String <span class="kw">-&gt;</span> String <span class="kw">-&gt;</span> Bool</span></code></pre></div>
 <h3 id="functions">Functions</h3>
 <div class="sourceCode" id="cb56"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:type</span> <span class="kw">\</span>x <span class="kw">-&gt;</span> x</span>
 <span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>forall t0. t0 <span class="kw">-&gt;</span> t0</span></code></pre></div>
@@ -518,26 +564,59 @@ main =
 <span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a>  length <span class="kw">:</span> Array a <span class="kw">-&gt;</span> Int</span>
 <span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a>  index <span class="kw">:</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> a</span>
-<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a>  slice <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
-<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a>  snoc <span class="kw">:</span> Array a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Array a</span>
-<span id="cb64-16"><a href="#cb64-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-17"><a href="#cb64-17" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb64-11"><a href="#cb64-11" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Get the value at a given index in the array.</span></span>
+<span id="cb64-12"><a href="#cb64-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb64-13"><a href="#cb64-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns `None ()` when the index is out of bounds.</span></span>
+<span id="cb64-14"><a href="#cb64-14" aria-hidden="true" tabindex="-1"></a>  get <span class="kw">:</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> a, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb64-15"><a href="#cb64-15" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-16"><a href="#cb64-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Like `get`, but crashes when the index is out of bounds.</span></span>
+<span id="cb64-17"><a href="#cb64-17" aria-hidden="true" tabindex="-1"></a>  get! <span class="kw">:</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> a</span>
 <span id="cb64-18"><a href="#cb64-18" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb64-19"><a href="#cb64-19" aria-hidden="true" tabindex="-1"></a>  flatMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Array b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
-<span id="cb64-20"><a href="#cb64-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-21"><a href="#cb64-21" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span></span>
-<span id="cb64-22"><a href="#cb64-22" aria-hidden="true" tabindex="-1"></a>    s <span class="kw">-&gt;</span> </span>
-<span id="cb64-23"><a href="#cb64-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> </span>
-<span id="cb64-24"><a href="#cb64-24" aria-hidden="true" tabindex="-1"></a>    Array a</span>
-<span id="cb64-25"><a href="#cb64-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-26"><a href="#cb64-26" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
-<span id="cb64-27"><a href="#cb64-27" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb64-28"><a href="#cb64-28" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
-<span id="cb64-29"><a href="#cb64-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb64-30"><a href="#cb64-30" aria-hidden="true" tabindex="-1"></a>  each_ <span class="kw">:</span> Array a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<span id="cb64-19"><a href="#cb64-19" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Get the first value in the array.</span></span>
+<span id="cb64-20"><a href="#cb64-20" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb64-21"><a href="#cb64-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns `None ()` when the array is empty.</span></span>
+<span id="cb64-22"><a href="#cb64-22" aria-hidden="true" tabindex="-1"></a>  first <span class="kw">:</span> Array <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> a, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb64-23"><a href="#cb64-23" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-24"><a href="#cb64-24" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Get the last value in the array.</span></span>
+<span id="cb64-25"><a href="#cb64-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb64-26"><a href="#cb64-26" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Returns `None ()` when the array is empty.</span></span>
+<span id="cb64-27"><a href="#cb64-27" aria-hidden="true" tabindex="-1"></a>  last <span class="kw">:</span> Array <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> a, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb64-28"><a href="#cb64-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-29"><a href="#cb64-29" aria-hidden="true" tabindex="-1"></a>  slice <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb64-30"><a href="#cb64-30" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-31"><a href="#cb64-31" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Swap two elements in an array.</span></span>
+<span id="cb64-32"><a href="#cb64-32" aria-hidden="true" tabindex="-1"></a>  <span class="co">#</span></span>
+<span id="cb64-33"><a href="#cb64-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Crashes when either index is out of bounds.</span></span>
+<span id="cb64-34"><a href="#cb64-34" aria-hidden="true" tabindex="-1"></a>  swap <span class="kw">:</span> Int <span class="kw">-&gt;</span> Int <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb64-35"><a href="#cb64-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-36"><a href="#cb64-36" aria-hidden="true" tabindex="-1"></a>  snoc <span class="kw">:</span> Array a <span class="kw">-&gt;</span> a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb64-37"><a href="#cb64-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-38"><a href="#cb64-38" aria-hidden="true" tabindex="-1"></a>  map <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb64-39"><a href="#cb64-39" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-40"><a href="#cb64-40" aria-hidden="true" tabindex="-1"></a>  flatMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Array b<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb64-41"><a href="#cb64-41" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-42"><a href="#cb64-42" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Keep only the values that satisfy a predicate.</span></span>
+<span id="cb64-43"><a href="#cb64-43" aria-hidden="true" tabindex="-1"></a>  filter <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array a</span>
+<span id="cb64-44"><a href="#cb64-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-45"><a href="#cb64-45" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Keep and transform the values that satisfy some condition.</span></span>
+<span id="cb64-46"><a href="#cb64-46" aria-hidden="true" tabindex="-1"></a>  filterMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> b, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Array b</span>
+<span id="cb64-47"><a href="#cb64-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-48"><a href="#cb64-48" aria-hidden="true" tabindex="-1"></a>  unfoldr <span class="kw">:</span></span>
+<span id="cb64-49"><a href="#cb64-49" aria-hidden="true" tabindex="-1"></a>    s <span class="kw">-&gt;</span> </span>
+<span id="cb64-50"><a href="#cb64-50" aria-hidden="true" tabindex="-1"></a>    <span class="kw">(</span>s <span class="kw">-&gt;</span> <span class="kw">(|</span> Step <span class="kw">:</span> <span class="kw">{</span> value <span class="kw">:</span> a, next <span class="kw">:</span> s <span class="kw">}</span>, Skip <span class="kw">:</span> <span class="kw">{</span> next <span class="kw">:</span> s <span class="kw">}</span>, Done <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> </span>
+<span id="cb64-51"><a href="#cb64-51" aria-hidden="true" tabindex="-1"></a>    Array a</span>
+<span id="cb64-52"><a href="#cb64-52" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb64-53"><a href="#cb64-53" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Return the first value of an array that satisfies a predicate.</span></span>
+<span id="cb64-54"><a href="#cb64-54" aria-hidden="true" tabindex="-1"></a>  find <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> a, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb64-55"><a href="#cb64-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-56"><a href="#cb64-56" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Return and transform the first value of an array that satisfies some condition.</span></span>
+<span id="cb64-57"><a href="#cb64-57" aria-hidden="true" tabindex="-1"></a>  findMap <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> b, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|))</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> <span class="kw">(|</span> Some <span class="kw">:</span> b, None <span class="kw">:</span> <span class="kw">()</span> <span class="kw">|)</span></span>
+<span id="cb64-58"><a href="#cb64-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-59"><a href="#cb64-59" aria-hidden="true" tabindex="-1"></a>  sum <span class="kw">:</span> Array Int <span class="kw">-&gt;</span> Int</span>
+<span id="cb64-60"><a href="#cb64-60" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb64-61"><a href="#cb64-61" aria-hidden="true" tabindex="-1"></a>  any <span class="kw">:</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> Bool<span class="kw">)</span> <span class="kw">-&gt;</span> Array a <span class="kw">-&gt;</span> Bool</span>
+<span id="cb64-62"><a href="#cb64-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-63"><a href="#cb64-63" aria-hidden="true" tabindex="-1"></a>  each_ <span class="kw">:</span> Array a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO <span class="kw">())</span> <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <h3 id="byte-arrays">Byte Arrays</h3>
 <div class="sourceCode" id="cb65"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Bytes</span>
 <span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>Type</span></code></pre></div>
@@ -588,7 +667,19 @@ main =
 <span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a>  andThen <span class="kw">:</span> IO a <span class="kw">-&gt;</span> <span class="kw">(</span>a <span class="kw">-&gt;</span> IO b<span class="kw">)</span> <span class="kw">-&gt;</span> IO b</span></code></pre></div>
 <div class="sourceCode" id="cb75"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a>println <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
 <span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>print <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>print <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Like `println`, but outputs to stderr.</span></span>
+<span id="cb75-6"><a href="#cb75-6" aria-hidden="true" tabindex="-1"></a>eprintln <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-7"><a href="#cb75-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-8"><a href="#cb75-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Like `print`, but outputs to stderr.</span></span>
+<span id="cb75-9"><a href="#cb75-9" aria-hidden="true" tabindex="-1"></a>eprint <span class="kw">:</span> String <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-10"><a href="#cb75-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-11"><a href="#cb75-11" aria-hidden="true" tabindex="-1"></a><span class="co"># `dprintln x = println &lt;| debug x`</span></span>
+<span id="cb75-12"><a href="#cb75-12" aria-hidden="true" tabindex="-1"></a>dprintln <span class="kw">:</span> Debug a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> IO <span class="kw">()</span></span>
+<span id="cb75-13"><a href="#cb75-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-14"><a href="#cb75-14" aria-hidden="true" tabindex="-1"></a><span class="co"># `dprint x = print &lt;| debug x`</span></span>
+<span id="cb75-15"><a href="#cb75-15" aria-hidden="true" tabindex="-1"></a>dprint <span class="kw">:</span> Debug a <span class="kw">=&gt;</span> a <span class="kw">-&gt;</span> IO <span class="kw">()</span></span></code></pre></div>
 <div class="sourceCode" id="cb76"><pre class="sourceCode ipso"><code class="sourceCode ipso"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>readln <span class="kw">:</span> IO String</span></code></pre></div>
 <h3 id="commands">Commands</h3>
 <div class="sourceCode" id="cb77"><pre class="sourceCode ipsorepl"><code class="sourceCode ipsorepl"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="co">&gt;</span> <span class="co">:kind</span> Cmd</span>
