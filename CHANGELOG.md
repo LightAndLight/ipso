@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.6
+
+*2023-06-01*
+
+### Breaking changes
+
+* `array.index` is now called `array.get!` ([#386](https://github.com/LightAndLight/ipso/issues/386))
+
+### Features and additions
+
+* New builtin functions
+  * `eprintln : String -> IO ()` ([#409](https://github.com/LightAndLight/ipso/issues/409))
+  * `eprint : String -> IO ()` ([#409](https://github.com/LightAndLight/ipso/issues/409))
+  * `dprintln : Debug a => a -> IO ()` ([#409](https://github.com/LightAndLight/ipso/issues/409))
+  * `dprint : Debug a => a -> IO ()` ([#409](https://github.com/LightAndLight/ipso/issues/409))
+  * `array.get : Int -> Array a -> (| Some : a, None : () |)` ([#386](https://github.com/LightAndLight/ipso/issues/386))
+  * `array.first : Array a -> (| Some : a, None : () |)` ([#376](https://github.com/LightAndLight/ipso/issues/376))
+  * `array.last : Array a -> (| Some : a, None : () |)` ([#376](https://github.com/LightAndLight/ipso/issues/376))
+  * `array.swap : Int -> Int -> Array a -> Array a` ([#325](https://github.com/LightAndLight/ipso/issues/325))
+  * `array.filter : (a -> Bool) -> Array a -> Array a` ([#321](https://github.com/LightAndLight/ipso/issues/321))
+  * `array.filterMap : (a -> (| Some : b, None : ()|)) -> Array a -> Array b` ([#321](https://github.com/LightAndLight/ipso/issues/321))
+  * `array.find : (a -> Bool) -> Array a -> (| Some : Int, None : () |)` ([#324](https://github.com/LightAndLight/ipso/issues/324))
+  * `array.findMap : (a -> (| Some : b, None : () |)) -> Array a -> (| Some : b, None : () |)` ([#324](https://github.com/LightAndLight/ipso/issues/324))
+  * `int.min : Int -> Int -> Int` ([#394](https://github.com/LightAndLight/ipso/issues/394))
+  * `int.max : Int -> Int -> Int` ([#394](https://github.com/LightAndLight/ipso/issues/394))
+  * `int.parseBin : String -> (| Some : Int, None : () |)`([#393](https://github.com/LightAndLight/ipso/issues/393))
+  * `int.parseOct : String -> (| Some : Int, None : () |)`([#393](https://github.com/LightAndLight/ipso/issues/393))
+  * `int.parseDec : String -> (| Some : Int, None : () |)`([#393](https://github.com/LightAndLight/ipso/issues/393))
+  * `int.parseHex : String -> (| Some : Int, None : () |)`([#393](https://github.com/LightAndLight/ipso/issues/393))
+  * `string.toChars : String -> Array Char` ([#318](https://github.com/LightAndLight/ipso/issues/318))
+  * `string.fromChars : Array Char -> String` ([#318](https://github.com/LightAndLight/ipso/issues/318))
+  * `string.startsWith : String -> String -> Bool` ([#319](https://github.com/LightAndLight/ipso/issues/319))
+  * `string.stripPrefix : String -> String -> (| Some : String, None : () |)` ([#319](https://github.com/LightAndLight/ipso/issues/319))
+
+### Improvements and fixes
+
+* Allow literal backslashes in string literals ([#395](https://github.com/LightAndLight/ipso/issues/395))
+
 ## 0.5
 
 *2023-02-26*
