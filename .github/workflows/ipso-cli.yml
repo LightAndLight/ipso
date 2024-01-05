@@ -5,6 +5,7 @@ on:
       - main
     tags:
       - "v*"
+  workflow_dispatch:
 env:
   NIX_PUBLIC_KEY: "ipso-binary-cache-1:UMRLNOKcCsb/a2dBhtcZhRZP4RN8yIDsSUwHTObu2w4="
 
