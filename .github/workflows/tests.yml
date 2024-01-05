@@ -37,7 +37,7 @@ jobs:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
 
-    - uses: cachix/install-nix-action@v15
+    - uses: cachix/install-nix-action@v24
 
     # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"

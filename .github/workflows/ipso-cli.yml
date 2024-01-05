@@ -27,7 +27,7 @@ jobs:
       UPLOAD_TO_CACHE: ".github/workflows/uploadToCache"
     steps:
     - uses: actions/checkout@v2.4.0
-    - uses: cachix/install-nix-action@v15
+    - uses: cachix/install-nix-action@v24
 
     # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
@@ -102,7 +102,7 @@ jobs:
       UPLOAD_TO_CACHE: ".github/workflows/uploadToCacheMacos"
     steps:
     - uses: actions/checkout@v2.4.0
-    - uses: cachix/install-nix-action@v15
+    - uses: cachix/install-nix-action@v24
 
     # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /var/run/nix-signing-key'"
@@ -183,7 +183,7 @@ jobs:
 
     # Nix setup
     - uses: actions/checkout@v2.4.0
-    - uses: cachix/install-nix-action@v15
+    - uses: cachix/install-nix-action@v24
 
     # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
