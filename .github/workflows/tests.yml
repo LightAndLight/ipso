@@ -28,7 +28,7 @@ env:
   CI_IPSO_VERSION: "v0.5"
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: nixos
     env:
       POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
@@ -36,8 +36,6 @@ jobs:
       with:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
-
-    - uses: cachix/install-nix-action@v24
 
     # Used by `uploadToCache` to sign store paths.
     - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
@@ -83,19 +81,6 @@ jobs:
     - run: echo "$(readlink ~/.nix-profile)/bin" >> $GITHUB_PATH
 
     - run: pueued -d
-
-    - name: cache .cargo
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-crates-io-index
-      with:
-        path: |
-          ~/.cargo/registry/index
-          ~/.cargo/registry/src
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-          ${{ runner.os }}-build-${{ env.cache-name }}-
 
     - name: "tests"
       if: github.event_name == 'pull_request'
