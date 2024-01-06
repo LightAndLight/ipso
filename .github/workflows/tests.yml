@@ -32,7 +32,7 @@ jobs:
     env:
       POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v4.0.0
       with:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
