@@ -62,7 +62,7 @@ jobs:
 
     - name: log all uploads
       if: always()
-      run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'")' | .[].task.original_command' -r
+      run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | .[].task.original_command' -r
 
     - name: log failed uploads
       if: always()
