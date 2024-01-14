@@ -37,17 +37,6 @@ jobs:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
 
-    # Grants the Nix daemon access to the bucket, which allows `nix build` to
-    # authenticate with the binary cache bucket and fetch cache items.
-    - run: sudo mkdir /root/.aws
-    - run: "sudo bash -c 'echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > /root/.aws/credentials'"
-
-    # Grants the runner access to the bucket, which allows `pueue` to
-    # authenticate with the binary cache bucket when pushing signed cache items.
-    - run: sudo mkdir ~/.aws
-    - run: sudo chown runner ~/.aws
-    - run: "echo -e \"[default]\naws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID}}\naws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}\" > ~/.aws/credentials"
-
     # Allow the Nix daemon to execute the post-build-hook script.
     - run: "sudo chmod +x $POST_BUILD_HOOK"
 
