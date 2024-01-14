@@ -39,8 +39,7 @@ jobs:
       if: github.event_name == 'pull_request'
       run: >
         nix develop .#tests
-        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
-        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER"
         -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
 
     # `tests.yml` is currently set to run on pushes to `main`. When that happens, `$GITHUB_BASE_REF`
@@ -54,8 +53,7 @@ jobs:
       if: github.event_name == 'push' && !github.event.forced
       run: >
         nix develop .#tests
-        --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
-        --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
+        --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER"
         -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
 
     - name: wait for uploads to finish
@@ -64,12 +62,12 @@ jobs:
 
     - name: log all uploads
       if: always()
-      run: pueue log --json | jq '.[].task.original_command' -r
+      run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'")' | .[].task.original_command' -r
 
     - name: log failed uploads
       if: always()
-      run: pueue log --json | jq 'to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
+      run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
 
     - name: check uploads succeeded
       if: always()
-      run: "[ \"$(pueue log --json | jq 'to_entries[] | select(.value.task.status.Done != \"Success\") | .key' -r)\" == \"\" ]"
+      run: "[ \"$(pueue log --json | jq 'select (.[].task.label == \"'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'\") | to_entries[] | select(.value.task.status.Done != \"Success\") | .key' -r)\" == \"\" ]"
