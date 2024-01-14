@@ -29,8 +29,6 @@ env:
 jobs:
   tests:
     runs-on: nixos
-    env:
-      POST_BUILD_HOOK: ".github/workflows/postBuildHook"
     steps:
     - uses: actions/checkout@v4.0.0
       with:
@@ -43,7 +41,6 @@ jobs:
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
 
     # `tests.yml` is currently set to run on pushes to `main`. When that happens, `$GITHUB_BASE_REF`
@@ -59,7 +56,6 @@ jobs:
         nix develop .#tests
         --extra-substituters "s3://$BINARY_CACHE_BUCKET?scheme=https&endpoint=$BINARY_CACHE_ENDPOINT"
         --extra-trusted-public-keys "$NIX_PUBLIC_KEY"
-        --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
 
     - name: wait for uploads to finish
