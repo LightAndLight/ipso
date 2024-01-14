@@ -37,9 +37,6 @@ jobs:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
 
-    # Used by `uploadToCache` to sign store paths.
-    - run: "sudo bash -c 'echo \"${{ secrets.NIX_SIGNING_KEY }}\" > /run/nix-signing-key'"
-
     # Grants the Nix daemon access to the bucket, which allows `nix build` to
     # authenticate with the binary cache bucket and fetch cache items.
     - run: sudo mkdir /root/.aws
