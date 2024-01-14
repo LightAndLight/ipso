@@ -37,37 +37,6 @@ jobs:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
 
-    # Allow the Nix daemon to execute the post-build-hook script.
-    - run: "sudo chmod +x $POST_BUILD_HOOK"
-
-    # Used in `postBuildHook`.
-    - run: sudo cp .github/workflows/uploadToCache /run/uploadToCache
-
-    # [note: installing Ipso binary]
-    #
-    # Installing an Ipso release binary leads to more reliable Nix caching (versus using `nix
-    # profile install`). See <https://github.com/LightAndLight/ipso/issues/407>.
-    - name: Install Ipso binary
-      run: |
-        mkdir -p $HOME/bin
-        curl -L \
-          "https://github.com/LightAndLight/ipso/releases/download/$CI_IPSO_VERSION/ipso-linux-x86_64" \
-          > $HOME/bin/ipso
-        chmod +x $HOME/bin/ipso
-        echo "$HOME/bin" >> $GITHUB_PATH
-
-    - run: nix profile install nixpkgs#pueue
-
-    # [note: nix profile install not adding to PATH]
-    #
-    # `nix profile install nixpkgs#pueue` used to "just work", but on 2023-03-02 I started getting
-    # `pueued: command not found` errors. So add it to the path manually.
-    #
-    # [Docs for `GITHUB_PATH`](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path)
-    - run: echo "$(readlink ~/.nix-profile)/bin" >> $GITHUB_PATH
-
-    - run: pueued -d
-
     - name: "tests"
       if: github.event_name == 'pull_request'
       run: >
