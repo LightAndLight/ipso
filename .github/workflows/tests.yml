@@ -57,17 +57,18 @@ jobs:
         -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
 
     - name: wait for uploads to finish
-      if: always()
-      run: pueue wait
+      # This used to be always(), which can't be cancelled: <https://github.com/orgs/community/discussions/26303>
+      if: ${{ !cancelled() }}
+      run: pueue log --json | jq '.[].task | select(.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | .id' | xargs -r pueue wait
 
     - name: log all uploads
-      if: always()
+      if: ${{ !cancelled() }}
       run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | .[].task.original_command' -r
 
     - name: log failed uploads
-      if: always()
+      if: ${{ !cancelled() }}
       run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
 
     - name: check uploads succeeded
-      if: always()
+      if: ${{ !cancelled() }}
       run: "[ \"$(pueue log --json | jq 'select (.[].task.label == \"'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'\") | to_entries[] | select(.value.task.status.Done != \"Success\") | .key' -r)\" == \"\" ]"
