@@ -34,6 +34,9 @@ jobs:
       with:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
+      
+    - name: "Restore cached directories"
+      run: restore
 
     - name: "tests"
       if: github.event_name == 'pull_request'
