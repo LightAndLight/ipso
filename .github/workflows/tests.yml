@@ -58,6 +58,9 @@ jobs:
         nix develop .#tests
         --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER"
         -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
+      
+    - name: "Save cached directories"
+      run: save
 
     - name: wait for uploads to finish
       # This used to be always(), which can't be cancelled: <https://github.com/orgs/community/discussions/26303>
