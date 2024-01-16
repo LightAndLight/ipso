@@ -40,10 +40,12 @@ jobs:
 
     - name: "tests"
       if: github.event_name == 'pull_request'
-      run: >
-        nix develop .#tests
-        --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER"
-        -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
+      run: |
+        export CARGO_HOME=/var/cache/github-runner/.cargo
+        export CARGO_TARGET_DIR=$(realpath --relative-to "$PWD" /var/cache/github-runner/target)
+        nix develop .#tests \
+          --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER" \
+          -c ./scripts/recheck origin/$GITHUB_BASE_REF $GITHUB_REF_NAME
 
     # `tests.yml` is currently set to run on pushes to `main`. When that happens, `$GITHUB_BASE_REF`
     # isn't set because it's not a pull request. Instead we use the most recent commit before the
