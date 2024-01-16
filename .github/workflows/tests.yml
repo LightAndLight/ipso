@@ -13,19 +13,11 @@ on:
   workflow_dispatch:
 
 env:
-  NIX_PUBLIC_KEY: "ipso-binary-cache-1:UMRLNOKcCsb/a2dBhtcZhRZP4RN8yIDsSUwHTObu2w4="
-
-  # Note: these values are duplicated in the `UPLOAD_TO_CACHE` script.
-  BINARY_CACHE_BUCKET: "ipso-binary-cache"
-  BINARY_CACHE_ENDPOINT: "7065dc7f7d1813a29036535b4c4f4014.r2.cloudflarestorage.com"
-
   # Avoid [rate
   # limiting](https://discourse.nixos.org/t/flakes-provide-github-api-token-for-rate-limiting/18609)
   # by allowing Nix to make authenticated GitHub requests.
   NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
 
-  # The version of ipso to use for CI scripts that are written in the language.
-  CI_IPSO_VERSION: "v0.5"
 jobs:
   tests:
     runs-on: nixos
@@ -35,7 +27,7 @@ jobs:
         # `./scripts/recheck` uses `git diff` which accesses the repo's history. `fetch-depth: 0` fetches all branches and history.
         fetch-depth: 0
       
-    - name: "tests"
+    - name: Run tests (pull request)
       if: github.event_name == 'pull_request'
       run: |
         export CARGO_HOME=$STATE_DIRECTORY/.cargo
@@ -51,26 +43,26 @@ jobs:
     # as the "old" commit for `./scripts/recheck`.
     #
     # If it's a force push (which it really shouldn't be for main) then we skip this step.
-    - name: "tests"
+    - name: Run tests (push)
       if: github.event_name == 'push' && !github.event.forced
       run: >
         nix develop .#tests
         --post-build-hook "$RUNNER_TEMP/postBuildHook-$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER"
         -c ./scripts/recheck ${{ github.event.before }} $GITHUB_REF_NAME
       
-    - name: wait for uploads to finish
+    - name: Wait for uploads to finish
       # This used to be always(), which can't be cancelled: <https://github.com/orgs/community/discussions/26303>
       if: ${{ !cancelled() }}
       run: pueue log --json | jq '.[].task | select(.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | .id' | xargs -r pueue wait
 
-    - name: log all uploads
+    - name: Log all uploads
       if: ${{ !cancelled() }}
       run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | .[].task.original_command' -r
 
-    - name: log failed uploads
+    - name: Log failed uploads
       if: ${{ !cancelled() }}
       run: pueue log --json | jq 'select(.[].task.label == "'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'") | to_entries[] | select(.value.task.status.Done != "Success") | .key' -r | xargs -r pueue log
 
-    - name: check uploads succeeded
+    - name: Check uploads succeeded
       if: ${{ !cancelled() }}
       run: "[ \"$(pueue log --json | jq 'select (.[].task.label == \"'$GITHUB_RUN_ID-$GITHUB_RUN_NUMBER'\") | to_entries[] | select(.value.task.status.Done != \"Success\") | .key' -r)\" == \"\" ]"
