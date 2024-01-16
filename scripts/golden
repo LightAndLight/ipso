@@ -2,4 +2,4 @@
 set -e
 
 cargo build
-ipso-golden --bin "$PWD/target/debug/ipso" --dir examples "$@"
+ipso-golden --bin "$PWD/${CARGO_TARGET_DIR:-target}/debug/ipso" --dir examples "$@"

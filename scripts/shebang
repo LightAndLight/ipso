@@ -2,4 +2,4 @@
 set -e
 
 cargo build
-env PATH="$PATH:$PWD/target/debug" ipso-shebang --dir examples/shebang "$@"
+env PATH="$PATH:$PWD/${CARGO_TARGET_DIR:-target}/debug" ipso-shebang --dir examples/shebang "$@"
