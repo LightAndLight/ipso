@@ -30,6 +30,7 @@ jobs:
     - name: Run tests (pull request)
       if: github.event_name == 'pull_request'
       run: |
+        nix build .#test-package -L --option post-build-hook ""
         export CARGO_HOME=$STATE_DIRECTORY/.cargo
         export CARGO_TARGET_DIR=$(realpath --relative-to "$PWD" $STATE_DIRECTORY/target)
         nix develop .#tests \
