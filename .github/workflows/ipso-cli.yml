@@ -97,7 +97,10 @@ jobs:
         path: ipso-linux-x86_64
 
   build-macos:
-    runs-on: macos-latest
+    # `macos-13` is the last CI runner that defaults to `x86_64`. Newer versions, including `macos-latest`, now use `aarch64`.
+    #
+    # See: https://github.com/actions/runner-images/issues/9741
+    runs-on: macos-13
     env:
       POST_BUILD_HOOK: ".github/workflows/postBuildHookMacos"
       UPLOAD_TO_CACHE: ".github/workflows/uploadToCacheMacos"
