@@ -231,11 +231,11 @@ jobs:
         --post-build-hook "$GITHUB_WORKSPACE/$POST_BUILD_HOOK"
         -c .github/workflows/checkReleaseVersion
 
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: ipso-linux-x86_64
 
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: ipso-macos-x86_64
 
