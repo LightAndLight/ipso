@@ -35,6 +35,15 @@
           ipso-cli = (rustPkgs { release = true; }).workspace.ipso-cli {};
           ipso-golden = pkgs.haskell.lib.justStaticExecutables (import ./tests/golden { inherit pkgs; });
           ipso-shebang = pkgs.haskell.lib.justStaticExecutables (import ./tests/shebang { inherit pkgs; });
+          test-package = pkgs.stdenv.mkDerivation {
+            name = "test-package";
+            unpackPhase = "true";
+            buildPhase = "true";
+            installPhase = ''
+              mkdir $out
+              echo "test 4" > $out/test
+            '';
+          };
         };
 
         defaultPackage = packages.ipso-cli;
