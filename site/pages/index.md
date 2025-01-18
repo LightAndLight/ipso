@@ -31,7 +31,7 @@ main = println "Hello world!"
 greet : IO ()
 greet =
   comp
-    bind you <- cmd.run `whoami`
+    bind you <- cmd.read `whoami`
     println "Hey, $you"
 ```
 </div>
